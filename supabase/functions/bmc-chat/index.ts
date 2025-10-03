@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { section, sectionContent, userMessage, conversationHistory, companyName } = await req.json();
+    const { section, sectionContent, userMessage, conversationHistory, companyName, businessContext } = await req.json();
     
     if (!section || !userMessage) {
       throw new Error('Section and message are required');
@@ -24,17 +24,31 @@ serve(async (req) => {
 
     console.log('Chat request for section:', section);
 
+    // Build rich context from business overview
+    const contextInfo = businessContext ? `
+
+COMPANY CONTEXT:
+- Company: ${companyName || 'Unknown'}
+- Industry: ${businessContext.industry || 'Unknown'}
+- Description: ${businessContext.description || 'N/A'}
+- Products/Services: ${Array.isArray(businessContext.productsServices) ? businessContext.productsServices.join(', ') : 'N/A'}
+- Key Leadership: ${Array.isArray(businessContext.keyExecutives) ? businessContext.keyExecutives.map((e: any) => `${e.name} (${e.role})`).join(', ') : 'N/A'}
+- Website: ${businessContext.website || 'N/A'}
+` : '';
+
     // Build conversation context with web search capabilities
     const systemPrompt = `You are a business strategy consultant with real-time web search capabilities helping analyze the "${section}" section of a Business Model Canvas for ${companyName || 'the company'}.
-
+${contextInfo}
 Current ${section} content:
 ${sectionContent}
 
 You have access to real-time information via web search. Use this to:
-- Find current market trends and data
+- Find current market trends and data specific to ${businessContext?.industry || 'the industry'}
 - Research competitors and industry benchmarks
-- Get up-to-date information about ${companyName || 'the company'}
-- Validate and enhance strategic recommendations
+- Get up-to-date information about ${companyName || 'the company'} and their products/services
+- Validate and enhance strategic recommendations based on the company context
+
+Leverage the company context above to provide highly relevant, specific advice. Reference their actual products, services, and market position when making recommendations.
 
 Provide insightful, actionable, data-driven advice. Be specific, cite sources when using web data, and reference the actual content when relevant. Keep responses concise but valuable.`;
 

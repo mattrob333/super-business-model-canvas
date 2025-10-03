@@ -26,41 +26,59 @@ serve(async (req) => {
     console.log('Analyzing company:', url);
 
     // Use Perplexity to gather comprehensive company information with web search
-    const analysisPrompt = `Research and analyze the company at ${url} in detail. Provide comprehensive information about:
+    const analysisPrompt = `Research and analyze the company at ${url} in detail. Focus on providing actionable strategic information.
 
-1. Company Overview: name, industry, founding year, headquarters, employee count, revenue
-2. Products & Services: List all main products and services offered
-3. Business Model Canvas components:
-   - Key Partners
-   - Key Activities
-   - Key Resources
-   - Value Propositions
-   - Customer Relationships
-   - Channels
-   - Customer Segments
-   - Cost Structure
-   - Revenue Streams
-4. Top 3-5 direct competitors with descriptions
+CRITICAL INFORMATION (must be comprehensive):
+1. Company Overview:
+   - Company name
+   - Industry/sector classification
+   - Core business description (2-3 sentences explaining what they do and their market position)
+   - **Products & Services** (THIS IS CRITICAL - list 4-8 main products/services with brief descriptions)
+   - Website URL
+   - 2-4 key executives with their roles (CEO, CTO, etc.)
 
-CRITICAL: Return ONLY valid JSON. Each canvas section must be an ARRAY of 3-5 specific strings (bullet points).
+OPTIONAL INFORMATION (only if easily available):
+   - Founding year
+   - Headquarters location
+   - Employee count
+   - Revenue
+
+2. Business Model Canvas components (3-5 specific, actionable items for each):
+   - Key Partners: Strategic alliances, suppliers, key collaborators
+   - Key Activities: Core operational activities that create value
+   - Key Resources: Critical assets (intellectual property, technology, talent, etc.)
+   - Value Propositions: Unique benefits and solutions provided to customers
+   - Customer Relationships: How they maintain and grow customer connections
+   - Channels: How products/services reach customers
+   - Customer Segments: Distinct groups of customers they serve
+   - Cost Structure: Major cost drivers in the business
+   - Revenue Streams: How the company generates income
+
+3. Top 3-5 direct competitors with:
+   - Company name
+   - Brief description (what they do and how they compete)
+   - Website URL
+
+CRITICAL: Return ONLY valid JSON without markdown. Each canvas section MUST be an ARRAY of 3-5 strings.
 
 Return in this exact JSON format:
 {
   "company": {
     "name": "Company Name",
-    "industry": "Industry",
-    "founded": "Year",
-    "description": "2-3 sentence description",
-    "headquarters": "City, Country",
-    "employees": "Number or range",
-    "revenue": "Amount or 'Not publicly disclosed'",
-    "productsServices": ["Product/Service 1", "Product/Service 2", "Product/Service 3"]
+    "industry": "Industry/Sector",
+    "description": "2-3 sentence core business description",
+    "productsServices": ["Product 1 with brief description", "Product 2", "Service 1", "Service 2"],
+    "keyExecutives": [
+      {"name": "Full Name", "role": "CEO"},
+      {"name": "Full Name", "role": "CTO"}
+    ],
+    "website": "https://example.com"
   },
   "canvas": {
-    "keyPartners": ["Partner 1", "Partner 2", "Partner 3"],
+    "keyPartners": ["Partner type 1", "Partner type 2", "Partner type 3"],
     "keyActivities": ["Activity 1", "Activity 2", "Activity 3"],
     "keyResources": ["Resource 1", "Resource 2", "Resource 3"],
-    "valuePropositions": ["Value prop 1", "Value prop 2", "Value prop 3"],
+    "valuePropositions": ["Value 1", "Value 2", "Value 3"],
     "customerRelationships": ["Relationship 1", "Relationship 2"],
     "channels": ["Channel 1", "Channel 2", "Channel 3"],
     "customerSegments": ["Segment 1", "Segment 2", "Segment 3"],
@@ -68,7 +86,7 @@ Return in this exact JSON format:
     "revenueStreams": ["Revenue 1", "Revenue 2"]
   },
   "competitors": [
-    {"name": "Name", "description": "What they do", "website": "https://..."}
+    {"name": "Competitor Name", "description": "What they do and how they compete", "website": "https://..."}
   ]
 }`;
 

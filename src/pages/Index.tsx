@@ -179,15 +179,20 @@ const Index = () => {
         {hasAnalyzed && !isLoading && analysisData && (
           <div className="space-y-16 animate-in fade-in duration-700">
             <section>
-              <BusinessOverview data={{
-                name: analysisData.company?.name || "Unknown Company",
-                description: analysisData.company?.description || "No description available",
-                productsServices: [],
-                founded: analysisData.company?.founded || "Unknown",
-                headquarters: analysisData.company?.industry || "Unknown",
-                employees: "N/A",
-                revenue: "N/A"
-              }} />
+              <BusinessOverview 
+                data={{
+                  name: analysisData.company?.name || "Unknown Company",
+                  industry: analysisData.company?.industry || "Unknown",
+                  description: analysisData.company?.description || "No description available",
+                  productsServices: Array.isArray(analysisData.company?.productsServices) 
+                    ? analysisData.company.productsServices 
+                    : [],
+                  keyExecutives: Array.isArray(analysisData.company?.keyExecutives)
+                    ? analysisData.company.keyExecutives
+                    : [],
+                  website: analysisData.company?.website || ""
+                }}
+              />
             </section>
 
             <section>
@@ -203,7 +208,14 @@ const Index = () => {
                   costStructure: Array.isArray(analysisData.canvas?.costStructure) ? analysisData.canvas.costStructure : [],
                   revenueStreams: Array.isArray(analysisData.canvas?.revenueStreams) ? analysisData.canvas.revenueStreams : [],
                 }}
-                companyName={analysisData.company?.name || "Unknown Company"} 
+                companyName={analysisData.company?.name || "Unknown Company"}
+                businessContext={{
+                  industry: analysisData.company?.industry || "",
+                  description: analysisData.company?.description || "",
+                  productsServices: Array.isArray(analysisData.company?.productsServices) ? analysisData.company.productsServices : [],
+                  keyExecutives: Array.isArray(analysisData.company?.keyExecutives) ? analysisData.company.keyExecutives : [],
+                  website: analysisData.company?.website || ""
+                }}
               />
             </section>
 

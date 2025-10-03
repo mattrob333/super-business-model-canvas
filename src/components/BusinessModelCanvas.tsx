@@ -20,9 +20,16 @@ interface BusinessModelCanvasProps {
     revenueStreams: string[];
   };
   companyName: string;
+  businessContext?: {
+    industry: string;
+    description: string;
+    productsServices: string[];
+    keyExecutives: { name: string; role: string }[];
+    website: string;
+  };
 }
 
-export const BusinessModelCanvas = ({ data, companyName }: BusinessModelCanvasProps) => {
+export const BusinessModelCanvas = ({ data, companyName, businessContext }: BusinessModelCanvasProps) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedSection, setSelectedSection] = useState<CanvasSection | null>(null);
 
@@ -87,6 +94,7 @@ export const BusinessModelCanvas = ({ data, companyName }: BusinessModelCanvasPr
         onOpenChange={setDrawerOpen}
         section={selectedSection}
         companyName={companyName}
+        businessContext={businessContext}
       />
     </>
   );

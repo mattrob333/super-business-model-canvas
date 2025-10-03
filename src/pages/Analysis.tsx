@@ -7,11 +7,14 @@ import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
+import { Button } from "@/components/ui/button";
+import { Copy, Check } from "lucide-react";
 
 const Analysis = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [analysisData, setAnalysisData] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
   const handleAnalyze = async (url: string) => {
@@ -45,6 +48,87 @@ const Analysis = () => {
     }
   };
 
+  const handleBusinessOverviewUpdate = (updatedData: any) => {
+    setAnalysisData({
+      ...analysisData,
+      company: updatedData
+    });
+    toast({
+      title: "Updated",
+      description: "Business overview updated successfully",
+    });
+  };
+
+  const copyToMarkdown = () => {
+    if (!analysisData) return;
+
+    const markdown = `# Business Analysis: ${analysisData.company?.name || 'Unknown Company'}
+
+## Business Overview
+- **Industry:** ${analysisData.company?.industry || 'N/A'}
+- **Website:** ${analysisData.company?.website || 'N/A'}
+- **Description:** ${analysisData.company?.description || 'N/A'}
+
+### Products & Services
+${analysisData.company?.productsServices?.map((p: string) => `- ${p}`).join('\n') || '- N/A'}
+
+### Key Leadership
+${analysisData.company?.keyExecutives?.map((e: any) => `- ${e.name} - ${e.role}`).join('\n') || '- N/A'}
+
+## Business Model Canvas
+
+### Key Partners
+${analysisData.canvas?.keyPartners?.map((p: string) => `- ${p}`).join('\n') || '- N/A'}
+
+### Key Activities
+${analysisData.canvas?.keyActivities?.map((a: string) => `- ${a}`).join('\n') || '- N/A'}
+
+### Key Resources
+${analysisData.canvas?.keyResources?.map((r: string) => `- ${r}`).join('\n') || '- N/A'}
+
+### Value Propositions
+${analysisData.canvas?.valuePropositions?.map((v: string) => `- ${v}`).join('\n') || '- N/A'}
+
+### Customer Relationships
+${analysisData.canvas?.customerRelationships?.map((c: string) => `- ${c}`).join('\n') || '- N/A'}
+
+### Channels
+${analysisData.canvas?.channels?.map((c: string) => `- ${c}`).join('\n') || '- N/A'}
+
+### Customer Segments
+${analysisData.canvas?.customerSegments?.map((s: string) => `- ${s}`).join('\n') || '- N/A'}
+
+### Cost Structure
+${analysisData.canvas?.costStructure?.map((c: string) => `- ${c}`).join('\n') || '- N/A'}
+
+### Revenue Streams
+${analysisData.canvas?.revenueStreams?.map((r: string) => `- ${r}`).join('\n') || '- N/A'}
+
+## Competitive Landscape
+
+${analysisData.competitors?.map((comp: any) => `### ${comp.name || 'Unknown Competitor'}
+${comp.description || 'N/A'}
+Website: ${comp.website || 'N/A'}
+`).join('\n') || 'N/A'}
+`;
+
+    navigator.clipboard.writeText(markdown).then(() => {
+      setCopied(true);
+      toast({
+        title: "Copied to Clipboard",
+        description: "Analysis copied in Markdown format",
+      });
+      setTimeout(() => setCopied(false), 2000);
+    }).catch((err) => {
+      console.error('Copy failed:', err);
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy to clipboard",
+        variant: "destructive",
+      });
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -55,9 +139,22 @@ const Analysis = () => {
               <h1 className="text-2xl font-semibold tracking-tight">Super Business Model Canvas</h1>
               <p className="text-sm text-muted-foreground">AI-Powered Strategic Analysis</p>
             </div>
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
-              <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-              <span className="label-tech text-primary text-[10px]">Powered by AI</span>
+            <div className="flex items-center gap-3">
+              {hasAnalyzed && !isLoading && analysisData && (
+                <Button 
+                  onClick={copyToMarkdown}
+                  variant="outline" 
+                  size="sm"
+                  className="gap-2"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? "Copied!" : "Copy Analysis"}
+                </Button>
+              )}
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
+                <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
+                <span className="label-tech text-primary text-[10px]">Powered by AI</span>
+              </div>
             </div>
           </div>
         </div>
@@ -80,15 +177,21 @@ const Analysis = () => {
         {hasAnalyzed && !isLoading && analysisData && (
           <div className="space-y-16 animate-in fade-in duration-700">
             <section>
-              <BusinessOverview data={{
-                name: analysisData.company?.name || "Unknown Company",
-                description: analysisData.company?.description || "No description available",
-                productsServices: [],
-                founded: analysisData.company?.founded || "Unknown",
-                headquarters: analysisData.company?.industry || "Unknown",
-                employees: "N/A",
-                revenue: "N/A"
-              }} />
+              <BusinessOverview 
+                data={{
+                  name: analysisData.company?.name || "Unknown Company",
+                  industry: analysisData.company?.industry || "Unknown",
+                  description: analysisData.company?.description || "No description available",
+                  productsServices: Array.isArray(analysisData.company?.productsServices) 
+                    ? analysisData.company.productsServices 
+                    : [],
+                  keyExecutives: Array.isArray(analysisData.company?.keyExecutives)
+                    ? analysisData.company.keyExecutives
+                    : [],
+                  website: analysisData.company?.website || ""
+                }}
+                onUpdate={handleBusinessOverviewUpdate}
+              />
             </section>
 
             <section>
@@ -104,7 +207,14 @@ const Analysis = () => {
                   costStructure: Array.isArray(analysisData.canvas?.costStructure) ? analysisData.canvas.costStructure : [],
                   revenueStreams: Array.isArray(analysisData.canvas?.revenueStreams) ? analysisData.canvas.revenueStreams : [],
                 }}
-                companyName={analysisData.company?.name || "Unknown Company"} 
+                companyName={analysisData.company?.name || "Unknown Company"}
+                businessContext={{
+                  industry: analysisData.company?.industry || "",
+                  description: analysisData.company?.description || "",
+                  productsServices: Array.isArray(analysisData.company?.productsServices) ? analysisData.company.productsServices : [],
+                  keyExecutives: Array.isArray(analysisData.company?.keyExecutives) ? analysisData.company.keyExecutives : [],
+                  website: analysisData.company?.website || ""
+                }}
               />
             </section>
 

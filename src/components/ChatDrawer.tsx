@@ -15,6 +15,13 @@ interface ChatDrawerProps {
   onOpenChange: (open: boolean) => void;
   section: CanvasSection | null;
   companyName: string;
+  businessContext?: {
+    industry: string;
+    description: string;
+    productsServices: string[];
+    keyExecutives: { name: string; role: string }[];
+    website: string;
+  };
 }
 
 interface Message {
@@ -22,7 +29,7 @@ interface Message {
   content: string;
 }
 
-export const ChatDrawer = ({ open, onOpenChange, section, companyName }: ChatDrawerProps) => {
+export const ChatDrawer = ({ open, onOpenChange, section, companyName, businessContext }: ChatDrawerProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -62,7 +69,8 @@ export const ChatDrawer = ({ open, onOpenChange, section, companyName }: ChatDra
           sectionContent: Array.isArray(section.items) ? section.items.join(', ') : section.items,
           userMessage: userInput,
           conversationHistory: messages,
-          companyName: companyName
+          companyName: companyName,
+          businessContext: businessContext
         }
       });
 
