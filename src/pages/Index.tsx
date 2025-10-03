@@ -180,22 +180,35 @@ const Index = () => {
           <div className="space-y-16 animate-in fade-in duration-700">
             <section>
               <BusinessOverview data={{
-                name: analysisData.company.name,
-                description: analysisData.company.description,
+                name: analysisData.company?.name || "Unknown Company",
+                description: analysisData.company?.description || "No description available",
                 productsServices: [],
-                founded: analysisData.company.founded,
-                headquarters: analysisData.company.industry,
+                founded: analysisData.company?.founded || "Unknown",
+                headquarters: analysisData.company?.industry || "Unknown",
                 employees: "N/A",
                 revenue: "N/A"
               }} />
             </section>
 
             <section>
-              <BusinessModelCanvas data={analysisData.canvas} companyName={analysisData.company.name} />
+              <BusinessModelCanvas 
+                data={{
+                  keyPartners: Array.isArray(analysisData.canvas?.keyPartners) ? analysisData.canvas.keyPartners : [],
+                  keyActivities: Array.isArray(analysisData.canvas?.keyActivities) ? analysisData.canvas.keyActivities : [],
+                  keyResources: Array.isArray(analysisData.canvas?.keyResources) ? analysisData.canvas.keyResources : [],
+                  valuePropositions: Array.isArray(analysisData.canvas?.valuePropositions) ? analysisData.canvas.valuePropositions : [],
+                  customerRelationships: Array.isArray(analysisData.canvas?.customerRelationships) ? analysisData.canvas.customerRelationships : [],
+                  channels: Array.isArray(analysisData.canvas?.channels) ? analysisData.canvas.channels : [],
+                  customerSegments: Array.isArray(analysisData.canvas?.customerSegments) ? analysisData.canvas.customerSegments : [],
+                  costStructure: Array.isArray(analysisData.canvas?.costStructure) ? analysisData.canvas.costStructure : [],
+                  revenueStreams: Array.isArray(analysisData.canvas?.revenueStreams) ? analysisData.canvas.revenueStreams : [],
+                }}
+                companyName={analysisData.company?.name || "Unknown Company"} 
+              />
             </section>
 
             <section>
-              <CompetitiveLandscape competitors={analysisData.competitors} />
+              <CompetitiveLandscape competitors={Array.isArray(analysisData.competitors) ? analysisData.competitors : []} />
             </section>
           </div>
         )}

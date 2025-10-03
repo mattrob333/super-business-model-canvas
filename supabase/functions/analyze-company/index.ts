@@ -59,6 +59,8 @@ Company URL: ${url}
 Search Results:
 ${searchContext}
 
+CRITICAL: Return ONLY valid JSON. Each canvas section must be an ARRAY of strings (bullet points), not a single string.
+
 Generate a detailed analysis in the following JSON format:
 {
   "company": {
@@ -68,21 +70,21 @@ Generate a detailed analysis in the following JSON format:
     "description": "Brief description"
   },
   "canvas": {
-    "keyPartners": "Detailed list of key partners and their roles",
-    "keyActivities": "Main activities the company performs",
-    "keyResources": "Critical resources (IP, technology, people, capital)",
-    "valuePropositions": "Unique value propositions for customers",
-    "customerRelationships": "How they interact with customers",
-    "channels": "Distribution and communication channels",
-    "customerSegments": "Target customer groups",
-    "costStructure": "Main cost drivers and structure",
-    "revenueStreams": "Revenue sources and pricing models"
+    "keyPartners": ["Partner 1", "Partner 2", "Partner 3"],
+    "keyActivities": ["Activity 1", "Activity 2", "Activity 3"],
+    "keyResources": ["Resource 1", "Resource 2", "Resource 3"],
+    "valuePropositions": ["Value prop 1", "Value prop 2", "Value prop 3"],
+    "customerRelationships": ["Relationship 1", "Relationship 2"],
+    "channels": ["Channel 1", "Channel 2", "Channel 3"],
+    "customerSegments": ["Segment 1", "Segment 2", "Segment 3"],
+    "costStructure": ["Cost 1", "Cost 2", "Cost 3"],
+    "revenueStreams": ["Revenue stream 1", "Revenue stream 2"]
   },
   "competitors": [
     {
       "name": "Competitor Name",
       "description": "What they do",
-      "differentiator": "How they differ from the analyzed company"
+      "differentiator": "How they differ"
     }
   ]
 }`;
@@ -126,6 +128,33 @@ Generate a detailed analysis in the following JSON format:
       // Remove markdown code blocks if present
       const cleanJson = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       analysis = JSON.parse(cleanJson);
+      
+      // Ensure all canvas fields are arrays
+      const ensureArray = (val: any): string[] => {
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string') return val.split('\n').filter(Boolean);
+        return [];
+      };
+      
+      if (analysis.canvas) {
+        analysis.canvas = {
+          keyPartners: ensureArray(analysis.canvas.keyPartners),
+          keyActivities: ensureArray(analysis.canvas.keyActivities),
+          keyResources: ensureArray(analysis.canvas.keyResources),
+          valuePropositions: ensureArray(analysis.canvas.valuePropositions),
+          customerRelationships: ensureArray(analysis.canvas.customerRelationships),
+          channels: ensureArray(analysis.canvas.channels),
+          customerSegments: ensureArray(analysis.canvas.customerSegments),
+          costStructure: ensureArray(analysis.canvas.costStructure),
+          revenueStreams: ensureArray(analysis.canvas.revenueStreams),
+        };
+      }
+      
+      // Ensure competitors is an array
+      if (!Array.isArray(analysis.competitors)) {
+        analysis.competitors = [];
+      }
+      
     } catch (e) {
       console.error('JSON parse error:', e);
       throw new Error('Failed to parse AI response');
