@@ -1,12 +1,182 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import { UrlInput } from "@/components/UrlInput";
+import { LoadingState } from "@/components/LoadingState";
+import { BusinessOverview } from "@/components/BusinessOverview";
+import { BusinessModelCanvas } from "@/components/BusinessModelCanvas";
+import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
+
+// Mock data for demonstration
+const mockData = {
+  overview: {
+    name: "Shopify Inc.",
+    description: "Shopify is a leading global commerce company providing essential internet infrastructure for commerce, offering trusted tools to start, grow, market, and manage a retail business of any size.",
+    productsServices: [
+      "E-commerce Platform",
+      "Point of Sale System",
+      "Payment Processing",
+      "Marketing Tools",
+      "Analytics & Reporting",
+      "Multi-channel Selling"
+    ],
+    founded: "2006",
+    headquarters: "Ottawa, Canada",
+    employees: "10,000+",
+    revenue: "$5.6B (2023)"
+  },
+  canvas: {
+    keyPartners: [
+      "Payment processors",
+      "Shipping carriers",
+      "App developers",
+      "Theme designers",
+      "Marketing agencies"
+    ],
+    keyActivities: [
+      "Platform development",
+      "Customer support",
+      "Partner ecosystem management",
+      "Marketing and sales"
+    ],
+    keyResources: [
+      "Technology infrastructure",
+      "Developer community",
+      "Brand reputation",
+      "Data and analytics"
+    ],
+    valuePropositions: [
+      "Easy-to-use e-commerce platform",
+      "Scalable infrastructure",
+      "Comprehensive toolkit",
+      "Multi-channel selling",
+      "Strong app ecosystem"
+    ],
+    customerRelationships: [
+      "Self-service platform",
+      "24/7 customer support",
+      "Community forums",
+      "Educational resources"
+    ],
+    channels: [
+      "Direct website",
+      "Partner network",
+      "App marketplace",
+      "Social media",
+      "Events and conferences"
+    ],
+    customerSegments: [
+      "Small businesses",
+      "Growing retailers",
+      "Enterprise brands",
+      "Direct-to-consumer brands",
+      "Multi-channel merchants"
+    ],
+    costStructure: [
+      "Technology infrastructure",
+      "R&D and engineering",
+      "Sales and marketing",
+      "Customer support",
+      "Payment processing fees"
+    ],
+    revenueStreams: [
+      "Subscription fees (monthly/annual)",
+      "Transaction fees",
+      "Payment processing fees",
+      "App and theme sales (revenue share)",
+      "Shopify Plus (enterprise)"
+    ]
+  },
+  competitors: [
+    {
+      name: "WooCommerce",
+      description: "Open-source e-commerce plugin for WordPress, offering flexibility and customization for online stores.",
+      website: "https://woocommerce.com"
+    },
+    {
+      name: "BigCommerce",
+      description: "SaaS e-commerce platform providing enterprise-grade features for growing and established businesses.",
+      website: "https://bigcommerce.com"
+    },
+    {
+      name: "Wix eCommerce",
+      description: "Website builder with integrated e-commerce capabilities, focusing on ease of use and design.",
+      website: "https://wix.com"
+    }
+  ]
+};
 
 const Index = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
+
+  const handleAnalyze = async (url: string) => {
+    setIsLoading(true);
+    setHasAnalyzed(false);
+
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 2500));
+
+    setIsLoading(false);
+    setHasAnalyzed(true);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-white/[0.12] backdrop-blur-sm sticky top-0 z-30 bg-background/80">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight">Super Business Model Canvas</h1>
+              <p className="text-sm text-muted-foreground">AI-Powered Strategic Analysis</p>
+            </div>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
+              <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
+              <span className="label-tech text-primary text-[10px]">Powered by AI</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-6 py-12 space-y-16">
+        {/* Input Section */}
+        <section className="pt-8">
+          <UrlInput onAnalyze={handleAnalyze} isLoading={isLoading} />
+        </section>
+
+        {/* Results Section */}
+        {isLoading && (
+          <section className="animate-in fade-in duration-500">
+            <LoadingState />
+          </section>
+        )}
+
+        {hasAnalyzed && !isLoading && (
+          <div className="space-y-16 animate-in fade-in duration-700">
+            <section>
+              <BusinessOverview data={mockData.overview} />
+            </section>
+
+            <section>
+              <BusinessModelCanvas data={mockData.canvas} companyName={mockData.overview.name} />
+            </section>
+
+            <section>
+              <CompetitiveLandscape competitors={mockData.competitors} />
+            </section>
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-white/[0.12] mt-24">
+        <div className="container mx-auto px-6 py-8">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <p>© 2025 Super Business Model Canvas</p>
+            <p className="label-tech text-[10px]">Strategic Analysis Tool</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

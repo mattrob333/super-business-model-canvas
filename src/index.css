@@ -8,89 +8,45 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Monochrome Futurism Design System */
+    --background: 0 0% 1.6%; /* #040404 - near-black base */
+    --foreground: 0 0% 96.1%; /* #F5F5F5 - off-white text */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 1.6%; /* same as background for cards */
+    --card-foreground: 0 0% 96.1%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 6%; /* slightly lighter for popovers */
+    --popover-foreground: 0 0% 96.1%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Highlighter Lime - The signature accent */
+    --primary: 73 96% 57%; /* #C4F82A */
+    --primary-foreground: 0 0% 6.7%; /* #111111 - dark text on lime */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 0 0% 10%; /* subtle gray for secondary elements */
+    --secondary-foreground: 0 0% 96.1%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 60%; /* 60% opacity subtle text */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 73 96% 57%; /* same as primary - lime */
+    --accent-foreground: 0 0% 6.7%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Borders - very subtle at 12% opacity */
+    --border: 0 0% 96.1%; /* will use with 12% opacity */
+    --input: 0 0% 5%; /* darker input background */
+    --ring: 73 96% 57%; /* lime focus ring */
 
-    --radius: 0.5rem;
+    --radius: 1.5rem; /* generous rounded corners */
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Custom tokens for translucent backgrounds */
+    --card-bg-opacity: 0.06; /* for bg-white/6 effect */
+    --card-hover-opacity: 0.10;
+    
+    /* Gradients and effects */
+    --gradient-subtle: radial-gradient(circle at top, rgba(196, 248, 42, 0.1) 0%, transparent 50%);
   }
 }
 
@@ -101,5 +57,36 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* Typography presets */
+  h1, h2, h3 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Wide-tracked uppercase labels (defining characteristic) */
+  .label-tech {
+    @apply uppercase font-semibold tracking-[0.3em] text-xs;
+  }
+
+  /* Translucent card backgrounds */
+  .card-mono {
+    @apply bg-white/[0.06] border border-white/[0.12] rounded-3xl p-8;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card-mono-hover:hover {
+    @apply bg-white/[0.10];
+    transform: translateY(-2px);
+  }
+
+  /* Input styling */
+  input[type="text"], input[type="url"] {
+    @apply bg-white/[0.05] border-white/[0.12] text-foreground;
+  }
+
+  input[type="text"]:focus, input[type="url"]:focus {
+    @apply border-primary ring-2 ring-primary/20;
   }
 }
