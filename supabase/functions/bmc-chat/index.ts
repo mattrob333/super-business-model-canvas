@@ -62,7 +62,7 @@ Provide insightful, actionable, data-driven advice. Be specific, cite sources wh
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'sonar-reasoning',
+        model: 'sonar',
         messages,
         temperature: 0.7,
         max_tokens: 1500,
