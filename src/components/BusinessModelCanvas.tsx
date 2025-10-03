@@ -34,19 +34,19 @@ export const BusinessModelCanvas = ({ data, companyName }: BusinessModelCanvasPr
   const CanvasCard = ({ title, items, span = "col-span-1 row-span-1", height = "h-[200px]" }: { title: string; items: string[]; span?: string; height?: string }) => (
     <div
       onClick={() => handleSectionClick(title, items)}
-      className={`card-mono card-mono-hover cursor-pointer ${span} ${height} group relative flex flex-col`}
+      className={`card-mono card-mono-hover cursor-pointer ${span} ${height} group relative flex flex-col p-3`}
     >
-      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <MessageSquare className="h-5 w-5 text-primary" />
       </div>
       <div className="flex flex-col h-full">
-        <h3 className="label-tech text-muted-foreground mb-4 flex-shrink-0">{title}</h3>
-        <div className="flex-1 overflow-y-auto pr-2 scrollbar-dark">
-          <ul className="space-y-2">
+        <h3 className="label-tech text-muted-foreground mb-2 flex-shrink-0">{title}</h3>
+        <div className="flex-1 overflow-y-auto pr-1 scrollbar-dark">
+          <ul className="space-y-1.5">
             {items.map((item, index) => (
               <li key={index} className="flex items-start gap-2">
-                <div className="h-1.5 w-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                <span className="text-foreground/80 text-sm leading-relaxed">{item}</span>
+                <div className="h-1.5 w-1.5 bg-primary rounded-full mt-1.5 flex-shrink-0" />
+                <span className="text-foreground/80 text-sm leading-snug">{item}</span>
               </li>
             ))}
           </ul>
@@ -74,8 +74,10 @@ export const BusinessModelCanvas = ({ data, companyName }: BusinessModelCanvasPr
             <CanvasCard title="Customer Segments" items={data.customerSegments} span="col-span-1 row-span-2" height="h-[400px]" />
             <CanvasCard title="Key Resources" items={data.keyResources} span="col-span-1" height="h-[200px]" />
             <CanvasCard title="Channels" items={data.channels} span="col-span-1" height="h-[200px]" />
-            <CanvasCard title="Cost Structure" items={data.costStructure} span="col-span-5" height="h-[200px]" />
-            <CanvasCard title="Revenue Streams" items={data.revenueStreams} span="col-span-5" height="h-[200px]" />
+            <div className="col-span-5 grid grid-cols-2 gap-4">
+              <CanvasCard title="Cost Structure" items={data.costStructure} height="h-[200px]" />
+              <CanvasCard title="Revenue Streams" items={data.revenueStreams} height="h-[200px]" />
+            </div>
           </div>
         </div>
       </div>
