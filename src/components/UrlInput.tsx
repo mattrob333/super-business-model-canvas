@@ -86,19 +86,19 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
             </p>
           </div>
           
-          <form onSubmit={handleSubmit} className="flex gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 md:gap-4">
             <Input
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="example.com or https://example.com"
-              className="flex-1 h-14 px-6 text-lg bg-white/[0.05] border-white/[0.12] focus:border-primary"
+              className="flex-1 h-14 px-6 text-base md:text-lg bg-white/[0.05] border-white/[0.12] focus:border-primary"
               disabled={isLoading}
             />
             <Button
               type="submit"
               disabled={isLoading || !url.trim()}
-              className="h-14 px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold uppercase tracking-tech transition-all hover:scale-105"
+              className="h-14 w-full md:w-auto md:px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold uppercase tracking-tech transition-all hover:scale-105"
             >
               <Search className="mr-2 h-5 w-5" />
               {isLoading ? "Analyzing..." : "Analyze"}

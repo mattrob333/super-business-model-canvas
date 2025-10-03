@@ -133,25 +133,31 @@ Website: ${comp.website || 'N/A'}
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-white/[0.12] backdrop-blur-sm sticky top-0 z-30 bg-background/80">
-        <div className="container mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h1 className="text-2xl font-semibold tracking-tight">Super Business Model Canvas</h1>
-              <p className="text-sm text-muted-foreground">AI-Powered Strategic Analysis</p>
+        <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <h1 className="text-lg md:text-2xl font-semibold tracking-tight">Super Business Model Canvas</h1>
+                <p className="text-xs md:text-sm text-muted-foreground">AI-Powered Strategic Analysis</p>
+              </div>
+              <div className="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full">
+                <div className="h-1.5 w-1.5 bg-primary rounded-full animate-pulse" />
+                <span className="label-tech text-primary text-[9px]">Powered by AI</span>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               {hasAnalyzed && !isLoading && analysisData && (
                 <Button 
                   onClick={copyToMarkdown}
                   variant="outline" 
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 h-8 md:h-9 text-xs md:text-sm"
                 >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? <Check className="h-3 w-3 md:h-4 md:w-4" /> : <Copy className="h-3 w-3 md:h-4 md:w-4" />}
                   {copied ? "Copied!" : "Copy Analysis"}
                 </Button>
               )}
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
+              <div className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
                 <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
                 <span className="label-tech text-primary text-[10px]">Powered by AI</span>
               </div>
