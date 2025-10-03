@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.bmc-chat]
 verify_jwt = false
+
+[functions.competitor-chat]
+verify_jwt = false

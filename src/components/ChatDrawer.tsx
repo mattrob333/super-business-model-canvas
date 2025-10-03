@@ -10,18 +10,20 @@ interface CanvasSection {
   items: string[];
 }
 
+interface Competitor {
+  name: string;
+  description: string;
+  website: string;
+}
+
 interface ChatDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  section: CanvasSection | null;
+  section?: CanvasSection | null;
+  competitor?: Competitor | null;
   companyName: string;
-  businessContext?: {
-    industry: string;
-    description: string;
-    productsServices: string[];
-    keyExecutives: { name: string; role: string }[];
-    website: string;
-  };
+  businessContext?: any;
+  mode?: 'bmc' | 'competitor';
 }
 
 interface Message {
@@ -29,22 +31,38 @@ interface Message {
   content: string;
 }
 
-export const ChatDrawer = ({ open, onOpenChange, section, companyName, businessContext }: ChatDrawerProps) => {
+export const ChatDrawer = ({ 
+  open, 
+  onOpenChange, 
+  section,
+  competitor,
+  companyName, 
+  businessContext,
+  mode = 'bmc'
+}: ChatDrawerProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open && section) {
-      // Initialize with AI greeting and suggested prompts
-      setMessages([
-        {
-          role: "assistant",
-          content: `I can help you analyze ${companyName}'s ${section.title}. You can ask me to:\n\n• Summarize their approach\n• Suggest improvements\n• Compare to competitors\n• Identify opportunities`,
-        },
-      ]);
+    if (open && messages.length === 0) {
+      if (mode === 'competitor' && competitor) {
+        setMessages([
+          {
+            role: "assistant",
+            content: `I'm here to help you analyze **${competitor.name}** as a competitor to ${companyName}. You can ask me to:\n\n• Explain their market positioning\n• Analyze their strengths and weaknesses\n• Compare them to ${companyName}\n• Identify strategic opportunities`,
+          },
+        ]);
+      } else if (mode === 'bmc' && section) {
+        setMessages([
+          {
+            role: "assistant",
+            content: `I can help you analyze ${companyName}'s ${section.title}. You can ask me to:\n\n• Summarize their approach\n• Suggest improvements\n• Compare to competitors\n• Identify opportunities`,
+          },
+        ]);
+      }
     }
-  }, [open, section, companyName]);
+  }, [open, section, competitor, companyName, mode]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -53,7 +71,9 @@ export const ChatDrawer = ({ open, onOpenChange, section, companyName, businessC
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || !section) return;
+    if (!input.trim()) return;
+    if (mode === 'bmc' && !section) return;
+    if (mode === 'competitor' && !competitor) return;
 
     const userMessage: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
@@ -63,15 +83,25 @@ export const ChatDrawer = ({ open, onOpenChange, section, companyName, businessC
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       
-      const { data, error } = await supabase.functions.invoke('bmc-chat', {
-        body: {
-          section: section.title,
-          sectionContent: Array.isArray(section.items) ? section.items.join(', ') : section.items,
-          userMessage: userInput,
-          conversationHistory: messages,
-          companyName: companyName,
-          businessContext: businessContext
-        }
+      const functionName = mode === 'competitor' ? 'competitor-chat' : 'bmc-chat';
+      const body = mode === 'competitor' 
+        ? {
+            messages: [...messages, userMessage],
+            competitor,
+            companyName,
+            businessContext
+          }
+        : {
+            section: section?.title,
+            sectionContent: Array.isArray(section?.items) ? section.items.join(', ') : section?.items,
+            userMessage: userInput,
+            conversationHistory: messages,
+            companyName: companyName,
+            businessContext: businessContext
+          };
+
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body
       });
 
       if (error) throw error;
@@ -98,7 +128,7 @@ export const ChatDrawer = ({ open, onOpenChange, section, companyName, businessC
     }
   };
 
-  if (!open || !section) return null;
+  if (!open) return null;
 
   return (
     <>
@@ -117,7 +147,9 @@ export const ChatDrawer = ({ open, onOpenChange, section, companyName, businessC
               <Sparkles className="h-4 w-4 text-primary" />
               <span className="label-tech text-primary">AI Analysis</span>
             </div>
-            <h2 className="text-xl font-semibold">{section.title}</h2>
+            <h2 className="text-xl font-semibold">
+              {mode === 'competitor' && competitor ? competitor.name : section?.title}
+            </h2>
           </div>
           <Button
             variant="ghost"

@@ -1,4 +1,5 @@
-import { ExternalLink, TrendingUp } from "lucide-react";
+import { ExternalLink, MessageCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Competitor {
   name: string;
@@ -8,9 +9,10 @@ interface Competitor {
 
 interface CompetitiveLandscapeProps {
   competitors: Competitor[];
+  onCompetitorChat?: (competitor: Competitor) => void;
 }
 
-export const CompetitiveLandscape = ({ competitors }: CompetitiveLandscapeProps) => {
+export const CompetitiveLandscape = ({ competitors, onCompetitorChat }: CompetitiveLandscapeProps) => {
   return (
     <div className="w-full max-w-7xl mx-auto">
       <div className="space-y-6">
@@ -31,7 +33,14 @@ export const CompetitiveLandscape = ({ competitors }: CompetitiveLandscapeProps)
                     </div>
                     <h3 className="text-xl font-semibold">{competitor.name}</h3>
                   </div>
-                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onCompetitorChat?.(competitor)}
+                    className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                  </Button>
                 </div>
 
                 <p className="text-foreground/80 text-sm leading-relaxed">

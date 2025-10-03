@@ -5,6 +5,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { BusinessOverview } from "@/components/BusinessOverview";
 import { BusinessModelCanvas } from "@/components/BusinessModelCanvas";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
+import { ChatDrawer } from "@/components/ChatDrawer";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,6 +29,8 @@ const Analysis = () => {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [competitorChatOpen, setCompetitorChatOpen] = useState(false);
+  const [selectedCompetitor, setSelectedCompetitor] = useState<any>(null);
   const { toast } = useToast();
 
   // Load saved analysis from sessionStorage if available
@@ -204,6 +207,11 @@ Website: ${comp.website || 'N/A'}
     });
   };
 
+  const handleCompetitorChat = (competitor: any) => {
+    setSelectedCompetitor(competitor);
+    setCompetitorChatOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -348,7 +356,10 @@ Website: ${comp.website || 'N/A'}
             </section>
 
             <section>
-              <CompetitiveLandscape competitors={Array.isArray(analysisData.competitors) ? analysisData.competitors : []} />
+              <CompetitiveLandscape 
+                competitors={Array.isArray(analysisData.competitors) ? analysisData.competitors : []} 
+                onCompetitorChat={handleCompetitorChat}
+              />
             </section>
           </div>
         )}
@@ -376,6 +387,15 @@ Website: ${comp.website || 'N/A'}
           </div>
         </div>
       </footer>
+
+      <ChatDrawer
+        open={competitorChatOpen}
+        onOpenChange={setCompetitorChatOpen}
+        mode="competitor"
+        competitor={selectedCompetitor}
+        companyName={analysisData?.company?.name || ""}
+        businessContext={analysisData}
+      />
       <Toaster />
     </div>
   );
