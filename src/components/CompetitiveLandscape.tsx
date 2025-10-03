@@ -21,7 +21,7 @@ export const CompetitiveLandscape = ({ competitors }: CompetitiveLandscapeProps)
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {competitors.map((competitor, index) => (
-            <div key={index} className="card-mono card-mono-hover">
+            <div key={index} className="card-mono">
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
@@ -42,7 +42,7 @@ export const CompetitiveLandscape = ({ competitors }: CompetitiveLandscapeProps)
                   href={competitor.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors hover:underline relative z-10"
                 >
                   <span>Visit Website</span>
                   <ExternalLink className="h-4 w-4" />
