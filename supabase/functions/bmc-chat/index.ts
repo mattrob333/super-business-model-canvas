@@ -38,9 +38,20 @@ You have access to real-time information via web search. Use this to:
 
 Provide insightful, actionable, data-driven advice. Be specific, cite sources when using web data, and reference the actual content when relevant. Keep responses concise but valuable.`;
 
+    // Filter conversation history to only include user-assistant exchanges (skip initial greeting)
+    const filteredHistory = (conversationHistory || []).filter((msg: any, index: number) => {
+      // Keep all user messages
+      if (msg.role === 'user') return true;
+      // For assistant messages, only keep if there's a preceding user message
+      if (msg.role === 'assistant' && index > 0) {
+        return conversationHistory[index - 1]?.role === 'user';
+      }
+      return false;
+    });
+
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...(conversationHistory || []),
+      ...filteredHistory,
       { role: 'user', content: userMessage }
     ];
 
