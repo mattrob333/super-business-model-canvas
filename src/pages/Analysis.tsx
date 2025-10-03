@@ -293,16 +293,6 @@ Website: ${comp.website || 'N/A'}
       <main className="container mx-auto px-6 py-12 space-y-16">
         {/* Input Section */}
         <section className="pt-8">
-          {/* Introduction Header */}
-          <div className="max-w-3xl mx-auto mb-8 pl-4 border-l-2 border-primary">
-            <h2 className="text-2xl font-semibold tracking-tight mb-1.5">
-              Generate Your Strategic Analysis
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Enter a company URL to instantly analyze their business model, competitive landscape, and strategic positioning
-            </p>
-          </div>
-          
           <UrlInput onAnalyze={handleAnalyze} isLoading={isLoading} />
         </section>
 
