@@ -1,10 +1,10 @@
 project_id = "kmqgbaaftwlqxhtfggeg"
 
 [functions.analyze-company]
-verify_jwt = false
+verify_jwt = true
 
 [functions.bmc-chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.competitor-chat]
-verify_jwt = false
+verify_jwt = true
