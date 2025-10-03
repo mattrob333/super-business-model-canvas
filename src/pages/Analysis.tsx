@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { Copy, Check } from "lucide-react";
+import logo from "@/assets/logo_2.png";
 
 const Analysis = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -234,9 +235,22 @@ Website: ${comp.website || 'N/A'}
       {/* Footer */}
       <footer className="border-t border-white/[0.12] mt-24">
         <div className="container mx-auto px-6 py-8">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <p>© 2025 Super Business Model Canvas</p>
-            <p className="label-tech text-[10px]">Strategic Analysis Tool</p>
+          <div className="flex flex-col items-center gap-4">
+            <a 
+              href="https://tier4intelligence.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="transition-opacity hover:opacity-80"
+            >
+              <img 
+                src={logo} 
+                alt="Tier 4 Intelligence" 
+                className="h-12 w-auto"
+              />
+            </a>
+            <p className="text-sm text-muted-foreground">
+              © 2025 Super Business Model Canvas
+            </p>
           </div>
         </div>
       </footer>
