@@ -95,6 +95,8 @@ Return in this exact JSON format:
       headers: {
         'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
         'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({
         model: 'sonar-pro',
