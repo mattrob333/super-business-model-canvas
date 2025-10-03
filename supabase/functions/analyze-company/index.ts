@@ -25,8 +25,16 @@ serve(async (req) => {
 
     console.log('Analyzing company:', url);
 
-    // Use Perplexity to gather comprehensive company information with web search
-    const analysisPrompt = `Research and analyze the company at ${url} in detail. Focus on providing actionable strategic information.
+    // Retry configuration
+    const maxRetries = 3;
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Attempt ${attempt} of ${maxRetries}`);
+
+        // Use Perplexity to gather comprehensive company information with web search
+        const analysisPrompt = `Research and analyze the company at ${url} in detail. Focus on providing actionable strategic information.
 
 CRITICAL INFORMATION (must be comprehensive):
 1. Company Overview:
@@ -90,45 +98,60 @@ Return in this exact JSON format:
   ]
 }`;
 
-    const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'sonar-pro',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a business research analyst. Research companies thoroughly using web search and return detailed, accurate information in JSON format without markdown.'
+        const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Origin': 'https://api.perplexity.ai',
+            'Referer': 'https://api.perplexity.ai/',
           },
-          {
-            role: 'user',
-            content: analysisPrompt
+          body: JSON.stringify({
+            model: 'sonar-pro',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a business research analyst. Research companies thoroughly using web search and return detailed, accurate information in JSON format without markdown.'
+              },
+              {
+                role: 'user',
+                content: analysisPrompt
+              }
+            ],
+            temperature: 0.3,
+            max_tokens: 4000,
+          }),
+        });
+
+        if (!perplexityResponse.ok) {
+          const errorText = await perplexityResponse.text();
+          console.error(`Attempt ${attempt} - Perplexity API error (${perplexityResponse.status}):`, errorText.substring(0, 500));
+          
+          // If it's a Cloudflare challenge, wait and retry
+          if (errorText.includes('Just a moment') || errorText.includes('cloudflare')) {
+            lastError = new Error('API rate limit or bot protection detected');
+            if (attempt < maxRetries) {
+              const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
+              console.log(`Waiting ${waitTime}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+              continue;
+            }
           }
-        ],
-        temperature: 0.3,
-        max_tokens: 4000,
-      }),
-    });
+          
+          throw new Error(`API request failed with status ${perplexityResponse.status}`);
+        }
 
-    if (!perplexityResponse.ok) {
-      const errorText = await perplexityResponse.text();
-      console.error('Perplexity API error:', errorText);
-      throw new Error('Analysis failed');
-    }
+        const perplexityData = await perplexityResponse.json();
+        const analysisText = perplexityData.choices[0].message.content;
+        
+        console.log('Analysis received successfully');
 
-    const perplexityData = await perplexityResponse.json();
-    const analysisText = perplexityData.choices[0].message.content;
-    
-    console.log('Analysis received');
-
-    // Parse JSON response
-    let analysis;
-    try {
+        // Parse JSON response
+        let analysis;
+        try {
       // Remove markdown code blocks if present
       const cleanJson = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       analysis = JSON.parse(cleanJson);
@@ -160,16 +183,40 @@ Return in this exact JSON format:
       }
       
     } catch (e) {
-      console.error('JSON parse error:', e);
-      throw new Error('Failed to parse AI response');
+          console.error('JSON parse error:', e);
+          throw new Error('Failed to parse AI response');
+        }
+
+        return new Response(JSON.stringify(analysis), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt) * 1000;
+          console.log(`Attempt ${attempt} failed, waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+      }
     }
 
-    return new Response(JSON.stringify(analysis), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // If we get here, all retries failed
+    console.error('All retry attempts failed:', lastError);
+    return new Response(
+      JSON.stringify({ 
+        error: lastError instanceof Error ? lastError.message : 'Analysis failed after multiple attempts',
+        details: 'Please try again in a moment'
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Unexpected error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {
