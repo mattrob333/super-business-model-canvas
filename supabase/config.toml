@@ -1,1 +1,7 @@
 project_id = "kmqgbaaftwlqxhtfggeg"
+
+[functions.analyze-company]
+verify_jwt = false
+
+[functions.bmc-chat]
+verify_jwt = false

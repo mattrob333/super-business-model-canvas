@@ -4,6 +4,9 @@ import { LoadingState } from "@/components/LoadingState";
 import { BusinessOverview } from "@/components/BusinessOverview";
 import { BusinessModelCanvas } from "@/components/BusinessModelCanvas";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 // Mock data for demonstration
 const mockData = {
@@ -107,16 +110,38 @@ const mockData = {
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const { toast } = useToast();
 
   const handleAnalyze = async (url: string) => {
     setIsLoading(true);
     setHasAnalyzed(false);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-company', {
+        body: { url }
+      });
 
-    setIsLoading(false);
-    setHasAnalyzed(true);
+      if (error) throw error;
+
+      if (data) {
+        setAnalysisData(data);
+        setHasAnalyzed(true);
+        toast({
+          title: "Analysis Complete",
+          description: "Business model canvas generated successfully",
+        });
+      }
+    } catch (error: any) {
+      console.error('Analysis error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to analyze company. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -151,18 +176,26 @@ const Index = () => {
           </section>
         )}
 
-        {hasAnalyzed && !isLoading && (
+        {hasAnalyzed && !isLoading && analysisData && (
           <div className="space-y-16 animate-in fade-in duration-700">
             <section>
-              <BusinessOverview data={mockData.overview} />
+              <BusinessOverview data={{
+                name: analysisData.company.name,
+                description: analysisData.company.description,
+                productsServices: [],
+                founded: analysisData.company.founded,
+                headquarters: analysisData.company.industry,
+                employees: "N/A",
+                revenue: "N/A"
+              }} />
             </section>
 
             <section>
-              <BusinessModelCanvas data={mockData.canvas} companyName={mockData.overview.name} />
+              <BusinessModelCanvas data={analysisData.canvas} companyName={analysisData.company.name} />
             </section>
 
             <section>
-              <CompetitiveLandscape competitors={mockData.competitors} />
+              <CompetitiveLandscape competitors={analysisData.competitors} />
             </section>
           </div>
         )}
@@ -177,6 +210,7 @@ const Index = () => {
           </div>
         </div>
       </footer>
+      <Toaster />
     </div>
   );
 };

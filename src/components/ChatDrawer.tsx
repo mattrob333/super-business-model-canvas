@@ -44,22 +44,41 @@ export const ChatDrawer = ({ open, onOpenChange, section, companyName }: ChatDra
     }
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || !section) return;
 
     const userMessage: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
+    const userInput = input;
+    setInput("");
 
-    // Simulate AI response (in real app, this would call the AI API)
-    setTimeout(() => {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      
+      const { data, error } = await supabase.functions.invoke('bmc-chat', {
+        body: {
+          section: section.title,
+          sectionContent: Array.isArray(section.items) ? section.items.join(', ') : section.items,
+          userMessage: userInput,
+          conversationHistory: messages
+        }
+      });
+
+      if (error) throw error;
+
       const aiMessage: Message = {
         role: "assistant",
-        content: `I understand you want to explore ${section?.title} for ${companyName}. In a production version, this would connect to Claude or OpenAI to provide detailed strategic insights based on the business context.`,
+        content: data.response
       };
       setMessages((prev) => [...prev, aiMessage]);
-    }, 1000);
-
-    setInput("");
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage: Message = {
+        role: "assistant",
+        content: "Sorry, I encountered an error. Please try again."
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
