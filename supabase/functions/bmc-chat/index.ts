@@ -11,26 +11,32 @@ serve(async (req) => {
   }
 
   try {
-    const { section, sectionContent, userMessage, conversationHistory } = await req.json();
+    const { section, sectionContent, userMessage, conversationHistory, companyName } = await req.json();
     
     if (!section || !userMessage) {
       throw new Error('Section and message are required');
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
+    if (!PERPLEXITY_API_KEY) {
+      throw new Error('PERPLEXITY_API_KEY not configured');
     }
 
     console.log('Chat request for section:', section);
 
-    // Build conversation context
-    const systemPrompt = `You are a business strategy consultant helping analyze the "${section}" section of a Business Model Canvas.
+    // Build conversation context with web search capabilities
+    const systemPrompt = `You are a business strategy consultant with real-time web search capabilities helping analyze the "${section}" section of a Business Model Canvas for ${companyName || 'the company'}.
 
 Current ${section} content:
 ${sectionContent}
 
-Provide insightful, actionable advice. Be specific and reference the actual content when relevant. Keep responses concise but valuable.`;
+You have access to real-time information via web search. Use this to:
+- Find current market trends and data
+- Research competitors and industry benchmarks
+- Get up-to-date information about ${companyName || 'the company'}
+- Validate and enhance strategic recommendations
+
+Provide insightful, actionable, data-driven advice. Be specific, cite sources when using web data, and reference the actual content when relevant. Keep responses concise but valuable.`;
 
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -38,27 +44,28 @@ Provide insightful, actionable advice. Be specific and reference the actual cont
       { role: 'user', content: userMessage }
     ];
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'llama-3.1-sonar-large-128k-online',
         messages,
-        temperature: 0.8,
+        temperature: 0.7,
+        max_tokens: 1500,
       }),
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', errorText);
+    if (!perplexityResponse.ok) {
+      const errorText = await perplexityResponse.text();
+      console.error('Perplexity API error:', errorText);
       throw new Error('AI chat failed');
     }
 
-    const aiData = await aiResponse.json();
-    const response = aiData.choices[0].message.content;
+    const perplexityData = await perplexityResponse.json();
+    const response = perplexityData.choices[0].message.content;
 
     return new Response(
       JSON.stringify({ response }),

@@ -61,7 +61,8 @@ export const ChatDrawer = ({ open, onOpenChange, section, companyName }: ChatDra
           section: section.title,
           sectionContent: Array.isArray(section.items) ? section.items.join(', ') : section.items,
           userMessage: userInput,
-          conversationHistory: messages
+          conversationHistory: messages,
+          companyName: companyName
         }
       });
 

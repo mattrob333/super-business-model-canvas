@@ -17,57 +17,44 @@ serve(async (req) => {
       throw new Error('URL is required');
     }
 
-    const SERPER_API_KEY = Deno.env.get('SERPER_API_KEY');
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
 
-    if (!SERPER_API_KEY || !LOVABLE_API_KEY) {
-      throw new Error('API keys not configured');
+    if (!PERPLEXITY_API_KEY) {
+      throw new Error('Perplexity API key not configured');
     }
 
-    console.log('Searching for company information:', url);
+    console.log('Analyzing company:', url);
 
-    // Search for company information using Serper
-    const searchResponse = await fetch('https://google.serper.dev/search', {
-      method: 'POST',
-      headers: {
-        'X-API-KEY': SERPER_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        q: `${url} business model revenue pricing customers competitors`,
-        num: 10,
-      }),
-    });
+    // Use Perplexity to gather comprehensive company information with web search
+    const analysisPrompt = `Research and analyze the company at ${url} in detail. Provide comprehensive information about:
 
-    if (!searchResponse.ok) {
-      throw new Error('Search API failed');
-    }
+1. Company Overview: name, industry, founding year, headquarters, employee count, revenue
+2. Products & Services: List all main products and services offered
+3. Business Model Canvas components:
+   - Key Partners
+   - Key Activities
+   - Key Resources
+   - Value Propositions
+   - Customer Relationships
+   - Channels
+   - Customer Segments
+   - Cost Structure
+   - Revenue Streams
+4. Top 3-5 direct competitors with descriptions
 
-    const searchData = await searchResponse.json();
-    console.log('Search results received');
+CRITICAL: Return ONLY valid JSON. Each canvas section must be an ARRAY of 3-5 specific strings (bullet points).
 
-    // Prepare context for AI analysis
-    const searchContext = searchData.organic?.slice(0, 8).map((result: any) => 
-      `Title: ${result.title}\nSnippet: ${result.snippet}`
-    ).join('\n\n') || 'No search results found';
-
-    // Analyze with Lovable AI (Gemini)
-    const analysisPrompt = `Analyze this company and create a comprehensive Business Model Canvas. Be specific and detailed.
-
-Company URL: ${url}
-
-Search Results:
-${searchContext}
-
-CRITICAL: Return ONLY valid JSON. Each canvas section must be an ARRAY of strings (bullet points), not a single string.
-
-Generate a detailed analysis in the following JSON format:
+Return in this exact JSON format:
 {
   "company": {
     "name": "Company Name",
     "industry": "Industry",
-    "founded": "Year or 'Unknown'",
-    "description": "Brief description"
+    "founded": "Year",
+    "description": "2-3 sentence description",
+    "headquarters": "City, Country",
+    "employees": "Number or range",
+    "revenue": "Amount or 'Not publicly disclosed'",
+    "productsServices": ["Product/Service 1", "Product/Service 2", "Product/Service 3"]
   },
   "canvas": {
     "keyPartners": ["Partner 1", "Partner 2", "Partner 3"],
@@ -78,49 +65,46 @@ Generate a detailed analysis in the following JSON format:
     "channels": ["Channel 1", "Channel 2", "Channel 3"],
     "customerSegments": ["Segment 1", "Segment 2", "Segment 3"],
     "costStructure": ["Cost 1", "Cost 2", "Cost 3"],
-    "revenueStreams": ["Revenue stream 1", "Revenue stream 2"]
+    "revenueStreams": ["Revenue 1", "Revenue 2"]
   },
   "competitors": [
-    {
-      "name": "Competitor Name",
-      "description": "What they do",
-      "differentiator": "How they differ"
-    }
+    {"name": "Name", "description": "What they do", "website": "https://..."}
   ]
 }`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'llama-3.1-sonar-large-128k-online',
         messages: [
           {
             role: 'system',
-            content: 'You are a business analysis expert. Return only valid JSON without markdown formatting.'
+            content: 'You are a business research analyst. Research companies thoroughly using web search and return detailed, accurate information in JSON format without markdown.'
           },
           {
             role: 'user',
             content: analysisPrompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.3,
+        max_tokens: 4000,
       }),
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', errorText);
-      throw new Error('AI analysis failed');
+    if (!perplexityResponse.ok) {
+      const errorText = await perplexityResponse.text();
+      console.error('Perplexity API error:', errorText);
+      throw new Error('Analysis failed');
     }
 
-    const aiData = await aiResponse.json();
-    const analysisText = aiData.choices[0].message.content;
+    const perplexityData = await perplexityResponse.json();
+    const analysisText = perplexityData.choices[0].message.content;
     
-    console.log('AI analysis received');
+    console.log('Analysis received');
 
     // Parse JSON response
     let analysis;
