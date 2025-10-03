@@ -31,10 +31,10 @@ export const BusinessModelCanvas = ({ data, companyName }: BusinessModelCanvasPr
     setDrawerOpen(true);
   };
 
-  const CanvasCard = ({ title, items, span = "col-span-1 row-span-1" }: { title: string; items: string[]; span?: string }) => (
+  const CanvasCard = ({ title, items, span = "col-span-1 row-span-1", height = "h-[200px]" }: { title: string; items: string[]; span?: string; height?: string }) => (
     <div
       onClick={() => handleSectionClick(title, items)}
-      className={`card-mono card-mono-hover cursor-pointer ${span} group relative flex flex-col h-[200px]`}
+      className={`card-mono card-mono-hover cursor-pointer ${span} ${height} group relative flex flex-col`}
     >
       <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <MessageSquare className="h-5 w-5 text-primary" />
@@ -67,11 +67,11 @@ export const BusinessModelCanvas = ({ data, companyName }: BusinessModelCanvasPr
 
           {/* Top Grid - 5 columns */}
           <div className="grid grid-cols-5 gap-4">
-            <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1" />
+            <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1" height="h-[400px]" />
             <CanvasCard title="Key Activities" items={data.keyActivities} span="col-span-1" />
-            <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1" />
+            <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1" height="h-[400px]" />
             <CanvasCard title="Customer Relationships" items={data.customerRelationships} span="col-span-1" />
-            <CanvasCard title="Customer Segments" items={data.customerSegments} span="col-span-1" />
+            <CanvasCard title="Customer Segments" items={data.customerSegments} span="col-span-1" height="h-[400px]" />
           </div>
           <div className="grid grid-cols-5 gap-4">
             <div className="col-span-1"></div>
