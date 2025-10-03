@@ -14,7 +14,7 @@ interface BusinessOverviewProps {
 
 export const BusinessOverview = ({ data }: BusinessOverviewProps) => {
   return (
-    <div className="w-full max-w-6xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto">
       <div className="space-y-4">
         <div className="space-y-1">
           <span className="label-tech text-muted-foreground">Business Overview</span>

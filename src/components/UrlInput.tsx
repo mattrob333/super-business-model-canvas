@@ -74,7 +74,7 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto">
       <div className="card-mono">
         <div className="space-y-6">
           <div className="space-y-2">

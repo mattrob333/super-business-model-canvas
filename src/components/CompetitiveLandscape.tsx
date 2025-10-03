@@ -12,7 +12,7 @@ interface CompetitiveLandscapeProps {
 
 export const CompetitiveLandscape = ({ competitors }: CompetitiveLandscapeProps) => {
   return (
-    <div className="w-full max-w-6xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto">
       <div className="space-y-6">
         <div className="space-y-1">
           <span className="label-tech text-muted-foreground">Competitive Landscape</span>
