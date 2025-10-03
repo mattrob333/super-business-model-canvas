@@ -3,6 +3,7 @@ import { X, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import ReactMarkdown from "react-markdown";
 
 interface CanvasSection {
   title: string;
@@ -134,7 +135,9 @@ export const ChatDrawer = ({ open, onOpenChange, section, companyName }: ChatDra
                       : "bg-white/[0.06] border border-white/[0.12]"
                   }`}
                 >
-                  <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
+                  <div className="text-sm leading-relaxed prose prose-sm prose-invert max-w-none">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </div>
                 </div>
               </div>
             ))}

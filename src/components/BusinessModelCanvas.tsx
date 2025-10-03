@@ -34,21 +34,23 @@ export const BusinessModelCanvas = ({ data, companyName }: BusinessModelCanvasPr
   const CanvasCard = ({ title, items, span = "col-span-1 row-span-1" }: { title: string; items: string[]; span?: string }) => (
     <div
       onClick={() => handleSectionClick(title, items)}
-      className={`card-mono card-mono-hover cursor-pointer ${span} group relative overflow-hidden`}
+      className={`card-mono card-mono-hover cursor-pointer ${span} group relative flex flex-col h-[200px]`}
     >
-      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <MessageSquare className="h-5 w-5 text-primary" />
       </div>
-      <div className="space-y-4">
-        <h3 className="label-tech text-muted-foreground">{title}</h3>
-        <ul className="space-y-2">
-          {items.map((item, index) => (
-            <li key={index} className="flex items-start gap-2">
-              <div className="h-1.5 w-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-              <span className="text-foreground/80 text-sm leading-relaxed">{item}</span>
-            </li>
-          ))}
-        </ul>
+      <div className="flex flex-col h-full">
+        <h3 className="label-tech text-muted-foreground mb-4 flex-shrink-0">{title}</h3>
+        <div className="flex-1 overflow-y-auto pr-2 scrollbar-dark">
+          <ul className="space-y-2">
+            {items.map((item, index) => (
+              <li key={index} className="flex items-start gap-2">
+                <div className="h-1.5 w-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
+                <span className="text-foreground/80 text-sm leading-relaxed">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
@@ -64,14 +66,19 @@ export const BusinessModelCanvas = ({ data, companyName }: BusinessModelCanvasPr
           </div>
 
           {/* Top Grid - 5 columns */}
-          <div className="grid grid-cols-5 gap-4 auto-rows-fr">
-            <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1 row-span-2" />
-            <CanvasCard title="Key Activities" items={data.keyActivities} span="col-span-1 row-span-1" />
-            <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1 row-span-2" />
-            <CanvasCard title="Customer Relationships" items={data.customerRelationships} span="col-span-1 row-span-1" />
-            <CanvasCard title="Customer Segments" items={data.customerSegments} span="col-span-1 row-span-2" />
-            <CanvasCard title="Key Resources" items={data.keyResources} span="col-span-1 row-span-1" />
-            <CanvasCard title="Channels" items={data.channels} span="col-span-1 row-span-1" />
+          <div className="grid grid-cols-5 gap-4">
+            <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1" />
+            <CanvasCard title="Key Activities" items={data.keyActivities} span="col-span-1" />
+            <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1" />
+            <CanvasCard title="Customer Relationships" items={data.customerRelationships} span="col-span-1" />
+            <CanvasCard title="Customer Segments" items={data.customerSegments} span="col-span-1" />
+          </div>
+          <div className="grid grid-cols-5 gap-4">
+            <div className="col-span-1"></div>
+            <CanvasCard title="Key Resources" items={data.keyResources} span="col-span-1" />
+            <div className="col-span-1"></div>
+            <CanvasCard title="Channels" items={data.channels} span="col-span-1" />
+            <div className="col-span-1"></div>
           </div>
 
           {/* Bottom Grid - 2 columns */}
