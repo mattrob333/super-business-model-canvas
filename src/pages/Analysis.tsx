@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
 import { LoadingState } from "@/components/LoadingState";
 import { BusinessOverview } from "@/components/BusinessOverview";
@@ -6,17 +7,42 @@ import { BusinessModelCanvas } from "@/components/BusinessModelCanvas";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Save, LogOut, User, Shield } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import logo from "@/assets/logo_2.png";
 
 const Analysis = () => {
+  const navigate = useNavigate();
+  const { user, isAdmin, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  // Load saved analysis from sessionStorage if available
+  useEffect(() => {
+    const loadedAnalysis = sessionStorage.getItem('loadedAnalysis');
+    if (loadedAnalysis) {
+      try {
+        setAnalysisData(JSON.parse(loadedAnalysis));
+        setHasAnalyzed(true);
+        sessionStorage.removeItem('loadedAnalysis');
+      } catch (error) {
+        console.error('Failed to load analysis:', error);
+      }
+    }
+  }, []);
 
   const handleAnalyze = async (url: string) => {
     setIsLoading(true);
@@ -57,6 +83,54 @@ const Analysis = () => {
     toast({
       title: "Updated",
       description: "Business overview updated successfully",
+    });
+  };
+
+  const saveAnalysis = async () => {
+    if (!user) {
+      toast({
+        title: "Sign up to save",
+        description: "Create an account to save your analyses",
+      });
+      navigate('/auth');
+      return;
+    }
+
+    if (!analysisData) return;
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('saved_analyses')
+        .insert({
+          user_id: user.id,
+          company_name: analysisData.company?.name || 'Unknown Company',
+          analysis_data: analysisData
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Saved!",
+        description: "Analysis saved to your account",
+      });
+    } catch (error: any) {
+      console.error('Save error:', error);
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save analysis",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast({
+      title: "Signed out",
+      description: "You've been signed out successfully",
     });
   };
 
@@ -148,16 +222,64 @@ Website: ${comp.website || 'N/A'}
             </div>
             <div className="flex items-center gap-2 md:gap-3">
               {hasAnalyzed && !isLoading && analysisData && (
+                <>
+                  <Button 
+                    onClick={saveAnalysis}
+                    variant="outline" 
+                    size="sm"
+                    className="gap-2 h-8 md:h-9 text-xs md:text-sm"
+                    disabled={isSaving}
+                  >
+                    <Save className="h-3 w-3 md:h-4 md:w-4" />
+                    {isSaving ? "Saving..." : "Save"}
+                  </Button>
+                  <Button 
+                    onClick={copyToMarkdown}
+                    variant="outline" 
+                    size="sm"
+                    className="gap-2 h-8 md:h-9 text-xs md:text-sm"
+                  >
+                    {copied ? <Check className="h-3 w-3 md:h-4 md:w-4" /> : <Copy className="h-3 w-3 md:h-4 md:w-4" />}
+                    {copied ? "Copied!" : "Copy"}
+                  </Button>
+                </>
+              )}
+              
+              {user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <User className="h-4 w-4" />
+                      <span className="hidden md:inline">{user.email?.split('@')[0]}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={() => navigate('/my-analyses')}>
+                      My Analyses
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        Admin Dashboard
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
                 <Button 
-                  onClick={copyToMarkdown}
                   variant="outline" 
                   size="sm"
-                  className="gap-2 h-8 md:h-9 text-xs md:text-sm"
+                  onClick={() => navigate('/auth')}
                 >
-                  {copied ? <Check className="h-3 w-3 md:h-4 md:w-4" /> : <Copy className="h-3 w-3 md:h-4 md:w-4" />}
-                  {copied ? "Copied!" : "Copy Analysis"}
+                  Sign In
                 </Button>
               )}
+              
               <div className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
                 <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
                 <span className="label-tech text-primary text-[10px]">Powered by AI</span>

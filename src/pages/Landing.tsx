@@ -127,6 +127,14 @@ const Landing = () => {
                 <p className="text-xs text-muted-foreground">
                   No credit card required. Instant access.
                 </p>
+                <div className="text-center">
+                  <a 
+                    href="/auth" 
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Already have an account? Sign in
+                  </a>
+                </div>
               </div>
             </form>
           </div>

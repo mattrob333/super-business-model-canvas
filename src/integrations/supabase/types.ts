@@ -32,6 +32,48 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      saved_analyses: {
+        Row: {
+          analysis_data: Json
+          company_name: string
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          analysis_data: Json
+          company_name: string
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          analysis_data?: Json
+          company_name?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
