@@ -25,6 +25,30 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
+    // Format business context for better readability
+    const companyInfo = businessContext?.company || {};
+    const canvasInfo = businessContext?.canvas || {};
+    
+    const formattedCompanyContext = `
+Company: ${companyInfo.name || companyName}
+Industry: ${companyInfo.industry || 'N/A'}
+Description: ${companyInfo.description || 'N/A'}
+Employee Count: ${companyInfo.employeeCount || 'N/A'}
+Revenue: ${companyInfo.revenue || 'N/A'}
+
+Value Propositions:
+${canvasInfo.valuePropositions?.map((v: string) => `- ${v}`).join('\n') || '- N/A'}
+
+Key Activities:
+${canvasInfo.keyActivities?.map((a: string) => `- ${a}`).join('\n') || '- N/A'}
+
+Customer Segments:
+${canvasInfo.customerSegments?.map((s: string) => `- ${s}`).join('\n') || '- N/A'}
+
+Revenue Streams:
+${canvasInfo.revenueStreams?.map((r: string) => `- ${r}`).join('\n') || '- N/A'}
+`;
+
     // Build system prompt for competitive analysis
     const systemPrompt = `You are a competitive intelligence analyst helping to analyze ${competitor.name} as a competitor to ${companyName}.
 
@@ -34,14 +58,14 @@ Description: ${competitor.description}
 Website: ${competitor.website}
 
 YOUR COMPANY (${companyName}) CONTEXT:
-${businessContext}
+${formattedCompanyContext}
 
 INSTRUCTIONS:
 - Provide specific, actionable insights about ${competitor.name}
 - Compare and contrast with ${companyName} when relevant
 - Focus on market positioning, strengths, weaknesses, and opportunities
 - Be concise but thorough
-- Use data points from the competitor's description when available
+- Use data points from both companies' information when available
 - Suggest strategic implications for ${companyName}
 
 Keep responses focused and actionable.`;
