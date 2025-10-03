@@ -42,7 +42,8 @@ export const CompetitiveLandscape = ({ competitors }: CompetitiveLandscapeProps)
                   href={competitor.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors hover:underline relative z-10"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors hover:underline relative z-10 cursor-pointer"
                 >
                   <span>Visit Website</span>
                   <ExternalLink className="h-4 w-4" />
