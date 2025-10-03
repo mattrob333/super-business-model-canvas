@@ -17,7 +17,7 @@ interface Lead {
 
 const Admin = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading, isAdmin } = useAuth();
+  const { user, loading: authLoading, isAdmin, adminLoading } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ const Admin = () => {
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
-    } else if (!authLoading && user && !isAdmin) {
+    } else if (!authLoading && !adminLoading && user && !isAdmin) {
       toast({
         title: "Access denied",
         description: "You don't have permission to access the admin dashboard.",
@@ -34,7 +34,7 @@ const Admin = () => {
       });
       navigate('/');
     }
-  }, [user, authLoading, isAdmin, navigate]);
+  }, [user, authLoading, isAdmin, adminLoading, navigate]);
 
   useEffect(() => {
     if (user && isAdmin) {
@@ -111,7 +111,7 @@ const Admin = () => {
     };
   };
 
-  if (authLoading || loading) {
+  if (authLoading || adminLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

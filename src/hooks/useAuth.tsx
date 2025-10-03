@@ -7,6 +7,7 @@ export const useAuth = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(true);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -17,11 +18,13 @@ export const useAuth = () => {
         
         // Check admin status after session is set
         if (session?.user) {
+          setAdminLoading(true);
           setTimeout(() => {
             checkAdminStatus(session.user.id);
           }, 0);
         } else {
           setIsAdmin(false);
+          setAdminLoading(false);
         }
         
         setLoading(false);
@@ -34,9 +37,12 @@ export const useAuth = () => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        setAdminLoading(true);
         setTimeout(() => {
           checkAdminStatus(session.user.id);
         }, 0);
+      } else {
+        setAdminLoading(false);
       }
       
       setLoading(false);
@@ -46,13 +52,22 @@ export const useAuth = () => {
   }, []);
 
   const checkAdminStatus = async (userId: string) => {
-    const { data, error } = await supabase.rpc('has_role', {
-      _user_id: userId,
-      _role: 'admin'
-    });
-    
-    if (!error && data) {
-      setIsAdmin(true);
+    try {
+      const { data, error } = await supabase.rpc('has_role', {
+        _user_id: userId,
+        _role: 'admin'
+      });
+      
+      if (!error && data) {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdmin(false);
+    } finally {
+      setAdminLoading(false);
     }
   };
 
@@ -89,6 +104,7 @@ export const useAuth = () => {
     session,
     loading,
     isAdmin,
+    adminLoading,
     signUp,
     signIn,
     signOut
