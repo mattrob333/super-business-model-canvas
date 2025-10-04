@@ -118,8 +118,8 @@ Return in this exact JSON format:
     "costStructure": ["Cost 1", "Cost 2", "Cost 3"],
     "revenueStreams": ["Revenue 1", "Revenue 2"]
   },
-  "competitors": [
-    {"name": "Competitor Name", "description": "What they do and how they compete", "website": "https://..."}
+  "similarCompanies": [
+    {"name": "Company Name", "description": "What they do and why they're similar", "website": "https://..."}
   ]
 }`;
 
