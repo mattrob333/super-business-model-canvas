@@ -83,12 +83,13 @@ OPTIONAL INFORMATION (only if easily available):
    - Cost Structure: Major cost drivers in the business
    - Revenue Streams: How the company generates income
 
-3. Top 3-5 direct competitors:
-   - Focus on companies that serve similar customers and solve similar problems
-   - Avoid companies with just similar names but different industries
-   - For each competitor provide:
+3. Top 3-5 similar companies:
+   - Find companies with similar business models, services, or target markets
+   - Focus on companies operating in the same industry or solving similar problems
+   - Avoid companies with just similar names but different business focus
+   - For each similar company provide:
      - Company name
-     - Brief description (what they do and how they compete)
+     - Brief description (what they do and why they're similar)
      - Website URL
 
 CRITICAL: Return ONLY valid JSON without markdown. Each canvas section MUST be an ARRAY of 3-5 strings.
@@ -138,7 +139,7 @@ Return in this exact JSON format:
             messages: [
               {
                 role: 'system',
-                content: 'You are a business research analyst. Research companies thoroughly using web search and return detailed, accurate information in JSON format without markdown. When finding competitors, focus on companies that solve similar problems for similar customers, not just name similarity.'
+                content: 'You are a business research analyst. Research companies thoroughly using web search and return detailed, accurate information in JSON format without markdown. When finding similar companies, focus on companies with similar business models, services, or target markets in the same industry, not just name similarity.'
               },
               {
                 role: 'user',
@@ -201,10 +202,10 @@ Return in this exact JSON format:
         };
       }
       
-      // Ensure competitors is an array
-      if (!Array.isArray(analysis.competitors)) {
-        analysis.competitors = [];
-      }
+            // Ensure similarCompanies is an array
+            if (!Array.isArray(analysis.similarCompanies)) {
+              analysis.similarCompanies = [];
+            }
       
       // Validate competitor quality - warn if too many name-similar matches
       if (analysis.competitors && analysis.competitors.length > 0 && analysis.company?.name) {

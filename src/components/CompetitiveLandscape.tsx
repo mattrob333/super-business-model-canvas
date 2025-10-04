@@ -9,16 +9,16 @@ interface Competitor {
 
 interface CompetitiveLandscapeProps {
   competitors: Competitor[];
-  onCompetitorChat?: (competitor: Competitor) => void;
+  onSimilarCompanyChat?: (competitor: Competitor) => void;
 }
 
-export const CompetitiveLandscape = ({ competitors, onCompetitorChat }: CompetitiveLandscapeProps) => {
+export const CompetitiveLandscape = ({ competitors, onSimilarCompanyChat }: CompetitiveLandscapeProps) => {
   return (
     <div className="w-full max-w-7xl mx-auto">
       <div className="space-y-6">
         <div className="space-y-1">
-          <span className="label-tech text-muted-foreground">Competitive Landscape</span>
-          <h2 className="text-3xl font-semibold tracking-tight">Key Competitors</h2>
+          <span className="label-tech text-muted-foreground">Industry Landscape</span>
+          <h2 className="text-3xl font-semibold tracking-tight">Similar Companies</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -29,14 +29,14 @@ export const CompetitiveLandscape = ({ competitors, onCompetitorChat }: Competit
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 bg-primary rounded-full" />
-                      <span className="label-tech text-primary">Competitor {index + 1}</span>
+                      <span className="label-tech text-primary">Company {index + 1}</span>
                     </div>
                     <h3 className="text-xl font-semibold">{competitor.name}</h3>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onCompetitorChat?.(competitor)}
+                    onClick={() => onSimilarCompanyChat?.(competitor)}
                     className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
                   >
                     <MessageCircle className="h-5 w-5" />

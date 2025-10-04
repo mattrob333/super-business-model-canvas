@@ -29,8 +29,8 @@ const Analysis = () => {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [competitorChatOpen, setCompetitorChatOpen] = useState(false);
-  const [selectedCompetitor, setSelectedCompetitor] = useState<any>(null);
+  const [similarCompanyChatOpen, setSimilarCompanyChatOpen] = useState(false);
+  const [selectedSimilarCompany, setSelectedSimilarCompany] = useState<any>(null);
   const { toast } = useToast();
 
   // Load saved analysis from sessionStorage if available
@@ -182,9 +182,9 @@ ${analysisData.canvas?.costStructure?.map((c: string) => `- ${c}`).join('\n') ||
 ### Revenue Streams
 ${analysisData.canvas?.revenueStreams?.map((r: string) => `- ${r}`).join('\n') || '- N/A'}
 
-## Competitive Landscape
+## Similar Companies
 
-${analysisData.competitors?.map((comp: any) => `### ${comp.name || 'Unknown Competitor'}
+${analysisData.similarCompanies?.map((comp: any) => `### ${comp.name || 'Unknown Company'}
 ${comp.description || 'N/A'}
 Website: ${comp.website || 'N/A'}
 `).join('\n') || 'N/A'}
@@ -207,9 +207,9 @@ Website: ${comp.website || 'N/A'}
     });
   };
 
-  const handleCompetitorChat = (competitor: any) => {
-    setSelectedCompetitor(competitor);
-    setCompetitorChatOpen(true);
+  const handleSimilarCompanyChat = (company: any) => {
+    setSelectedSimilarCompany(company);
+    setSimilarCompanyChatOpen(true);
   };
 
   return (
@@ -357,8 +357,8 @@ Website: ${comp.website || 'N/A'}
 
             <section>
               <CompetitiveLandscape 
-                competitors={Array.isArray(analysisData.competitors) ? analysisData.competitors : []} 
-                onCompetitorChat={handleCompetitorChat}
+                competitors={Array.isArray(analysisData.similarCompanies) ? analysisData.similarCompanies : []} 
+                onSimilarCompanyChat={handleSimilarCompanyChat}
               />
             </section>
           </div>
@@ -389,10 +389,10 @@ Website: ${comp.website || 'N/A'}
       </footer>
 
       <ChatDrawer
-        open={competitorChatOpen}
-        onOpenChange={setCompetitorChatOpen}
+        open={similarCompanyChatOpen}
+        onOpenChange={setSimilarCompanyChatOpen}
         mode="competitor"
-        competitor={selectedCompetitor}
+        competitor={selectedSimilarCompany}
         companyName={analysisData?.company?.name || ""}
         businessContext={analysisData}
       />
