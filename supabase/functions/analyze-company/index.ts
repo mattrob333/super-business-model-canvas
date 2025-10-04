@@ -83,10 +83,31 @@ OPTIONAL INFORMATION (only if easily available):
    - Cost Structure: Major cost drivers in the business
    - Revenue Streams: How the company generates income
 
-3. Top 3-5 direct competitors with:
-   - Company name
-   - Brief description (what they do and how they compete)
-   - Website URL
+3. Competitive Landscape Analysis:
+   
+   CRITICAL: Find competitors based on FUNCTION, not name similarity.
+   
+   Step 1: Identify the company's core value proposition and target customers
+   Step 2: Search for companies that:
+      - Serve the same customer segments
+      - Solve similar problems or provide similar solutions
+      - Operate in the same industry/sector
+      - Have overlapping value propositions
+   
+   Step 3: For each competitor, provide:
+      - Company name
+      - Why they compete (focus on overlapping value props, not name)
+      - Their differentiation approach
+      - Website URL
+   
+   IGNORE: Companies with similar names but different industries/value props
+   
+   If the company is new with limited online presence:
+   - Infer competitors from industry benchmarks
+   - Use product/service descriptions to find functional alternatives
+   - Look for established players in the same market category
+   
+   Return 3-5 true functional competitors (companies customers would compare against)
 
 CRITICAL: Return ONLY valid JSON without markdown. Each canvas section MUST be an ARRAY of 3-5 strings.
 
@@ -135,7 +156,7 @@ Return in this exact JSON format:
             messages: [
               {
                 role: 'system',
-                content: 'You are a business research analyst. Research companies thoroughly using web search and return detailed, accurate information in JSON format without markdown.'
+                content: 'You are a business research analyst specializing in competitive intelligence. When identifying competitors, focus on companies that compete for the same customers and solve similar problems, NOT companies with similar names. Use industry analysis and business model overlap to identify true competitive threats. For new companies with limited web presence, infer competitors from their stated industry, value proposition, and target market. Research companies thoroughly using web search and return detailed, accurate information in JSON format without markdown.'
               },
               {
                 role: 'user',
@@ -201,6 +222,18 @@ Return in this exact JSON format:
       // Ensure competitors is an array
       if (!Array.isArray(analysis.competitors)) {
         analysis.competitors = [];
+      }
+      
+      // Validate competitor quality - warn if too many name-similar matches
+      if (analysis.competitors && analysis.competitors.length > 0 && analysis.company?.name) {
+        const companyNameBase = analysis.company.name.split(' ')[0].toLowerCase();
+        const nameSimilarCount = analysis.competitors.filter((comp: any) => 
+          comp.name.toLowerCase().includes(companyNameBase)
+        ).length;
+        
+        if (nameSimilarCount > analysis.competitors.length / 2) {
+          console.warn(`Warning: ${nameSimilarCount}/${analysis.competitors.length} competitors appear name-similar to "${analysis.company.name}" - may need better industry context`);
+        }
       }
       
     } catch (e) {
