@@ -81,10 +81,8 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext }: Busi
             <CanvasCard title="Customer Segments" items={data.customerSegments} span="col-span-1 row-span-2" height="h-[400px]" />
             <CanvasCard title="Key Resources" items={data.keyResources} span="col-span-1" height="h-[200px]" />
             <CanvasCard title="Channels" items={data.channels} span="col-span-1" height="h-[200px]" />
-            <div className="col-span-1 md:col-span-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <CanvasCard title="Cost Structure" items={data.costStructure} height="h-[200px]" />
-              <CanvasCard title="Revenue Streams" items={data.revenueStreams} height="h-[200px]" />
-            </div>
+            <CanvasCard title="Cost Structure" items={data.costStructure} span="col-span-1 md:col-span-3" height="h-[200px]" />
+            <CanvasCard title="Revenue Streams" items={data.revenueStreams} span="col-span-1 md:col-span-2" height="h-[200px]" />
           </div>
         </div>
       </div>
