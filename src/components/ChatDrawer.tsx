@@ -201,13 +201,13 @@ export const ChatDrawer = ({
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl p-4 ${
+                  className={`max-w-[85%] rounded-2xl p-6 ${
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-white/[0.06] border border-white/[0.12]"
                   }`}
                 >
-                  <div className="text-sm leading-relaxed prose prose-sm prose-invert max-w-none">
+                  <div className="prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6">
                     <ReactMarkdown>{message.content}</ReactMarkdown>
                   </div>
                 </div>
