@@ -293,9 +293,11 @@ Website: ${comp.website || 'N/A'}
         <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <h1 className="text-lg md:text-2xl font-semibold tracking-tight">Super Business Model Canvas</h1>
-                <p className="text-xs md:text-sm text-muted-foreground">AI-Powered Strategic Analysis</p>
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="inline-flex items-center bg-[#C4F82A] text-black px-3 md:px-4 py-1 md:py-1.5 rounded-full font-montserrat font-light tracking-wide">
+                  <span className="text-sm md:text-base">SUPER</span>
+                </div>
+                <h1 className="text-sm md:text-xl font-montserrat font-light tracking-wide text-white">BUSINESS MODEL CANVAS</h1>
               </div>
               <div className="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full">
                 <div className="h-1.5 w-1.5 bg-primary rounded-full animate-pulse" />
