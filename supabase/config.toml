@@ -6,5 +6,8 @@ verify_jwt = true
 [functions.bmc-chat]
 verify_jwt = true
 
+[functions.business-overview-chat]
+verify_jwt = true
+
 [functions.competitor-chat]
 verify_jwt = true

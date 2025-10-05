@@ -83,10 +83,84 @@ const Analysis = () => {
       ...analysisData,
       company: updatedData
     });
-    toast({
-      title: "Updated",
-      description: "Business overview updated successfully",
+    
+    // Auto-save if user is logged in
+    if (user && analysisData) {
+      supabase
+        .from('saved_analyses')
+        .update({
+          analysis_data: {
+            ...analysisData,
+            company: updatedData
+          }
+        })
+        .eq('user_id', user.id)
+        .eq('company_name', analysisData.company?.name || 'Unknown Company')
+        .then(() => {
+          toast({
+            title: "Saved",
+            description: "Business overview updated and saved",
+          });
+        });
+    } else {
+      toast({
+        title: "Updated",
+        description: "Business overview updated successfully",
+      });
+    }
+  };
+
+  const handleBMCSectionUpdate = (sectionTitle: string, updatedData: { items: string[]; notes: string }) => {
+    const sectionKeyMap: Record<string, string> = {
+      'Key Partners': 'keyPartners',
+      'Key Activities': 'keyActivities',
+      'Key Resources': 'keyResources',
+      'Value Propositions': 'valuePropositions',
+      'Customer Relationships': 'customerRelationships',
+      'Channels': 'channels',
+      'Customer Segments': 'customerSegments',
+      'Cost Structure': 'costStructure',
+      'Revenue Streams': 'revenueStreams'
+    };
+    
+    const sectionKey = sectionKeyMap[sectionTitle];
+    if (!sectionKey) return;
+
+    const updatedCanvas = {
+      ...analysisData.canvas,
+      [sectionKey]: updatedData.items,
+      [`${sectionKey}_notes`]: updatedData.notes
+    };
+
+    setAnalysisData({
+      ...analysisData,
+      canvas: updatedCanvas
     });
+
+    // Auto-save if user is logged in
+    if (user && analysisData) {
+      supabase
+        .from('saved_analyses')
+        .update({
+          analysis_data: {
+            ...analysisData,
+            canvas: updatedCanvas
+          }
+        })
+        .eq('user_id', user.id)
+        .eq('company_name', analysisData.company?.name || 'Unknown Company')
+        .then(() => {
+          toast({
+            title: "Saved",
+            description: `${sectionTitle} updated and saved`,
+          });
+        });
+    } else {
+      toast({
+        title: "Updated",
+        description: `${sectionTitle} updated successfully`,
+      });
+    }
   };
 
   const saveAnalysis = async () => {
@@ -325,7 +399,8 @@ Website: ${comp.website || 'N/A'}
                   keyExecutives: Array.isArray(analysisData.company?.keyExecutives)
                     ? analysisData.company.keyExecutives
                     : [],
-                  website: analysisData.company?.website || ""
+                  website: analysisData.company?.website || "",
+                  notes: analysisData.company?.notes
                 }}
                 onUpdate={handleBusinessOverviewUpdate}
               />
@@ -343,6 +418,15 @@ Website: ${comp.website || 'N/A'}
                   customerSegments: Array.isArray(analysisData.canvas?.customerSegments) ? analysisData.canvas.customerSegments : [],
                   costStructure: Array.isArray(analysisData.canvas?.costStructure) ? analysisData.canvas.costStructure : [],
                   revenueStreams: Array.isArray(analysisData.canvas?.revenueStreams) ? analysisData.canvas.revenueStreams : [],
+                  keyPartners_notes: analysisData.canvas?.keyPartners_notes,
+                  keyActivities_notes: analysisData.canvas?.keyActivities_notes,
+                  keyResources_notes: analysisData.canvas?.keyResources_notes,
+                  valuePropositions_notes: analysisData.canvas?.valuePropositions_notes,
+                  customerRelationships_notes: analysisData.canvas?.customerRelationships_notes,
+                  channels_notes: analysisData.canvas?.channels_notes,
+                  customerSegments_notes: analysisData.canvas?.customerSegments_notes,
+                  costStructure_notes: analysisData.canvas?.costStructure_notes,
+                  revenueStreams_notes: analysisData.canvas?.revenueStreams_notes,
                 }}
                 companyName={analysisData.company?.name || "Unknown Company"}
                 businessContext={{
@@ -352,6 +436,7 @@ Website: ${comp.website || 'N/A'}
                   keyExecutives: Array.isArray(analysisData.company?.keyExecutives) ? analysisData.company.keyExecutives : [],
                   website: analysisData.company?.website || ""
                 }}
+                onSectionUpdate={handleBMCSectionUpdate}
               />
             </section>
 

@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { MessageSquare } from "lucide-react";
-import { ChatDrawer } from "./ChatDrawer";
+import { Button } from "@/components/ui/button";
+import { BMCSectionEditor } from "./BMCSectionEditor";
 
 interface CanvasSection {
   title: string;
   items: string[];
+  notes?: string;
 }
 
 interface BusinessModelCanvasProps {
@@ -18,6 +20,15 @@ interface BusinessModelCanvasProps {
     customerSegments: string[];
     costStructure: string[];
     revenueStreams: string[];
+    keyPartners_notes?: string;
+    keyActivities_notes?: string;
+    keyResources_notes?: string;
+    valuePropositions_notes?: string;
+    customerRelationships_notes?: string;
+    channels_notes?: string;
+    customerSegments_notes?: string;
+    costStructure_notes?: string;
+    revenueStreams_notes?: string;
   };
   companyName: string;
   businessContext?: {
@@ -27,15 +38,45 @@ interface BusinessModelCanvasProps {
     keyExecutives: { name: string; role: string }[];
     website: string;
   };
+  onSectionUpdate?: (sectionTitle: string, updatedData: { items: string[]; notes: string }) => void;
 }
 
-export const BusinessModelCanvas = ({ data, companyName, businessContext }: BusinessModelCanvasProps) => {
-  const [drawerOpen, setDrawerOpen] = useState(false);
+export const BusinessModelCanvas = ({ data, companyName, businessContext, onSectionUpdate }: BusinessModelCanvasProps) => {
+  const [editorOpen, setEditorOpen] = useState(false);
   const [selectedSection, setSelectedSection] = useState<CanvasSection | null>(null);
 
+  const getSectionKey = (title: string): string => {
+    const mapping: Record<string, string> = {
+      'Key Partners': 'keyPartners',
+      'Key Activities': 'keyActivities',
+      'Key Resources': 'keyResources',
+      'Value Propositions': 'valuePropositions',
+      'Customer Relationships': 'customerRelationships',
+      'Channels': 'channels',
+      'Customer Segments': 'customerSegments',
+      'Cost Structure': 'costStructure',
+      'Revenue Streams': 'revenueStreams'
+    };
+    return mapping[title] || title;
+  };
+
   const handleSectionClick = (title: string, items: string[]) => {
-    setSelectedSection({ title, items });
-    setDrawerOpen(true);
+    const sectionKey = getSectionKey(title);
+    const notesKey = `${sectionKey}_notes` as keyof typeof data;
+    const notes = data[notesKey] as string | undefined;
+    setSelectedSection({ title, items, notes });
+    setEditorOpen(true);
+  };
+
+  const handleSectionSave = (updatedData: { items: string[]; notes: string }) => {
+    if (selectedSection && onSectionUpdate) {
+      onSectionUpdate(selectedSection.title, updatedData);
+      setSelectedSection({
+        ...selectedSection,
+        items: updatedData.items,
+        notes: updatedData.notes
+      });
+    }
   };
 
   const CanvasCard = ({ title, items, span = "col-span-1 row-span-1", height = "h-[200px]" }: { title: string; items: string[]; span?: string; height?: string }) => (
@@ -87,13 +128,16 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext }: Busi
         </div>
       </div>
 
-      <ChatDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        section={selectedSection}
-        companyName={companyName}
-        businessContext={businessContext}
-      />
+      {selectedSection && (
+        <BMCSectionEditor
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          section={selectedSection}
+          companyName={companyName}
+          businessContext={businessContext}
+          onSave={handleSectionSave}
+        />
+      )}
     </>
   );
 };

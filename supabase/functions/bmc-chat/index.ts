@@ -32,7 +32,7 @@ serve(async (req) => {
 
     console.log('Authenticated request received');
 
-    const { section, sectionContent, userMessage, conversationHistory, companyName, businessContext } = await req.json();
+    const { section, sectionContent, sectionNotes, userMessage, conversationHistory, companyName, businessContext } = await req.json();
     
     if (!section || !userMessage) {
       throw new Error('Section and message are required');
@@ -63,6 +63,9 @@ ${contextInfo}
 Current ${section} content:
 ${sectionContent}
 
+${sectionNotes ? `Additional Context/Notes:
+${sectionNotes}
+` : ''}
 You have access to real-time information via web search. Use this to:
 - Find current market trends and data specific to ${businessContext?.industry || 'the industry'}
 - Research competitors and industry benchmarks
