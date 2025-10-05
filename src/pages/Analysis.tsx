@@ -291,82 +291,162 @@ Website: ${comp.website || 'N/A'}
       {/* Header */}
       <header className="border-b border-white/[0.12] backdrop-blur-sm sticky top-0 z-30 bg-background/80">
         <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1 md:gap-1.5">
-                <div className="inline-flex items-center bg-[#C4F82A] text-black px-2.5 md:px-3 py-0.5 md:py-1 rounded-full font-montserrat font-normal tracking-wide">
-                  <span className="text-sm md:text-xl">SUPER</span>
+          <div className="flex items-start md:items-center justify-between gap-3">
+            {/* Logo - Mobile: Stacked, Desktop: Horizontal */}
+            <div className="flex-1">
+              <div className="hidden md:flex items-center gap-1.5">
+                <div className="inline-flex items-center bg-[#C4F82A] text-black px-3 py-1 rounded-full font-montserrat font-normal tracking-wide">
+                  <span className="text-xl">SUPER</span>
                 </div>
-                <h1 className="text-sm md:text-xl font-montserrat font-light tracking-wide text-white">BUSINESS MODEL CANVAS</h1>
+                <h1 className="text-xl font-montserrat font-light tracking-wide text-white">BUSINESS MODEL CANVAS</h1>
               </div>
-              <div className="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full">
-                <div className="h-1.5 w-1.5 bg-primary rounded-full animate-pulse" />
-                <span className="label-tech text-primary text-[9px]">Powered by AI</span>
+              
+              {/* Mobile Logo - Stacked */}
+              <div className="md:hidden flex flex-col gap-0.5">
+                <div className="inline-flex items-center bg-[#C4F82A] text-black px-2.5 py-0.5 rounded-full font-montserrat font-normal tracking-wide w-fit">
+                  <span className="text-sm">SUPER</span>
+                </div>
+                <div className="font-montserrat font-light tracking-wide text-white text-sm leading-tight">
+                  <div>BUSINESS MODEL</div>
+                  <div>CANVAS</div>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 md:gap-3">
-              {hasAnalyzed && !isLoading && analysisData && (
-                <>
-                  <Button 
-                    onClick={saveAnalysis}
-                    variant="outline" 
-                    size="sm"
-                    className="gap-2 h-8 md:h-9 text-xs md:text-sm"
-                    disabled={isSaving}
-                  >
-                    <Save className="h-3 w-3 md:h-4 md:w-4" />
-                    {isSaving ? "Saving..." : "Save"}
-                  </Button>
-                  <Button 
-                    onClick={copyToMarkdown}
-                    variant="outline" 
-                    size="sm"
-                    className="gap-2 h-8 md:h-9 text-xs md:text-sm"
-                  >
-                    {copied ? <Check className="h-3 w-3 md:h-4 md:w-4" /> : <Copy className="h-3 w-3 md:h-4 md:w-4" />}
-                    {copied ? "Copied!" : "Copy"}
-                  </Button>
-                </>
-              )}
-              
-              {user ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <User className="h-4 w-4" />
-                      <span className="hidden md:inline">{user.email?.split('@')[0]}</span>
+
+            {/* Right Side Controls */}
+            <div className="flex flex-col md:flex-row items-end md:items-center gap-2 md:gap-3">
+              {/* Action Buttons - Desktop */}
+              <div className="hidden md:flex items-center gap-3">
+                {hasAnalyzed && !isLoading && analysisData && (
+                  <>
+                    <Button 
+                      onClick={saveAnalysis}
+                      variant="outline" 
+                      size="sm"
+                      className="gap-2 h-9 text-sm"
+                      disabled={isSaving}
+                    >
+                      <Save className="h-4 w-4" />
+                      {isSaving ? "Saving..." : "Save"}
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem onClick={() => navigate('/my-analyses')}>
-                      My Analyses
-                    </DropdownMenuItem>
-                    {isAdmin && (
-                      <DropdownMenuItem onClick={() => navigate('/admin')}>
-                        <Shield className="mr-2 h-4 w-4" />
-                        Admin Dashboard
+                    <Button 
+                      onClick={copyToMarkdown}
+                      variant="outline" 
+                      size="sm"
+                      className="gap-2 h-9 text-sm"
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copied ? "Copied!" : "Copy"}
+                    </Button>
+                  </>
+                )}
+                
+                {user ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <User className="h-4 w-4" />
+                        <span>{user.email?.split('@')[0]}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => navigate('/my-analyses')}>
+                        My Analyses
                       </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Sign Out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => navigate('/auth')}
-                >
-                  Sign In
-                </Button>
-              )}
-              
-              <div className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
-                <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                <span className="label-tech text-primary text-[10px]">Powered by AI</span>
+                      {isAdmin && (
+                        <DropdownMenuItem onClick={() => navigate('/admin')}>
+                          <Shield className="mr-2 h-4 w-4" />
+                          Admin Dashboard
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleSignOut}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => navigate('/auth')}
+                  >
+                    Sign In
+                  </Button>
+                )}
+                
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
+                  <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
+                  <span className="label-tech text-primary text-[10px]">Powered by AI</span>
+                </div>
+              </div>
+
+              {/* Mobile Controls */}
+              <div className="md:hidden flex flex-col items-end gap-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full">
+                  <div className="h-1.5 w-1.5 bg-primary rounded-full animate-pulse" />
+                  <span className="label-tech text-primary text-[8px] whitespace-nowrap">POWERED BY AI</span>
+                </div>
+                
+                {user ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                        <User className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => navigate('/my-analyses')}>
+                        My Analyses
+                      </DropdownMenuItem>
+                      {isAdmin && (
+                        <DropdownMenuItem onClick={() => navigate('/admin')}>
+                          <Shield className="mr-2 h-4 w-4" />
+                          Admin Dashboard
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleSignOut}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="h-8"
+                    onClick={() => navigate('/auth')}
+                  >
+                    Sign In
+                  </Button>
+                )}
+                
+                {hasAnalyzed && !isLoading && analysisData && (
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={saveAnalysis}
+                      variant="outline" 
+                      size="sm"
+                      className="gap-2 h-8 text-xs"
+                      disabled={isSaving}
+                    >
+                      <Save className="h-3 w-3" />
+                      {isSaving ? "Saving..." : "Save"}
+                    </Button>
+                    <Button 
+                      onClick={copyToMarkdown}
+                      variant="outline" 
+                      size="sm"
+                      className="gap-2 h-8 text-xs"
+                    >
+                      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                      {copied ? "Copied!" : "Copy"}
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -385,7 +465,7 @@ Website: ${comp.website || 'N/A'}
       {/* Main Content */}
       <main className="container mx-auto px-6 py-12 space-y-16">
         {/* Input Section */}
-        <section className="pt-8">
+        <section className="pt-2 md:pt-8">
           <UrlInput onAnalyze={handleAnalyze} isLoading={isLoading} />
         </section>
 
