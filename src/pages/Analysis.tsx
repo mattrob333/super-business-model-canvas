@@ -466,7 +466,16 @@ Website: ${comp.website || 'N/A'}
       <main className="container mx-auto px-6 py-12 space-y-16">
         {/* Input Section */}
         <section className="pt-2 md:pt-8">
-          <UrlInput onAnalyze={handleAnalyze} isLoading={isLoading} />
+          <div className="w-full max-w-7xl mx-auto">
+            <div className="space-y-6">
+              <div className="space-y-1">
+                <span className="label-tech text-muted-foreground">Company Analysis</span>
+                <h2 className="text-3xl font-semibold tracking-tight">Get Started</h2>
+                <p className="text-muted-foreground text-sm">Enter a company URL to generate comprehensive business insights</p>
+              </div>
+              <UrlInput onAnalyze={handleAnalyze} isLoading={isLoading} />
+            </div>
+          </div>
         </section>
 
         {/* Results Section */}
