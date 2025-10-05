@@ -306,7 +306,7 @@ Website: ${comp.website || 'N/A'}
                 <div className="inline-flex items-center bg-[#C4F82A] text-black px-2.5 py-0.5 rounded-full font-montserrat font-normal tracking-wide w-fit">
                   <span className="text-sm">SUPER</span>
                 </div>
-                <div className="font-montserrat font-light tracking-wide text-white text-sm leading-tight">
+                <div className="font-montserrat font-light tracking-wide text-white text-sm leading-tight pl-2.5">
                   <div>BUSINESS MODEL</div>
                   <div>CANVAS</div>
                 </div>
