@@ -159,7 +159,7 @@ export const ChatDrawer = ({
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-[500px] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 h-full w-full md:max-w-[500px] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="border-b border-white/[0.12] p-6 flex items-center justify-between">
           <div className="space-y-1">

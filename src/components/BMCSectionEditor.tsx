@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReactMarkdown from "react-markdown";
 import { useToast } from "@/hooks/use-toast";
 
@@ -148,9 +149,156 @@ export const BMCSectionEditor = ({
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 h-full w-full md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300">
+        {/* Mobile Tabs Layout */}
+        <div className="flex-1 md:hidden flex flex-col">
+          <Tabs defaultValue="edit" className="flex-1 flex flex-col">
+            <div className="border-b border-white/[0.12] px-6 pt-6 pb-4 flex items-center justify-between">
+              <TabsList className="bg-white/[0.05]">
+                <TabsTrigger value="edit">Edit</TabsTrigger>
+                <TabsTrigger value="chat">AI Chat</TabsTrigger>
+              </TabsList>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onOpenChange(false)}
+                className="hover:bg-white/[0.1]"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <TabsContent value="edit" className="flex-1 flex flex-col mt-0">
+              <ScrollArea className="flex-1 p-6">
+                <div className="space-y-4">
+                  {/* Bullet Points */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Content Items</label>
+                      <Button onClick={addItem} size="sm" variant="outline" className="h-8">
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                    {editedItems.map((item, index) => (
+                      <div key={index} className="flex gap-2">
+                        <Input
+                          value={item}
+                          onChange={(e) => updateItem(index, e.target.value)}
+                          className="flex-1 bg-white/[0.05] border-white/[0.12]"
+                          placeholder={`Item ${index + 1}`}
+                        />
+                        <Button
+                          onClick={() => removeItem(index)}
+                          size="icon"
+                          variant="ghost"
+                          className="h-10 w-10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Notes Field */}
+                  <div className="space-y-2 pt-4">
+                    <label className="text-sm font-medium">Additional Notes</label>
+                    <Textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Add context or details for AI chat (not visible on main canvas)"
+                      className="min-h-[150px] bg-white/[0.05] border-white/[0.12]"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      These notes will be included in AI chat context but won't appear on the main canvas
+                    </p>
+                  </div>
+                </div>
+              </ScrollArea>
+
+              {/* Save Button */}
+              <div className="border-t border-white/[0.12] p-6">
+                <Button onClick={handleSave} className="w-full" size="lg">
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
+              {/* Header */}
+              <div className="border-b border-white/[0.12] p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="label-tech text-primary">AI Assistant</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Chat & Refine</h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleClearChat}
+                    className="hover:bg-white/[0.1]"
+                    title="Clear chat"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Chat Area */}
+              <ScrollArea className="flex-1 p-6">
+                <div ref={scrollRef} className="space-y-4">
+                  {messages.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl p-4 ${
+                          message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-white/[0.06] border border-white/[0.12]"
+                        }`}
+                      >
+                        <div className="text-sm leading-relaxed prose prose-sm prose-invert max-w-none">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              {/* Input Area */}
+              <div className="border-t border-white/[0.12] p-6">
+                <div className="flex gap-3">
+                  <Input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Ask for suggestions or improvements..."
+                    className="flex-1 bg-white/[0.05] border-white/[0.12] focus:border-primary"
+                  />
+                  <Button
+                    onClick={handleSend}
+                    disabled={!input.trim()}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Press Enter to send, Shift+Enter for new line
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Desktop Side-by-Side Layout */}
         {/* Left Panel - Edit Form */}
-        <div className="w-[55%] border-r border-white/[0.12] flex flex-col">
+        <div className="hidden md:flex md:w-[55%] border-r border-white/[0.12] flex-col">
           {/* Header */}
           <div className="border-b border-white/[0.12] p-6">
             <h2 className="text-xl font-semibold">{section.title}</h2>
@@ -215,7 +363,7 @@ export const BMCSectionEditor = ({
         </div>
 
         {/* Right Panel - AI Chat */}
-        <div className="w-[45%] flex flex-col">
+        <div className="hidden md:flex md:w-[45%] flex-col">
           {/* Header */}
           <div className="border-b border-white/[0.12] p-6 flex items-center justify-between">
             <div className="space-y-1">
