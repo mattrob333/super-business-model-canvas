@@ -113,21 +113,17 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
             <p className="text-muted-foreground text-sm">Click any section to explore deeper insights</p>
           </div>
 
-          {/* Single Grid - Business Model Canvas */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1" height="h-[412px]" />
-            <CanvasCard title="Key Activities" items={data.keyActivities} span="col-span-1" height="h-[200px]" />
-            <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1" height="h-[412px]" />
-            <CanvasCard title="Customer Relationships" items={data.customerRelationships} span="col-span-1" height="h-[200px]" />
-            <CanvasCard title="Customer Segments" items={data.customerSegments} span="col-span-1" height="h-[412px]" />
-            <CanvasCard title="Key Resources" items={data.keyResources} span="col-span-1" height="h-[200px]" />
-            <CanvasCard title="Channels" items={data.channels} span="col-span-1" height="h-[200px]" />
-          </div>
-          
-          {/* Bottom Row - 50/50 Split */}
-          <div className="flex flex-col md:flex-row gap-3">
-            <CanvasCard title="Cost Structure" items={data.costStructure} span="flex-1" height="h-[200px]" />
-            <CanvasCard title="Revenue Streams" items={data.revenueStreams} span="flex-1" height="h-[200px]" />
+          {/* Business Model Canvas - Tight Grid Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 auto-rows-[200px]">
+            <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1 row-span-2" height="h-full" />
+            <CanvasCard title="Key Activities" items={data.keyActivities} span="col-span-1" height="h-full" />
+            <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1 row-span-2" height="h-full" />
+            <CanvasCard title="Customer Relationships" items={data.customerRelationships} span="col-span-1" height="h-full" />
+            <CanvasCard title="Customer Segments" items={data.customerSegments} span="col-span-1 row-span-2" height="h-full" />
+            <CanvasCard title="Key Resources" items={data.keyResources} span="col-span-1" height="h-full" />
+            <CanvasCard title="Channels" items={data.channels} span="col-span-1" height="h-full" />
+            <CanvasCard title="Cost Structure" items={data.costStructure} span="col-span-1 md:col-span-2.5" height="h-full" />
+            <CanvasCard title="Revenue Streams" items={data.revenueStreams} span="col-span-1 md:col-span-2.5" height="h-full" />
           </div>
         </div>
       </div>
