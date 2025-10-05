@@ -293,7 +293,7 @@ Website: ${comp.website || 'N/A'}
         <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 md:gap-2">
+              <div className="flex items-center gap-1 md:gap-1.5">
                 <div className="inline-flex items-center bg-[#C4F82A] text-black px-2.5 md:px-3 py-0.5 md:py-1 rounded-full font-montserrat font-normal tracking-wide">
                   <span className="text-sm md:text-xl">SUPER</span>
                 </div>
