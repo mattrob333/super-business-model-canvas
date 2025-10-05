@@ -72,8 +72,8 @@ const Landing = () => {
       <header className="border-b border-white/[0.12] backdrop-blur-sm sticky top-0 z-30 bg-background/80">
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="inline-flex items-center bg-[#C4F82A] text-black px-4 py-1.5 rounded-full font-montserrat font-light tracking-wide">
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center bg-[#C4F82A] text-black px-4 py-1.5 rounded-full font-montserrat font-bold tracking-wide">
                 <span className="text-base">SUPER</span>
               </div>
               <h1 className="text-xl font-montserrat font-light tracking-wide text-white">BUSINESS MODEL CANVAS</h1>
