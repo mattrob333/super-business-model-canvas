@@ -43,18 +43,15 @@ export const BMCSectionEditor = ({
   useEffect(() => {
     setEditedItems(section.items);
     setNotes(section.notes || "");
-  }, [section]);
+    // Reset messages when section changes to show correct welcome message
+    setMessages([
+      {
+        role: "assistant",
+        content: `I can help you refine ${companyName}'s **${section.title}**. You can ask me to:\n\n• Suggest improvements\n• Analyze the current approach\n• Compare to industry best practices\n• Identify missing elements`,
+      },
+    ]);
+  }, [section, companyName]);
 
-  useEffect(() => {
-    if (open && messages.length === 0) {
-      setMessages([
-        {
-          role: "assistant",
-          content: `I can help you refine ${companyName}'s **${section.title}**. You can ask me to:\n\n• Suggest improvements\n• Analyze the current approach\n• Compare to industry best practices\n• Identify missing elements`,
-        },
-      ]);
-    }
-  }, [open, section, companyName]);
 
   useEffect(() => {
     if (scrollRef.current) {
