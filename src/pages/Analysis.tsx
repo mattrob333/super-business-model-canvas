@@ -373,6 +373,15 @@ Website: ${comp.website || 'N/A'}
         </div>
       </header>
 
+      {/* Tagline */}
+      <div className="border-b border-white/[0.12] pb-8">
+        <div className="container mx-auto px-6 pt-8">
+          <p className="text-center text-muted-foreground font-montserrat font-light text-sm md:text-base tracking-wide">
+            AI-Powered Strategic Business Analysis
+          </p>
+        </div>
+      </div>
+
       {/* Main Content */}
       <main className="container mx-auto px-6 py-12 space-y-16">
         {/* Input Section */}
