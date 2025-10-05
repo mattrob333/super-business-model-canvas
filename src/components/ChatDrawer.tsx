@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Sparkles } from "lucide-react";
+import { X, Send, Sparkles, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -128,6 +128,26 @@ export const ChatDrawer = ({
     }
   };
 
+  const handleClearChat = () => {
+    setMessages([]);
+    // Re-initialize with welcome message
+    if (mode === 'competitor' && competitor) {
+      setMessages([
+        {
+          role: "assistant",
+          content: `I'm here to help you analyze **${competitor.name}** as a similar company to ${companyName}. You can ask me to:\n\n• Explain their market positioning\n• Analyze their strengths and weaknesses\n• Compare them to ${companyName}\n• Identify strategic opportunities`,
+        },
+      ]);
+    } else if (mode === 'bmc' && section) {
+      setMessages([
+        {
+          role: "assistant",
+          content: `I can help you analyze ${companyName}'s ${section.title}. You can ask me to:\n\n• Summarize their approach\n• Suggest improvements\n• Compare to similar companies\n• Identify opportunities`,
+        },
+      ]);
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -151,14 +171,25 @@ export const ChatDrawer = ({
               {mode === 'competitor' && competitor ? competitor.name : section?.title}
             </h2>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onOpenChange(false)}
-            className="hover:bg-white/[0.1]"
-          >
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClearChat}
+              className="hover:bg-white/[0.1]"
+              title="Clear chat"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenChange(false)}
+              className="hover:bg-white/[0.1]"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Chat Area */}
