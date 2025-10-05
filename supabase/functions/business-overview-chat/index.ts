@@ -1,4 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,7 +10,7 @@ interface Message {
   content: string;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -120,7 +120,7 @@ Always consider the full context including the additional notes field when provi
     console.error('Error in business-overview-chat function:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'An error occurred',
+        error: error instanceof Error ? error.message : 'An error occurred',
         response: 'Sorry, I encountered an error processing your request. Please try again.' 
       }),
       { 
