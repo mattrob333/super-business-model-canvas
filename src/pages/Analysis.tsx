@@ -295,7 +295,7 @@ Website: ${comp.website || 'N/A'}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 md:gap-2">
                 <div className="inline-flex items-center bg-[#C4F82A] text-black px-3 md:px-4 py-1 md:py-1.5 rounded-full font-montserrat font-bold tracking-wide">
-                  <span className="text-sm md:text-base">SUPER</span>
+                  <span className="text-sm md:text-xl">SUPER</span>
                 </div>
                 <h1 className="text-sm md:text-xl font-montserrat font-light tracking-wide text-white">BUSINESS MODEL CANVAS</h1>
               </div>
