@@ -153,7 +153,7 @@ export const BMCSectionEditor = ({
       {/* Drawer */}
       <div className="fixed right-0 top-0 h-full w-full max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300">
         {/* Left Panel - Edit Form */}
-        <div className="w-[40%] border-r border-white/[0.12] flex flex-col">
+        <div className="w-[55%] border-r border-white/[0.12] flex flex-col">
           {/* Header */}
           <div className="border-b border-white/[0.12] p-6">
             <h2 className="text-xl font-semibold">{section.title}</h2>
@@ -218,7 +218,7 @@ export const BMCSectionEditor = ({
         </div>
 
         {/* Right Panel - AI Chat */}
-        <div className="w-[60%] flex flex-col">
+        <div className="w-[45%] flex flex-col">
           {/* Header */}
           <div className="border-b border-white/[0.12] p-6 flex items-center justify-between">
             <div className="space-y-1">
