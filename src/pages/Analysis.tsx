@@ -374,9 +374,9 @@ Website: ${comp.website || 'N/A'}
       </header>
 
       {/* Tagline */}
-      <div className="border-b border-white/[0.12] pb-8">
-        <div className="container mx-auto px-6 pt-8">
-          <p className="text-center text-muted-foreground font-montserrat font-light text-sm md:text-base tracking-wide">
+      <div className="bg-background">
+        <div className="container mx-auto px-4 md:px-6 pt-4 pb-8">
+          <p className="text-muted-foreground font-montserrat font-light text-sm md:text-base tracking-wide">
             AI-Powered Strategic Business Analysis
           </p>
         </div>
