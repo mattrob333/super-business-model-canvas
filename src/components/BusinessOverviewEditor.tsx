@@ -382,22 +382,27 @@ export const BusinessOverviewEditor = ({
                           ? "prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6"
                           : "prose prose-invert max-w-none [&>p]:mb-0"
                       }>
-                        <ReactMarkdown
-                          components={{
-                            table: ({ node, ...props }) => (
-                              <div className="my-6 w-full overflow-x-auto">
-                                <Table {...props} />
-                              </div>
-                            ),
-                            thead: ({ node, ...props }) => <TableHeader {...props} />,
-                            tbody: ({ node, ...props }) => <TableBody {...props} />,
-                            tr: ({ node, ...props }) => <TableRow {...props} />,
-                            th: ({ node, ...props }) => <TableHead {...props} />,
-                            td: ({ node, ...props }) => <TableCell {...props} />,
-                          }}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              table: ({ node, ...props }) => (
+                                <div className="my-6 w-full overflow-x-auto">
+                                  <Table {...props} />
+                                </div>
+                              ),
+                              thead: ({ node, ...props }) => <TableHeader {...props} />,
+                              tbody: ({ node, ...props }) => <TableBody {...props} />,
+                              tr: ({ node, ...props }) => <TableRow {...props} />,
+                              th: ({ node, ...props }) => (
+                                <TableHead {...props} />
+                              ),
+                              td: ({ node, ...props }) => (
+                                <TableCell {...props} />
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
                       </div>
                       </div>
                     </div>
@@ -633,22 +638,27 @@ export const BusinessOverviewEditor = ({
                         ? "prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6"
                         : "prose prose-invert max-w-none [&>p]:mb-0"
                     }>
-                      <ReactMarkdown
-                        components={{
-                          table: ({ node, ...props }) => (
-                            <div className="my-6 w-full overflow-x-auto">
-                              <Table {...props} />
-                            </div>
-                          ),
-                          thead: ({ node, ...props }) => <TableHeader {...props} />,
-                          tbody: ({ node, ...props }) => <TableBody {...props} />,
-                          tr: ({ node, ...props }) => <TableRow {...props} />,
-                          th: ({ node, ...props }) => <TableHead {...props} />,
-                          td: ({ node, ...props }) => <TableCell {...props} />,
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            table: ({ node, ...props }) => (
+                              <div className="my-6 w-full overflow-x-auto">
+                                <Table {...props} />
+                              </div>
+                            ),
+                            thead: ({ node, ...props }) => <TableHeader {...props} />,
+                            tbody: ({ node, ...props }) => <TableBody {...props} />,
+                            tr: ({ node, ...props }) => <TableRow {...props} />,
+                            th: ({ node, ...props }) => (
+                              <TableHead {...props} />
+                            ),
+                            td: ({ node, ...props }) => (
+                              <TableCell {...props} />
+                            ),
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
                     </div>
                   </div>
                 </div>
