@@ -226,35 +226,45 @@ ${analysisData.company?.productsServices?.map((p: string) => `- ${p}`).join('\n'
 
 ### Key Leadership
 ${analysisData.company?.keyExecutives?.map((e: any) => `- ${e.name} - ${e.role}`).join('\n') || '- N/A'}
+${analysisData.company?.notes ? `\n**Additional Notes:**\n${analysisData.company.notes}\n` : ''}
 
 ## Business Model Canvas
 
 ### Key Partners
 ${analysisData.canvas?.keyPartners?.map((p: string) => `- ${p}`).join('\n') || '- N/A'}
+${analysisData.canvas?.keyPartners_notes ? `\n**Additional Notes:**\n${analysisData.canvas.keyPartners_notes}\n` : ''}
 
 ### Key Activities
 ${analysisData.canvas?.keyActivities?.map((a: string) => `- ${a}`).join('\n') || '- N/A'}
+${analysisData.canvas?.keyActivities_notes ? `\n**Additional Notes:**\n${analysisData.canvas.keyActivities_notes}\n` : ''}
 
 ### Key Resources
 ${analysisData.canvas?.keyResources?.map((r: string) => `- ${r}`).join('\n') || '- N/A'}
+${analysisData.canvas?.keyResources_notes ? `\n**Additional Notes:**\n${analysisData.canvas.keyResources_notes}\n` : ''}
 
 ### Value Propositions
 ${analysisData.canvas?.valuePropositions?.map((v: string) => `- ${v}`).join('\n') || '- N/A'}
+${analysisData.canvas?.valuePropositions_notes ? `\n**Additional Notes:**\n${analysisData.canvas.valuePropositions_notes}\n` : ''}
 
 ### Customer Relationships
 ${analysisData.canvas?.customerRelationships?.map((c: string) => `- ${c}`).join('\n') || '- N/A'}
+${analysisData.canvas?.customerRelationships_notes ? `\n**Additional Notes:**\n${analysisData.canvas.customerRelationships_notes}\n` : ''}
 
 ### Channels
 ${analysisData.canvas?.channels?.map((c: string) => `- ${c}`).join('\n') || '- N/A'}
+${analysisData.canvas?.channels_notes ? `\n**Additional Notes:**\n${analysisData.canvas.channels_notes}\n` : ''}
 
 ### Customer Segments
 ${analysisData.canvas?.customerSegments?.map((s: string) => `- ${s}`).join('\n') || '- N/A'}
+${analysisData.canvas?.customerSegments_notes ? `\n**Additional Notes:**\n${analysisData.canvas.customerSegments_notes}\n` : ''}
 
 ### Cost Structure
 ${analysisData.canvas?.costStructure?.map((c: string) => `- ${c}`).join('\n') || '- N/A'}
+${analysisData.canvas?.costStructure_notes ? `\n**Additional Notes:**\n${analysisData.canvas.costStructure_notes}\n` : ''}
 
 ### Revenue Streams
 ${analysisData.canvas?.revenueStreams?.map((r: string) => `- ${r}`).join('\n') || '- N/A'}
+${analysisData.canvas?.revenueStreams_notes ? `\n**Additional Notes:**\n${analysisData.canvas.revenueStreams_notes}\n` : ''}
 
 ## Similar Companies
 
