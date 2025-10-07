@@ -67,15 +67,28 @@ Guidelines:
 
 Always consider the full context including the additional notes field when providing advice.`;
 
-    // Filter conversation history to last 10 messages
+    // Filter conversation history to ensure proper user-assistant alternation
+    const filteredHistory: Message[] = [];
     const recentHistory = conversationHistory.slice(-10);
+    
+    for (let i = 0; i < recentHistory.length; i++) {
+      const msg = recentHistory[i];
+      const lastMsg = filteredHistory[filteredHistory.length - 1];
+      
+      // Skip if this would create consecutive messages of the same role
+      if (lastMsg && lastMsg.role === msg.role) {
+        continue;
+      }
+      
+      // Only include if it maintains alternation
+      if (msg.role === 'user' || (msg.role === 'assistant' && lastMsg?.role === 'user')) {
+        filteredHistory.push(msg);
+      }
+    }
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...recentHistory.map((msg: Message) => ({
-        role: msg.role,
-        content: msg.content
-      })),
+      ...filteredHistory,
       { role: "user", content: userMessage }
     ];
 

@@ -76,16 +76,24 @@ Leverage the company context above to provide highly relevant, specific advice. 
 
 Provide insightful, actionable, data-driven advice. Be specific, cite sources when using web data, and reference the actual content when relevant. Keep responses concise but valuable.`;
 
-    // Filter conversation history to only include user-assistant exchanges (skip initial greeting)
-    const filteredHistory = (conversationHistory || []).filter((msg: any, index: number) => {
-      // Keep all user messages
-      if (msg.role === 'user') return true;
-      // For assistant messages, only keep if there's a preceding user message
-      if (msg.role === 'assistant' && index > 0) {
-        return conversationHistory[index - 1]?.role === 'user';
+    // Filter conversation history to ensure proper user-assistant alternation
+    const filteredHistory: any[] = [];
+    const history = conversationHistory || [];
+    
+    for (let i = 0; i < history.length; i++) {
+      const msg = history[i];
+      const lastMsg = filteredHistory[filteredHistory.length - 1];
+      
+      // Skip if this would create consecutive messages of the same role
+      if (lastMsg && lastMsg.role === msg.role) {
+        continue;
       }
-      return false;
-    });
+      
+      // Only include if it maintains alternation
+      if (msg.role === 'user' || (msg.role === 'assistant' && lastMsg?.role === 'user')) {
+        filteredHistory.push(msg);
+      }
+    }
 
     const messages = [
       { role: 'system', content: systemPrompt },
