@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Save, LogOut, User, Shield, Search } from "lucide-react";
+import { Copy, Check, Save, LogOut, User, Shield, Search, ChevronUp } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,7 @@ const Analysis = () => {
       try {
         setAnalysisData(JSON.parse(loadedAnalysis));
         setHasAnalyzed(true);
+        setSearchCollapsed(true);
         sessionStorage.removeItem('loadedAnalysis');
       } catch (error) {
         console.error('Failed to load analysis:', error);
@@ -318,9 +319,18 @@ Website: ${comp.website || 'N/A'}
     setSimilarCompanyChatOpen(true);
   };
 
-  const handleNewSearch = () => {
-    setSearchCollapsed(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleSearchToggle = () => {
+    if (searchCollapsed) {
+      // Currently collapsed → expand it
+      setSearchCollapsed(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (hasAnalyzed && analysisData) {
+      // Currently expanded with results → collapse it
+      setSearchCollapsed(true);
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300);
+    }
   };
 
   return (
@@ -514,7 +524,7 @@ Website: ${comp.website || 'N/A'}
                 </div>
               </div>
               <Button
-                onClick={handleNewSearch}
+                onClick={handleSearchToggle}
                 variant="outline"
                 size="sm"
                 className="gap-2 flex-shrink-0"
@@ -536,6 +546,21 @@ Website: ${comp.website || 'N/A'}
                 <p className="text-muted-foreground text-sm">Enter a company URL to generate comprehensive business insights</p>
               </div>
               <UrlInput onAnalyze={handleAnalyze} isLoading={isLoading} />
+              
+              {/* Collapse button when results exist */}
+              {hasAnalyzed && analysisData && !isLoading && (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    onClick={handleSearchToggle}
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                    <span>Collapse and view results</span>
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </section>
