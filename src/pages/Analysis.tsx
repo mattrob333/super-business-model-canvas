@@ -45,6 +45,8 @@ const Analysis = () => {
         setHasAnalyzed(true);
         setSearchCollapsed(true);
         sessionStorage.removeItem('loadedAnalysis');
+        // Ensure page starts at the top
+        window.scrollTo({ top: 0, behavior: 'auto' });
       } catch (error) {
         console.error('Failed to load analysis:', error);
       }
