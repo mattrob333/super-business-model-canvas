@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
 import { LoadingState } from "@/components/LoadingState";
@@ -32,6 +32,8 @@ const Analysis = () => {
   const [similarCompanyChatOpen, setSimilarCompanyChatOpen] = useState(false);
   const [selectedSimilarCompany, setSelectedSimilarCompany] = useState<any>(null);
   const [recentAnalyses, setRecentAnalyses] = useState<any[]>([]);
+  const [searchCollapsed, setSearchCollapsed] = useState(false);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Load saved analysis from sessionStorage if available
@@ -75,10 +77,16 @@ const Analysis = () => {
       if (data) {
         setAnalysisData(data);
         setHasAnalyzed(true);
+        setSearchCollapsed(true);
         toast({
           title: "Analysis Complete",
           description: "Business model canvas generated successfully",
         });
+        
+        // Scroll to results after a brief delay
+        setTimeout(() => {
+          resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
       }
     } catch (error: any) {
       console.error('Analysis error:', error);
@@ -310,6 +318,11 @@ Website: ${comp.website || 'N/A'}
     setSimilarCompanyChatOpen(true);
   };
 
+  const handleNewSearch = () => {
+    setSearchCollapsed(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -488,8 +501,34 @@ Website: ${comp.website || 'N/A'}
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-12 space-y-16">
+        
+        {/* Collapsed Search Bar - Shows when results are loaded */}
+        {searchCollapsed && hasAnalyzed && !isLoading && (
+          <div className="sticky top-[88px] z-20 animate-in fade-in slide-in-from-top duration-300 -mx-6 px-6">
+            <div className="bg-white/[0.04] backdrop-blur-sm border border-white/[0.08] rounded-lg px-4 md:px-6 py-3 flex items-center justify-between gap-4 max-w-7xl mx-auto">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Search className="h-5 w-5 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-muted-foreground">Analyzing</p>
+                  <p className="text-base font-medium truncate">{analysisData?.company?.name || 'Company'}</p>
+                </div>
+              </div>
+              <Button
+                onClick={handleNewSearch}
+                variant="outline"
+                size="sm"
+                className="gap-2 flex-shrink-0"
+              >
+                <Search className="h-4 w-4" />
+                <span className="hidden md:inline">New Search</span>
+              </Button>
+            </div>
+          </div>
+        )}
+        
         {/* Input Section */}
-        <section className="pt-0 md:pt-4">
+        {!searchCollapsed && (
+          <section className="pt-0 md:pt-4 animate-in fade-in slide-in-from-top duration-300">
           <div className="w-full max-w-7xl mx-auto">
             <div className="space-y-6">
               <div className="space-y-1">
@@ -500,9 +539,10 @@ Website: ${comp.website || 'N/A'}
             </div>
           </div>
         </section>
+        )}
 
         {/* Recent Analyses Section */}
-        {!hasAnalyzed && !isLoading && recentAnalyses.length > 0 && (
+        {!searchCollapsed && !hasAnalyzed && !isLoading && recentAnalyses.length > 0 && (
           <section className="w-full max-w-7xl mx-auto">
             <h2 className="text-2xl font-semibold text-white mb-8">
               Recent Analyses
@@ -515,6 +555,10 @@ Website: ${comp.website || 'N/A'}
                   onClick={() => {
                     setAnalysisData(analysis.analysis_data);
                     setHasAnalyzed(true);
+                    setSearchCollapsed(true);
+                    setTimeout(() => {
+                      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 300);
                   }}
                   className="card-mono card-mono-hover text-left h-36 flex flex-col p-6 group"
                 >
@@ -539,7 +583,7 @@ Website: ${comp.website || 'N/A'}
         )}
 
         {hasAnalyzed && !isLoading && analysisData && (
-          <div className="space-y-16 animate-in fade-in duration-700">
+          <div ref={resultsRef} className="space-y-16 animate-in fade-in slide-in-from-bottom duration-500">
             <section>
               <BusinessOverview 
                 data={{
