@@ -78,12 +78,9 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
       <div className="card-mono">
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="label-tech text-muted-foreground">
-              Company URL
+            <label className="label-tech text-muted-foreground text-[10px] opacity-60">
+              COMPANY URL
             </label>
-            <p className="text-foreground/80 text-sm">
-              Enter any business website to generate an AI-powered strategic analysis
-            </p>
           </div>
           
           <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 md:gap-4">
@@ -92,7 +89,7 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="example.com or https://example.com"
-              className="flex-1 h-14 px-6 text-base md:text-lg bg-white/[0.05] border-white/[0.12] focus:border-primary"
+              className="flex-1 h-14 px-6 text-base md:text-lg bg-white/[0.12] border-white/[0.20] text-white placeholder:text-muted-foreground focus:bg-white/[0.15] focus:border-primary focus:ring-2 focus:ring-primary/20"
               disabled={isLoading}
             />
             <Button
@@ -104,6 +101,17 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
               {isLoading ? "Analyzing..." : "Analyze"}
             </Button>
           </form>
+          
+          <div className="flex flex-col md:flex-row items-center justify-between gap-2 mt-3 text-xs text-muted-foreground">
+            <p className="text-center md:text-left">
+              Press <kbd className="px-2 py-0.5 text-xs font-semibold bg-white/[0.08] border border-white/[0.12] rounded">Enter</kbd> to analyze
+            </p>
+            {isLoading && (
+              <p className="animate-pulse">
+                Analysis typically completes in 30-60 seconds...
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>

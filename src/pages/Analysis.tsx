@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Save, LogOut, User, Shield } from "lucide-react";
+import { Copy, Check, Save, LogOut, User, Shield, Search } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,7 @@ const Analysis = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [similarCompanyChatOpen, setSimilarCompanyChatOpen] = useState(false);
   const [selectedSimilarCompany, setSelectedSimilarCompany] = useState<any>(null);
+  const [recentAnalyses, setRecentAnalyses] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Load saved analysis from sessionStorage if available
@@ -45,7 +46,20 @@ const Analysis = () => {
         console.error('Failed to load analysis:', error);
       }
     }
-  }, []);
+    
+    // Fetch recent analyses if user is logged in
+    if (user) {
+      supabase
+        .from('saved_analyses')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(3)
+        .then(({ data }) => {
+          if (data) setRecentAnalyses(data);
+        });
+    }
+  }, [user]);
 
   const handleAnalyze = async (url: string) => {
     setIsLoading(true);
@@ -354,9 +368,9 @@ Website: ${comp.website || 'N/A'}
                 {user ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2">
+                      <Button variant="outline" size="sm" className="gap-2 bg-white/[0.08] hover:bg-white/[0.12]">
                         <User className="h-4 w-4" />
-                        <span>{user.email?.split('@')[0]}</span>
+                        <span>{user.email?.split('@')[0] || 'Account'}</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
@@ -402,7 +416,7 @@ Website: ${comp.website || 'N/A'}
                 {user ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0 bg-white/[0.08] hover:bg-white/[0.12]">
                         <User className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -465,7 +479,7 @@ Website: ${comp.website || 'N/A'}
 
       {/* Tagline */}
       <div className="bg-background">
-        <div className="container mx-auto px-4 md:px-6 pt-4 pb-8">
+        <div className="container mx-auto px-4 md:px-6 pt-6 pb-6">
           <p className="text-muted-foreground font-montserrat font-light text-sm md:text-base tracking-wide">
             AI-Powered Strategic Business Analysis
           </p>
@@ -487,6 +501,89 @@ Website: ${comp.website || 'N/A'}
             </div>
           </div>
         </section>
+
+        {/* Quick Access Section */}
+        {!hasAnalyzed && !isLoading && (
+          <section className="w-full max-w-7xl mx-auto">
+            <h2 className="text-2xl font-semibold text-white mb-8">
+              {recentAnalyses.length > 0 ? 'Recent Analyses' : 'Quick Start'}
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {recentAnalyses.length > 0 ? (
+                // Show recent analyses
+                recentAnalyses.map((analysis) => (
+                  <button
+                    key={analysis.id}
+                    onClick={() => {
+                      setAnalysisData(analysis.analysis_data);
+                      setHasAnalyzed(true);
+                    }}
+                    className="card-mono card-mono-hover text-left h-36 flex flex-col justify-between group"
+                  >
+                    <div>
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                        <Search className="h-6 w-6 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
+                        {analysis.company_name}
+                      </h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">View analysis</p>
+                  </button>
+                ))
+              ) : (
+                // Show example companies for new users
+                <>
+                  <button
+                    onClick={() => handleAnalyze('https://www.tesla.com')}
+                    className="card-mono card-mono-hover text-left h-36 flex flex-col justify-between group"
+                  >
+                    <div>
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                        <Search className="h-6 w-6 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
+                        Analyze Tesla
+                      </h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Electric vehicles & energy</p>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleAnalyze('https://www.nike.com')}
+                    className="card-mono card-mono-hover text-left h-36 flex flex-col justify-between group"
+                  >
+                    <div>
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                        <Search className="h-6 w-6 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
+                        Analyze Nike
+                      </h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Athletic footwear & apparel</p>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleAnalyze('https://www.starbucks.com')}
+                    className="card-mono card-mono-hover text-left h-36 flex flex-col justify-between group"
+                  >
+                    <div>
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                        <Search className="h-6 w-6 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
+                        Analyze Starbucks
+                      </h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Coffee & beverages</p>
+                  </button>
+                </>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Results Section */}
         {isLoading && (
