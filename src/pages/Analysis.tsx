@@ -479,7 +479,7 @@ Website: ${comp.website || 'N/A'}
 
       {/* Tagline */}
       <div className="bg-background">
-        <div className="container mx-auto px-4 md:px-6 pt-6 pb-6">
+        <div className="container mx-auto px-4 md:px-6 pt-6 pb-3">
           <p className="text-muted-foreground font-montserrat font-light text-sm md:text-base tracking-wide">
             AI-Powered Strategic Business Analysis
           </p>
@@ -489,11 +489,10 @@ Website: ${comp.website || 'N/A'}
       {/* Main Content */}
       <main className="container mx-auto px-6 py-12 space-y-16">
         {/* Input Section */}
-        <section className="pt-2 md:pt-8">
+        <section className="pt-0 md:pt-4">
           <div className="w-full max-w-7xl mx-auto">
             <div className="space-y-6">
               <div className="space-y-1">
-                <span className="label-tech text-muted-foreground">Company Analysis</span>
                 <h2 className="text-3xl font-semibold tracking-tight">Get Started</h2>
                 <p className="text-muted-foreground text-sm">Enter a company URL to generate comprehensive business insights</p>
               </div>
@@ -529,7 +528,7 @@ Website: ${comp.website || 'N/A'}
                         {analysis.company_name}
                       </h3>
                     </div>
-                    <p className="text-sm text-muted-foreground">View analysis</p>
+                    <p className="text-sm text-muted-foreground mb-2">View analysis</p>
                   </button>
                 ))
               ) : (
@@ -547,7 +546,7 @@ Website: ${comp.website || 'N/A'}
                         Analyze Tesla
                       </h3>
                     </div>
-                    <p className="text-sm text-muted-foreground">Electric vehicles & energy</p>
+                    <p className="text-sm text-muted-foreground mb-2">Electric vehicles & energy</p>
                   </button>
                   
                   <button
@@ -562,7 +561,7 @@ Website: ${comp.website || 'N/A'}
                         Analyze Nike
                       </h3>
                     </div>
-                    <p className="text-sm text-muted-foreground">Athletic footwear & apparel</p>
+                    <p className="text-sm text-muted-foreground mb-2">Athletic footwear & apparel</p>
                   </button>
                   
                   <button
@@ -577,7 +576,7 @@ Website: ${comp.website || 'N/A'}
                         Analyze Starbucks
                       </h3>
                     </div>
-                    <p className="text-sm text-muted-foreground">Coffee & beverages</p>
+                    <p className="text-sm text-muted-foreground mb-2">Coffee & beverages</p>
                   </button>
                 </>
               )}

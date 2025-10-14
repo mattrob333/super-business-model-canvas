@@ -77,12 +77,6 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
     <div className="w-full max-w-7xl mx-auto">
       <div className="card-mono">
         <div className="space-y-6">
-          <div className="space-y-2">
-            <label className="label-tech text-muted-foreground text-[10px] opacity-60">
-              COMPANY URL
-            </label>
-          </div>
-          
           <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 md:gap-4">
             <Input
               type="text"
