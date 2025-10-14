@@ -501,85 +501,32 @@ Website: ${comp.website || 'N/A'}
           </div>
         </section>
 
-        {/* Quick Access Section */}
-        {!hasAnalyzed && !isLoading && (
+        {/* Recent Analyses Section */}
+        {!hasAnalyzed && !isLoading && recentAnalyses.length > 0 && (
           <section className="w-full max-w-7xl mx-auto">
             <h2 className="text-2xl font-semibold text-white mb-8">
-              {recentAnalyses.length > 0 ? 'Recent Analyses' : 'Quick Start'}
+              Recent Analyses
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {recentAnalyses.length > 0 ? (
-                // Show recent analyses
-                recentAnalyses.map((analysis) => (
-                  <button
-                    key={analysis.id}
-                    onClick={() => {
-                      setAnalysisData(analysis.analysis_data);
-                      setHasAnalyzed(true);
-                    }}
-                    className="card-mono card-mono-hover text-left h-36 flex flex-col justify-between group"
-                  >
-                    <div>
-                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                        <Search className="h-6 w-6 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
-                        {analysis.company_name}
-                      </h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">View analysis</p>
-                  </button>
-                ))
-              ) : (
-                // Show example companies for new users
-                <>
-                  <button
-                    onClick={() => handleAnalyze('https://www.tesla.com')}
-                    className="card-mono card-mono-hover text-left h-36 flex flex-col justify-between group"
-                  >
-                    <div>
-                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                        <Search className="h-6 w-6 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
-                        Analyze Tesla
-                      </h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">Electric vehicles & energy</p>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleAnalyze('https://www.nike.com')}
-                    className="card-mono card-mono-hover text-left h-36 flex flex-col justify-between group"
-                  >
-                    <div>
-                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                        <Search className="h-6 w-6 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
-                        Analyze Nike
-                      </h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">Athletic footwear & apparel</p>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleAnalyze('https://www.starbucks.com')}
-                    className="card-mono card-mono-hover text-left h-36 flex flex-col justify-between group"
-                  >
-                    <div>
-                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                        <Search className="h-6 w-6 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
-                        Analyze Starbucks
-                      </h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">Coffee & beverages</p>
-                  </button>
-                </>
-              )}
+              {recentAnalyses.map((analysis) => (
+                <button
+                  key={analysis.id}
+                  onClick={() => {
+                    setAnalysisData(analysis.analysis_data);
+                    setHasAnalyzed(true);
+                  }}
+                  className="card-mono card-mono-hover text-left h-36 flex flex-col p-6 group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                    <Search className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors mb-auto">
+                    {analysis.company_name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-4">View analysis</p>
+                </button>
+              ))}
             </div>
           </section>
         )}
