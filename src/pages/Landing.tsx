@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Sparkles, BarChart3, Lightbulb } from "lucide-react";
+import { ArrowRight, Sparkles, BarChart3, Lightbulb, Zap, MessageSquare, RefreshCw } from "lucide-react";
 
 const Landing = () => {
   const [email, setEmail] = useState("");
@@ -96,15 +96,53 @@ const Landing = () => {
               <span className="label-tech text-primary text-[10px]">AI Strategic Analysis</span>
             </div>
             
-            <h2 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-tight">
-              Analyze Any Business<br />
-              <span className="text-primary">In Seconds</span>
+            <h2 className="text-5xl md:text-6xl font-bold tracking-tight leading-tight">
+              Build Your Business<br />
+              <span className="text-primary">Source of Truth</span>
             </h2>
             
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Turn any company URL into a complete Business Model Canvas. Get strategic insights, 
-              competitive analysis, and market positioning—powered by AI.
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+              AI generates your complete business context in 60 seconds. 
+              Refine it with AI assistance. Use it as your strategic foundation.
             </p>
+
+            {/* 3-Step Process */}
+            <div className="max-w-2xl mx-auto">
+              <div className="flex items-center justify-center gap-4 md:gap-8">
+                {/* Step 1 */}
+                <div className="flex flex-col items-center gap-2 flex-1">
+                  <div className="w-8 h-8 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-sm">
+                    1
+                  </div>
+                  <h3 className="text-base font-semibold text-white">AI Builds</h3>
+                  <p className="text-sm text-muted-foreground">60 seconds</p>
+                </div>
+
+                {/* Arrow */}
+                <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0 hidden sm:block" />
+
+                {/* Step 2 */}
+                <div className="flex flex-col items-center gap-2 flex-1">
+                  <div className="w-8 h-8 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-sm">
+                    2
+                  </div>
+                  <h3 className="text-base font-semibold text-white">You Refine</h3>
+                  <p className="text-sm text-muted-foreground">With AI assistance</p>
+                </div>
+
+                {/* Arrow */}
+                <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0 hidden sm:block" />
+
+                {/* Step 3 */}
+                <div className="flex flex-col items-center gap-2 flex-1">
+                  <div className="w-8 h-8 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-sm">
+                    3
+                  </div>
+                  <h3 className="text-base font-semibold text-white">Reuse Forever</h3>
+                  <p className="text-sm text-muted-foreground">As foundation</p>
+                </div>
+              </div>
+            </div>
 
             {/* Email Signup Form */}
             <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-12">
@@ -149,7 +187,7 @@ const Landing = () => {
               </div>
               <h3 className="text-xl font-semibold">Complete BMC</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Generate a full Business Model Canvas with all 9 building blocks analyzed and mapped out.
+                AI generates all 9 building blocks of your Business Model Canvas instantly from any company URL.
               </p>
             </div>
 
@@ -159,7 +197,7 @@ const Landing = () => {
               </div>
               <h3 className="text-xl font-semibold">AI-Powered</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Leverage advanced AI to analyze company websites, extract key insights, and identify patterns.
+                Refine each section with embedded AI chat until your context file is perfect and accurate.
               </p>
             </div>
 
@@ -167,9 +205,9 @@ const Landing = () => {
               <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                 <Lightbulb className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold">Strategic Insights</h3>
+              <h3 className="text-xl font-semibold">Reusable Foundation</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Get competitive landscape analysis, market positioning, and actionable strategic recommendations.
+                Save your context file and use it to run 70+ strategic frameworks—build once, use forever.
               </p>
             </div>
           </div>
