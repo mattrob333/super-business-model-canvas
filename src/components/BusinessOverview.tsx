@@ -48,43 +48,44 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
 
         <div className="card-mono">
           <div className="space-y-6">
-            {/* Description */}
+            {/* Description - Always visible */}
             <div>
-              <p className={`text-foreground/80 text-lg leading-relaxed ${!isExpanded ? 'line-clamp-2' : ''}`}>
+              <p className="text-foreground/80 text-lg leading-relaxed">
                 {data.description}
               </p>
             </div>
 
-            {isExpanded && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                {/* Key Facts */}
-                <div className="space-y-4">
-                  <h3 className="label-tech text-muted-foreground">Key Facts</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <Briefcase className="h-5 w-5 text-primary mt-0.5" />
-                      <div className="flex-1">
-                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Industry</div>
-                        <div className="text-foreground font-medium">{data.industry}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <Globe className="h-5 w-5 text-primary mt-0.5" />
-                      <div className="flex-1">
-                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Website</div>
-                        <a 
-                          href={data.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline font-medium"
-                        >
-                          {data.website}
-                        </a>
-                      </div>
+            {/* Two-column grid - Always visible */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Left Column: Key Facts */}
+              <div className="space-y-4">
+                <h3 className="label-tech text-muted-foreground">Key Facts</h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Briefcase className="h-5 w-5 text-primary mt-0.5" />
+                    <div className="flex-1">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide">Industry</div>
+                      <div className="text-foreground font-medium">{data.industry}</div>
                     </div>
                   </div>
+                  <div className="flex items-start gap-3">
+                    <Globe className="h-5 w-5 text-primary mt-0.5" />
+                    <div className="flex-1">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide">Website</div>
+                      <a 
+                        href={data.website} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline font-medium"
+                      >
+                        {data.website}
+                      </a>
+                    </div>
+                  </div>
+                </div>
 
-                  {/* Key Executives */}
+                {/* Key Leadership - Only when expanded */}
+                {isExpanded && (
                   <div className="pt-4 space-y-3">
                     <h3 className="label-tech text-muted-foreground">Key Leadership</h3>
                     <div className="space-y-2">
@@ -102,25 +103,35 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
                       )}
                     </div>
                   </div>
-                </div>
-
-                {/* Products & Services */}
-                <div className="space-y-4">
-                  <h3 className="label-tech text-muted-foreground">Products & Services</h3>
-                  <ul className="space-y-2">
-                    {data.productsServices.map((item, index) => (
-                      <li key={index} className="flex items-start gap-3">
-                        <div className="h-1.5 w-1.5 bg-primary rounded-full mt-2" />
-                        <span className="text-foreground/80">{item}</span>
-                      </li>
-                    ))}
-                    {data.productsServices.length === 0 && (
-                      <p className="text-sm text-muted-foreground">No products or services listed</p>
-                    )}
-                  </ul>
-                </div>
+                )}
               </div>
-            )}
+
+              {/* Right Column: Products & Services */}
+              <div className="space-y-4">
+                <h3 className="label-tech text-muted-foreground">Products & Services</h3>
+                <ul className="space-y-2">
+                  {/* First 2 products - Always visible */}
+                  {data.productsServices.slice(0, 2).map((item, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <div className="h-1.5 w-1.5 bg-primary rounded-full mt-2" />
+                      <span className="text-foreground/80">{item}</span>
+                    </li>
+                  ))}
+                  
+                  {/* Remaining products - Only when expanded */}
+                  {isExpanded && data.productsServices.slice(2).map((item, index) => (
+                    <li key={index + 2} className="flex items-start gap-3">
+                      <div className="h-1.5 w-1.5 bg-primary rounded-full mt-2" />
+                      <span className="text-foreground/80">{item}</span>
+                    </li>
+                  ))}
+                  
+                  {data.productsServices.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No products or services listed</p>
+                  )}
+                </ul>
+              </div>
+            </div>
 
             {/* Toggle Button */}
             <div className="flex justify-center pt-2">

@@ -497,16 +497,7 @@ Website: ${comp.website || 'N/A'}
             </section>
 
             <section className="w-full max-w-7xl mx-auto">
-              <div className="space-y-8">
-                <div className="text-center">
-                  <h2 className="text-3xl font-semibold tracking-tight mb-2">
-                    Business Model Canvas
-                  </h2>
-                  <p className="text-muted-foreground text-sm">
-                    Click any section to view details and get AI insights
-                  </p>
-                </div>
-                <BusinessModelCanvas
+              <BusinessModelCanvas
                 data={{
                   keyPartners: Array.isArray(analysisData.canvas?.keyPartners) ? analysisData.canvas.keyPartners : [],
                   keyActivities: Array.isArray(analysisData.canvas?.keyActivities) ? analysisData.canvas.keyActivities : [],
@@ -537,7 +528,6 @@ Website: ${comp.website || 'N/A'}
                 }}
                 onSectionUpdate={handleBMCSectionUpdate}
               />
-              </div>
             </section>
 
             <section className="w-full max-w-7xl mx-auto">
