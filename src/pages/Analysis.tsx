@@ -197,20 +197,59 @@ const Analysis = () => {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
+      const companyName = analysisData.company?.name || 'Unknown Company';
+      
+      // Check for existing analysis
+      const { data: existing } = await supabase
         .from('saved_analyses')
-        .insert({
-          user_id: user.id,
-          company_name: analysisData.company?.name || 'Unknown Company',
-          analysis_data: analysisData
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_name', companyName)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from('saved_analyses')
+          .update({
+            analysis_data: analysisData,
+          })
+          .eq('id', existing.id);
+
+        if (error) throw error;
+        
+        toast({
+          title: "Updated!",
+          description: "Analysis updated in your account",
         });
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from('saved_analyses')
+          .insert({
+            user_id: user.id,
+            company_name: companyName,
+            analysis_data: analysisData
+          });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: "Saved!",
-        description: "Analysis saved to your account",
-      });
+        toast({
+          title: "Saved!",
+          description: "Analysis saved to your account",
+        });
+      }
+      
+      // Refresh recent analyses list
+      const { data } = await supabase
+        .from('saved_analyses')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      if (data) setRecentAnalyses(data);
+      
     } catch (error: any) {
       console.error('Save error:', error);
       toast({
@@ -438,8 +477,16 @@ Website: ${comp.website || 'N/A'}
                   }}
                   className="card-mono card-mono-hover text-left h-36 flex flex-col p-6 group"
                 >
-                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                    <Search className="h-6 w-6 text-primary" />
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                      <Search className="h-6 w-6 text-primary" />
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(analysis.created_at).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
+                    </span>
                   </div>
                   <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors mb-auto">
                     {analysis.company_name}
