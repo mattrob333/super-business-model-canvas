@@ -129,76 +129,67 @@ const Playbooks = () => {
     <div className="min-h-screen bg-background">
       <Navigation />
       <main className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Hero Section with Company Selector in Top Right */}
+        {/* Hero Section - Centered */}
         <div className="mb-12">
-          <div className="flex items-start justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-                Strategy Playbooks
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl">
-                Get AI-powered strategy recommendations tailored to your business, or browse our library of proven frameworks.
-              </p>
-            </div>
-
-            {/* Compact Company Selector - Top Right */}
-            <div className="flex-shrink-0 w-80">
-              <label className="text-xs text-muted-foreground mb-1.5 block">
-                Company Context
-              </label>
-              <Select
-                value={selectedAnalysis?.id || ""}
-                onValueChange={(value) => {
-                  const analysis = savedAnalyses.find((a) => a.id === value);
-                  setSelectedAnalysis(analysis || null);
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select company..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {savedAnalyses.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      No analyses yet
-                    </SelectItem>
-                  ) : (
-                    savedAnalyses.map((analysis) => (
-                      <SelectItem key={analysis.id} value={analysis.id}>
-                        {analysis.company_name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              {savedAnalyses.length === 0 && (
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  <Button 
-                    variant="link" 
-                    className="p-0 h-auto text-xs font-semibold" 
-                    onClick={() => navigate('/analyze')}
-                  >
-                    Create one first
-                  </Button>
-                </p>
-              )}
-              {selectedAnalysis && (
-                <div className="flex items-center gap-1.5 text-xs text-green-600 mt-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>Context loaded</span>
-                </div>
-              )}
-            </div>
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold mb-4 pb-2 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+              Strategy Playbooks
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Get AI-powered strategy recommendations tailored to your business
+            </p>
           </div>
 
-          {/* Large Prominent Chat Input */}
-          <div className="max-w-5xl">
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold mb-2">What do you want to achieve?</h2>
-              <p className="text-muted-foreground">
-                Describe your business goals and get AI-powered strategy recommendations
+          {/* Centered Company Selector - Inline Above Chat */}
+          <div className="max-w-5xl mx-auto mb-6">
+            <label className="text-xs text-muted-foreground mb-1.5 block text-center">
+              Company Context
+            </label>
+            <Select
+              value={selectedAnalysis?.id || ""}
+              onValueChange={(value) => {
+                const analysis = savedAnalyses.find((a) => a.id === value);
+                setSelectedAnalysis(analysis || null);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select company..." />
+              </SelectTrigger>
+              <SelectContent>
+                {savedAnalyses.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    No analyses yet
+                  </SelectItem>
+                ) : (
+                  savedAnalyses.map((analysis) => (
+                    <SelectItem key={analysis.id} value={analysis.id}>
+                      {analysis.company_name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            {savedAnalyses.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1.5 text-center">
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto text-xs font-semibold" 
+                  onClick={() => navigate('/analyze')}
+                >
+                  Create one first
+                </Button>
               </p>
-            </div>
+            )}
+            {selectedAnalysis && (
+              <div className="flex items-center justify-center gap-1.5 text-xs text-green-600 mt-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>Context loaded</span>
+              </div>
+            )}
+          </div>
 
+          {/* Large Prominent Chat Input - Centered */}
+          <div className="max-w-5xl mx-auto">
             <div className="relative border-2 border-primary/20 rounded-lg bg-card p-4 shadow-sm hover:border-primary/40 transition-colors">
               <Textarea 
                 value={goalInput}
@@ -207,7 +198,7 @@ const Playbooks = () => {
                 className="min-h-[150px] border-none bg-transparent resize-none focus-visible:ring-0 text-base"
               />
               
-              <div className="flex items-center justify-between mt-3 pt-3 border-t">
+              <div className="flex items-center justify-between mt-3 pt-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Sparkles className="h-4 w-4" />
                   <span>AI Strategy Assistant</span>
