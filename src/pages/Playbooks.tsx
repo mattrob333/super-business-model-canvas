@@ -205,7 +205,7 @@ const Playbooks = () => {
                 </div>
                 <Button 
                   onClick={handleGetStrategy}
-                  disabled={!selectedAnalysis || !goalInput.trim() || isGenerating}
+                  disabled={!goalInput.trim() || isGenerating}
                 >
                   {isGenerating ? "Analyzing..." : "Get Strategy"}
                 </Button>
