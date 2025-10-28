@@ -7,9 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Sparkles, Clock, Users } from "lucide-react";
 import { DUMMY_FRAMEWORKS, getCategoryColor } from "@/data/dummy-frameworks";
+import { StrategyDrawer } from "@/components/StrategyDrawer";
+import { FrameworkDetailModal } from "@/components/FrameworkDetailModal";
 
 interface SavedAnalysis {
   id: string;
@@ -44,6 +47,12 @@ const Playbooks = () => {
   const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
   const [selectedAnalysis, setSelectedAnalysis] = useState<SavedAnalysis | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [goalInput, setGoalInput] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showStrategyDrawer, setShowStrategyDrawer] = useState(false);
+  const [strategyRecommendations, setStrategyRecommendations] = useState<any>(null);
+  const [selectedFramework, setSelectedFramework] = useState<string | null>(null);
+  const [showFrameworkModal, setShowFrameworkModal] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -75,73 +84,144 @@ const Playbooks = () => {
     ? DUMMY_FRAMEWORKS 
     : DUMMY_FRAMEWORKS.filter((f) => f.category === selectedCategory);
 
+  const handleGetStrategy = () => {
+    setIsGenerating(true);
+    // Simulate API call with dummy data
+    setTimeout(() => {
+      setStrategyRecommendations({
+        insights: [
+          "Focus on sales acceleration to achieve 40% revenue growth",
+          "Implement competitive positioning before market expansion",
+          "Partnership development should follow initial sales success"
+        ],
+        frameworks: [
+          {
+            id: "sales-acceleration",
+            relevance: "High",
+            alignment: "Aligns with revenue growth objectives",
+            timeline: "Immediate"
+          },
+          {
+            id: "porter-five-forces",
+            relevance: "High",
+            alignment: "Essential for market differentiation",
+            timeline: "Week 1-2"
+          },
+          {
+            id: "market-entry-strategy",
+            relevance: "Medium",
+            alignment: "Supports market expansion goals",
+            timeline: "Week 3-4"
+          }
+        ],
+        nextSteps: [
+          "Start with Sales Acceleration Playbook (Critical Priority)",
+          "Run Market Analysis to validate positioning strategy",
+          "Schedule weekly reviews to track progress"
+        ]
+      });
+      setShowStrategyDrawer(true);
+      setIsGenerating(false);
+    }, 2000);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
       <main className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-            Strategy Playbooks
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Get AI-powered strategy recommendations tailored to your business, or browse our library of proven frameworks.
-          </p>
-        </div>
-
-        {/* Company Context Selection */}
-        <Card className="mb-8 border-primary/20">
-          <CardHeader>
-            <CardTitle className="text-lg">Select Company Context</CardTitle>
-            <CardDescription>Choose which company to run strategic analysis on</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Select
-              value={selectedAnalysis?.id || ""}
-              onValueChange={(value) => {
-                const analysis = savedAnalyses.find((a) => a.id === value);
-                setSelectedAnalysis(analysis || null);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose a company analysis..." />
-              </SelectTrigger>
-              <SelectContent>
-                {savedAnalyses.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    No analyses yet - create one first
-                  </SelectItem>
-                ) : (
-                  savedAnalyses.map((analysis) => (
-                    <SelectItem key={analysis.id} value={analysis.id}>
-                      {analysis.company_name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {savedAnalyses.length === 0 && (
-              <p className="text-sm text-muted-foreground mt-2">
-                No business context found.{" "}
-                <Button 
-                  variant="link" 
-                  className="p-0 h-auto font-semibold" 
-                  onClick={() => navigate('/analyze')}
-                >
-                  Create one first
-                </Button>
+        {/* Hero Section with Company Selector in Top Right */}
+        <div className="mb-12">
+          <div className="flex items-start justify-between gap-4 mb-8">
+            <div>
+              <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+                Strategy Playbooks
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-2xl">
+                Get AI-powered strategy recommendations tailored to your business, or browse our library of proven frameworks.
               </p>
-            )}
-            {selectedAnalysis && (
-              <div className="flex items-center gap-2 text-sm text-green-600 mt-2">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Context loaded: {selectedAnalysis.company_name}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
 
-        {/* TODO: Chat Assistant - Coming in Step 2 */}
+            {/* Compact Company Selector - Top Right */}
+            <div className="flex-shrink-0 w-80">
+              <label className="text-xs text-muted-foreground mb-1.5 block">
+                Company Context
+              </label>
+              <Select
+                value={selectedAnalysis?.id || ""}
+                onValueChange={(value) => {
+                  const analysis = savedAnalyses.find((a) => a.id === value);
+                  setSelectedAnalysis(analysis || null);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select company..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedAnalyses.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No analyses yet
+                    </SelectItem>
+                  ) : (
+                    savedAnalyses.map((analysis) => (
+                      <SelectItem key={analysis.id} value={analysis.id}>
+                        {analysis.company_name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {savedAnalyses.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-xs font-semibold" 
+                    onClick={() => navigate('/analyze')}
+                  >
+                    Create one first
+                  </Button>
+                </p>
+              )}
+              {selectedAnalysis && (
+                <div className="flex items-center gap-1.5 text-xs text-green-600 mt-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Context loaded</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Large Prominent Chat Input */}
+          <div className="max-w-5xl">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold mb-2">What do you want to achieve?</h2>
+              <p className="text-muted-foreground">
+                Describe your business goals and get AI-powered strategy recommendations
+              </p>
+            </div>
+
+            <div className="relative border-2 border-primary/20 rounded-lg bg-card p-4 shadow-sm hover:border-primary/40 transition-colors">
+              <Textarea 
+                value={goalInput}
+                onChange={(e) => setGoalInput(e.target.value)}
+                placeholder="E.g., 'We want to break into a new market and drive customer acquisition' or 'Need to improve operational efficiency and reduce costs'"
+                className="min-h-[150px] border-none bg-transparent resize-none focus-visible:ring-0 text-base"
+              />
+              
+              <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Sparkles className="h-4 w-4" />
+                  <span>AI Strategy Assistant</span>
+                </div>
+                <Button 
+                  onClick={handleGetStrategy}
+                  disabled={!selectedAnalysis || !goalInput.trim() || isGenerating}
+                >
+                  {isGenerating ? "Analyzing..." : "Get Strategy"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Framework Library */}
         <div>
@@ -170,6 +250,10 @@ const Playbooks = () => {
               return (
                 <Card 
                   key={framework.id}
+                  onClick={() => {
+                    setSelectedFramework(framework.id);
+                    setShowFrameworkModal(true);
+                  }}
                   className="group cursor-pointer hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1 duration-300"
                 >
                   <CardHeader>
@@ -225,6 +309,33 @@ const Playbooks = () => {
             </div>
           )}
         </div>
+
+        {/* Strategy Drawer */}
+        <StrategyDrawer
+          isOpen={showStrategyDrawer}
+          onClose={() => setShowStrategyDrawer(false)}
+          recommendations={strategyRecommendations}
+          companyName={selectedAnalysis?.company_name}
+          onSelectFramework={(id) => {
+            setSelectedFramework(id);
+            setShowFrameworkModal(true);
+          }}
+        />
+
+        {/* Framework Detail Modal */}
+        <FrameworkDetailModal
+          isOpen={showFrameworkModal}
+          onClose={() => setShowFrameworkModal(false)}
+          frameworkId={selectedFramework}
+          onRunFramework={(id) => {
+            console.log("Running framework:", id);
+            toast({
+              title: "Framework Started",
+              description: "This will generate a report in the next phase"
+            });
+            setShowFrameworkModal(false);
+          }}
+        />
       </main>
     </div>
   );
