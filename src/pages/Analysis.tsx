@@ -491,7 +491,9 @@ Website: ${comp.website || 'N/A'}
                   <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors mb-auto">
                     {analysis.company_name}
                   </h3>
-                  <p className="text-sm text-muted-foreground mt-4">View analysis</p>
+                  <div className="flex justify-end mt-4">
+                    <span className="text-sm text-primary font-medium">View analysis</span>
+                  </div>
                 </button>
               ))}
             </div>
