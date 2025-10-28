@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ const authSchema = z.object({
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { signUp, signIn, user } = useAuth();
+  const { signUp, signIn, user, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
@@ -25,10 +25,11 @@ const Auth = () => {
   const [signInPassword, setSignInPassword] = useState('');
 
   // Redirect if already authenticated
-  if (user) {
-    navigate('/analyze');
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/analyze');
+    }
+  }, [user, loading, navigate]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();

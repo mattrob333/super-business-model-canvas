@@ -23,19 +23,21 @@ interface Report {
 const ReportViewer = () => {
   const { reportId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [report, setReport] = useState<Report | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       navigate("/auth");
       return;
     }
-    fetchReport();
-  }, [reportId, user]);
+    if (user) {
+      fetchReport();
+    }
+  }, [reportId, user, authLoading, navigate]);
 
   const fetchReport = async () => {
     setIsLoading(true);

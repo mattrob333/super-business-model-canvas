@@ -27,7 +27,7 @@ const FrameworkDetail = () => {
   const { frameworkId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [framework, setFramework] = useState<Framework | null>(null);
@@ -38,12 +38,14 @@ const FrameworkDetail = () => {
   const strategicGoal = location.state?.goal;
 
   useEffect(() => {
-    if (!user) {
+    if (!authLoading && !user) {
       navigate("/auth");
       return;
     }
-    fetchFramework();
-  }, [frameworkId, user]);
+    if (user) {
+      fetchFramework();
+    }
+  }, [frameworkId, user, authLoading, navigate]);
 
   const fetchFramework = async () => {
     setIsLoading(true);

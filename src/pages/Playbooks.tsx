@@ -37,7 +37,7 @@ interface Recommendation {
 }
 
 const Playbooks = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -50,14 +50,16 @@ const Playbooks = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       navigate("/auth");
       return;
     }
     
-    fetchSavedAnalyses();
-    fetchAllFrameworks();
-  }, [user]);
+    if (user) {
+      fetchSavedAnalyses();
+      fetchAllFrameworks();
+    }
+  }, [user, loading, navigate]);
 
   const fetchSavedAnalyses = async () => {
     const { data, error } = await supabase
