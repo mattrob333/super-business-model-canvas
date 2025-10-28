@@ -33,7 +33,7 @@ export const StrategyDrawer = ({
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:w-[900px] overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:w-[1200px] sm:max-w-[85vw] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-primary" />
