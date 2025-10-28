@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      generated_reports: {
+        Row: {
+          business_context: Json
+          company_id: string
+          company_name: string
+          created_at: string | null
+          framework_id: string | null
+          id: string
+          report_content: string
+          status: string | null
+          strategic_goal: string | null
+          updated_at: string | null
+          user_id: string
+          version: number | null
+        }
+        Insert: {
+          business_context: Json
+          company_id: string
+          company_name: string
+          created_at?: string | null
+          framework_id?: string | null
+          id?: string
+          report_content: string
+          status?: string | null
+          strategic_goal?: string | null
+          updated_at?: string | null
+          user_id: string
+          version?: number | null
+        }
+        Update: {
+          business_context?: Json
+          company_id?: string
+          company_name?: string
+          created_at?: string | null
+          framework_id?: string | null
+          id?: string
+          report_content?: string
+          status?: string | null
+          strategic_goal?: string | null
+          updated_at?: string | null
+          user_id?: string
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_reports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "saved_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_reports_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           created_at: string
@@ -73,6 +133,92 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      strategic_frameworks: {
+        Row: {
+          category: string
+          company_stages: string[] | null
+          created_at: string | null
+          departments: string[] | null
+          description: string
+          estimated_time: number | null
+          goal_alignment: string[] | null
+          id: string
+          shortcut: string | null
+          status: string | null
+          title: string
+          when_to_use: string[] | null
+        }
+        Insert: {
+          category: string
+          company_stages?: string[] | null
+          created_at?: string | null
+          departments?: string[] | null
+          description: string
+          estimated_time?: number | null
+          goal_alignment?: string[] | null
+          id: string
+          shortcut?: string | null
+          status?: string | null
+          title: string
+          when_to_use?: string[] | null
+        }
+        Update: {
+          category?: string
+          company_stages?: string[] | null
+          created_at?: string | null
+          departments?: string[] | null
+          description?: string
+          estimated_time?: number | null
+          goal_alignment?: string[] | null
+          id?: string
+          shortcut?: string | null
+          status?: string | null
+          title?: string
+          when_to_use?: string[] | null
+        }
+        Relationships: []
+      }
+      strategy_sessions: {
+        Row: {
+          company_id: string | null
+          company_name: string
+          created_at: string | null
+          goal_input: string
+          id: string
+          insights: Json | null
+          recommended_frameworks: Json | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          company_name: string
+          created_at?: string | null
+          goal_input: string
+          id?: string
+          insights?: Json | null
+          recommended_frameworks?: Json | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          company_name?: string
+          created_at?: string | null
+          goal_input?: string
+          id?: string
+          insights?: Json | null
+          recommended_frameworks?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "saved_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

@@ -11,3 +11,12 @@ verify_jwt = true
 
 [functions.competitor-chat]
 verify_jwt = true
+
+[functions.seed-frameworks]
+verify_jwt = false
+
+[functions.recommend-frameworks]
+verify_jwt = true
+
+[functions.generate-framework-report]
+verify_jwt = true
