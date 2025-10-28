@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Sparkles, Clock, Users, Target } from "lucide-react";
+import { Sparkles, Clock, Users, Target, ChevronRight } from "lucide-react";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 interface Framework {
   id: string;
@@ -109,6 +111,7 @@ const FrameworkDetail = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
+        <Navigation />
         <div className="container max-w-4xl mx-auto px-4 py-8">
           <Skeleton className="h-8 w-64 mb-8" />
           <Card className="p-8">
@@ -126,15 +129,31 @@ const FrameworkDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Navigation />
+      <div className="border-b bg-muted/30">
+        <div className="container max-w-4xl mx-auto px-4 py-3">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={() => navigate('/')} className="cursor-pointer">
+                  Home
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={() => navigate('/playbooks')} className="cursor-pointer">
+                  Playbooks
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{framework?.title}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+      </div>
       <div className="container max-w-4xl mx-auto px-4 py-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/playbooks")}
-          className="mb-6"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Playbooks
-        </Button>
 
         <Card className="p-8 space-y-8">
           {/* Header */}

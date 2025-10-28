@@ -11,14 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Save, LogOut, User, Shield, Search, ChevronUp } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Copy, Check, Save, Search, ChevronUp, ArrowRight } from "lucide-react";
+import { Navigation } from "@/components/Navigation";
+import { Card as UICard, CardContent } from "@/components/ui/card";
 import logo from "@/assets/logo_2.png";
 
 const Analysis = () => {
@@ -228,14 +223,6 @@ const Analysis = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    toast({
-      title: "Signed out",
-      description: "You've been signed out successfully",
-    });
-  };
-
   const copyToMarkdown = () => {
     if (!analysisData) return;
 
@@ -337,170 +324,7 @@ Website: ${comp.website || 'N/A'}
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-white/[0.12] backdrop-blur-sm sticky top-0 z-30 bg-background/80">
-        <div className="container mx-auto px-4 md:px-6 py-4 md:py-6">
-          <div className="flex items-start md:items-center justify-between gap-3">
-            {/* Logo - Mobile: Stacked, Desktop: Horizontal */}
-            <div className="flex-1">
-              <div className="hidden md:flex items-center gap-1.5">
-                <div className="inline-flex items-center bg-[#C4F82A] text-black px-3 py-1 rounded-full font-montserrat font-normal tracking-wide">
-                  <span className="text-xl">SUPER</span>
-                </div>
-                <h1 className="text-xl font-montserrat font-light tracking-wide text-white">BUSINESS MODEL CANVAS</h1>
-              </div>
-              
-              {/* Mobile Logo - Stacked */}
-              <div className="md:hidden flex flex-col gap-0.5">
-                <div className="inline-flex items-center bg-[#C4F82A] text-black px-2.5 py-0.5 rounded-full font-montserrat font-normal tracking-wide w-fit">
-                  <span className="text-sm">SUPER</span>
-                </div>
-                <div className="font-montserrat font-light tracking-wide text-white text-sm leading-tight pl-2.5">
-                  <div>BUSINESS MODEL</div>
-                  <div>CANVAS</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Side Controls */}
-            <div className="flex flex-col md:flex-row items-end md:items-center gap-2 md:gap-3">
-              {/* Action Buttons - Desktop */}
-              <div className="hidden md:flex items-center gap-3">
-                {hasAnalyzed && !isLoading && analysisData && (
-                  <>
-                    <Button 
-                      onClick={saveAnalysis}
-                      variant="outline" 
-                      size="sm"
-                      className="gap-2 h-9 text-sm"
-                      disabled={isSaving}
-                    >
-                      <Save className="h-4 w-4" />
-                      {isSaving ? "Saving..." : "Save"}
-                    </Button>
-                    <Button 
-                      onClick={copyToMarkdown}
-                      variant="outline" 
-                      size="sm"
-                      className="gap-2 h-9 text-sm"
-                    >
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      {copied ? "Copied!" : "Copy"}
-                    </Button>
-                  </>
-                )}
-                
-                {user ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2 bg-white/[0.08] hover:bg-white/[0.12]">
-                        <User className="h-4 w-4" />
-                        <span>{user.email?.split('@')[0] || 'Account'}</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={() => navigate('/my-analyses')}>
-                        My Analyses
-                      </DropdownMenuItem>
-                      {isAdmin && (
-                        <DropdownMenuItem onClick={() => navigate('/admin')}>
-                          <Shield className="mr-2 h-4 w-4" />
-                          Admin Dashboard
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleSignOut}>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign Out
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => navigate('/auth')}
-                  >
-                    Sign In
-                  </Button>
-                )}
-                
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
-                  <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                  <span className="label-tech text-primary text-[10px]">Powered by AI</span>
-                </div>
-              </div>
-
-              {/* Mobile Controls */}
-              <div className="md:hidden flex flex-col items-end gap-2">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full">
-                  <div className="h-1.5 w-1.5 bg-primary rounded-full animate-pulse" />
-                  <span className="label-tech text-primary text-[8px] whitespace-nowrap">POWERED BY AI</span>
-                </div>
-                
-                {user ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 w-8 p-0 bg-white/[0.08] hover:bg-white/[0.12]">
-                        <User className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={() => navigate('/my-analyses')}>
-                        My Analyses
-                      </DropdownMenuItem>
-                      {isAdmin && (
-                        <DropdownMenuItem onClick={() => navigate('/admin')}>
-                          <Shield className="mr-2 h-4 w-4" />
-                          Admin Dashboard
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleSignOut}>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign Out
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-8"
-                    onClick={() => navigate('/auth')}
-                  >
-                    Sign In
-                  </Button>
-                )}
-                
-                {hasAnalyzed && !isLoading && analysisData && (
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      onClick={saveAnalysis}
-                      variant="outline" 
-                      size="sm"
-                      className="gap-2 h-8 text-xs"
-                      disabled={isSaving}
-                    >
-                      <Save className="h-3 w-3" />
-                      {isSaving ? "Saving..." : "Save"}
-                    </Button>
-                    <Button 
-                      onClick={copyToMarkdown}
-                      variant="outline" 
-                      size="sm"
-                      className="gap-2 h-8 text-xs"
-                    >
-                      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                      {copied ? "Copied!" : "Copy"}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
       {/* Tagline */}
       <div className="bg-background">
@@ -535,6 +359,31 @@ Website: ${comp.website || 'N/A'}
                 <span className="hidden md:inline">New Search</span>
               </Button>
             </div>
+          </div>
+        )}
+        
+        {/* Action Buttons - Mobile */}
+        {hasAnalyzed && !isLoading && analysisData && (
+          <div className="md:hidden flex gap-2 px-4">
+            <Button 
+              onClick={saveAnalysis}
+              variant="outline" 
+              size="sm"
+              className="flex-1 gap-2"
+              disabled={isSaving}
+            >
+              <Save className="h-4 w-4" />
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+            <Button 
+              onClick={copyToMarkdown}
+              variant="outline" 
+              size="sm"
+              className="flex-1 gap-2"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copied!" : "Copy"}
+            </Button>
           </div>
         )}
         
@@ -611,6 +460,21 @@ Website: ${comp.website || 'N/A'}
 
         {hasAnalyzed && !isLoading && analysisData && (
           <div ref={resultsRef} className="space-y-16 animate-in fade-in slide-in-from-bottom duration-500">
+            {/* CTA to Playbooks */}
+            <UICard className="bg-primary/5 border-primary/20">
+              <CardContent className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 gap-4">
+                <div>
+                  <h4 className="font-semibold mb-1">Next: Generate Strategic Insights</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Use this business context to run strategic frameworks and get AI-powered recommendations
+                  </p>
+                </div>
+                <Button onClick={() => navigate('/playbooks')} size="sm" className="whitespace-nowrap">
+                  Go to Playbooks <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </CardContent>
+            </UICard>
+            
             <section>
               <BusinessOverview 
                 data={{

@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Download, FileText } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 interface Report {
   id: string;
@@ -79,6 +81,7 @@ const ReportViewer = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
+        <Navigation />
         <div className="container max-w-4xl mx-auto px-4 py-8">
           <Skeleton className="h-8 w-64 mb-8" />
           <Card className="p-8">
@@ -96,22 +99,36 @@ const ReportViewer = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Navigation />
+      <div className="border-b bg-muted/30">
+        <div className="container max-w-4xl mx-auto px-4 py-3">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={() => navigate('/')} className="cursor-pointer">
+                  Home
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={() => navigate('/playbooks')} className="cursor-pointer">
+                  Playbooks
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Report</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+      </div>
       <div className="container max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/playbooks")}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Playbooks
+        <div className="flex items-center justify-end mb-6">
+          <Button variant="outline" onClick={handleDownloadMarkdown}>
+            <Download className="mr-2 h-4 w-4" />
+            Download Markdown
           </Button>
-
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleDownloadMarkdown}>
-              <Download className="mr-2 h-4 w-4" />
-              Download Markdown
-            </Button>
-          </div>
         </div>
 
         <Card className="p-8">

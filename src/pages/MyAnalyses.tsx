@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, ArrowLeft, Trash2, ExternalLink } from 'lucide-react';
+import { Loader2, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -112,15 +113,8 @@ const MyAnalyses = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      <Navigation />
       <div className="container mx-auto px-6 py-8 max-w-6xl">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/analyze')}
-          className="mb-6"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Analysis
-        </Button>
 
         <div className="space-y-6">
           <div>

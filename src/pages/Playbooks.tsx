@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -137,6 +138,7 @@ const Playbooks = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Navigation />
       <div className="container max-w-7xl mx-auto px-4 py-8">
         {/* Hero Section */}
         <section className="text-center mb-12">
@@ -165,13 +167,24 @@ const Playbooks = () => {
                   <SelectValue placeholder="Choose a company..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {savedAnalyses.map((analysis) => (
-                    <SelectItem key={analysis.id} value={analysis.id}>
-                      {analysis.company_name}
+              {savedAnalyses.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No analyses yet - create one first
                     </SelectItem>
-                  ))}
+                  ) : (
+                    savedAnalyses.map((analysis) => (
+                      <SelectItem key={analysis.id} value={analysis.id}>
+                        {analysis.company_name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              {savedAnalyses.length === 0 && (
+                <div className="text-sm text-muted-foreground">
+                  No business context found. <Button variant="link" className="p-0 h-auto" onClick={() => navigate('/analyze')}>Create one first</Button>
+                </div>
+              )}
               {selectedAnalysis && (
                 <div className="flex items-center gap-2 text-sm text-green-600">
                   <CheckCircle2 className="h-4 w-4" />
