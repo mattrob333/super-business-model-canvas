@@ -106,7 +106,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
   return (
     <>
       <div className="w-full max-w-7xl mx-auto">
-        <div className="space-y-6">
+        <div className="space-y-3">
           <div className="space-y-1">
             <span className="label-tech text-muted-foreground">Business Model Canvas</span>
             <h2 className="text-3xl font-semibold tracking-tight">Strategic Framework</h2>
@@ -114,7 +114,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
           </div>
 
           {/* Business Model Canvas - Top Rows */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 auto-rows-[200px]">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 auto-rows-[200px]">
             <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1 row-span-2" height="h-full" />
             <CanvasCard title="Key Activities" items={data.keyActivities} span="col-span-1" height="h-full" />
             <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1 row-span-2" height="h-full" />
@@ -125,7 +125,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
           </div>
           
           {/* Bottom Row - Full Width 50/50 Split */}
-          <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex flex-col md:flex-row gap-2">
             <CanvasCard title="Cost Structure" items={data.costStructure} span="flex-1" height="h-[200px]" />
             <CanvasCard title="Revenue Streams" items={data.revenueStreams} span="flex-1" height="h-[200px]" />
           </div>
