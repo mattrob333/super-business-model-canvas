@@ -459,21 +459,23 @@ Website: ${comp.website || 'N/A'}
         )}
 
         {hasAnalyzed && !isLoading && analysisData && (
-          <div ref={resultsRef} className="space-y-16 animate-in fade-in slide-in-from-bottom duration-500">
+          <div ref={resultsRef} className="space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
             {/* CTA to Playbooks */}
-            <UICard className="bg-primary/5 border-primary/20">
-              <CardContent className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 gap-4">
-                <div>
-                  <h4 className="font-semibold mb-1">Next: Generate Strategic Insights</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Use this business context to run strategic frameworks and get AI-powered recommendations
-                  </p>
-                </div>
-                <Button onClick={() => navigate('/playbooks')} size="sm" className="whitespace-nowrap">
-                  Go to Playbooks <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardContent>
-            </UICard>
+            <div className="w-full max-w-7xl mx-auto">
+              <UICard className="bg-primary/5 border-primary/20">
+                <CardContent className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 gap-4">
+                  <div>
+                    <h4 className="font-semibold mb-1">Next: Generate Strategic Insights</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Use this business context to run strategic frameworks and get AI-powered recommendations
+                    </p>
+                  </div>
+                  <Button onClick={() => navigate('/playbooks')} size="sm" className="whitespace-nowrap">
+                    Go to Playbooks <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </UICard>
+            </div>
             
             <section>
               <BusinessOverview 
@@ -494,8 +496,17 @@ Website: ${comp.website || 'N/A'}
               />
             </section>
 
-            <section>
-              <BusinessModelCanvas 
+            <section className="w-full max-w-7xl mx-auto">
+              <div className="space-y-8">
+                <div className="text-center">
+                  <h2 className="text-3xl font-semibold tracking-tight mb-2">
+                    Business Model Canvas
+                  </h2>
+                  <p className="text-muted-foreground text-sm">
+                    Click any section to view details and get AI insights
+                  </p>
+                </div>
+                <BusinessModelCanvas
                 data={{
                   keyPartners: Array.isArray(analysisData.canvas?.keyPartners) ? analysisData.canvas.keyPartners : [],
                   keyActivities: Array.isArray(analysisData.canvas?.keyActivities) ? analysisData.canvas.keyActivities : [],
@@ -526,10 +537,11 @@ Website: ${comp.website || 'N/A'}
                 }}
                 onSectionUpdate={handleBMCSectionUpdate}
               />
+              </div>
             </section>
 
-            <section>
-              <CompetitiveLandscape 
+            <section className="w-full max-w-7xl mx-auto">
+              <CompetitiveLandscape
                 competitors={Array.isArray(analysisData.similarCompanies) ? analysisData.similarCompanies : []} 
                 onSimilarCompanyChat={handleSimilarCompanyChat}
               />
