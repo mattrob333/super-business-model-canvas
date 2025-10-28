@@ -488,11 +488,11 @@ Website: ${comp.website || 'N/A'}
                       })}
                     </span>
                   </div>
-                  <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors mb-auto">
-                    {analysis.company_name}
-                  </h3>
-                  <div className="flex justify-end mt-4">
-                    <span className="text-sm text-primary font-medium">View analysis</span>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
+                      {analysis.company_name}
+                    </h3>
+                    <span className="text-sm text-primary font-medium whitespace-nowrap ml-4">View analysis</span>
                   </div>
                 </button>
               ))}
