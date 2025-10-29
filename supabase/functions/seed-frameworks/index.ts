@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     // Framework seed data
     const frameworks = [
       {
-        id: "swot-strategist",
+        id: "swot-analysis",
         title: "SWOT Analysis",
         shortcut: "SWOT",
         category: "Strategic Planning & Growth",
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
         estimated_time: 45
       },
       {
-        id: "porter-five-forces",
+        id: "porters-five-forces",
         title: "Porter's Five Forces",
         shortcut: "P5F",
         category: "Market Intelligence & Competition",
@@ -42,100 +42,16 @@ Deno.serve(async (req) => {
         estimated_time: 60
       },
       {
-        id: "sales-acceleration",
-        title: "Sales Acceleration Framework",
-        shortcut: "SAF",
-        category: "Sales & Revenue",
-        description: "Systematic approach to increase sales velocity and revenue growth through process optimization, team enablement, and pipeline management.",
-        when_to_use: ["Revenue growth targets", "Sales team scaling", "Process optimization", "Pipeline improvement"],
-        departments: ["Sales", "Revenue Operations"],
+        id: "ai-automation-audit",
+        title: "AI & Automation Audit",
+        shortcut: "AI3",
+        category: "Technology",
+        description: "Comprehensive analysis of AI and automation opportunities across your organization with competitive intelligence on industry leaders.",
+        when_to_use: ["Improving operational efficiency", "Digital transformation planning", "Cost reduction opportunities", "Technology adoption strategy"],
+        departments: ["Technology", "Operations", "Finance", "Product"],
         company_stages: ["Growth", "Mature"],
-        goal_alignment: ["increase_revenue", "sales_optimization", "growth"],
-        estimated_time: 60
-      },
-      {
-        id: "ansoff-matrix",
-        title: "Ansoff Matrix",
-        shortcut: "ANS",
-        category: "Strategic Planning & Growth",
-        description: "Evaluate growth strategies across four quadrants: market penetration, market development, product development, and diversification.",
-        when_to_use: ["Growth planning", "Market expansion decisions", "Product strategy", "Risk assessment"],
-        departments: ["Strategy", "Marketing", "Product"],
-        company_stages: ["Growth", "Mature"],
-        goal_alignment: ["enter_new_market", "growth", "product_development"],
-        estimated_time: 45
-      },
-      {
-        id: "value-proposition-canvas",
-        title: "Value Proposition Canvas",
-        shortcut: "VPC",
-        category: "Product & Innovation",
-        description: "Map customer jobs, pains, and gains to your products/services' pain relievers and gain creators to achieve product-market fit.",
-        when_to_use: ["Product development", "Customer research", "Positioning strategy", "Feature prioritization"],
-        departments: ["Product", "Marketing", "Customer Success"],
-        company_stages: ["Startup", "Growth"],
-        goal_alignment: ["product_market_fit", "customer_satisfaction", "innovation"],
-        estimated_time: 60
-      },
-      {
-        id: "okr-framework",
-        title: "OKR Framework",
-        shortcut: "OKR",
-        category: "Execution & Operations",
-        description: "Set ambitious Objectives and measurable Key Results to align teams and track progress toward strategic goals.",
-        when_to_use: ["Goal setting", "Team alignment", "Performance tracking", "Strategic execution"],
-        departments: ["Executive", "All Departments"],
-        company_stages: ["Growth", "Mature"],
-        goal_alignment: ["goal_setting", "alignment", "performance"],
-        estimated_time: 45
-      },
-      {
-        id: "customer-journey-map",
-        title: "Customer Journey Mapping",
-        shortcut: "CJM",
-        category: "Customer Experience",
-        description: "Visualize the end-to-end customer experience across all touchpoints to identify pain points and opportunities for improvement.",
-        when_to_use: ["CX improvement", "Touchpoint optimization", "Service design", "Customer retention"],
-        departments: ["Customer Success", "Marketing", "Product"],
-        company_stages: ["Growth", "Mature"],
-        goal_alignment: ["customer_satisfaction", "retention", "experience"],
-        estimated_time: 90
-      },
-      {
-        id: "bcg-matrix",
-        title: "BCG Growth-Share Matrix",
-        shortcut: "BCG",
-        category: "Portfolio Management",
-        description: "Analyze product portfolio by categorizing offerings as Stars, Cash Cows, Question Marks, or Dogs based on market growth and market share.",
-        when_to_use: ["Portfolio analysis", "Resource allocation", "Investment decisions", "Product rationalization"],
-        departments: ["Strategy", "Finance", "Product"],
-        company_stages: ["Mature"],
-        goal_alignment: ["resource_optimization", "portfolio_management"],
-        estimated_time: 60
-      },
-      {
-        id: "lean-canvas",
-        title: "Lean Canvas",
-        shortcut: "LC",
-        category: "Strategic Planning & Growth",
-        description: "One-page business model template focusing on problem, solution, key metrics, and unfair advantage for rapid iteration.",
-        when_to_use: ["Startup validation", "Business model design", "Pivot planning", "Investor communication"],
-        departments: ["Executive", "Strategy", "Product"],
-        company_stages: ["Startup"],
-        goal_alignment: ["validation", "business_model", "pivot"],
-        estimated_time: 45
-      },
-      {
-        id: "pestel-analysis",
-        title: "PESTEL Analysis",
-        shortcut: "PESTEL",
-        category: "Market Intelligence & Competition",
-        description: "Examine macro-environmental factors: Political, Economic, Social, Technological, Environmental, and Legal forces affecting your business.",
-        when_to_use: ["Market entry", "Strategic planning", "Risk assessment", "Industry analysis"],
-        departments: ["Strategy", "Legal", "Risk Management"],
-        company_stages: ["Growth", "Mature"],
-        goal_alignment: ["risk_mitigation", "market_analysis", "compliance"],
-        estimated_time: 60
+        goal_alignment: ["efficiency", "automation", "innovation", "cost_reduction"],
+        estimated_time: 75
       }
     ];
 
