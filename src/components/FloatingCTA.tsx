@@ -30,9 +30,11 @@ export const FloatingCTA = ({ show, onNavigate, variant = 'floating' }: Floating
       <Button
         onClick={onNavigate}
         size="lg"
-        className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xl hover:scale-105 transition-all rounded-full px-4 py-4 sm:px-6 sm:py-6 font-semibold w-full sm:w-auto min-h-[44px] text-sm sm:text-base"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xl hover:scale-105 transition-all rounded-full px-6 py-3.5 sm:px-6 sm:py-6 font-semibold w-full sm:w-auto min-h-[44px] text-sm sm:text-base"
       >
-        <span className="mr-2">Ready to Generate Insights</span>
+        <span className="mr-2">
+          <span className="hidden xs:inline">Ready to </span>Generate Insights
+        </span>
         <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
       </Button>
     </div>

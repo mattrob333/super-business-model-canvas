@@ -40,31 +40,57 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto">
-      <div className="space-y-4">
-          <div className="flex items-start justify-between">
-          <div className="space-y-1 flex-1">
-            <span className="label-tech text-muted-foreground">Business Overview</span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight leading-tight">{data.name}</h2>
-          </div>
-          <Button onClick={() => setEditorOpen(true)} size="sm" variant="outline">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Edit & Chat
+      <div className="space-y-3 sm:space-y-4">
+        {/* Header: Company Name + Edit Button */}
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold tracking-tight leading-tight flex-1">
+            {data.name}
+          </h2>
+          <Button 
+            onClick={() => setEditorOpen(true)} 
+            size="sm" 
+            variant="outline"
+            className="h-8 px-2 sm:px-3"
+          >
+            <MessageSquare className="h-3.5 w-3.5 sm:mr-2" />
+            <span className="hidden sm:inline">Edit & Chat</span>
           </Button>
         </div>
 
-        <div className="card-mono">
-          <div className="space-y-6">
-            {/* Description - Always visible */}
+        {/* Mobile Links Row - Only on mobile when collapsed */}
+        {!isExpanded && (
+          <div className="flex items-center gap-3 md:hidden">
+            {data.website && (
+              <a 
+                href={data.website} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <Globe className="h-3.5 w-3.5" />
+                <span>Website</span>
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Card Content */}
+        <div 
+          className="card-mono cursor-pointer md:cursor-default"
+          onClick={() => window.innerWidth < 768 && setIsExpanded(!isExpanded)}
+        >
+          <div className="space-y-4 sm:space-y-6">
+            {/* Description */}
             <div>
-              <p className={`text-foreground/80 text-base sm:text-lg leading-relaxed ${
-                !isExpanded ? 'line-clamp-3' : ''
+              <p className={`text-foreground/80 text-sm sm:text-base md:text-lg leading-relaxed ${
+                !isExpanded ? 'line-clamp-1 md:line-clamp-3' : ''
               }`}>
                 {data.description}
               </p>
             </div>
 
             {/* Two-column grid - Collapsible on mobile */}
-            <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 ${
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 ${
               !isExpanded ? 'hidden md:grid' : ''
             }`}>
               {/* Left Column: Key Facts */}
@@ -143,29 +169,30 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
               </div>
             </div>
 
-            {/* Toggle Button */}
-            <div className="flex justify-center pt-2">
-              <Button 
-                onClick={() => setIsExpanded(!isExpanded)} 
-                variant="ghost" 
-                size="sm"
-                className="gap-2 text-muted-foreground hover:text-foreground"
-              >
-                {isExpanded ? (
-                  <>
-                    <ChevronUp className="h-4 w-4" />
-                    <span className="hidden sm:inline">Show Less</span>
-                    <span className="sm:hidden">Less</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-4 w-4" />
-                    <span className="hidden sm:inline">Read More</span>
-                    <span className="sm:hidden">More</span>
-                  </>
-                )}
-              </Button>
-            </div>
+            {/* Toggle indicator - Mobile only */}
+            {!isExpanded && (
+              <div className="flex justify-center md:hidden pt-1">
+                <ChevronDown className="h-4 w-4 text-muted-foreground animate-pulse" />
+              </div>
+            )}
+            
+            {/* Close button when expanded - Mobile only */}
+            {isExpanded && (
+              <div className="flex justify-center md:hidden pt-2">
+                <Button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(false);
+                  }} 
+                  variant="ghost" 
+                  size="sm"
+                  className="gap-2 text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                  <span>Close</span>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

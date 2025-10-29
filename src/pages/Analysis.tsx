@@ -469,34 +469,20 @@ Website: ${comp.website || 'N/A'}
       </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-8 sm:py-12 space-y-8 sm:space-y-12 md:space-y-16">
+      <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-12 space-y-6 sm:space-y-8 md:space-y-12">
         
-        {/* Action Buttons - Mobile */}
+        {/* Mobile Copy Button - Top Right Corner */}
         {hasAnalyzed && !isLoading && analysisData && (
-          <div className="md:hidden sticky top-16 z-10 bg-background/95 backdrop-blur pb-3 -mt-6">
-            <div className="container mx-auto px-4">
-              <div className="flex gap-2">
-                <Button 
-                  onClick={saveAnalysis}
-                  variant="outline" 
-                  size="default"
-                  className="flex-1 gap-2 min-h-[44px]"
-                  disabled={isSaving}
-                >
-                  <Save className="h-4 w-4" />
-                  {isSaving ? "Saving..." : "Save"}
-                </Button>
-                <Button 
-                  onClick={copyToMarkdown}
-                  variant="outline" 
-                  size="default"
-                  className="flex-1 gap-2 min-h-[44px]"
-                >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copied ? "Copied!" : "Copy"}
-                </Button>
-              </div>
-            </div>
+          <div className="md:hidden fixed top-20 right-4 z-20">
+            <Button 
+              onClick={copyToMarkdown}
+              variant="outline" 
+              size="icon"
+              className="h-10 w-10 rounded-full shadow-lg"
+              title="Copy to clipboard"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </Button>
           </div>
         )}
         
@@ -585,7 +571,7 @@ Website: ${comp.website || 'N/A'}
         )}
 
         {hasAnalyzed && !isLoading && analysisData && (
-          <div ref={resultsRef} className="space-y-8 sm:space-y-12 animate-in fade-in slide-in-from-bottom duration-500 pt-4 md:pt-0">
+          <div ref={resultsRef} className="space-y-6 sm:space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
             {/* Success Banner - Only show for new analyses */}
             {isNewAnalysis && (
               <SuccessBanner 
