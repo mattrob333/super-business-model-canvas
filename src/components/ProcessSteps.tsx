@@ -9,7 +9,7 @@ export const ProcessSteps = () => {
         label="AI Research"
         sublabel="60 seconds"
       />
-      <ArrowRight className="hidden md:block w-6 h-6 text-muted-foreground" />
+      <ArrowRight className="hidden md:block w-6 h-6 text-muted-foreground self-start mt-4" />
       <div className="block md:hidden w-0.5 h-8 bg-border" />
       
       <ProcessStep 
@@ -17,7 +17,7 @@ export const ProcessSteps = () => {
         label="You Refine"
         sublabel="5-10 minutes"
       />
-      <ArrowRight className="hidden md:block w-6 h-6 text-muted-foreground" />
+      <ArrowRight className="hidden md:block w-6 h-6 text-muted-foreground self-start mt-4" />
       <div className="block md:hidden w-0.5 h-8 bg-border" />
       
       <ProcessStep 
