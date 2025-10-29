@@ -6,6 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   role: "user" | "assistant";
@@ -278,9 +280,15 @@ export const BusinessContextChat = ({
                       AI Coach
                     </Badge>
                   )}
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {message.content}
-                  </p>
+                  <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none">
+                    {message.role === "assistant" ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {message.content}
+                      </ReactMarkdown>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    )}
+                  </div>
                   {isLoading && index === messages.length - 1 && message.role === "assistant" && !message.content && (
                     <div className="flex gap-1 mt-2">
                       <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse" />
