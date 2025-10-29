@@ -465,18 +465,15 @@ Website: ${comp.website || 'N/A'}
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {recentAnalyses.map((analysis) => (
-                <button
-                  key={analysis.id}
-                  onClick={() => {
-                    setAnalysisData(analysis.analysis_data);
-                    setHasAnalyzed(true);
-                    setSearchCollapsed(true);
-                    setTimeout(() => {
-                      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 300);
-                  }}
-                  className="card-mono card-mono-hover text-left h-36 flex flex-col p-6 group"
-                >
+            <button
+              key={analysis.id}
+              onClick={() => {
+                setAnalysisData(analysis.analysis_data);
+                setHasAnalyzed(true);
+                setSearchCollapsed(true);
+              }}
+              className="card-mono card-mono-hover text-left h-36 flex flex-col p-6 group"
+            >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                       <Search className="h-6 w-6 text-primary" />
