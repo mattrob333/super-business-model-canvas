@@ -13,32 +13,48 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('Missing authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    if (!token) {
+      console.error('Invalid authorization token');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Authenticated request received');
+
     const { sessionId, companyId, userMessage, conversationHistory } = await req.json();
     
     console.log('Received request:', { sessionId, companyId, hasMessage: !!userMessage });
-    console.log('Authorization header:', req.headers.get('Authorization')?.substring(0, 50));
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Get user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    console.log('User fetch result:', { hasUser: !!user, userError });
+    // Get user using the token
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
     
-    if (!user) {
-      console.error('No user found, auth failed');
+    if (userError || !user) {
+      console.error('User authentication failed:', userError);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    console.log('User authenticated:', user.id);
 
     // Fetch company analysis data
     const { data: analysisData, error: analysisError } = await supabaseClient
