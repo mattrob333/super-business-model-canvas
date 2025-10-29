@@ -182,11 +182,11 @@ export const BusinessOverviewEditor = ({
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300">
+      <div className="fixed inset-0 md:right-0 md:left-auto md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300 overflow-hidden">
         {/* Mobile Tabs Layout */}
         <div className="flex-1 md:hidden flex flex-col">
           <Tabs defaultValue="edit" className="flex-1 flex flex-col">
-            <div className="border-b border-white/[0.12] px-6 pt-6 pb-4 flex items-center justify-between">
+            <div className="border-b border-white/[0.12] px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 flex items-center justify-between">
               <TabsList className="bg-white/[0.05]">
                 <TabsTrigger value="edit">Edit</TabsTrigger>
                 <TabsTrigger value="chat">AI Chat</TabsTrigger>
@@ -202,8 +202,8 @@ export const BusinessOverviewEditor = ({
             </div>
 
             <TabsContent value="edit" className="flex-1 flex flex-col mt-0">
-              <ScrollArea className="flex-1 p-6">
-                <div className="space-y-6">
+              <ScrollArea className="flex-1 px-4 py-4 sm:p-6">
+                <div className="space-y-4 sm:space-y-6">
                   {/* Company Name */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Company Name</label>
@@ -334,7 +334,7 @@ export const BusinessOverviewEditor = ({
               </ScrollArea>
 
               {/* Save Button */}
-              <div className="border-t border-white/[0.12] p-6">
+              <div className="sticky bottom-0 border-t border-white/[0.12] px-4 py-3 sm:p-6 bg-[#0a0a0a]">
                 <Button onClick={handleSave} className="w-full" size="lg">
                   <Save className="h-4 w-4 mr-2" />
                   Save Changes
@@ -344,7 +344,7 @@ export const BusinessOverviewEditor = ({
 
             <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
               {/* Header */}
-              <div className="border-b border-white/[0.12] p-6">
+              <div className="border-b border-white/[0.12] px-4 py-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <span className="label-tech text-primary">AI Assistant</span>
@@ -364,7 +364,7 @@ export const BusinessOverviewEditor = ({
               </div>
 
               {/* Chat Area */}
-              <ScrollArea className="flex-1 p-6">
+              <ScrollArea className="flex-1 px-4 py-4 sm:p-6">
                 <div ref={scrollRef} className="space-y-4">
                   {messages.map((message, index) => (
                     <div
@@ -372,7 +372,7 @@ export const BusinessOverviewEditor = ({
                       className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-[85%] rounded-2xl p-6 ${
+                        className={`max-w-[90%] sm:max-w-[85%] rounded-2xl p-4 sm:p-6 ${
                           message.role === "user"
                             ? "bg-primary text-primary-foreground"
                             : "bg-white/[0.06] border border-white/[0.12]"
@@ -412,7 +412,7 @@ export const BusinessOverviewEditor = ({
               </ScrollArea>
 
               {/* Input Area */}
-              <div className="border-t border-white/[0.12] p-6">
+              <div className="border-t border-white/[0.12] px-4 py-4 sm:p-6">
                 <div className="flex gap-3">
                   <Input
                     value={input}
