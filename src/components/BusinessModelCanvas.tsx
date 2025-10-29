@@ -179,7 +179,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
           </div>
           
           {/* Bottom Row - Full Width 50/50 Split */}
-          <div className="flex flex-col md:flex-row gap-2">
+          <div className="flex flex-col md:flex-row gap-[2px]">
             <CanvasCard title="Cost Structure" items={data.costStructure} span="flex-1" height="h-[200px]" />
             <CanvasCard title="Revenue Streams" items={data.revenueStreams} span="flex-1" height="h-[200px]" />
         </div>
