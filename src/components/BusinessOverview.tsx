@@ -83,7 +83,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
             {/* Description */}
             <div>
               <p className={`text-foreground/80 text-sm sm:text-base md:text-lg leading-relaxed ${
-                !isExpanded ? 'line-clamp-1 md:line-clamp-3' : ''
+                !isExpanded ? 'line-clamp-5 sm:line-clamp-3' : ''
               }`}>
                 {data.description}
               </p>

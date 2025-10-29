@@ -101,7 +101,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
     
     return (
       <div 
-        className={`card-mono ${span} ${height} flex flex-col p-3 sm:p-3.5 cursor-pointer hover:border-primary/50 transition-colors group`}
+        className={`card-mono ${span} ${height} flex flex-col p-3 sm:p-4 cursor-pointer hover:border-primary/50 transition-colors group`}
         onClick={() => handleSectionClick(title, items)}
       >
         <div className="flex items-center justify-between mb-3">
@@ -149,8 +149,13 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
   return (
     <>
       <div className="w-full max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6 gap-6">
+      {/* Mobile: Simplified header */}
+      <div className="md:hidden mb-4">
+        <h2 className="text-xl font-bold">Business Model Canvas</h2>
+      </div>
+
+      {/* Desktop: Full verbose header */}
+      <div className="hidden md:flex items-start justify-between mb-6 gap-6">
         <div>
           <span className="label-tech text-muted-foreground">Business Model Canvas</span>
           <h2 className="text-3xl font-semibold tracking-tight">Strategic Framework</h2>

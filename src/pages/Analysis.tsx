@@ -469,7 +469,7 @@ Website: ${comp.website || 'N/A'}
       </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-12 space-y-6 sm:space-y-8 md:space-y-12">
+      <main className="container mx-auto px-3 sm:px-6 py-4 sm:py-8 md:py-12 space-y-4 sm:space-y-8 md:space-y-12">
         
         {/* Mobile Copy Button - Top Right Corner */}
         {hasAnalyzed && !isLoading && analysisData && (
@@ -571,7 +571,7 @@ Website: ${comp.website || 'N/A'}
         )}
 
         {hasAnalyzed && !isLoading && analysisData && (
-          <div ref={resultsRef} className="space-y-6 sm:space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
+          <div ref={resultsRef} className="space-y-4 sm:space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
             {/* Success Banner - Only show for new analyses */}
             {isNewAnalysis && (
               <SuccessBanner 
