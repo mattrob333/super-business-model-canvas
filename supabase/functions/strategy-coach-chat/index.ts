@@ -115,7 +115,7 @@ GUIDELINES:
 - Ask follow-up questions to dig deeper into their challenges
 - Be encouraging but realistic about what's achievable
 - Suggest specific frameworks or methodologies when relevant
-- Use your web browsing capability to research industry trends, competitor strategies, and best practices for ${companyData.industry || 'their industry'}
+- Draw on your knowledge of industry trends, competitor strategies, and best practices for ${companyData.industry || 'their industry'}
 
 Remember: You're helping them navigate strategic challenges with the wisdom of a McKinsey consultant but the approachability of a trusted advisor.`;
 
@@ -132,7 +132,7 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    console.log('Calling Lovable AI Gateway with GPT-5...');
+    console.log('Calling Lovable AI Gateway with Gemini Flash...');
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -140,7 +140,7 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-5',
+        model: 'google/gemini-2.5-flash',
         messages,
         stream: true,
       }),
