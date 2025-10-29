@@ -441,7 +441,7 @@ export const BusinessOverviewEditor = ({
         {/* Left Panel - Edit Form */}
         <div className="hidden md:flex md:w-[55%] border-r border-white/[0.12] flex-col">
           {/* Header */}
-          <div className="border-b border-white/[0.12] p-6">
+          <div className="border-b border-white/[0.12] p-6 h-[88px] flex flex-col justify-center">
             <h2 className="text-xl font-semibold">Business Overview</h2>
             <p className="text-sm text-muted-foreground mt-1">Edit your company information</p>
           </div>
@@ -579,7 +579,7 @@ export const BusinessOverviewEditor = ({
           </ScrollArea>
 
           {/* Save Button */}
-          <div className="border-t border-white/[0.12] p-6">
+          <div className="border-t border-white/[0.12] p-6 h-[88px] flex items-center">
             <Button onClick={handleSave} className="w-full" size="lg">
               <Save className="h-4 w-4 mr-2" />
               Save Changes
@@ -590,7 +590,7 @@ export const BusinessOverviewEditor = ({
         {/* Right Panel - AI Chat */}
         <div className="hidden md:flex md:w-[45%] flex-col">
           {/* Header */}
-          <div className="border-b border-white/[0.12] p-6 flex items-center justify-between">
+          <div className="border-b border-white/[0.12] p-6 h-[88px] flex items-center justify-between">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
@@ -668,7 +668,7 @@ export const BusinessOverviewEditor = ({
           </ScrollArea>
 
           {/* Input Area */}
-          <div className="border-t border-white/[0.12] p-6">
+          <div className="border-t border-white/[0.12] p-6 h-[88px] flex flex-col justify-center">
             <div className="flex gap-3">
               <Input
                 value={input}
