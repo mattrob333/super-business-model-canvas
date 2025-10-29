@@ -41,8 +41,9 @@ export const Navigation = () => {
             <div className="inline-flex items-center bg-[#C4F82A] text-black px-3 py-1 rounded-full font-montserrat">
               <span className="text-xl">SUPER</span>
             </div>
-            <h1 className="hidden md:block text-xl font-montserrat font-light text-white">
-              BUSINESS MODEL CANVAS
+            <h1 className="text-xl font-montserrat font-light text-white">
+              <span className="md:hidden">BMC</span>
+              <span className="hidden md:inline">BUSINESS MODEL CANVAS</span>
             </h1>
           </div>
           

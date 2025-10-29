@@ -291,14 +291,13 @@ const Playbooks = () => {
                 className="min-h-[120px] sm:min-h-[150px] border-none bg-transparent resize-none focus-visible:ring-0 text-sm sm:text-base"
               />
               
-              <div className="flex items-center justify-between mt-3 pt-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Sparkles className="h-4 w-4" />
-                    <span>AI Strategy Assistant</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 border-l pl-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-3 pt-4 border-t">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center sm:justify-start">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-xs sm:text-sm">AI Strategy Assistant</span>
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+                  <div className="flex items-center gap-2 justify-center sm:justify-start sm:border-l sm:pl-4">
                     <Switch
                       id="initial-research-mode"
                       checked={initialResearchMode}
@@ -306,22 +305,21 @@ const Playbooks = () => {
                     />
                     <Label 
                       htmlFor="initial-research-mode" 
-                      className="text-sm cursor-pointer flex items-center gap-1.5"
+                      className="text-xs sm:text-sm cursor-pointer flex items-center gap-1.5"
                     >
                       <Globe className="h-3.5 w-3.5" />
                       Research Mode
                     </Label>
                   </div>
+                  <Button 
+                    onClick={handleStartChat}
+                    disabled={!selectedAnalysis || !goalInput.trim()}
+                    className="w-full sm:w-auto min-h-[44px]"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Start Strategy Session
+                  </Button>
                 </div>
-                
-                <Button 
-                  onClick={handleStartChat}
-                  disabled={!selectedAnalysis || !goalInput.trim()}
-                  className="w-full sm:w-auto min-h-[44px]"
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Start Strategy Session
-                </Button>
               </div>
             </div>
           </div>

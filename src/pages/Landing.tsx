@@ -76,7 +76,10 @@ const Landing = () => {
               <div className="inline-flex items-center bg-[#C4F82A] text-black px-3 py-1 rounded-full font-montserrat font-normal tracking-wide">
                 <span className="text-lg sm:text-xl">SUPER</span>
               </div>
-              <h1 className="text-lg sm:text-xl font-montserrat font-light tracking-wide text-white">BUSINESS MODEL CANVAS</h1>
+              <h1 className="text-lg sm:text-xl font-montserrat font-light tracking-wide text-white">
+                <span className="md:hidden">BMC</span>
+                <span className="hidden md:inline">BUSINESS MODEL CANVAS</span>
+              </h1>
             </div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-primary/10 border border-primary/20 rounded-full">
               <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />

@@ -3,25 +3,23 @@ import { ArrowRight } from "lucide-react";
 
 export const ProcessSteps = () => {
   return (
-    <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8 mb-6 md:mb-8 px-4">
+    <div className="flex flex-row items-center justify-center gap-3 sm:gap-6 md:gap-8 mb-6 md:mb-8 px-4 overflow-x-auto">
       <ProcessStep 
-        icon={<Search className="w-6 h-6" />}
+        icon={<Search className="w-8 h-8 sm:w-10 md:w-12" />}
         label="AI Research"
         sublabel="60 seconds"
       />
-      <ArrowRight className="hidden md:block w-6 h-6 text-muted-foreground self-start mt-4" />
-      <div className="block md:hidden w-0.5 h-8 bg-border" />
+      <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0" />
       
       <ProcessStep 
-        icon={<Edit className="w-6 h-6" />}
+        icon={<Edit className="w-8 h-8 sm:w-10 md:w-12" />}
         label="You Refine"
         sublabel="5-10 minutes"
       />
-      <ArrowRight className="hidden md:block w-6 h-6 text-muted-foreground self-start mt-4" />
-      <div className="block md:hidden w-0.5 h-8 bg-border" />
+      <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0" />
       
       <ProcessStep 
-        icon={<Repeat className="w-6 h-6" />}
+        icon={<Repeat className="w-8 h-8 sm:w-10 md:w-12" />}
         label="Reuse Forever"
         sublabel="Apply frameworks"
       />
@@ -37,13 +35,13 @@ interface ProcessStepProps {
 
 const ProcessStep = ({ icon, label, sublabel }: ProcessStepProps) => {
   return (
-    <div className="flex flex-col items-center gap-2 text-center">
-      <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+    <div className="flex flex-col items-center gap-1 sm:gap-2 text-center flex-shrink-0">
+      <div className="w-10 h-10 sm:w-12 md:w-14 sm:h-12 md:h-14 rounded-full bg-primary/20 flex items-center justify-center text-primary">
         {icon}
       </div>
       <div>
-        <div className="font-semibold text-foreground">{label}</div>
-        <div className="text-xs text-muted-foreground">{sublabel}</div>
+        <div className="font-semibold text-foreground text-xs sm:text-sm md:text-base">{label}</div>
+        <div className="text-[10px] sm:text-xs text-muted-foreground">{sublabel}</div>
       </div>
     </div>
   );
