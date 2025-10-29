@@ -122,11 +122,13 @@ export const DUMMY_FRAMEWORKS: DummyFramework[] = [
 
 export const getCategoryColor = (category: string): string => {
   const colors: Record<string, string> = {
-    Strategy: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    "Strategy": "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    "Strategic Planning & Growth": "bg-blue-500/10 text-blue-600 border-blue-500/20",
     "Market Analysis": "bg-purple-500/10 text-purple-600 border-purple-500/20",
-    Technology: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-    Growth: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-    Expansion: "bg-pink-500/10 text-pink-600 border-pink-500/20",
+    "Market Intelligence & Competition": "bg-purple-500/10 text-purple-600 border-purple-500/20",
+    "Technology": "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    "Growth": "bg-orange-500/10 text-orange-600 border-orange-500/20",
+    "Expansion": "bg-pink-500/10 text-pink-600 border-pink-500/20",
   };
   return colors[category] || "bg-muted text-muted-foreground";
 };
