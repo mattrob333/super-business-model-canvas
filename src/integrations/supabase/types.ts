@@ -14,6 +14,215 @@ export type Database = {
   }
   public: {
     Tables: {
+      framework_executions: {
+        Row: {
+          ai_model: string | null
+          analysis_id: string | null
+          completed_at: string | null
+          error_message: string | null
+          execution_time: number | null
+          exported_to_pdf: boolean | null
+          framework_id: string | null
+          id: string
+          input_data: Json | null
+          manually_edited: boolean | null
+          prompt_used: string | null
+          raw_response: Json | null
+          rendered_html: string | null
+          started_at: string | null
+          status: string | null
+          tokens_used: number | null
+          user_id: string | null
+          validation_errors: Json | null
+          validation_passed: boolean | null
+        }
+        Insert: {
+          ai_model?: string | null
+          analysis_id?: string | null
+          completed_at?: string | null
+          error_message?: string | null
+          execution_time?: number | null
+          exported_to_pdf?: boolean | null
+          framework_id?: string | null
+          id?: string
+          input_data?: Json | null
+          manually_edited?: boolean | null
+          prompt_used?: string | null
+          raw_response?: Json | null
+          rendered_html?: string | null
+          started_at?: string | null
+          status?: string | null
+          tokens_used?: number | null
+          user_id?: string | null
+          validation_errors?: Json | null
+          validation_passed?: boolean | null
+        }
+        Update: {
+          ai_model?: string | null
+          analysis_id?: string | null
+          completed_at?: string | null
+          error_message?: string | null
+          execution_time?: number | null
+          exported_to_pdf?: boolean | null
+          framework_id?: string | null
+          id?: string
+          input_data?: Json | null
+          manually_edited?: boolean | null
+          prompt_used?: string | null
+          raw_response?: Json | null
+          rendered_html?: string | null
+          started_at?: string | null
+          status?: string | null
+          tokens_used?: number | null
+          user_id?: string | null
+          validation_errors?: Json | null
+          validation_passed?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "framework_executions_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "saved_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "framework_executions_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      frameworks: {
+        Row: {
+          ai_model: string | null
+          allow_manual_edit: boolean | null
+          allow_pdf_export: boolean | null
+          analysis_prompt: string
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          custom_css: string | null
+          departments: string[] | null
+          description: string | null
+          downstream_frameworks: string[] | null
+          estimated_time: number | null
+          goal_alignment: string[] | null
+          icon: string | null
+          id: string
+          layout_style: string | null
+          max_tokens: number | null
+          output_template: string
+          parent_version: string | null
+          required_upstream: string[] | null
+          requires_business_context: boolean | null
+          response_schema: Json | null
+          shortcut: string
+          show_in_playbooks: boolean | null
+          stages: string[] | null
+          status: Database["public"]["Enums"]["framework_status"] | null
+          system_prompt: string | null
+          tags: string[] | null
+          temperature: number | null
+          template_type: string | null
+          title: string
+          updated_at: string | null
+          upstream_frameworks: string[] | null
+          usage_count: number | null
+          validate_json: boolean | null
+          version: number | null
+          when_to_use: string | null
+        }
+        Insert: {
+          ai_model?: string | null
+          allow_manual_edit?: boolean | null
+          allow_pdf_export?: boolean | null
+          analysis_prompt: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          custom_css?: string | null
+          departments?: string[] | null
+          description?: string | null
+          downstream_frameworks?: string[] | null
+          estimated_time?: number | null
+          goal_alignment?: string[] | null
+          icon?: string | null
+          id?: string
+          layout_style?: string | null
+          max_tokens?: number | null
+          output_template: string
+          parent_version?: string | null
+          required_upstream?: string[] | null
+          requires_business_context?: boolean | null
+          response_schema?: Json | null
+          shortcut: string
+          show_in_playbooks?: boolean | null
+          stages?: string[] | null
+          status?: Database["public"]["Enums"]["framework_status"] | null
+          system_prompt?: string | null
+          tags?: string[] | null
+          temperature?: number | null
+          template_type?: string | null
+          title: string
+          updated_at?: string | null
+          upstream_frameworks?: string[] | null
+          usage_count?: number | null
+          validate_json?: boolean | null
+          version?: number | null
+          when_to_use?: string | null
+        }
+        Update: {
+          ai_model?: string | null
+          allow_manual_edit?: boolean | null
+          allow_pdf_export?: boolean | null
+          analysis_prompt?: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          custom_css?: string | null
+          departments?: string[] | null
+          description?: string | null
+          downstream_frameworks?: string[] | null
+          estimated_time?: number | null
+          goal_alignment?: string[] | null
+          icon?: string | null
+          id?: string
+          layout_style?: string | null
+          max_tokens?: number | null
+          output_template?: string
+          parent_version?: string | null
+          required_upstream?: string[] | null
+          requires_business_context?: boolean | null
+          response_schema?: Json | null
+          shortcut?: string
+          show_in_playbooks?: boolean | null
+          stages?: string[] | null
+          status?: Database["public"]["Enums"]["framework_status"] | null
+          system_prompt?: string | null
+          tags?: string[] | null
+          temperature?: number | null
+          template_type?: string | null
+          title?: string
+          updated_at?: string | null
+          upstream_frameworks?: string[] | null
+          usage_count?: number | null
+          validate_json?: boolean | null
+          version?: number | null
+          when_to_use?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "frameworks_parent_version_fkey"
+            columns: ["parent_version"]
+            isOneToOne: false
+            referencedRelation: "frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generated_reports: {
         Row: {
           business_context: Json
@@ -306,6 +515,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      framework_status: "draft" | "active" | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -434,6 +644,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      framework_status: ["draft", "active", "archived"],
     },
   },
 } as const
