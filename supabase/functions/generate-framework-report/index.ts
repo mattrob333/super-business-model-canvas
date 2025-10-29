@@ -89,6 +89,19 @@ Deno.serve(async (req) => {
     // Determine if we need JSON output
     const needsJsonOutput = framework.template_type === 'html' && framework.output_template?.includes('{{#each');
     
+    // Build JSON schema instructions if needed
+    let jsonSchemaInstructions = '';
+    if (needsJsonOutput && framework.response_schema) {
+      jsonSchemaInstructions = `
+
+REQUIRED JSON STRUCTURE:
+You must return ONLY valid JSON (no markdown, no code blocks) with this exact structure:
+${JSON.stringify(framework.response_schema, null, 2)}
+
+EXAMPLE FORMAT:
+${JSON.stringify(framework.response_schema, null, 2)}`;
+    }
+    
     // Build the full prompt
     const fullPrompt = `${systemPrompt}
 
@@ -105,9 +118,10 @@ CRITICAL INSTRUCTIONS:
 - Provide comprehensive, specific analysis
 - Be quantitative where possible
 - Focus on actionable insights
-${needsJsonOutput ? '- IMPORTANT: Return ONLY valid JSON in your response, no markdown formatting, no code blocks' : '- Return well-formatted HTML content'}`;
+${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no markdown formatting, no code blocks${jsonSchemaInstructions}` : '- Return well-formatted HTML content'}`;
 
     console.log('Generating report with AI...');
+    console.log('Needs JSON output:', needsJsonOutput);
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     const aiModel = framework.ai_model || 'google/gemini-2.5-flash';
     
@@ -138,12 +152,17 @@ ${needsJsonOutput ? '- IMPORTANT: Return ONLY valid JSON in your response, no ma
 
     const aiData = await aiResponse.json();
     let reportContent = aiData.choices[0].message.content;
+    
+    console.log('AI Response received, length:', reportContent.length);
+    console.log('First 200 chars:', reportContent.substring(0, 200));
 
     // Process template if needed
     if (framework.template_type === 'html' && framework.output_template) {
       try {
         // If the template uses Handlebars loops/conditionals, parse JSON response
         if (framework.output_template.includes('{{#each') || framework.output_template.includes('{{#if')) {
+          console.log('Processing Handlebars template with JSON data...');
+          
           // Clean the response - remove markdown code blocks if present
           let jsonContent = reportContent.trim();
           if (jsonContent.startsWith('```json')) {
@@ -152,7 +171,17 @@ ${needsJsonOutput ? '- IMPORTANT: Return ONLY valid JSON in your response, no ma
             jsonContent = jsonContent.replace(/```\n?/g, '').replace(/```\n?$/g, '');
           }
           
-          const analysisData = JSON.parse(jsonContent);
+          console.log('Cleaned JSON content, first 200 chars:', jsonContent.substring(0, 200));
+          
+          let analysisData;
+          try {
+            analysisData = JSON.parse(jsonContent);
+            console.log('Successfully parsed JSON, keys:', Object.keys(analysisData));
+          } catch (jsonError) {
+            console.error('JSON Parse Error:', jsonError);
+            console.error('Failed to parse content:', jsonContent.substring(0, 500));
+            throw new Error(`Failed to parse AI response as JSON: ${jsonError.message}`);
+          }
           
           // Compile and render template with data
           const template = Handlebars.compile(framework.output_template);
@@ -162,7 +191,10 @@ ${needsJsonOutput ? '- IMPORTANT: Return ONLY valid JSON in your response, no ma
             analysis: analysisData,
             ...analysisData
           });
+          
+          console.log('Template rendered successfully, length:', reportContent.length);
         } else {
+          console.log('Using simple variable substitution...');
           // Simple variable substitution
           reportContent = replaceVariables(framework.output_template, {
             companyName,
@@ -172,11 +204,21 @@ ${needsJsonOutput ? '- IMPORTANT: Return ONLY valid JSON in your response, no ma
         }
       } catch (templateError) {
         console.error('Template processing error:', templateError);
-        console.log('Raw AI response:', reportContent.substring(0, 500));
+        console.error('Error details:', {
+          message: templateError.message,
+          stack: templateError.stack,
+        });
+        console.log('Raw AI response (full):', reportContent);
+        
         // If template processing fails, wrap in basic HTML
         reportContent = `<div class="framework-report">
           <h1>${framework.title}</h1>
           <h2>${companyName}</h2>
+          <div class="error-notice" style="background: #fee; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #fcc;">
+            <strong>⚠️ Template Processing Error</strong>
+            <p>The report was generated but could not be formatted properly. Raw content is displayed below.</p>
+            <p style="font-size: 12px; color: #666;">Error: ${templateError.message}</p>
+          </div>
           <div class="content">${reportContent}</div>
         </div>`;
       }

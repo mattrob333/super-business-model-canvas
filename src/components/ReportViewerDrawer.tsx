@@ -33,6 +33,7 @@ export function ReportViewerDrawer({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [frameworkTitle, setFrameworkTitle] = useState("");
+  const [customCss, setCustomCss] = useState("");
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export function ReportViewerDrawer({
     setIsLoading(true);
     const { data, error } = await supabase
       .from('generated_reports')
-      .select('*, frameworks(title)')
+      .select('*, frameworks(title, custom_css)')
       .eq('id', reportId)
       .single();
 
@@ -66,6 +67,7 @@ export function ReportViewerDrawer({
       setOriginalHtml(data.original_content || data.report_content);
       setIsEdited(data.is_edited || false);
       setFrameworkTitle(data.frameworks?.title || "Strategic Report");
+      setCustomCss(data.frameworks?.custom_css || "");
     }
     
     setIsLoading(false);
@@ -145,9 +147,6 @@ export function ReportViewerDrawer({
     }
   };
 
-  const template = REPORT_TEMPLATES[frameworkId];
-  const styles = template?.cssStyles || "";
-
   return (
     <Sheet open={isOpen} onOpenChange={handleClose}>
       <SheetContent side="right" className="w-full sm:w-[1100px] sm:max-w-[1100px] xl:w-[1200px] xl:max-w-[1200px] overflow-y-auto p-0 flex flex-col">
@@ -220,7 +219,7 @@ export function ReportViewerDrawer({
             </div>
           ) : (
             <>
-              <style>{styles}</style>
+              <style>{customCss}</style>
               <div
                 ref={contentRef}
                 contentEditable
