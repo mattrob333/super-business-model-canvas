@@ -34,6 +34,7 @@ const Analysis = () => {
   const [scrollPercentage, setScrollPercentage] = useState(0);
   const [reviewedSections, setReviewedSections] = useState(0);
   const [showPlaybooksCTA, setShowPlaybooksCTA] = useState(false);
+  const [bmcEditorOpen, setBmcEditorOpen] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -595,6 +596,7 @@ Website: ${comp.website || 'N/A'}
                   website: analysisData.company?.website || ""
                 }}
                 onSectionUpdate={handleBMCSectionUpdate}
+                onEditorOpenChange={setBmcEditorOpen}
               />
             </section>
 
@@ -605,9 +607,9 @@ Website: ${comp.website || 'N/A'}
               />
             </section>
             
-            {/* Floating CTA */}
+            {/* Floating CTA - hide when BMC editor is open */}
             <FloatingCTA 
-              show={showPlaybooksCTA}
+              show={showPlaybooksCTA && !bmcEditorOpen}
               onNavigate={() => navigate('/playbooks')}
               variant="floating"
             />

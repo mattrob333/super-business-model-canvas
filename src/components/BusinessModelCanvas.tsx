@@ -38,13 +38,19 @@ interface BusinessModelCanvasProps {
     website: string;
   };
   onSectionUpdate?: (sectionTitle: string, updatedData: { items: string[]; notes: string }) => void;
+  onEditorOpenChange?: (open: boolean) => void;
 }
 
-export const BusinessModelCanvas = ({ data, companyName, businessContext, onSectionUpdate }: BusinessModelCanvasProps) => {
+export const BusinessModelCanvas = ({ data, companyName, businessContext, onSectionUpdate, onEditorOpenChange }: BusinessModelCanvasProps) => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [selectedSection, setSelectedSection] = useState<CanvasSection | null>(null);
   const [viewedSections, setViewedSections] = useState<Set<string>>(new Set());
   const [editedSections, setEditedSections] = useState<Set<string>>(new Set());
+
+  const handleEditorOpenChange = (open: boolean) => {
+    setEditorOpen(open);
+    onEditorOpenChange?.(open);
+  };
 
   const getSectionKey = (title: string): string => {
     const mapping: Record<string, string> = {
@@ -66,7 +72,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
     const notesKey = `${sectionKey}_notes` as keyof typeof data;
     const notes = data[notesKey] as string | undefined;
     setSelectedSection({ title, items, notes });
-    setEditorOpen(true);
+    handleEditorOpenChange(true);
     setViewedSections(prev => new Set(prev).add(title));
   };
 
@@ -182,7 +188,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
       {selectedSection && (
         <BMCSectionEditor
           open={editorOpen}
-          onOpenChange={setEditorOpen}
+          onOpenChange={handleEditorOpenChange}
           section={selectedSection}
           companyName={companyName}
           businessContext={businessContext}
