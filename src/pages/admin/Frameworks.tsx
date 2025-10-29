@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Search, Edit, Eye, Copy, Archive } from 'lucide-react';
+import { Loader2, Plus, Search, Edit, Eye, Copy, Archive, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { FrameworkImportDialog } from '@/components/FrameworkImportDialog';
 
 interface Framework {
   id: string;
@@ -32,6 +33,7 @@ const AdminFrameworks = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -189,13 +191,22 @@ const AdminFrameworks = () => {
               <h1 className="text-4xl font-bold tracking-tight">Framework Library</h1>
               <p className="text-muted-foreground mt-2">Manage strategic analysis frameworks</p>
             </div>
-            <Button
-              onClick={() => navigate('/admin/frameworks/new')}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              New Framework
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setImportDialogOpen(true)}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Import
+              </Button>
+              <Button
+                onClick={() => navigate('/admin/frameworks/new')}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Framework
+              </Button>
+            </div>
           </div>
 
           {/* Filters */}
@@ -319,6 +330,13 @@ const AdminFrameworks = () => {
           )}
         </div>
       </div>
+
+      <FrameworkImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        existingShortcuts={frameworks.map(f => f.shortcut.toLowerCase())}
+        onSuccess={fetchFrameworks}
+      />
     </div>
   );
 };

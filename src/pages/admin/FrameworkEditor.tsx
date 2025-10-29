@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, ArrowLeft, Save } from 'lucide-react';
+import { Loader2, ArrowLeft, Save, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { downloadFrameworkTemplate, generateBlankTemplate } from '@/lib/framework-import-export';
 
 const FrameworkEditor = () => {
   const navigate = useNavigate();
@@ -162,13 +163,22 @@ const FrameworkEditor = () => {
         </Button>
 
         <div className="space-y-6">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight">
-              {id === 'new' ? 'Create Framework' : 'Edit Framework'}
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Configure framework metadata, AI prompts, and output templates
-            </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-bold tracking-tight">
+                {id === 'new' ? 'Create Framework' : 'Edit Framework'}
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Configure framework metadata, AI prompts, and output templates
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => downloadFrameworkTemplate(generateBlankTemplate())}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Template
+            </Button>
           </div>
 
           <Tabs defaultValue="basic" className="space-y-6">
