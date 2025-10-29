@@ -111,7 +111,7 @@ const Playbooks = () => {
 
   const fetchFrameworks = async () => {
     const { data, error } = await supabase
-      .from("strategic_frameworks")
+      .from("frameworks")
       .select("*")
       .eq("status", "active")
       .order("category", { ascending: true });
@@ -123,15 +123,23 @@ const Playbooks = () => {
 
     // Map frameworks with icons
     const iconMap: Record<string, any> = {
-      'swot-analysis': Target,
-      'porters-five-forces': TrendingUp,
-      'ai-automation-audit': Bot,
+      'SWOT': Target,
+      'PORTER': TrendingUp,
+      'BMC': Target,
+      'PESTLE': Globe,
+      'ANSOFF': TrendingUp,
+      '7S': Target,
+      'VALUE_CHAIN': Target,
+      'BCG': Target,
+      'BSC': Target,
+      'BLUE_OCEAN': Target,
     };
 
     const mappedFrameworks = (data || []).map(f => ({
       ...f,
-      icon: iconMap[f.id] || Target,
-      estimated_time: f.estimated_time || 45,
+      icon: iconMap[f.shortcut] || Target,
+      estimated_time: f.estimated_time || 15,
+      when_to_use: f.when_to_use ? [f.when_to_use] : [],
     }));
 
     setFrameworks(mappedFrameworks);
