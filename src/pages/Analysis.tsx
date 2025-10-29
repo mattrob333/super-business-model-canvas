@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Save, Search, ChevronUp, ArrowRight } from "lucide-react";
+import { Copy, Check, Save, Search, ChevronUp, ArrowRight, Loader2 } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 import { Card as UICard, CardContent } from "@/components/ui/card";
 import logo from "@/assets/logo_2.png";
@@ -307,6 +307,52 @@ const Analysis = () => {
     }
   };
 
+  const handleNavigateToPlaybooks = async () => {
+    // Save analysis first if user is logged in
+    if (user && analysisData) {
+      try {
+        const companyName = analysisData.company?.name || 'Unknown Company';
+        
+        // Check for existing analysis
+        const { data: existing } = await supabase
+          .from('saved_analyses')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('company_name', companyName)
+          .maybeSingle();
+
+        if (existing) {
+          // Update existing record
+          await supabase
+            .from('saved_analyses')
+            .update({ analysis_data: analysisData })
+            .eq('id', existing.id);
+        } else {
+          // Insert new record
+          await supabase
+            .from('saved_analyses')
+            .insert({
+              user_id: user.id,
+              company_name: companyName,
+              analysis_data: analysisData
+            });
+        }
+      } catch (error) {
+        console.error('Failed to save before navigation:', error);
+        // Continue to navigate even if save fails
+      }
+    }
+    
+    // Store analysis in sessionStorage for Playbooks page to pick up
+    sessionStorage.setItem('playbookContext', JSON.stringify({
+      companyName: analysisData?.company?.name || 'Unknown Company',
+      businessContext: analysisData
+    }));
+    
+    // Navigate to Playbooks
+    navigate('/playbooks');
+  };
+
   const copyToMarkdown = () => {
     if (!analysisData) return;
 
@@ -536,6 +582,29 @@ Website: ${comp.website || 'N/A'}
           <SuccessBanner 
             companyName={analysisData.company?.name || "Unknown Company"}
           />
+
+            {/* Save Button */}
+            <div className="w-full max-w-7xl mx-auto mb-6 flex justify-end">
+              <Button
+                onClick={saveAnalysis}
+                disabled={isSaving || !user}
+                variant="outline"
+                size="default"
+                className="gap-2"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Save Analysis
+                  </>
+                )}
+              </Button>
+            </div>
             
             {/* Inline prompt to scroll if user hasn't scrolled much */}
             {!showPlaybooksCTA && scrollPercentage < 20 && (
@@ -610,7 +679,7 @@ Website: ${comp.website || 'N/A'}
             {/* Floating CTA - hide when BMC editor is open */}
             <FloatingCTA 
               show={showPlaybooksCTA && !bmcEditorOpen}
-              onNavigate={() => navigate('/playbooks')}
+              onNavigate={handleNavigateToPlaybooks}
               variant="floating"
             />
           </div>

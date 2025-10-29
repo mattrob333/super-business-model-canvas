@@ -67,19 +67,6 @@ export const Navigation = () => {
           
           {/* Right Side */}
           <div className="flex items-center gap-3">
-            {/* New Analysis Button - Shows on analyze page for logged-in users */}
-            {user && isOnAnalysisPage && (
-              <Button
-                onClick={() => window.location.reload()}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden md:inline">New Analysis</span>
-              </Button>
-            )}
-            
             {/* AI Badge */}
             <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
               <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />

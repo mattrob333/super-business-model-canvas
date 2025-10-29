@@ -66,6 +66,27 @@ const Playbooks = () => {
     }
   }, [user, loading, navigate]);
 
+  // Load pre-selected context from sessionStorage if available
+  useEffect(() => {
+    const savedContext = sessionStorage.getItem('playbookContext');
+    if (savedContext && savedAnalyses.length > 0) {
+      try {
+        const { companyName, businessContext } = JSON.parse(savedContext);
+        // Find matching analysis by company name
+        const matchingAnalysis = savedAnalyses.find(
+          a => a.company_name === companyName
+        );
+        if (matchingAnalysis) {
+          setSelectedAnalysis(matchingAnalysis);
+        }
+        // Clear the storage after loading
+        sessionStorage.removeItem('playbookContext');
+      } catch (error) {
+        console.error('Failed to load playbook context:', error);
+      }
+    }
+  }, [savedAnalyses]);
+
   const fetchSavedAnalyses = async () => {
     const { data, error } = await supabase
       .from("saved_analyses")
