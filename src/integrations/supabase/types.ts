@@ -287,7 +287,7 @@ export type Database = {
             foreignKeyName: "generated_reports_framework_id_fkey"
             columns: ["framework_id"]
             isOneToOne: false
-            referencedRelation: "strategic_frameworks"
+            referencedRelation: "frameworks"
             referencedColumns: ["id"]
           },
         ]
