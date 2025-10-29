@@ -1,8 +1,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, Play, Target } from "lucide-react";
+import { Users, Play, Target } from "lucide-react";
 import { DUMMY_FRAMEWORKS, getCategoryColor } from "@/data/dummy-frameworks";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface FrameworkDetailModalProps {
   isOpen: boolean;
@@ -26,8 +27,10 @@ export const FrameworkDetailModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[85vh] p-0">
+        <ScrollArea className="max-h-[85vh] px-6 [&>[data-radix-scroll-area-viewport]]:max-h-[85vh]">
+          <div className="py-6">
+            <DialogHeader>
           <div className="flex items-start gap-4 mb-4">
             <div className={`p-3 rounded-lg ${getCategoryColor(framework.category)} border`}>
               <IconComponent className="h-8 w-8" />
@@ -42,9 +45,9 @@ export const FrameworkDetailModal = ({
               </Badge>
             </div>
           </div>
-        </DialogHeader>
+            </DialogHeader>
 
-        <div className="space-y-6">
+            <div className="space-y-6">
           {/* Overview */}
           <div>
             <h4 className="font-semibold mb-2 flex items-center gap-2">
@@ -93,21 +96,10 @@ export const FrameworkDetailModal = ({
                 </Badge>
               ))}
             </div>
-          </div>
-
-          {/* Time & Complexity */}
-          <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-            <Clock className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">Estimated Time</p>
-              <p className="text-sm text-muted-foreground">
-                {framework.estimatedTime} minutes
-              </p>
             </div>
-          </div>
-        </div>
+            </div>
 
-        <DialogFooter className="gap-2">
+            <DialogFooter className="gap-2 pb-6">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -118,8 +110,10 @@ export const FrameworkDetailModal = ({
           >
             <Play className="h-4 w-4" />
             Run Framework
-          </Button>
-        </DialogFooter>
+            </Button>
+            </DialogFooter>
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
