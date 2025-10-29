@@ -9,10 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Sparkles, Clock, Users, Globe } from "lucide-react";
+import { CheckCircle2, Sparkles, Clock, Users, Globe, Target, TrendingUp, Bot } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { DUMMY_FRAMEWORKS, getCategoryColor } from "@/data/dummy-frameworks";
+import { getCategoryColor } from "@/data/dummy-frameworks";
 import { BusinessContextChat } from "@/components/BusinessContextChat";
 import { FrameworkDetailModal } from "@/components/FrameworkDetailModal";
 import { ReportViewerDrawer } from "@/components/ReportViewerDrawer";
@@ -26,11 +26,13 @@ interface SavedAnalysis {
 interface Framework {
   id: string;
   title: string;
-  shortcut: string;
+  shortcut?: string;
   category: string;
   description: string;
   estimated_time: number;
-  status: string;
+  departments: string[];
+  when_to_use: string[];
+  icon?: any;
 }
 
 interface Recommendation {
@@ -58,6 +60,7 @@ const Playbooks = () => {
   const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false);
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [frameworks, setFrameworks] = useState<Framework[]>([]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -67,6 +70,7 @@ const Playbooks = () => {
     
     if (user) {
       fetchSavedAnalyses();
+      fetchFrameworks();
     }
   }, [user, loading, navigate]);
 
@@ -105,10 +109,38 @@ const Playbooks = () => {
     setSavedAnalyses(data || []);
   };
 
-  const categories = ["all", ...new Set(DUMMY_FRAMEWORKS.map((f) => f.category))];
+  const fetchFrameworks = async () => {
+    const { data, error } = await supabase
+      .from("strategic_frameworks")
+      .select("*")
+      .eq("status", "active")
+      .order("category", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching frameworks:", error);
+      return;
+    }
+
+    // Map frameworks with icons
+    const iconMap: Record<string, any> = {
+      'swot-analysis': Target,
+      'porters-five-forces': TrendingUp,
+      'ai-automation-audit': Bot,
+    };
+
+    const mappedFrameworks = (data || []).map(f => ({
+      ...f,
+      icon: iconMap[f.id] || Target,
+      estimated_time: f.estimated_time || 45,
+    }));
+
+    setFrameworks(mappedFrameworks);
+  };
+
+  const categories = ["all", ...new Set(frameworks.map((f) => f.category))];
   const filteredFrameworks = selectedCategory === "all" 
-    ? DUMMY_FRAMEWORKS 
-    : DUMMY_FRAMEWORKS.filter((f) => f.category === selectedCategory);
+    ? frameworks 
+    : frameworks.filter((f) => f.category === selectedCategory);
 
   const handleStartChat = () => {
     if (!selectedAnalysis) {
@@ -317,7 +349,7 @@ const Playbooks = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredFrameworks.map((framework) => {
-              const IconComponent = framework.icon;
+              const IconComponent = framework.icon || Target;
               return (
                 <Card 
                   key={framework.id}
@@ -334,7 +366,7 @@ const Playbooks = () => {
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                         <Clock className="h-3 w-3" />
-                        {framework.estimatedTime}m
+                        {framework.estimated_time}m
                       </div>
                     </div>
                     <Badge 
@@ -353,17 +385,17 @@ const Playbooks = () => {
                   <CardContent>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
                       <Users className="h-3 w-3" />
-                      <span>{framework.departments.length} departments</span>
+                      <span>{framework.departments?.length || 0} departments</span>
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {framework.departments.slice(0, 3).map((dept) => (
+                      {(framework.departments || []).slice(0, 3).map((dept) => (
                         <Badge key={dept} variant="secondary" className="text-xs">
                           {dept}
                         </Badge>
                       ))}
-                      {framework.departments.length > 3 && (
+                      {(framework.departments || []).length > 3 && (
                         <Badge variant="secondary" className="text-xs">
-                          +{framework.departments.length - 3}
+                          +{(framework.departments || []).length - 3}
                         </Badge>
                       )}
                     </div>
@@ -394,12 +426,12 @@ const Playbooks = () => {
         )}
 
         {/* Framework Detail Modal */}
-        <FrameworkDetailModal
-          isOpen={showFrameworkModal}
-          onClose={() => setShowFrameworkModal(false)}
-          frameworkId={selectedFramework}
-          onRunFramework={handleRunFramework}
-        />
+      <FrameworkDetailModal
+        isOpen={showFrameworkModal}
+        onClose={() => setShowFrameworkModal(false)}
+        framework={frameworks.find(f => f.id === selectedFramework) || null}
+        onRunFramework={handleRunFramework}
+      />
 
         {/* Report Viewer Drawer */}
         {selectedAnalysis && selectedFramework && (
