@@ -1,11 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import Handlebars from 'https://esm.sh/handlebars@4.7.8';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper to replace template variables
+// Helper to replace template variables (for simple string substitution)
 const replaceVariables = (template: string, variables: Record<string, any>) => {
   let result = template;
   Object.entries(variables).forEach(([key, value]) => {
@@ -85,6 +86,9 @@ Deno.serve(async (req) => {
       ? replaceVariables(framework.system_prompt, variables)
       : 'You are a strategic business analyst providing professional, actionable insights.';
 
+    // Determine if we need JSON output
+    const needsJsonOutput = framework.template_type === 'html' && framework.output_template?.includes('{{#each');
+    
     // Build the full prompt
     const fullPrompt = `${systemPrompt}
 
@@ -101,7 +105,7 @@ CRITICAL INSTRUCTIONS:
 - Provide comprehensive, specific analysis
 - Be quantitative where possible
 - Focus on actionable insights
-- Return structured response that can be formatted`;
+${needsJsonOutput ? '- IMPORTANT: Return ONLY valid JSON in your response, no markdown formatting, no code blocks' : '- Return well-formatted HTML content'}`;
 
     console.log('Generating report with AI...');
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
@@ -133,7 +137,50 @@ CRITICAL INSTRUCTIONS:
     }
 
     const aiData = await aiResponse.json();
-    const reportContent = aiData.choices[0].message.content;
+    let reportContent = aiData.choices[0].message.content;
+
+    // Process template if needed
+    if (framework.template_type === 'html' && framework.output_template) {
+      try {
+        // If the template uses Handlebars loops/conditionals, parse JSON response
+        if (framework.output_template.includes('{{#each') || framework.output_template.includes('{{#if')) {
+          // Clean the response - remove markdown code blocks if present
+          let jsonContent = reportContent.trim();
+          if (jsonContent.startsWith('```json')) {
+            jsonContent = jsonContent.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
+          } else if (jsonContent.startsWith('```')) {
+            jsonContent = jsonContent.replace(/```\n?/g, '').replace(/```\n?$/g, '');
+          }
+          
+          const analysisData = JSON.parse(jsonContent);
+          
+          // Compile and render template with data
+          const template = Handlebars.compile(framework.output_template);
+          reportContent = template({
+            companyName,
+            strategicGoal: strategic_goal,
+            analysis: analysisData,
+            ...analysisData
+          });
+        } else {
+          // Simple variable substitution
+          reportContent = replaceVariables(framework.output_template, {
+            companyName,
+            strategicGoal: strategic_goal,
+            content: reportContent
+          });
+        }
+      } catch (templateError) {
+        console.error('Template processing error:', templateError);
+        console.log('Raw AI response:', reportContent.substring(0, 500));
+        // If template processing fails, wrap in basic HTML
+        reportContent = `<div class="framework-report">
+          <h1>${framework.title}</h1>
+          <h2>${companyName}</h2>
+          <div class="content">${reportContent}</div>
+        </div>`;
+      }
+    }
 
     console.log('Report generated, saving to database...');
 
