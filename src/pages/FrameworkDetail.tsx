@@ -16,9 +16,9 @@ interface Framework {
   shortcut: string;
   category: string;
   description: string;
-  when_to_use: string[];
+  when_to_use: string;
   departments: string[];
-  company_stages: string[];
+  stages: string[];
   goal_alignment: string[];
   estimated_time: number;
 }
@@ -50,7 +50,7 @@ const FrameworkDetail = () => {
   const fetchFramework = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
-      .from("strategic_frameworks")
+      .from("frameworks")
       .select("*")
       .eq("id", frameworkId)
       .single();
@@ -192,7 +192,7 @@ const FrameworkDetail = () => {
               <Target className="h-5 w-5 text-primary mt-1" />
               <div>
                 <p className="text-sm font-semibold">Company Stages</p>
-                <p className="text-sm text-muted-foreground">{framework.company_stages?.join(", ")}</p>
+                <p className="text-sm text-muted-foreground">{framework.stages?.join(", ")}</p>
               </div>
             </div>
           </div>
@@ -200,14 +200,9 @@ const FrameworkDetail = () => {
           {/* When to Use */}
           <div className="space-y-3">
             <h2 className="text-xl font-semibold">When to Use</h2>
-            <ul className="space-y-2">
-              {framework.when_to_use?.map((use, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span className="text-primary">•</span>
-                  <span className="text-muted-foreground">{use}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="text-muted-foreground">
+              {framework.when_to_use}
+            </div>
           </div>
 
           {/* Goal Alignment */}

@@ -47,7 +47,7 @@ export function ReportViewerDrawer({
     setIsLoading(true);
     const { data, error } = await supabase
       .from('generated_reports')
-      .select('*, strategic_frameworks(title)')
+      .select('*, frameworks(title)')
       .eq('id', reportId)
       .single();
 
@@ -65,7 +65,7 @@ export function ReportViewerDrawer({
       setReportHtml(data.report_content);
       setOriginalHtml(data.original_content || data.report_content);
       setIsEdited(data.is_edited || false);
-      setFrameworkTitle(data.strategic_frameworks?.title || "Strategic Report");
+      setFrameworkTitle(data.frameworks?.title || "Strategic Report");
     }
     
     setIsLoading(false);
