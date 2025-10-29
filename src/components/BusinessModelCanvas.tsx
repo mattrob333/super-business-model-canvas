@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Edit as EditIcon } from "lucide-react";
+import { Edit as EditIcon, Info } from "lucide-react";
 import { BMCSectionEditor } from "./BMCSectionEditor";
 
 interface CanvasSection {
@@ -131,30 +131,35 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
               )}
             </>
           ) : (
-            <p className="text-sm text-muted-foreground italic">
-              No data yet. Click to add.
-            </p>
-          )}
-        </div>
-        
-        <div className="mt-2 pt-2 border-t border-border/50">
-          <p className="text-xs text-muted-foreground text-center group-hover:text-primary transition-colors">
-            Click to view & edit
+          <p className="text-sm text-muted-foreground italic">
+            No data yet. Click to add.
           </p>
-        </div>
+        )}
       </div>
+    </div>
     );
   };
 
   return (
     <>
       <div className="w-full max-w-7xl mx-auto">
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <span className="label-tech text-muted-foreground">Business Model Canvas</span>
-            <h2 className="text-3xl font-semibold tracking-tight">Strategic Framework</h2>
-            <p className="text-muted-foreground text-sm">Click any section to explore deeper insights</p>
-          </div>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6 gap-6">
+        <div>
+          <span className="label-tech text-muted-foreground">Business Model Canvas</span>
+          <h2 className="text-3xl font-semibold tracking-tight">Strategic Framework</h2>
+          <p className="text-muted-foreground text-sm mt-1">
+            Strategic framework showing how the business creates, delivers, and captures value
+          </p>
+        </div>
+        
+        <div className="bg-white/[0.06] border border-white/[0.12] rounded-lg px-4 py-3 flex items-start gap-3 max-w-xs flex-shrink-0">
+          <Info className="w-5 h-5 text-[hsl(var(--primary))] flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-gray-300">
+            Click any section to expand, review, and refine with AI assistance
+          </p>
+        </div>
+      </div>
 
           {/* Business Model Canvas - Top Rows */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2 auto-rows-[200px]">
@@ -171,7 +176,6 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
           <div className="flex flex-col md:flex-row gap-2">
             <CanvasCard title="Cost Structure" items={data.costStructure} span="flex-1" height="h-[200px]" />
             <CanvasCard title="Revenue Streams" items={data.revenueStreams} span="flex-1" height="h-[200px]" />
-          </div>
         </div>
       </div>
 

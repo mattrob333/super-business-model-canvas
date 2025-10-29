@@ -421,30 +421,6 @@ Website: ${comp.website || 'N/A'}
       {/* Main Content */}
       <main className="container mx-auto px-6 py-12 space-y-16">
         
-        {/* Collapsed Search Bar - Shows when results are loaded */}
-        {searchCollapsed && hasAnalyzed && !isLoading && (
-          <div className="sticky top-[88px] z-20 animate-in fade-in slide-in-from-top duration-300 -mx-6 px-6">
-            <div className="bg-white/[0.04] backdrop-blur-sm border border-white/[0.08] rounded-lg px-4 md:px-6 py-3 flex items-center justify-between gap-4 max-w-7xl mx-auto">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Search className="h-5 w-5 text-primary flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-muted-foreground">Analyzing</p>
-                  <p className="text-base font-medium truncate">{analysisData?.company?.name || 'Company'}</p>
-                </div>
-              </div>
-              <Button
-                onClick={handleSearchToggle}
-                variant="outline"
-                size="sm"
-                className="gap-2 flex-shrink-0"
-              >
-                <Search className="h-4 w-4" />
-                <span className="hidden md:inline">New Search</span>
-              </Button>
-            </div>
-          </div>
-        )}
-        
         {/* Action Buttons - Mobile */}
         {hasAnalyzed && !isLoading && analysisData && (
           <div className="md:hidden flex gap-2 px-4">
@@ -556,11 +532,9 @@ Website: ${comp.website || 'N/A'}
         {hasAnalyzed && !isLoading && analysisData && (
           <div ref={resultsRef} className="space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
             {/* Success Banner */}
-            <SuccessBanner 
-              companyName={analysisData.company?.name || "Unknown Company"}
-              reviewedSections={reviewedSections}
-              totalSections={11}
-            />
+          <SuccessBanner 
+            companyName={analysisData.company?.name || "Unknown Company"}
+          />
             
             {/* Inline prompt to scroll if user hasn't scrolled much */}
             {!showPlaybooksCTA && scrollPercentage < 20 && (
