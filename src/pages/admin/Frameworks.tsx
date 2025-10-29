@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Search, Edit, Eye, Copy, Archive, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { FrameworkImportDialog } from '@/components/FrameworkImportDialog';
+import { Navigation } from '@/components/Navigation';
 
 interface Framework {
   id: string;
@@ -183,6 +184,7 @@ const AdminFrameworks = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      <Navigation />
       <div className="container mx-auto px-6 py-8 max-w-7xl">
         <div className="space-y-6">
           {/* Header */}

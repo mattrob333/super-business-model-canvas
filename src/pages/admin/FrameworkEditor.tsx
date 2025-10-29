@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, ArrowLeft, Save, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { downloadFrameworkTemplate, generateBlankTemplate } from '@/lib/framework-import-export';
+import { Navigation } from '@/components/Navigation';
 
 const FrameworkEditor = () => {
   const navigate = useNavigate();
@@ -152,6 +153,7 @@ const FrameworkEditor = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      <Navigation />
       <div className="container mx-auto px-6 py-8 max-w-6xl">
         <Button
           variant="ghost"
