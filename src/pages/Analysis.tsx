@@ -24,6 +24,7 @@ const Analysis = () => {
   const { user, isAdmin, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const [isNewAnalysis, setIsNewAnalysis] = useState(false);
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -75,6 +76,7 @@ const Analysis = () => {
       try {
         setAnalysisData(JSON.parse(loadedAnalysis));
         setHasAnalyzed(true);
+        setIsNewAnalysis(false);
         setSearchCollapsed(true);
         sessionStorage.removeItem('loadedAnalysis');
         // Ensure page starts at the top
@@ -114,6 +116,7 @@ const Analysis = () => {
       if (data) {
         setAnalysisData(data);
         setHasAnalyzed(true);
+        setIsNewAnalysis(true);
         setSearchCollapsed(true);
         toast({
           title: "Analysis Complete",
@@ -542,6 +545,7 @@ Website: ${comp.website || 'N/A'}
               onClick={() => {
                 setAnalysisData(analysis.analysis_data);
                 setHasAnalyzed(true);
+                setIsNewAnalysis(false);
                 setSearchCollapsed(true);
               }}
               className="card-mono card-mono-hover text-left h-36 flex flex-col p-6 group"
@@ -578,10 +582,12 @@ Website: ${comp.website || 'N/A'}
 
         {hasAnalyzed && !isLoading && analysisData && (
           <div ref={resultsRef} className="space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
-            {/* Success Banner */}
-          <SuccessBanner 
-            companyName={analysisData.company?.name || "Unknown Company"}
-          />
+            {/* Success Banner - Only show for new analyses */}
+            {isNewAnalysis && (
+              <SuccessBanner 
+                companyName={analysisData.company?.name || "Unknown Company"}
+              />
+            )}
 
             {/* Save Button */}
             <div className="w-full max-w-7xl mx-auto mb-6 flex justify-end">
