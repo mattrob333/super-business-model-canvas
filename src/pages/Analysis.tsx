@@ -469,30 +469,34 @@ Website: ${comp.website || 'N/A'}
       </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-12 space-y-16">
+      <main className="container mx-auto px-6 py-8 sm:py-12 space-y-8 sm:space-y-12 md:space-y-16">
         
         {/* Action Buttons - Mobile */}
         {hasAnalyzed && !isLoading && analysisData && (
-          <div className="md:hidden flex gap-2 px-4">
-            <Button 
-              onClick={saveAnalysis}
-              variant="outline" 
-              size="default"
-              className="flex-1 gap-2 min-h-[44px]"
-              disabled={isSaving}
-            >
-              <Save className="h-5 w-5" />
-              {isSaving ? "Saving..." : "Save"}
-            </Button>
-            <Button 
-              onClick={copyToMarkdown}
-              variant="outline" 
-              size="default"
-              className="flex-1 gap-2 min-h-[44px]"
-            >
-              {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-              {copied ? "Copied!" : "Copy"}
-            </Button>
+          <div className="md:hidden sticky top-16 z-10 bg-background/95 backdrop-blur pb-3 -mt-6">
+            <div className="container mx-auto px-4">
+              <div className="flex gap-2">
+                <Button 
+                  onClick={saveAnalysis}
+                  variant="outline" 
+                  size="default"
+                  className="flex-1 gap-2 min-h-[44px]"
+                  disabled={isSaving}
+                >
+                  <Save className="h-4 w-4" />
+                  {isSaving ? "Saving..." : "Save"}
+                </Button>
+                <Button 
+                  onClick={copyToMarkdown}
+                  variant="outline" 
+                  size="default"
+                  className="flex-1 gap-2 min-h-[44px]"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? "Copied!" : "Copy"}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
         
@@ -581,7 +585,7 @@ Website: ${comp.website || 'N/A'}
         )}
 
         {hasAnalyzed && !isLoading && analysisData && (
-          <div ref={resultsRef} className="space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
+          <div ref={resultsRef} className="space-y-8 sm:space-y-12 animate-in fade-in slide-in-from-bottom duration-500 pt-4 md:pt-0">
             {/* Success Banner - Only show for new analyses */}
             {isNewAnalysis && (
               <SuccessBanner 
@@ -589,8 +593,8 @@ Website: ${comp.website || 'N/A'}
               />
             )}
 
-            {/* Save Button */}
-            <div className="w-full max-w-7xl mx-auto mb-6 flex justify-end">
+            {/* Save Button - Desktop Only */}
+            <div className="w-full max-w-7xl mx-auto mb-6 hidden sm:flex justify-end">
               <Button
                 onClick={saveAnalysis}
                 disabled={isSaving || !user}

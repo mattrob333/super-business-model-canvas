@@ -23,7 +23,13 @@ interface BusinessOverviewProps {
 
 export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
   const [editorOpen, setEditorOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(() => {
+    // Collapsed on mobile (< 768px), expanded on desktop
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true; // Default to expanded for SSR
+  });
 
   const handleSave = (updatedData: BusinessOverviewProps['data']) => {
     if (onUpdate) {
@@ -50,13 +56,17 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
           <div className="space-y-6">
             {/* Description - Always visible */}
             <div>
-              <p className="text-foreground/80 text-lg leading-relaxed">
+              <p className={`text-foreground/80 text-base sm:text-lg leading-relaxed ${
+                !isExpanded ? 'line-clamp-3' : ''
+              }`}>
                 {data.description}
               </p>
             </div>
 
-            {/* Two-column grid - Always visible */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Two-column grid - Collapsible on mobile */}
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 ${
+              !isExpanded ? 'hidden md:grid' : ''
+            }`}>
               {/* Left Column: Key Facts */}
               <div className="space-y-4">
                 <h3 className="label-tech text-muted-foreground">Key Facts</h3>
@@ -144,12 +154,14 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
                 {isExpanded ? (
                   <>
                     <ChevronUp className="h-4 w-4" />
-                    Show Less
+                    <span className="hidden sm:inline">Show Less</span>
+                    <span className="sm:hidden">Less</span>
                   </>
                 ) : (
                   <>
                     <ChevronDown className="h-4 w-4" />
-                    Read More
+                    <span className="hidden sm:inline">Read More</span>
+                    <span className="sm:hidden">More</span>
                   </>
                 )}
               </Button>
