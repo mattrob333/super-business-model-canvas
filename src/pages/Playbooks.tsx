@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Sparkles, Clock, Users } from "lucide-react";
 import { DUMMY_FRAMEWORKS, getCategoryColor } from "@/data/dummy-frameworks";
-import { StrategyDrawer } from "@/components/StrategyDrawer";
+import { BusinessContextChat } from "@/components/BusinessContextChat";
 import { FrameworkDetailModal } from "@/components/FrameworkDetailModal";
 
 interface SavedAnalysis {
@@ -48,9 +48,7 @@ const Playbooks = () => {
   const [selectedAnalysis, setSelectedAnalysis] = useState<SavedAnalysis | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [goalInput, setGoalInput] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [showStrategyDrawer, setShowStrategyDrawer] = useState(false);
-  const [strategyRecommendations, setStrategyRecommendations] = useState<any>(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const [selectedFramework, setSelectedFramework] = useState<string | null>(null);
   const [showFrameworkModal, setShowFrameworkModal] = useState(false);
 
@@ -84,45 +82,26 @@ const Playbooks = () => {
     ? DUMMY_FRAMEWORKS 
     : DUMMY_FRAMEWORKS.filter((f) => f.category === selectedCategory);
 
-  const handleGetStrategy = () => {
-    setIsGenerating(true);
-    // Simulate API call with dummy data
-    setTimeout(() => {
-      setStrategyRecommendations({
-        insights: [
-          "Focus on sales acceleration to achieve 40% revenue growth",
-          "Implement competitive positioning before market expansion",
-          "Partnership development should follow initial sales success"
-        ],
-        frameworks: [
-          {
-            id: "sales-acceleration",
-            relevance: "High",
-            alignment: "Aligns with revenue growth objectives",
-            timeline: "Immediate"
-          },
-          {
-            id: "porter-five-forces",
-            relevance: "High",
-            alignment: "Essential for market differentiation",
-            timeline: "Week 1-2"
-          },
-          {
-            id: "market-entry-strategy",
-            relevance: "Medium",
-            alignment: "Supports market expansion goals",
-            timeline: "Week 3-4"
-          }
-        ],
-        nextSteps: [
-          "Start with Sales Acceleration Playbook (Critical Priority)",
-          "Run Market Analysis to validate positioning strategy",
-          "Schedule weekly reviews to track progress"
-        ]
+  const handleStartChat = () => {
+    if (!selectedAnalysis) {
+      toast({
+        title: "Select a company",
+        description: "Please select a company context first",
+        variant: "destructive",
       });
-      setShowStrategyDrawer(true);
-      setIsGenerating(false);
-    }, 2000);
+      return;
+    }
+
+    if (!goalInput.trim()) {
+      toast({
+        title: "Enter your goal",
+        description: "Please describe what you'd like to discuss",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setChatOpen(true);
   };
 
   return (
@@ -204,10 +183,11 @@ const Playbooks = () => {
                   <span>AI Strategy Assistant</span>
                 </div>
                 <Button 
-                  onClick={handleGetStrategy}
-                  disabled={!goalInput.trim() || isGenerating}
+                  onClick={handleStartChat}
+                  disabled={!selectedAnalysis || !goalInput.trim()}
                 >
-                  {isGenerating ? "Analyzing..." : "Get Strategy"}
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Start Strategy Session
                 </Button>
               </div>
             </div>
@@ -301,17 +281,16 @@ const Playbooks = () => {
           )}
         </div>
 
-        {/* Strategy Drawer */}
-        <StrategyDrawer
-          isOpen={showStrategyDrawer}
-          onClose={() => setShowStrategyDrawer(false)}
-          recommendations={strategyRecommendations}
-          companyName={selectedAnalysis?.company_name}
-          onSelectFramework={(id) => {
-            setSelectedFramework(id);
-            setShowFrameworkModal(true);
-          }}
-        />
+        {/* Business Context Chat */}
+        {selectedAnalysis && user && (
+          <BusinessContextChat
+            isOpen={chatOpen}
+            onClose={() => setChatOpen(false)}
+            selectedAnalysis={selectedAnalysis}
+            initialPrompt={goalInput}
+            userId={user.id}
+          />
+        )}
 
         {/* Framework Detail Modal */}
         <FrameworkDetailModal

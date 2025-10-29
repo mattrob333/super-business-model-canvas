@@ -179,6 +179,47 @@ export type Database = {
         }
         Relationships: []
       }
+      strategy_coaching_sessions: {
+        Row: {
+          company_id: string | null
+          company_name: string | null
+          created_at: string | null
+          id: string
+          initial_prompt: string | null
+          messages: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          id?: string
+          initial_prompt?: string | null
+          messages?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          id?: string
+          initial_prompt?: string | null
+          messages?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_coaching_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "saved_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       strategy_sessions: {
         Row: {
           company_id: string | null

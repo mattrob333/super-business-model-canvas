@@ -20,3 +20,6 @@ verify_jwt = true
 
 [functions.generate-framework-report]
 verify_jwt = true
+
+[functions.strategy-coach-chat]
+verify_jwt = true
