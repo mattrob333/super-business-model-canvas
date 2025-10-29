@@ -15,6 +15,9 @@ serve(async (req) => {
   try {
     const { sessionId, companyId, userMessage, conversationHistory } = await req.json();
     
+    console.log('Received request:', { sessionId, companyId, hasMessage: !!userMessage });
+    console.log('Authorization header:', req.headers.get('Authorization')?.substring(0, 50));
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -26,8 +29,11 @@ serve(async (req) => {
     );
 
     // Get user
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    console.log('User fetch result:', { hasUser: !!user, userError });
+    
     if (!user) {
+      console.error('No user found, auth failed');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
