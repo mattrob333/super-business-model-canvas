@@ -180,7 +180,8 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
           } catch (jsonError) {
             console.error('JSON Parse Error:', jsonError);
             console.error('Failed to parse content:', jsonContent.substring(0, 500));
-            throw new Error(`Failed to parse AI response as JSON: ${jsonError.message}`);
+            const errorMsg = jsonError instanceof Error ? jsonError.message : 'Unknown error';
+            throw new Error(`Failed to parse AI response as JSON: ${errorMsg}`);
           }
           
           // Compile and render template with data
@@ -204,10 +205,11 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
         }
       } catch (templateError) {
         console.error('Template processing error:', templateError);
-        console.error('Error details:', {
+        const errorDetails = templateError instanceof Error ? {
           message: templateError.message,
           stack: templateError.stack,
-        });
+        } : { message: String(templateError), stack: undefined };
+        console.error('Error details:', errorDetails);
         console.log('Raw AI response (full):', reportContent);
         
         // If template processing fails, wrap in basic HTML
@@ -217,7 +219,7 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
           <div class="error-notice" style="background: #fee; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #fcc;">
             <strong>⚠️ Template Processing Error</strong>
             <p>The report was generated but could not be formatted properly. Raw content is displayed below.</p>
-            <p style="font-size: 12px; color: #666;">Error: ${templateError.message}</p>
+            <p style="font-size: 12px; color: #666;">Error: ${errorDetails.message}</p>
           </div>
           <div class="content">${reportContent}</div>
         </div>`;
