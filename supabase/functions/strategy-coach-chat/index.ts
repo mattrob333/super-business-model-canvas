@@ -34,7 +34,7 @@ serve(async (req) => {
 
     console.log('Authenticated request received');
 
-    const { sessionId, companyId, userMessage, conversationHistory } = await req.json();
+    const { sessionId, companyId, userMessage, conversationHistory, useResearchMode } = await req.json();
     
     console.log('Received request:', { sessionId, companyId, hasMessage: !!userMessage });
     
@@ -76,8 +76,7 @@ serve(async (req) => {
     const companyName = analysisData.company_name;
 
     // Build comprehensive system prompt
-    const systemPrompt = `You are a senior strategy consultant with expertise across all business functions. You're having a strategic conversation with the leadership team of ${companyName}.
-
+    const baseContext = `
 BUSINESS CONTEXT:
 Company: ${companyName}
 Industry: ${companyData.industry || 'Not specified'}
@@ -101,6 +100,35 @@ COMPETITIVE LANDSCAPE:
 ${companyData.competitors?.length > 0 ? 
   companyData.competitors.map((comp: any) => `- ${comp.name}: ${comp.description}`).join('\n') 
   : 'Not specified'}
+`;
+
+    const systemPrompt = useResearchMode 
+      ? `You are a senior strategy consultant with real-time web search capabilities. You're having a strategic conversation with the leadership team of ${companyName}.
+
+RESEARCH MODE ACTIVATED: Use web search to find current market trends, competitor activities, industry developments, and recent news relevant to the conversation.
+
+${baseContext}
+
+YOUR ROLE:
+1. Use web search to research competitors, market trends, and industry developments
+2. Provide strategic advice backed by current market intelligence
+3. Ask clarifying questions when needed to understand their goals better
+4. Reference specific aspects of their business model in your responses
+5. Suggest concrete next steps based on real-time competitive intelligence
+
+GUIDELINES:
+- Search for current information about competitors and industry trends
+- Keep responses focused and actionable (300-500 words typically)
+- Reference their specific business context in your answers
+- Ask follow-up questions to dig deeper into their challenges
+- Be encouraging but realistic about what's achievable
+- Suggest specific frameworks or methodologies when relevant
+- Draw on both web search results and your knowledge of industry best practices
+
+Remember: You're helping them navigate strategic challenges with the wisdom of a McKinsey consultant but the approachability of a trusted advisor.`
+      : `You are a senior strategy consultant with expertise across all business functions. You're having a strategic conversation with the leadership team of ${companyName}.
+
+${baseContext}
 
 YOUR ROLE:
 1. Provide strategic advice and actionable recommendations
@@ -126,25 +154,50 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
       { role: 'user', content: userMessage }
     ];
 
-    // Call Lovable AI Gateway with GPT-5
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
+    let aiResponse;
 
-    console.log('Calling Lovable AI Gateway with Gemini Flash...');
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages,
-        stream: true,
-      }),
-    });
+    if (useResearchMode) {
+      // Use Perplexity for research mode with web search
+      const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
+      if (!PERPLEXITY_API_KEY) {
+        throw new Error('PERPLEXITY_API_KEY not configured');
+      }
+
+      console.log('Calling Perplexity API with sonar-pro for research...');
+      aiResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'sonar-pro',
+          messages,
+          temperature: 0.5,
+          max_tokens: 2500,
+        }),
+      });
+    } else {
+      // Use Lovable AI Gateway with Gemini Flash for fast mode
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      if (!LOVABLE_API_KEY) {
+        throw new Error('LOVABLE_API_KEY not configured');
+      }
+
+      console.log('Calling Lovable AI Gateway with Gemini Flash...');
+      aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages,
+          stream: true,
+        }),
+      });
+    }
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
@@ -190,14 +243,34 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
       }
     }
 
-    // Return the streaming response
-    return new Response(aiResponse.body, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'X-Session-Id': currentSessionId || '',
-      },
-    });
+    // Return the response (streaming for Gemini, non-streaming for Perplexity)
+    if (useResearchMode) {
+      // Perplexity returns non-streaming JSON response
+      const data = await aiResponse.json();
+      const content = data.choices?.[0]?.message?.content || 'No response generated';
+      
+      // Convert to SSE format for consistency with frontend
+      const sseData = `data: ${JSON.stringify({
+        choices: [{ delta: { content } }]
+      })}\n\ndata: [DONE]\n\n`;
+      
+      return new Response(sseData, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/event-stream',
+          'X-Session-Id': currentSessionId || '',
+        },
+      });
+    } else {
+      // Return Gemini streaming response as-is
+      return new Response(aiResponse.body, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/event-stream',
+          'X-Session-Id': currentSessionId || '',
+        },
+      });
+    }
 
   } catch (error) {
     console.error('Error in strategy-coach-chat:', error);

@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Sparkles, Trash2 } from "lucide-react";
+import { X, Send, Sparkles, Trash2, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
@@ -34,6 +36,7 @@ export const BusinessContextChat = ({
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [useResearchMode, setUseResearchMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -87,6 +90,7 @@ export const BusinessContextChat = ({
             sessionId,
             companyId: selectedAnalysis.id,
             userMessage: textToSend,
+            useResearchMode,
             conversationHistory: messages.map((m) => ({
               role: m.role,
               content: m.content,
@@ -226,7 +230,19 @@ export const BusinessContextChat = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="research-mode"
+                checked={useResearchMode}
+                onCheckedChange={setUseResearchMode}
+                disabled={isLoading}
+              />
+              <Label htmlFor="research-mode" className="text-xs cursor-pointer flex items-center gap-1">
+                <Globe className="h-3 w-3" />
+                Research Mode
+              </Label>
+            </div>
             {messages.length > 0 && (
               <Button
                 variant="ghost"
@@ -306,7 +322,10 @@ export const BusinessContextChat = ({
         <div className="p-4 border-t bg-muted/30">
           <div className="flex items-center gap-2 mb-2">
             <Badge variant="secondary" className="text-xs">
-              💡 {selectedAnalysis.company_name} context loaded
+              {useResearchMode ? '🔬 Research Mode (Web Search)' : '💡 Fast Mode (Gemini Flash)'}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              {selectedAnalysis.company_name}
             </Badge>
           </div>
           <div className="flex gap-2">
