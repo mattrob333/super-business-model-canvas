@@ -23,6 +23,7 @@ interface BusinessContextChatProps {
   selectedAnalysis: any;
   initialPrompt: string;
   userId: string;
+  initialResearchMode?: boolean;
 }
 
 export const BusinessContextChat = ({
@@ -31,12 +32,13 @@ export const BusinessContextChat = ({
   selectedAnalysis,
   initialPrompt,
   userId,
+  initialResearchMode = false,
 }: BusinessContextChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [useResearchMode, setUseResearchMode] = useState(false);
+  const [useResearchMode, setUseResearchMode] = useState(initialResearchMode);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -46,6 +48,13 @@ export const BusinessContextChat = ({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Sync research mode with initial prop when drawer opens
+  useEffect(() => {
+    if (isOpen) {
+      setUseResearchMode(initialResearchMode);
+    }
+  }, [isOpen, initialResearchMode]);
 
   // Send initial prompt when chat opens
   useEffect(() => {

@@ -96,30 +96,36 @@ ${companyData.businessModelCanvas ? `
 - Cost Structure: ${companyData.businessModelCanvas.costStructure?.map((cs: any) => cs.title).join(', ') || 'Not specified'}
 ` : 'Business Model Canvas not available'}
 
-COMPETITIVE LANDSCAPE:
-${companyData.competitors?.length > 0 ? 
-  companyData.competitors.map((comp: any) => `- ${comp.name}: ${comp.description}`).join('\n') 
+SIMILAR COMPANIES (Primary Competitors):
+${companyData.similarCompanies?.length > 0 ? 
+  companyData.similarCompanies.map((comp: any) => `- ${comp.name}: ${comp.description}${comp.website ? ` (${comp.website})` : ''}`).join('\n') 
   : 'Not specified'}
 `;
 
     const systemPrompt = useResearchMode 
       ? `You are a senior strategy consultant with real-time web search capabilities. You're having a strategic conversation with the leadership team of ${companyName}.
 
-RESEARCH MODE ACTIVATED: Use web search to find current market trends, competitor activities, industry developments, and recent news relevant to the conversation.
+CRITICAL INSTRUCTIONS FOR COMPETITIVE ANALYSIS:
+1. The "SIMILAR COMPANIES" section below lists the user's direct competitors - treat them as such
+2. When asked about competitors, competition, or competitive strategy:
+   - ALWAYS reference these specific companies by name
+   - DO NOT search for or suggest different competitors
+   - Use web search ONLY to find recent news, activities, and positioning of THESE specific companies
+3. Supplement your strategic advice with real-time web data about the companies listed below
 
 ${baseContext}
 
 YOUR ROLE:
-1. Use web search to research competitors, market trends, and industry developments
-2. Provide strategic advice backed by current market intelligence
+1. Use web search to research the SPECIFIC similar companies listed above, along with market trends and industry developments
+2. Provide strategic advice backed by current market intelligence about those companies
 3. Ask clarifying questions when needed to understand their goals better
 4. Reference specific aspects of their business model in your responses
 5. Suggest concrete next steps based on real-time competitive intelligence
 
 GUIDELINES:
-- Search for current information about competitors and industry trends
+- Search for current information about the SPECIFIC similar companies listed and industry trends
 - Keep responses focused and actionable (300-500 words typically)
-- Reference their specific business context in your answers
+- Reference their specific business context and competitors in your answers
 - Ask follow-up questions to dig deeper into their challenges
 - Be encouraging but realistic about what's achievable
 - Suggest specific frameworks or methodologies when relevant

@@ -9,7 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Sparkles, Clock, Users } from "lucide-react";
+import { CheckCircle2, Sparkles, Clock, Users, Globe } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { DUMMY_FRAMEWORKS, getCategoryColor } from "@/data/dummy-frameworks";
 import { BusinessContextChat } from "@/components/BusinessContextChat";
 import { FrameworkDetailModal } from "@/components/FrameworkDetailModal";
@@ -51,6 +53,7 @@ const Playbooks = () => {
   const [chatOpen, setChatOpen] = useState(false);
   const [selectedFramework, setSelectedFramework] = useState<string | null>(null);
   const [showFrameworkModal, setShowFrameworkModal] = useState(false);
+  const [initialResearchMode, setInitialResearchMode] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -178,10 +181,28 @@ const Playbooks = () => {
               />
               
               <div className="flex items-center justify-between mt-3 pt-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Sparkles className="h-4 w-4" />
-                  <span>AI Strategy Assistant</span>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Sparkles className="h-4 w-4" />
+                    <span>AI Strategy Assistant</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 border-l pl-4">
+                    <Switch
+                      id="initial-research-mode"
+                      checked={initialResearchMode}
+                      onCheckedChange={setInitialResearchMode}
+                    />
+                    <Label 
+                      htmlFor="initial-research-mode" 
+                      className="text-sm cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      Research Mode
+                    </Label>
+                  </div>
                 </div>
+                
                 <Button 
                   onClick={handleStartChat}
                   disabled={!selectedAnalysis || !goalInput.trim()}
@@ -289,6 +310,7 @@ const Playbooks = () => {
             selectedAnalysis={selectedAnalysis}
             initialPrompt={goalInput}
             userId={user.id}
+            initialResearchMode={initialResearchMode}
           />
         )}
 
