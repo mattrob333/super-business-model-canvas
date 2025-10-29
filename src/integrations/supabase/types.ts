@@ -22,7 +22,10 @@ export type Database = {
           created_at: string | null
           framework_id: string | null
           id: string
+          is_edited: boolean | null
+          original_content: string | null
           report_content: string
+          report_format: string | null
           status: string | null
           strategic_goal: string | null
           updated_at: string | null
@@ -36,7 +39,10 @@ export type Database = {
           created_at?: string | null
           framework_id?: string | null
           id?: string
+          is_edited?: boolean | null
+          original_content?: string | null
           report_content: string
+          report_format?: string | null
           status?: string | null
           strategic_goal?: string | null
           updated_at?: string | null
@@ -50,7 +56,10 @@ export type Database = {
           created_at?: string | null
           framework_id?: string | null
           id?: string
+          is_edited?: boolean | null
+          original_content?: string | null
           report_content?: string
+          report_format?: string | null
           status?: string | null
           strategic_goal?: string | null
           updated_at?: string | null

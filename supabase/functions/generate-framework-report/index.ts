@@ -61,7 +61,83 @@ Deno.serve(async (req) => {
 
     // Generate comprehensive report using Lovable AI
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    const reportPrompt = `You are a McKinsey-level strategy consultant creating a professional strategic report.
+    
+    // Framework-specific HTML templates
+    const getFrameworkPrompt = (frameworkId: string) => {
+      const templates: Record<string, { structure: string; instructions: string }> = {
+        'swot-analysis': {
+          structure: `
+<div class="swot-container">
+  <h1>${companyName} - SWOT Analysis</h1>
+  <div class="swot-grid">
+    <div class="quadrant strengths">
+      <h3>Strengths</h3>
+      <ul>
+        <li>Specific strength 1</li>
+        <li>Specific strength 2</li>
+      </ul>
+    </div>
+    <div class="quadrant weaknesses">
+      <h3>Weaknesses</h3>
+      <ul>
+        <li>Specific weakness 1</li>
+      </ul>
+    </div>
+    <div class="quadrant opportunities">
+      <h3>Opportunities</h3>
+      <ul>
+        <li>Specific opportunity 1</li>
+      </ul>
+    </div>
+    <div class="quadrant threats">
+      <h3>Threats</h3>
+      <ul>
+        <li>Specific threat 1</li>
+      </ul>
+    </div>
+  </div>
+</div>`,
+          instructions: `Generate a SWOT analysis for ${companyName}. Provide 4-6 specific points per quadrant based on the business context. Use ONLY the HTML structure above with actual content.`
+        },
+        'porters-five-forces': {
+          structure: `
+<div class="porters-container">
+  <h1>${companyName} - Porter's Five Forces Analysis</h1>
+  <div class="porters-diagram">
+    <div class="force-card supplier-power">
+      <h3>Supplier Power</h3>
+      <p>Analysis paragraph here</p>
+      <span class="rating rating-medium">Medium</span>
+    </div>
+    <div class="force-card new-entrants">
+      <h3>Threat of New Entrants</h3>
+      <p>Analysis paragraph here</p>
+      <span class="rating rating-low">Low</span>
+    </div>
+    <div class="force-card rivalry">
+      <h3>Industry Rivalry</h3>
+      <p>Analysis paragraph here</p>
+      <span class="rating rating-high">High</span>
+    </div>
+    <div class="force-card substitutes">
+      <h3>Threat of Substitutes</h3>
+      <p>Analysis paragraph here</p>
+      <span class="rating rating-medium">Medium</span>
+    </div>
+    <div class="force-card buyer-power">
+      <h3>Buyer Power</h3>
+      <p>Analysis paragraph here</p>
+      <span class="rating rating-high">High</span>
+    </div>
+  </div>
+</div>`,
+          instructions: `Generate a Porter's Five Forces analysis for ${companyName}. For each force, provide a concise analysis (3-4 sentences) and rate it as High/Medium/Low using the appropriate CSS class. Use ONLY the HTML structure above.`
+        }
+      };
+
+      const template = templates[frameworkId] || templates['swot-analysis'];
+      
+      return `You are a McKinsey-level strategy consultant creating a professional strategic report in HTML format.
 
 BUSINESS CONTEXT:
 Company: ${companyName}
@@ -70,39 +146,22 @@ ${JSON.stringify(businessContext, null, 2)}
 STRATEGIC GOAL:
 ${strategic_goal || 'Comprehensive strategic analysis'}
 
-FRAMEWORK TO APPLY:
-${framework.title}
-${framework.description}
+FRAMEWORK: ${framework.title}
 
-Create a comprehensive strategic report using the ${framework.title} methodology.
+${template.instructions}
 
-Structure your report in Markdown:
+CRITICAL INSTRUCTIONS:
+- Return ONLY valid HTML using the exact structure below
+- Replace placeholder content with specific, actionable insights
+- Keep all CSS classes exactly as shown
+- Do not add markdown, code blocks, or explanations
+- Ensure all HTML tags are properly closed
 
-# Executive Summary
-[2-3 paragraphs summarizing key findings]
+HTML STRUCTURE TO USE:
+${template.structure}`;
+    };
 
-# 1. Current Situation Analysis
-[Analyze company's current position]
-
-# 2. ${framework.title} Analysis
-[Apply framework methodology with specific insights]
-
-# 3. Key Findings & Insights
-[Synthesize strategic implications]
-
-# 4. Strategic Recommendations
-[Prioritized, actionable recommendations]
-
-# 5. Implementation Roadmap
-[Timeline, milestones, resources]
-
-# 6. Success Metrics & KPIs
-[Measurable outcomes]
-
-# 7. Risk Mitigation Strategies
-[Potential obstacles and solutions]
-
-Write professionally with clear sections, bullet points, and actionable insights.`;
+    const reportPrompt = getFrameworkPrompt(framework_id);
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -141,6 +200,9 @@ Write professionally with clear sections, bullet points, and actionable insights
         framework_id,
         company_name: companyName,
         report_content: reportContent,
+        original_content: reportContent,
+        report_format: 'html',
+        is_edited: false,
         business_context: businessContext,
         strategic_goal,
         status: 'final',

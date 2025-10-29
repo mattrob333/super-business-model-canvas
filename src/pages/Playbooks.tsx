@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { DUMMY_FRAMEWORKS, getCategoryColor } from "@/data/dummy-frameworks";
 import { BusinessContextChat } from "@/components/BusinessContextChat";
 import { FrameworkDetailModal } from "@/components/FrameworkDetailModal";
+import { ReportViewerDrawer } from "@/components/ReportViewerDrawer";
 
 interface SavedAnalysis {
   id: string;
@@ -54,6 +55,9 @@ const Playbooks = () => {
   const [selectedFramework, setSelectedFramework] = useState<string | null>(null);
   const [showFrameworkModal, setShowFrameworkModal] = useState(false);
   const [initialResearchMode, setInitialResearchMode] = useState(false);
+  const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false);
+  const [currentReportId, setCurrentReportId] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -126,6 +130,60 @@ const Playbooks = () => {
     }
 
     setChatOpen(true);
+  };
+
+  const handleRunFramework = async (frameworkId: string) => {
+    if (!selectedAnalysis) {
+      toast({
+        title: "Select a company",
+        description: "Please select a company context first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    setShowFrameworkModal(false);
+    setIsReportDrawerOpen(true);
+    setCurrentReportId(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-framework-report', {
+        body: {
+          company_id: selectedAnalysis.id,
+          framework_id: frameworkId,
+          strategic_goal: goalInput || null
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.report_id) {
+        setCurrentReportId(data.report_id);
+        toast({
+          title: "Report Generated",
+          description: "Your strategic report is ready",
+        });
+      }
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate report. Please try again.",
+        variant: "destructive",
+      });
+      setIsReportDrawerOpen(false);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleRegenerateReport = async () => {
+    if (!selectedAnalysis || !selectedFramework) return;
+    
+    if (!confirm("Generate a fresh version of this report?")) return;
+
+    await handleRunFramework(selectedFramework);
   };
 
   return (
@@ -340,15 +398,21 @@ const Playbooks = () => {
           isOpen={showFrameworkModal}
           onClose={() => setShowFrameworkModal(false)}
           frameworkId={selectedFramework}
-          onRunFramework={(id) => {
-            console.log("Running framework:", id);
-            toast({
-              title: "Framework Started",
-              description: "This will generate a report in the next phase"
-            });
-            setShowFrameworkModal(false);
-          }}
+          onRunFramework={handleRunFramework}
         />
+
+        {/* Report Viewer Drawer */}
+        {selectedAnalysis && selectedFramework && (
+          <ReportViewerDrawer
+            isOpen={isReportDrawerOpen}
+            onClose={() => setIsReportDrawerOpen(false)}
+            reportId={currentReportId}
+            frameworkId={selectedFramework}
+            companyId={selectedAnalysis.id}
+            companyName={selectedAnalysis.company_name}
+            onRegenerate={handleRegenerateReport}
+          />
+        )}
       </main>
     </div>
   );
