@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, ChevronDown, ChevronUp, Check, Edit as EditIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BMCSectionEditor } from "./BMCSectionEditor";
 
@@ -44,6 +44,9 @@ interface BusinessModelCanvasProps {
 export const BusinessModelCanvas = ({ data, companyName, businessContext, onSectionUpdate }: BusinessModelCanvasProps) => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [selectedSection, setSelectedSection] = useState<CanvasSection | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Value Propositions']));
+  const [viewedSections, setViewedSections] = useState<Set<string>>(new Set());
+  const [editedSections, setEditedSections] = useState<Set<string>>(new Set());
 
   const getSectionKey = (title: string): string => {
     const mapping: Record<string, string> = {
@@ -66,6 +69,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
     const notes = data[notesKey] as string | undefined;
     setSelectedSection({ title, items, notes });
     setEditorOpen(true);
+    setEditedSections(prev => new Set(prev).add(title));
   };
 
   const handleSectionSave = (updatedData: { items: string[]; notes: string }) => {
@@ -76,32 +80,89 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
         items: updatedData.items,
         notes: updatedData.notes
       });
+      setEditedSections(prev => new Set(prev).add(selectedSection.title));
     }
   };
 
-  const CanvasCard = ({ title, items, span = "col-span-1 row-span-1", height = "h-[200px]" }: { title: string; items: string[]; span?: string; height?: string }) => (
-    <div
-      onClick={() => handleSectionClick(title, items)}
-      className={`card-mono card-mono-hover cursor-pointer ${span} ${height} group relative flex flex-col p-3.5`}
-    >
-      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <MessageSquare className="h-5 w-5 text-primary" />
-      </div>
-      <div className="flex flex-col h-full">
-        <h3 className="label-tech text-muted-foreground mb-3 flex-shrink-0">{title}</h3>
-        <div className="flex-1 overflow-y-auto pr-1.5 scrollbar-dark">
-          <ul className="space-y-2">
-            {items.map((item, index) => (
-              <li key={index} className="flex items-start gap-2">
-                <div className="h-1.5 w-1.5 bg-primary rounded-full mt-1.5 flex-shrink-0" />
-                <span className="text-foreground/80 text-sm leading-snug">{item}</span>
-              </li>
-            ))}
-          </ul>
+  const toggleSection = (title: string) => {
+    setExpandedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(title)) {
+        newSet.delete(title);
+      } else {
+        newSet.add(title);
+        setViewedSections(prevViewed => new Set(prevViewed).add(title));
+      }
+      return newSet;
+    });
+  };
+
+  const getReviewStatus = (title: string): 'not-viewed' | 'viewed' | 'edited' => {
+    if (editedSections.has(title)) return 'edited';
+    if (viewedSections.has(title) || expandedSections.has(title)) return 'viewed';
+    return 'not-viewed';
+  };
+
+  const CanvasCard = ({ title, items, span = "col-span-1 row-span-1", height = "h-[200px]" }: { title: string; items: string[]; span?: string; height?: string }) => {
+    const isExpanded = expandedSections.has(title);
+    const reviewStatus = getReviewStatus(title);
+    
+    return (
+      <div className={`card-mono ${span} ${height} flex flex-col p-3.5`}>
+        <div 
+          onClick={() => toggleSection(title)}
+          className="flex items-center justify-between mb-3 cursor-pointer group"
+        >
+          <div className="flex items-center gap-2">
+            <h3 className="label-tech text-muted-foreground">{title}</h3>
+            {reviewStatus === 'edited' && (
+              <div className="w-2 h-2 rounded-full bg-primary" title="Edited" />
+            )}
+            {reviewStatus === 'viewed' && (
+              <div className="w-2 h-2 rounded-full bg-primary/50" title="Viewed" />
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {isExpanded ? (
+              <ChevronUp className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            )}
+          </div>
         </div>
+        
+        {isExpanded && (
+          <div className="flex flex-col flex-1 animate-accordion-down">
+            <div className="flex-1 overflow-y-auto pr-1.5 scrollbar-dark mb-3">
+              <ul className="space-y-2">
+                {items.map((item, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <div className="h-1.5 w-1.5 bg-primary rounded-full mt-1.5 flex-shrink-0" />
+                    <span className="text-foreground/80 text-sm leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSectionClick(title, items);
+              }}
+              variant="outline"
+              size="sm"
+              className="w-full border-primary/30 hover:bg-primary/10 hover:border-primary"
+            >
+              <EditIcon className="w-4 h-4 mr-2" />
+              Edit & Chat
+              {reviewStatus === 'edited' && (
+                <Check className="w-4 h-4 ml-2 text-primary" />
+              )}
+            </Button>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <>

@@ -77,26 +77,36 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
     <div className="w-full max-w-7xl mx-auto">
       <div className="card-mono">
         <div className="space-y-6">
-          <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 md:gap-4">
-            <Input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="example.com or https://example.com"
-              className="flex-1 h-14 px-6 text-base md:text-lg bg-white/[0.12] border-white/[0.20] text-white placeholder:text-muted-foreground focus:bg-white/[0.15] focus:border-primary focus:ring-2 focus:ring-primary/20"
-              disabled={isLoading}
-            />
-            <Button
-              type="submit"
-              disabled={isLoading || !url.trim()}
-              className="h-14 w-full md:w-auto md:px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold uppercase tracking-tech transition-all hover:scale-105"
-            >
-              <Search className="mr-2 h-5 w-5" />
-              {isLoading ? "Analyzing..." : "Analyze"}
-            </Button>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground block">
+                Company Website
+              </label>
+              <div className="flex flex-col md:flex-row gap-3 md:gap-4">
+                <Input
+                  type="text"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="salesforce.com or https://salesforce.com"
+                  className="flex-1 h-14 px-6 text-base md:text-lg bg-white/[0.12] border-white/[0.20] text-white placeholder:text-muted-foreground focus:bg-white/[0.15] focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  disabled={isLoading}
+                />
+                <Button
+                  type="submit"
+                  disabled={isLoading || !url.trim()}
+                  className="h-14 w-full md:w-auto md:px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold uppercase tracking-tech transition-all hover:scale-105"
+                >
+                  <Search className="mr-2 h-5 w-5" />
+                  {isLoading ? "Building..." : "Start Building"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Works with any company—analyze competitors, partners, or your own business.
+              </p>
+            </div>
           </form>
           
-          <div className="flex flex-col md:flex-row items-center justify-between gap-2 mt-3 text-xs text-muted-foreground">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
             <p className="text-center md:text-left">
               Press <kbd className="px-2 py-0.5 text-xs font-semibold bg-white/[0.08] border border-white/[0.12] rounded">Enter</kbd> to analyze
             </p>

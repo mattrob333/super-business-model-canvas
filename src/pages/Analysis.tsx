@@ -6,6 +6,9 @@ import { BusinessOverview } from "@/components/BusinessOverview";
 import { BusinessModelCanvas } from "@/components/BusinessModelCanvas";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
 import { ChatDrawer } from "@/components/ChatDrawer";
+import { ProcessSteps } from "@/components/ProcessSteps";
+import { SuccessBanner } from "@/components/SuccessBanner";
+import { FloatingCTA } from "@/components/FloatingCTA";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,8 +31,41 @@ const Analysis = () => {
   const [selectedSimilarCompany, setSelectedSimilarCompany] = useState<any>(null);
   const [recentAnalyses, setRecentAnalyses] = useState<any[]>([]);
   const [searchCollapsed, setSearchCollapsed] = useState(false);
+  const [scrollPercentage, setScrollPercentage] = useState(0);
+  const [reviewedSections, setReviewedSections] = useState(0);
+  const [showPlaybooksCTA, setShowPlaybooksCTA] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Scroll tracking for CTA display
+  useEffect(() => {
+    if (!hasAnalyzed || !analysisData) return;
+    
+    const handleScroll = () => {
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      const scrollTop = window.scrollY;
+      const percentage = (scrollTop / (documentHeight - windowHeight)) * 100;
+      setScrollPercentage(percentage);
+      
+      // Show CTA after 70% scroll or 30 seconds on page
+      if (percentage > 70) {
+        setShowPlaybooksCTA(true);
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    
+    // Also show CTA after 30 seconds
+    const timer = setTimeout(() => {
+      setShowPlaybooksCTA(true);
+    }, 30000);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(timer);
+    };
+  }, [hasAnalyzed, analysisData]);
 
   // Load saved analysis from sessionStorage if available
   useEffect(() => {
@@ -64,6 +100,8 @@ const Analysis = () => {
   const handleAnalyze = async (url: string) => {
     setIsLoading(true);
     setHasAnalyzed(false);
+    setReviewedSections(0);
+    setShowPlaybooksCTA(false);
 
     try {
       const { data, error } = await supabase.functions.invoke('analyze-company', {
@@ -103,6 +141,9 @@ const Analysis = () => {
       ...analysisData,
       company: updatedData
     });
+    
+    // Mark section as reviewed
+    setReviewedSections(prev => prev + 1);
     
     // Auto-save if user is logged in
     if (user && analysisData) {
@@ -145,6 +186,9 @@ const Analysis = () => {
     
     const sectionKey = sectionKeyMap[sectionTitle];
     if (!sectionKey) return;
+
+    // Track unique reviewed sections
+    setReviewedSections(prev => Math.min(prev + 1, 11));
 
     const updatedCanvas = {
       ...analysisData.canvas,
@@ -431,9 +475,14 @@ Website: ${comp.website || 'N/A'}
           <section className="pt-0 md:pt-4 animate-in fade-in slide-in-from-top duration-300">
           <div className="w-full max-w-7xl mx-auto">
             <div className="space-y-6">
-              <div className="space-y-1">
-                <h2 className="text-3xl font-semibold tracking-tight">Get Started</h2>
-                <p className="text-muted-foreground text-sm">Enter a company URL to generate comprehensive business insights</p>
+              <div className="space-y-4">
+                <div className="space-y-1 text-center">
+                  <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">Build Your Business Source of Truth</h2>
+                  <p className="text-muted-foreground text-base max-w-3xl mx-auto">
+                    Enter a company URL below. Our AI will research public data, analyze business models, and create a comprehensive strategic foundation—ready in 60 seconds.
+                  </p>
+                </div>
+                <ProcessSteps />
               </div>
               <UrlInput onAnalyze={handleAnalyze} isLoading={isLoading} />
               
@@ -500,28 +549,27 @@ Website: ${comp.website || 'N/A'}
         {/* Results Section */}
         {isLoading && (
           <section className="animate-in fade-in duration-500">
-            <LoadingState />
+            <LoadingState companyName={analysisData?.company?.name} />
           </section>
         )}
 
         {hasAnalyzed && !isLoading && analysisData && (
           <div ref={resultsRef} className="space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
-            {/* CTA to Playbooks */}
-            <div className="w-full max-w-7xl mx-auto">
-              <UICard className="bg-primary/5 border-primary/20">
-                <CardContent className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 gap-4">
-                  <div>
-                    <h4 className="font-semibold mb-1">Next: Generate Strategic Insights</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Use this business context to run strategic frameworks and get AI-powered recommendations
-                    </p>
-                  </div>
-                  <Button onClick={() => navigate('/playbooks')} size="sm" className="whitespace-nowrap">
-                    Go to Playbooks <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </UICard>
-            </div>
+            {/* Success Banner */}
+            <SuccessBanner 
+              companyName={analysisData.company?.name || "Unknown Company"}
+              reviewedSections={reviewedSections}
+              totalSections={11}
+            />
+            
+            {/* Inline prompt to scroll if user hasn't scrolled much */}
+            {!showPlaybooksCTA && scrollPercentage < 20 && (
+              <FloatingCTA 
+                show={true}
+                onNavigate={() => navigate('/playbooks')}
+                variant="inline"
+              />
+            )}
             
             <section>
               <BusinessOverview 
@@ -582,6 +630,13 @@ Website: ${comp.website || 'N/A'}
                 onSimilarCompanyChat={handleSimilarCompanyChat}
               />
             </section>
+            
+            {/* Floating CTA */}
+            <FloatingCTA 
+              show={showPlaybooksCTA}
+              onNavigate={() => navigate('/playbooks')}
+              variant="floating"
+            />
           </div>
         )}
       </main>
