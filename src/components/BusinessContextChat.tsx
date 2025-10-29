@@ -280,7 +280,7 @@ export const BusinessContextChat = ({
                       AI Coach
                     </Badge>
                   )}
-                  <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none">
+                  <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none [&_p]:mb-4 [&_ul]:mb-4 [&_ol]:mb-4 [&_h1]:mb-4 [&_h2]:mb-4 [&_h3]:mb-4">
                     {message.role === "assistant" ? (
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {message.content}
