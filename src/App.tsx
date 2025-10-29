@@ -7,6 +7,8 @@ import Landing from "./pages/Landing";
 import Analysis from "./pages/Analysis";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import AdminFrameworks from "./pages/admin/Frameworks";
+import FrameworkEditor from "./pages/admin/FrameworkEditor";
 import MyAnalyses from "./pages/MyAnalyses";
 import Playbooks from "./pages/Playbooks";
 import FrameworkDetail from "./pages/FrameworkDetail";
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="/analyze" element={<Analysis />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/frameworks" element={<AdminFrameworks />} />
+          <Route path="/admin/frameworks/:id/edit" element={<FrameworkEditor />} />
           <Route path="/my-analyses" element={<MyAnalyses />} />
           <Route path="/playbooks" element={<Playbooks />} />
           <Route path="/playbooks/framework/:frameworkId" element={<FrameworkDetail />} />

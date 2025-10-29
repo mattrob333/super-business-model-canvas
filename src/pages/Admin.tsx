@@ -140,7 +140,23 @@ const Admin = () => {
         <div className="space-y-6">
           <div>
             <h1 className="text-4xl font-bold tracking-tight">Admin Dashboard</h1>
-            <p className="text-muted-foreground mt-2">Manage leads and monitor growth</p>
+            <p className="text-muted-foreground mt-2">Manage leads, frameworks, and monitor growth</p>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/frameworks')}>
+              <CardHeader>
+                <CardTitle>Framework Library</CardTitle>
+                <CardDescription>Manage strategic analysis frameworks</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Lead Management</CardTitle>
+                <CardDescription>View and export email leads</CardDescription>
+              </CardHeader>
+            </Card>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
