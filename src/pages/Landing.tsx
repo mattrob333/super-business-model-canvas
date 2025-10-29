@@ -72,13 +72,13 @@ const Landing = () => {
       <header className="border-b border-white/[0.12] backdrop-blur-sm sticky top-0 z-30 bg-background/80">
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-col sm:flex-row items-center sm:gap-1.5 gap-2">
               <div className="inline-flex items-center bg-[#C4F82A] text-black px-3 py-1 rounded-full font-montserrat font-normal tracking-wide">
-                <span className="text-xl">SUPER</span>
+                <span className="text-lg sm:text-xl">SUPER</span>
               </div>
-              <h1 className="text-xl font-montserrat font-light tracking-wide text-white">BUSINESS MODEL CANVAS</h1>
+              <h1 className="text-lg sm:text-xl font-montserrat font-light tracking-wide text-white">BUSINESS MODEL CANVAS</h1>
             </div>
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-primary/10 border border-primary/20 rounded-full">
               <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
               <span className="label-tech text-primary text-[10px]">Powered by AI</span>
             </div>
@@ -96,12 +96,12 @@ const Landing = () => {
               <span className="label-tech text-primary text-[10px]">AI Strategic Analysis</span>
             </div>
             
-            <h2 className="text-5xl md:text-6xl font-bold tracking-tight leading-tight">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
               Build Your Business<br />
               <span className="text-primary">Source of Truth</span>
             </h2>
             
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
               AI generates your complete business context in 60 seconds. 
               Refine it with AI assistance. Use it as your strategic foundation.
             </p>
@@ -145,7 +145,7 @@ const Landing = () => {
             </div>
 
             {/* Email Signup Form */}
-            <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-12">
+            <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-8 sm:mt-12 px-4 sm:px-0">
               <div className="card-mono p-6 space-y-4">
                 <Input
                   type="email"

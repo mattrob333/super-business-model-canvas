@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 
 export const ProcessSteps = () => {
   return (
-    <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 mb-8 px-4">
+    <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8 mb-6 md:mb-8 px-4">
       <ProcessStep 
         icon={<Search className="w-6 h-6" />}
         label="AI Research"

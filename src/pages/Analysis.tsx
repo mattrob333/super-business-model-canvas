@@ -462,7 +462,7 @@ Website: ${comp.website || 'N/A'}
       {/* Tagline */}
       <div className="bg-background">
         <div className="container mx-auto px-4 md:px-6 pt-6 pb-3">
-          <p className="text-muted-foreground font-montserrat font-light text-sm md:text-base tracking-wide">
+          <p className="text-muted-foreground font-montserrat font-light text-xs sm:text-sm md:text-base tracking-wide">
             AI-Powered Strategic Business Analysis
           </p>
         </div>
@@ -477,20 +477,20 @@ Website: ${comp.website || 'N/A'}
             <Button 
               onClick={saveAnalysis}
               variant="outline" 
-              size="sm"
-              className="flex-1 gap-2"
+              size="default"
+              className="flex-1 gap-2 min-h-[44px]"
               disabled={isSaving}
             >
-              <Save className="h-4 w-4" />
+              <Save className="h-5 w-5" />
               {isSaving ? "Saving..." : "Save"}
             </Button>
             <Button 
               onClick={copyToMarkdown}
               variant="outline" 
-              size="sm"
-              className="flex-1 gap-2"
+              size="default"
+              className="flex-1 gap-2 min-h-[44px]"
             >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
               {copied ? "Copied!" : "Copy"}
             </Button>
           </div>
@@ -503,8 +503,8 @@ Website: ${comp.website || 'N/A'}
             <div className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-1 text-center">
-                  <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">Build Your Business Source of Truth</h2>
-                  <p className="text-muted-foreground text-base max-w-3xl mx-auto">
+                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">Build Your Business Source of Truth</h2>
+                  <p className="text-muted-foreground text-sm sm:text-base max-w-3xl mx-auto px-4 sm:px-0">
                     Enter a company URL below. Our AI will research public data, analyze business models, and create a comprehensive strategic foundation—ready in 60 seconds.
                   </p>
                 </div>
@@ -596,7 +596,7 @@ Website: ${comp.website || 'N/A'}
                 disabled={isSaving || !user}
                 variant="outline"
                 size="default"
-                className="gap-2"
+                className="gap-2 min-h-[44px] w-full sm:w-auto"
               >
                 {isSaving ? (
                   <>

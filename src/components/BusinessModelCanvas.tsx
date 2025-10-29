@@ -94,14 +94,14 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
     return 'not-viewed';
   };
 
-  const CanvasCard = ({ title, items, span = "col-span-1 row-span-1", height = "h-[200px]" }: { title: string; items: string[]; span?: string; height?: string }) => {
+  const CanvasCard = ({ title, items, span = "col-span-1 row-span-1", height = "h-[180px] sm:h-[200px]" }: { title: string; items: string[]; span?: string; height?: string }) => {
     const reviewStatus = getReviewStatus(title);
     const previewItems = items.slice(0, 3);
     const remainingCount = items.length - 3;
     
     return (
       <div 
-        className={`card-mono ${span} ${height} flex flex-col p-3.5 cursor-pointer hover:border-primary/50 transition-colors group`}
+        className={`card-mono ${span} ${height} flex flex-col p-3 sm:p-3.5 cursor-pointer hover:border-primary/50 transition-colors group`}
         onClick={() => handleSectionClick(title, items)}
       >
         <div className="flex items-center justify-between mb-3">
@@ -168,7 +168,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
       </div>
 
           {/* Business Model Canvas - Top Rows */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 auto-rows-[200px]">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 auto-rows-[180px] sm:auto-rows-[200px]">
             <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1 row-span-2" height="h-full" />
             <CanvasCard title="Key Activities" items={data.keyActivities} span="col-span-1" height="h-full" />
             <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1 row-span-2" height="h-full" />

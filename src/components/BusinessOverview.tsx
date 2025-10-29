@@ -38,7 +38,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
           <div className="flex items-start justify-between">
           <div className="space-y-1 flex-1">
             <span className="label-tech text-muted-foreground">Business Overview</span>
-            <h2 className="text-4xl font-semibold tracking-tight leading-tight">{data.name}</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight leading-tight">{data.name}</h2>
           </div>
           <Button onClick={() => setEditorOpen(true)} size="sm" variant="outline">
             <MessageSquare className="h-4 w-4 mr-2" />

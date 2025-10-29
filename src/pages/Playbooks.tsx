@@ -225,10 +225,10 @@ const Playbooks = () => {
         {/* Hero Section - Centered */}
         <div className="mb-12">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4 pb-2 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 pb-2 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
               Strategy Playbooks
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
               Get AI-powered strategy recommendations tailored to your business
             </p>
           </div>
@@ -283,12 +283,12 @@ const Playbooks = () => {
 
           {/* Large Prominent Chat Input - Centered */}
           <div className="max-w-5xl mx-auto">
-            <div className="relative border-2 border-primary/20 rounded-lg bg-card p-4 shadow-sm hover:border-primary/40 transition-colors">
+            <div className="relative border-2 border-primary/20 rounded-lg bg-card p-3 sm:p-4 shadow-sm hover:border-primary/40 transition-colors">
               <Textarea 
                 value={goalInput}
                 onChange={(e) => setGoalInput(e.target.value)}
                 placeholder="E.g., 'We want to break into a new market and drive customer acquisition' or 'Need to improve operational efficiency and reduce costs'"
-                className="min-h-[150px] border-none bg-transparent resize-none focus-visible:ring-0 text-base"
+                className="min-h-[120px] sm:min-h-[150px] border-none bg-transparent resize-none focus-visible:ring-0 text-sm sm:text-base"
               />
               
               <div className="flex items-center justify-between mt-3 pt-4">
@@ -317,6 +317,7 @@ const Playbooks = () => {
                 <Button 
                   onClick={handleStartChat}
                   disabled={!selectedAnalysis || !goalInput.trim()}
+                  className="w-full sm:w-auto min-h-[44px]"
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
                   Start Strategy Session
@@ -347,7 +348,7 @@ const Playbooks = () => {
             </Select>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredFrameworks.map((framework) => {
               const IconComponent = framework.icon || Target;
               return (
