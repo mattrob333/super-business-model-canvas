@@ -150,9 +150,10 @@ export function ReportViewerDrawer({
 
   return (
     <Sheet open={isOpen} onOpenChange={handleClose}>
-      <SheetContent side="right" className="w-full sm:w-[900px] sm:max-w-[900px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center justify-between">
+      <SheetContent side="right" className="w-full sm:w-[1100px] sm:max-w-[1100px] xl:w-[1200px] xl:max-w-[1200px] overflow-y-auto p-0 flex flex-col">
+        {/* Sticky Header with Actions */}
+        <div className="sticky top-0 z-10 bg-background border-b px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-xl font-bold">{frameworkTitle}</div>
               <div className="text-sm font-normal text-muted-foreground mt-1">{companyName}</div>
@@ -160,10 +161,57 @@ export function ReportViewerDrawer({
             <Button variant="ghost" size="icon" onClick={handleClose}>
               <X className="h-4 w-4" />
             </Button>
-          </SheetTitle>
-        </SheetHeader>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyHtml}
+              disabled={isLoading}
+            >
+              <Copy className="mr-2 h-4 w-4" />
+              Copy HTML
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPdf}
+              disabled={isLoading}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export PDF
+            </Button>
 
-        <div className="mt-6">
+            {isEdited && (
+              <Button
+                size="sm"
+                onClick={handleSaveChanges}
+                disabled={isSaving || isLoading}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
+            )}
+
+            {onRegenerate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRegenerate}
+                disabled={isLoading}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Regenerate
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Report Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
           {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-8 w-3/4" />
@@ -183,47 +231,6 @@ export function ReportViewerDrawer({
             </>
           )}
         </div>
-
-        <SheetFooter className="mt-6 gap-2 flex-col sm:flex-row">
-          <Button
-            variant="outline"
-            onClick={handleCopyHtml}
-            disabled={isLoading}
-          >
-            <Copy className="mr-2 h-4 w-4" />
-            Copy HTML
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={handleExportPdf}
-            disabled={isLoading}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export PDF
-          </Button>
-
-          {isEdited && (
-            <Button
-              onClick={handleSaveChanges}
-              disabled={isSaving || isLoading}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {isSaving ? "Saving..." : "Save Changes"}
-            </Button>
-          )}
-
-          {onRegenerate && (
-            <Button
-              variant="outline"
-              onClick={onRegenerate}
-              disabled={isLoading}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Regenerate
-            </Button>
-          )}
-        </SheetFooter>
       </SheetContent>
     </Sheet>
   );
