@@ -50,10 +50,6 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        lime: {
-          DEFAULT: "#C4F82A",
-          dark: "#111111",
-        },
       },
       letterSpacing: {
         tech: "0.3em",
