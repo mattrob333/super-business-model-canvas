@@ -152,7 +152,7 @@ const Playbooks = () => {
                 setSelectedAnalysis(analysis || null);
               }}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full border-primary/30 hover:border-primary/50 transition-colors">
                 <SelectValue placeholder="Select company..." />
               </SelectTrigger>
               <SelectContent>
