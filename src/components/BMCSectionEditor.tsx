@@ -407,7 +407,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
             <TabsContent value="chat" className="flex-1 flex flex-col mt-0 overflow-hidden">
               {/* Header */}
-              <div className="border-b border-white/[0.12] p-6 flex-shrink-0">
+              <div className="sticky top-0 z-10 bg-background border-b border-white/[0.12] p-6 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <span className="label-tech text-primary">AI Assistant</span>
@@ -537,18 +537,18 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
               {/* Input Area */}
               <div className="border-t border-white/[0.12] p-6 flex-shrink-0">
-                <div className="flex gap-3">
+                <div className="relative">
                   <Input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Ask for suggestions or improvements..."
-                    className="flex-1 bg-white/[0.05] border-white/[0.12] focus:border-primary"
+                    className="w-full pr-12 bg-white/[0.05] border-white/[0.12] focus:border-primary"
                   />
                   <Button
                     onClick={() => handleSend()}
                     disabled={!input.trim() || isLoading}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 p-0"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
