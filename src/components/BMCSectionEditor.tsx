@@ -50,7 +50,7 @@ export const BMCSectionEditor = ({
     setMessages([
       {
         role: "assistant",
-        content: `I can help you refine ${companyName}'s **${section.title}**. You can ask me to:\n\n• Suggest improvements\n• Analyze the current approach\n• Compare to industry best practices\n• Identify missing elements`,
+        content: `I'm your **Strategy Assistant** for ${companyName}'s **${section.title}**. I can help you:\n\n• Identify improvement opportunities and strategic goals\n• Suggest expansion targets and new segments/partners/channels\n• Analyze gaps between current state and industry leaders\n• Define measurable objectives for this section\n\nYour goals will be saved and used to guide all future framework analyses.`,
       },
     ]);
   }, [section, companyName]);
@@ -121,7 +121,7 @@ export const BMCSectionEditor = ({
     setMessages([
       {
         role: "assistant",
-        content: `I can help you refine ${companyName}'s **${section.title}**. You can ask me to:\n\n• Suggest improvements\n• Analyze the current approach\n• Compare to industry best practices\n• Identify missing elements`,
+        content: `I'm your **Strategy Assistant** for ${companyName}'s **${section.title}**. I can help you:\n\n• Identify improvement opportunities and strategic goals\n• Suggest expansion targets and new segments/partners/channels\n• Analyze gaps between current state and industry leaders\n• Define measurable objectives for this section\n\nYour goals will be saved and used to guide all future framework analyses.`,
       },
     ]);
   };
@@ -202,17 +202,17 @@ export const BMCSectionEditor = ({
                     ))}
                   </div>
 
-                  {/* Notes Field */}
+                  {/* Strategic Goals */}
                   <div className="space-y-2 pt-4">
-                    <label className="text-sm font-medium">Additional Notes</label>
+                    <label className="text-sm font-medium">Strategic Goals & Improvement Targets</label>
                     <Textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Add context or details for AI chat (not visible on main canvas)"
+                      placeholder="Define where you want to go with this section. What improvements, expansions, or strategic shifts are you targeting?"
                       className="min-h-[150px] bg-white/[0.05] border-white/[0.12]"
                     />
                     <p className="text-xs text-muted-foreground">
-                      These notes will be included in AI chat context but won't appear on the main canvas
+                      * These goals will guide AI recommendations across all framework analyses. They won't appear on the main canvas but will shape strategic advice.
                     </p>
                   </div>
                 </div>
@@ -365,17 +365,17 @@ export const BMCSectionEditor = ({
                 ))}
               </div>
 
-              {/* Notes Field */}
+              {/* Strategic Goals */}
               <div className="space-y-2 pt-4">
-                <label className="text-sm font-medium">Additional Notes</label>
+                <label className="text-sm font-medium">Strategic Goals & Improvement Targets</label>
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add context or details for AI chat (not visible on main canvas)"
+                  placeholder="Define where you want to go with this section. What improvements, expansions, or strategic shifts are you targeting?"
                   className="min-h-[150px] bg-white/[0.05] border-white/[0.12]"
                 />
                 <p className="text-xs text-muted-foreground">
-                  These notes will be included in AI chat context but won't appear on the main canvas
+                  * These goals will guide AI recommendations across all framework analyses. They won't appear on the main canvas but will shape strategic advice.
                 </p>
               </div>
             </div>

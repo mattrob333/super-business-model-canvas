@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Edit as EditIcon, Info } from "lucide-react";
+import { Edit as EditIcon, Info, Target } from "lucide-react";
 import { BMCSectionEditor } from "./BMCSectionEditor";
 
 interface CanvasSection {
@@ -94,7 +94,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
     return 'not-viewed';
   };
 
-  const CanvasCard = ({ title, items, span = "col-span-1 row-span-1", height = "h-[180px] sm:h-[200px]" }: { title: string; items: string[]; span?: string; height?: string }) => {
+  const CanvasCard = ({ title, items, notes, span = "col-span-1 row-span-1", height = "h-[180px] sm:h-[200px]" }: { title: string; items: string[]; notes?: string; span?: string; height?: string }) => {
     const reviewStatus = getReviewStatus(title);
     const previewItems = items.slice(0, 3);
     const remainingCount = items.length - 3;
@@ -107,6 +107,11 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <h3 className="label-tech text-muted-foreground">{title}</h3>
+            {notes && (
+              <span title="Strategic goals defined">
+                <Target className="w-3.5 h-3.5 text-primary opacity-70" />
+              </span>
+            )}
             {reviewStatus === 'edited' && (
               <div className="w-2 h-2 rounded-full bg-primary" title="Edited" />
             )}
@@ -174,19 +179,19 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
 
           {/* Business Model Canvas - Top Rows */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-1 auto-rows-[180px] sm:auto-rows-[200px]">
-            <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1 row-span-2" height="h-full" />
-            <CanvasCard title="Key Activities" items={data.keyActivities} span="col-span-1" height="h-full" />
-            <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1 row-span-2" height="h-full" />
-            <CanvasCard title="Customer Relationships" items={data.customerRelationships} span="col-span-1" height="h-full" />
-            <CanvasCard title="Customer Segments" items={data.customerSegments} span="col-span-1 row-span-2" height="h-full" />
-            <CanvasCard title="Key Resources" items={data.keyResources} span="col-span-1" height="h-full" />
-            <CanvasCard title="Channels" items={data.channels} span="col-span-1" height="h-full" />
+            <CanvasCard title="Key Partners" items={data.keyPartners} notes={data.keyPartners_notes} span="col-span-1 row-span-2" height="h-full" />
+            <CanvasCard title="Key Activities" items={data.keyActivities} notes={data.keyActivities_notes} span="col-span-1" height="h-full" />
+            <CanvasCard title="Value Propositions" items={data.valuePropositions} notes={data.valuePropositions_notes} span="col-span-1 row-span-2" height="h-full" />
+            <CanvasCard title="Customer Relationships" items={data.customerRelationships} notes={data.customerRelationships_notes} span="col-span-1" height="h-full" />
+            <CanvasCard title="Customer Segments" items={data.customerSegments} notes={data.customerSegments_notes} span="col-span-1 row-span-2" height="h-full" />
+            <CanvasCard title="Key Resources" items={data.keyResources} notes={data.keyResources_notes} span="col-span-1" height="h-full" />
+            <CanvasCard title="Channels" items={data.channels} notes={data.channels_notes} span="col-span-1" height="h-full" />
           </div>
           
           {/* Bottom Row - Full Width 50/50 Split */}
           <div className="flex flex-col md:flex-row gap-1 mt-1">
-            <CanvasCard title="Cost Structure" items={data.costStructure} span="flex-1" height="h-[200px]" />
-            <CanvasCard title="Revenue Streams" items={data.revenueStreams} span="flex-1" height="h-[200px]" />
+            <CanvasCard title="Cost Structure" items={data.costStructure} notes={data.costStructure_notes} span="flex-1" height="h-[200px]" />
+            <CanvasCard title="Revenue Streams" items={data.revenueStreams} notes={data.revenueStreams_notes} span="flex-1" height="h-[200px]" />
         </div>
       </div>
 
