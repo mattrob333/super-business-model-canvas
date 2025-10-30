@@ -53,7 +53,7 @@ const Playbooks = () => {
   const [selectedAnalysis, setSelectedAnalysis] = useState<SavedAnalysis | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [goalInput, setGoalInput] = useState("");
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatState, setChatState] = useState<'closed' | 'minimized' | 'open'>('closed');
   const [selectedFramework, setSelectedFramework] = useState<string | null>(null);
   const [showFrameworkModal, setShowFrameworkModal] = useState(false);
   const [initialResearchMode, setInitialResearchMode] = useState(false);
@@ -169,7 +169,7 @@ const Playbooks = () => {
       return;
     }
 
-    setChatOpen(true);
+    setChatState('open');
   };
 
   const handleRunFramework = async (frameworkId: string) => {
@@ -423,8 +423,8 @@ const Playbooks = () => {
         {/* Business Context Chat */}
         {selectedAnalysis && user && (
           <BusinessContextChat
-            isOpen={chatOpen}
-            onClose={() => setChatOpen(false)}
+            chatState={chatState}
+            onStateChange={setChatState}
             selectedAnalysis={selectedAnalysis}
             initialPrompt={goalInput}
             userId={user.id}

@@ -23,8 +23,8 @@ interface Message {
 }
 
 interface BusinessContextChatProps {
-  isOpen: boolean;
-  onClose: () => void;
+  chatState: 'closed' | 'minimized' | 'open';
+  onStateChange: (state: 'closed' | 'minimized' | 'open') => void;
   selectedAnalysis: any;
   initialPrompt: string;
   userId: string;
@@ -32,8 +32,8 @@ interface BusinessContextChatProps {
 }
 
 export const BusinessContextChat = ({
-  isOpen,
-  onClose,
+  chatState,
+  onStateChange,
   selectedAnalysis,
   initialPrompt,
   userId,
@@ -57,17 +57,17 @@ export const BusinessContextChat = ({
 
   // Sync research mode with initial prop when drawer opens
   useEffect(() => {
-    if (isOpen) {
+    if (chatState === 'open') {
       setUseResearchMode(initialResearchMode);
     }
-  }, [isOpen, initialResearchMode]);
+  }, [chatState, initialResearchMode]);
 
   // Send initial prompt when chat opens
   useEffect(() => {
-    if (isOpen && initialPrompt && messages.length === 0) {
+    if (chatState === 'open' && initialPrompt && messages.length === 0) {
       handleSendMessage(initialPrompt);
     }
-  }, [isOpen, initialPrompt]);
+  }, [chatState, initialPrompt]);
 
   const handleSendMessage = async (messageText?: string) => {
     const textToSend = messageText || inputValue.trim();
@@ -213,22 +213,56 @@ export const BusinessContextChat = ({
     });
   };
 
-  const handleClose = () => {
-    // Cancel any ongoing request
+  const handleMinimize = () => {
+    // Cancel any ongoing request when minimizing
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    onClose();
+    onStateChange('minimized');
   };
 
-  if (!isOpen) return null;
+  if (chatState === 'closed') return null;
+
+  // Show floating button when minimized
+  if (chatState === 'minimized') {
+    return (
+      <div className="fixed right-6 bottom-6 z-40">
+        <button
+          onClick={() => onStateChange('open')}
+          className="group bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl shadow-2xl hover:shadow-primary/20 transition-all duration-300 hover:scale-105 p-4 flex flex-col gap-2 min-w-[160px]"
+        >
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Sparkles className="h-5 w-5" />
+              {messages.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  {messages.length}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col items-start gap-0.5">
+              <span className="text-xs font-semibold">Strategy Coach</span>
+              <span className="text-[10px] opacity-80">{selectedAnalysis.company_name}</span>
+            </div>
+          </div>
+          {isLoading && (
+            <div className="flex gap-1 justify-center">
+              <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground animate-pulse" />
+              <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground animate-pulse [animation-delay:0.2s]" />
+              <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground animate-pulse [animation-delay:0.4s]" />
+            </div>
+          )}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity"
-        onClick={handleClose}
+        onClick={handleMinimize}
       />
 
       {/* Chat Drawer */}
@@ -257,7 +291,7 @@ export const BusinessContextChat = ({
                 <Trash2 className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={handleClose}>
+            <Button variant="ghost" size="icon" onClick={handleMinimize}>
               <X className="h-5 w-5" />
             </Button>
           </div>
