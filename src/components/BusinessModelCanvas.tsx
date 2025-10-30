@@ -166,14 +166,14 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
         
         <div className="bg-white/[0.06] border border-white/[0.12] rounded-lg px-4 py-3 flex items-start gap-3 max-w-xs flex-shrink-0">
           <Info className="w-5 h-5 text-[hsl(var(--primary))] flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-gray-300">
-            Click any section to expand, review, and refine with AI assistance
+          <p className="text-xs text-gray-300">
+            Click any section to expand
           </p>
         </div>
       </div>
 
           {/* Business Model Canvas - Top Rows */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 auto-rows-[180px] sm:auto-rows-[200px]">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-1 auto-rows-[180px] sm:auto-rows-[200px]">
             <CanvasCard title="Key Partners" items={data.keyPartners} span="col-span-1 row-span-2" height="h-full" />
             <CanvasCard title="Key Activities" items={data.keyActivities} span="col-span-1" height="h-full" />
             <CanvasCard title="Value Propositions" items={data.valuePropositions} span="col-span-1 row-span-2" height="h-full" />
@@ -184,7 +184,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
           </div>
           
           {/* Bottom Row - Full Width 50/50 Split */}
-          <div className="flex flex-col md:flex-row gap-[2px] mt-[2px]">
+          <div className="flex flex-col md:flex-row gap-1 mt-1">
             <CanvasCard title="Cost Structure" items={data.costStructure} span="flex-1" height="h-[200px]" />
             <CanvasCard title="Revenue Streams" items={data.revenueStreams} span="flex-1" height="h-[200px]" />
         </div>
