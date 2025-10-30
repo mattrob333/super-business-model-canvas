@@ -72,18 +72,18 @@ const Landing = () => {
       <header className="border-b border-white/[0.12] backdrop-blur-sm sticky top-0 z-30 bg-background/80">
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex flex-col sm:flex-row items-center sm:gap-1.5 gap-2">
-              <div className="inline-flex items-center bg-[#C4F82A] text-black px-3 py-1 rounded-full font-montserrat font-normal tracking-wide">
-                <span className="text-lg sm:text-xl">SUPER</span>
+            <div className="flex flex-row items-center gap-1.5">
+              <div className="inline-flex items-center bg-[#C4F82A] text-black px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full font-montserrat font-normal tracking-wide">
+                <span className="text-base sm:text-lg md:text-xl whitespace-nowrap">SUPER</span>
               </div>
-              <h1 className="text-lg sm:text-xl font-montserrat font-light tracking-wide text-white">
+              <h1 className="text-base sm:text-lg md:text-xl font-montserrat font-light tracking-wide text-white whitespace-nowrap">
                 <span className="md:hidden">BMC</span>
                 <span className="hidden md:inline">BUSINESS MODEL CANVAS</span>
               </h1>
             </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-primary/10 border border-primary/20 rounded-full">
-              <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-              <span className="label-tech text-primary text-[10px]">Powered by AI</span>
+            <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 bg-primary/10 border border-primary/20 rounded-full">
+              <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-primary rounded-full animate-pulse" />
+              <span className="label-tech text-primary text-[9px] sm:text-[10px]">Powered by AI</span>
             </div>
           </div>
         </div>
@@ -111,38 +111,38 @@ const Landing = () => {
 
             {/* 3-Step Process */}
             <div className="max-w-2xl mx-auto">
-              <div className="flex items-center justify-center gap-4 md:gap-8">
+              <div className="flex items-start justify-center gap-3 sm:gap-6 md:gap-8">
                 {/* Step 1 */}
-                <div className="flex flex-col items-center gap-2 flex-1">
-                  <div className="w-8 h-8 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-sm">
+                <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0">
                     1
                   </div>
-                  <h3 className="text-base font-semibold text-white">AI Builds</h3>
-                  <p className="text-sm text-muted-foreground">60 seconds</p>
+                  <h3 className="text-sm sm:text-base font-semibold text-white text-center">AI Builds</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground text-center">60 seconds</p>
                 </div>
 
                 {/* Arrow */}
-                <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0 hidden sm:block" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0 mt-3 sm:mt-4" />
 
                 {/* Step 2 */}
-                <div className="flex flex-col items-center gap-2 flex-1">
-                  <div className="w-8 h-8 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-sm">
+                <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0">
                     2
                   </div>
-                  <h3 className="text-base font-semibold text-white">You Refine</h3>
-                  <p className="text-sm text-muted-foreground">With AI assistance</p>
+                  <h3 className="text-sm sm:text-base font-semibold text-white text-center">You Refine</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground text-center">With AI assistance</p>
                 </div>
 
                 {/* Arrow */}
-                <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0 hidden sm:block" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0 mt-3 sm:mt-4" />
 
                 {/* Step 3 */}
-                <div className="flex flex-col items-center gap-2 flex-1">
-                  <div className="w-8 h-8 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-sm">
+                <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0">
                     3
                   </div>
-                  <h3 className="text-base font-semibold text-white">Reuse Forever</h3>
-                  <p className="text-sm text-muted-foreground">As foundation</p>
+                  <h3 className="text-sm sm:text-base font-semibold text-white text-center">Reuse Forever</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground text-center">As foundation</p>
                 </div>
               </div>
             </div>
