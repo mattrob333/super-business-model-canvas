@@ -34,7 +34,7 @@ serve(async (req) => {
 
     console.log('Authenticated request received');
 
-    const { sessionId, companyId, userMessage, conversationHistory, useResearchMode } = await req.json();
+    const { sessionId, companyId, userMessage, conversationHistory, useResearchMode, selectedModel } = await req.json();
     
     console.log('Received request:', { sessionId, companyId, hasMessage: !!userMessage });
     
@@ -263,13 +263,21 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
         }),
       });
     } else {
-      // Use Lovable AI Gateway with Gemini 2.5 Pro for superior reasoning
+      // Use Lovable AI Gateway with selected model
       const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
       if (!LOVABLE_API_KEY) {
         throw new Error('LOVABLE_API_KEY not configured');
       }
 
-      console.log('Calling Lovable AI Gateway with Gemini 2.5 Pro...');
+      // Map selected model to API model name
+      const modelMap: { [key: string]: string } = {
+        'gemini-pro': 'google/gemini-2.5-pro',
+        'gemini-flash': 'google/gemini-2.5-flash',
+      };
+      
+      const aiModel = modelMap[selectedModel] || 'google/gemini-2.5-pro';
+
+      console.log(`Calling Lovable AI Gateway with ${aiModel}...`);
       aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -277,7 +285,7 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-pro',
+          model: aiModel,
           messages,
           stream: true,
           temperature: 0.7,

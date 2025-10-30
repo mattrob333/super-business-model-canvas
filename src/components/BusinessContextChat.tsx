@@ -1,15 +1,20 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Sparkles, Trash2, Globe } from "lucide-react";
+import { X, Send, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Message {
   role: "user" | "assistant";
@@ -39,6 +44,7 @@ export const BusinessContextChat = ({
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [useResearchMode, setUseResearchMode] = useState(initialResearchMode);
+  const [selectedModel, setSelectedModel] = useState<string>("gemini-pro");
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -100,6 +106,7 @@ export const BusinessContextChat = ({
             companyId: selectedAnalysis.id,
             userMessage: textToSend,
             useResearchMode,
+            selectedModel,
             conversationHistory: messages.map((m) => ({
               role: m.role,
               content: m.content,
@@ -225,7 +232,7 @@ export const BusinessContextChat = ({
       />
 
       {/* Chat Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full sm:w-[600px] bg-background border-l shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-[600px] bg-background shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-muted/50">
           <div className="flex items-center gap-3">
@@ -239,19 +246,7 @@ export const BusinessContextChat = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="research-mode"
-                checked={useResearchMode}
-                onCheckedChange={setUseResearchMode}
-                disabled={isLoading}
-              />
-              <Label htmlFor="research-mode" className="text-xs cursor-pointer flex items-center gap-1">
-                <Globe className="h-3 w-3" />
-                Research Mode
-              </Label>
-            </div>
+          <div className="flex items-center gap-2">
             {messages.length > 0 && (
               <Button
                 variant="ghost"
@@ -330,9 +325,23 @@ export const BusinessContextChat = ({
         {/* Input Area */}
         <div className="p-4 border-t bg-muted/30">
           <div className="flex items-center gap-2 mb-2">
-            <Badge variant="secondary" className="text-xs">
-              {useResearchMode ? '🔬 Research Mode (Web Search)' : '💡 Fast Mode (Gemini Flash)'}
-            </Badge>
+            <Select
+              value={selectedModel}
+              onValueChange={(value) => {
+                setSelectedModel(value);
+                setUseResearchMode(value === "perplexity");
+              }}
+              disabled={isLoading}
+            >
+              <SelectTrigger className="w-[180px] h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gemini-pro" className="text-xs">Gemini Pro 2.5</SelectItem>
+                <SelectItem value="gemini-flash" className="text-xs">Gemini Flash</SelectItem>
+                <SelectItem value="perplexity" className="text-xs">Perplexity</SelectItem>
+              </SelectContent>
+            </Select>
             <Badge variant="outline" className="text-xs">
               {selectedAnalysis.company_name}
             </Badge>
