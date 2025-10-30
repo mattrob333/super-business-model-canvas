@@ -232,9 +232,9 @@ export const BusinessContextChat = ({
       />
 
       {/* Chat Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full sm:w-[600px] bg-background shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-[720px] bg-background border-l border-gray-800 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-muted/50">
+        <div className="flex items-center justify-between p-4 border-b border-gray-800 bg-muted/50">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10">
               <Sparkles className="h-5 w-5 text-primary" />
@@ -323,7 +323,7 @@ export const BusinessContextChat = ({
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="p-4 border-t bg-muted/30">
+        <div className="p-4 border-t border-gray-800 bg-muted/30">
           <div className="flex items-center gap-2 mb-2">
             <Select
               value={selectedModel}
