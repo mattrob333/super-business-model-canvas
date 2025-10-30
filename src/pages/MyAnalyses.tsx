@@ -6,8 +6,10 @@ import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Trash2, ExternalLink, FileText, Eye, Target } from 'lucide-react';
+import { Loader2, Trash2, ExternalLink, FileText, Target, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { getIconComponent } from '@/lib/icon-utils';
+import { exportAnalysisPackage } from '@/lib/analysis-export';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -132,6 +134,59 @@ const MyAnalyses = () => {
     navigate('/analyze');
   };
 
+  const handleDeleteReport = async (reportId: string) => {
+    try {
+      const { error } = await supabase
+        .from('generated_reports')
+        .delete()
+        .eq('id', reportId);
+
+      if (error) throw error;
+
+      await fetchAnalyses();
+      
+      toast({
+        title: "Report deleted",
+        description: "Report deleted successfully"
+      });
+    } catch (error) {
+      console.error('Error deleting report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete report",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleExportPackage = async (analysis: SavedAnalysis) => {
+    try {
+      const reports = analysis.generated_reports?.map(r => ({
+        title: r.frameworks?.title || 'Report',
+        content: r.report_content,
+        framework: r.frameworks?.title || 'report'
+      })) || [];
+      
+      await exportAnalysisPackage(
+        analysis.company_name,
+        analysis.analysis_data,
+        reports
+      );
+      
+      toast({
+        title: "Success",
+        description: "Analysis package exported successfully"
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to export analysis package",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -213,14 +268,24 @@ const MyAnalyses = () => {
                       </div>
                     )}
 
-                    <Button
-                      variant="default"
-                      className="w-full"
-                      onClick={() => loadAnalysis(analysis)}
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      View Full Analysis
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="default"
+                        className="flex-1"
+                        onClick={() => loadAnalysis(analysis)}
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        View Full Analysis
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleExportPackage(analysis)}
+                        title="Export Package"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
 
                     {/* Reports Section */}
                     {analysis.generated_reports && analysis.generated_reports.length > 0 && (
@@ -229,34 +294,42 @@ const MyAnalyses = () => {
                           <FileText className="h-4 w-4" />
                           Generated Reports
                         </h4>
-                        {analysis.generated_reports.map((report) => (
-                          <div
-                            key={report.id}
-                            className="flex items-center justify-between p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="text-xl">{report.frameworks?.icon || "📊"}</div>
-                              <div>
-                                <p className="font-medium text-xs">
-                                  {report.frameworks?.title || "Report"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(report.created_at).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
+                        {analysis.generated_reports.map((report) => {
+                          const IconComponent = getIconComponent(report.frameworks?.icon);
+                          return (
+                            <div
+                              key={report.id}
+                              className="flex items-center justify-between p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
                               onClick={() => {
                                 setSelectedReportId(report.id);
                                 setReportDrawerOpen(true);
                               }}
                             >
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
+                              <div className="flex items-center gap-2 flex-1">
+                                <IconComponent className="h-4 w-4 text-primary" />
+                                <div>
+                                  <p className="font-medium text-xs">
+                                    {report.frameworks?.title || "Report"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {new Date(report.created_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteReport(report.id);
+                                }}
+                                className="opacity-70 group-hover:opacity-100"
+                              >
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
