@@ -34,7 +34,7 @@ serve(async (req) => {
 
     console.log('Authenticated request received');
 
-    const { sessionId, companyId, userMessage, conversationHistory, useResearchMode, selectedModel } = await req.json();
+    const { sessionId, companyId, userMessage, conversationHistory, useResearchMode, selectedModel, selectedReports } = await req.json();
     
     console.log('Received request:', { sessionId, companyId, hasMessage: !!userMessage });
     
@@ -87,6 +87,52 @@ serve(async (req) => {
 
     const companyData = analysisData.analysis_data;
     const companyName = analysisData.company_name;
+
+    // Fetch selected framework reports if provided
+    let reportsContext = '';
+    if (selectedReports && Array.isArray(selectedReports) && selectedReports.length > 0) {
+      const { data: reports, error: reportsError } = await supabaseClient
+        .from('generated_reports')
+        .select(`
+          id,
+          framework_id,
+          report_content,
+          created_at,
+          frameworks:framework_id (
+            title,
+            shortcut,
+            category
+          )
+        `)
+        .in('id', selectedReports)
+        .eq('user_id', user.id);
+
+      if (reportsError) {
+        console.error('Error fetching reports:', reportsError);
+      } else if (reports && reports.length > 0) {
+        reportsContext = `
+
+COMPLETED FRAMEWORK ANALYSES:
+The following strategic frameworks have already been completed for ${companyName}. 
+Reference these insights when providing strategic advice:
+
+${reports.map((r: any) => `
+### ${r.frameworks?.title || 'Framework'} (${r.frameworks?.shortcut || ''})
+Category: ${r.frameworks?.category || 'Strategic Analysis'}
+Completed: ${new Date(r.created_at).toLocaleDateString()}
+
+${r.report_content}
+`).join('\n---\n')}
+
+GUIDANCE FOR USING COMPLETED ANALYSES:
+- Reference specific insights from these completed frameworks in your responses
+- Connect insights across frameworks (e.g., "Your PESTLE analysis identified regulatory risks, which aligns with the competitive pressure shown in your Porter's analysis...")
+- Point out patterns or contradictions across multiple frameworks
+- Suggest new frameworks that build on these completed analyses
+- Use concrete examples from the reports when giving advice
+`;
+      }
+    }
 
     // Build comprehensive system prompt
     const baseContext = `
@@ -189,6 +235,8 @@ CRITICAL INSTRUCTIONS FOR COMPETITIVE ANALYSIS:
 
 ${baseContext}
 
+${reportsContext}
+
 ${frameworksSection}
 
 YOUR ROLE:
@@ -211,6 +259,8 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
       : `You are a senior strategy consultant with expertise across all business functions. You're having a strategic conversation with the leadership team of ${companyName}.
 
 ${baseContext}
+
+${reportsContext}
 
 ${frameworksSection}
 

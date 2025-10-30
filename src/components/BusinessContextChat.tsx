@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Sparkles, Trash2 } from "lucide-react";
+import { X, Send, Sparkles, Trash2, Building, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ReportSelector } from "@/components/ReportSelector";
 
 interface Message {
   role: "user" | "assistant";
@@ -29,6 +30,9 @@ interface BusinessContextChatProps {
   initialPrompt: string;
   userId: string;
   initialResearchMode?: boolean;
+  availableReports: any[];
+  selectedReports: string[];
+  onReportsChange: (reportIds: string[]) => void;
 }
 
 export const BusinessContextChat = ({
@@ -38,6 +42,9 @@ export const BusinessContextChat = ({
   initialPrompt,
   userId,
   initialResearchMode = false,
+  availableReports,
+  selectedReports,
+  onReportsChange,
 }: BusinessContextChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -107,6 +114,7 @@ export const BusinessContextChat = ({
             userMessage: textToSend,
             useResearchMode,
             selectedModel,
+            selectedReports,
             conversationHistory: messages.map((m) => ({
               role: m.role,
               content: m.content,
@@ -266,34 +274,58 @@ export const BusinessContextChat = ({
       />
 
       {/* Chat Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full sm:w-[720px] bg-background border-l border-gray-800 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-[720px] bg-background border-l shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-800 bg-muted/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Sparkles className="h-5 w-5 text-primary" />
+        <div className="flex flex-col gap-3 p-4 border-b bg-muted/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Sparkles className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Strategy Coach</h3>
+                <div className="flex items-center gap-2 text-sm">
+                  <Badge variant="outline" className="gap-1.5 text-xs">
+                    <Building className="h-3 w-3" />
+                    {selectedAnalysis.company_name}
+                  </Badge>
+                  {selectedReports.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedReports.length} report{selectedReports.length > 1 ? 's' : ''} loaded
+                    </Badge>
+                  )}
+                </div>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-lg">Strategy Coach</h3>
-              <p className="text-sm text-muted-foreground">
-                {selectedAnalysis.company_name}
-              </p>
+            <div className="flex items-center gap-2">
+              {messages.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleClearChat}
+                  title="Clear conversation"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" onClick={handleMinimize} title="Minimize">
+                <Minus className="h-5 w-5" />
+              </Button>
             </div>
           </div>
+
+          {/* Report Selector */}
           <div className="flex items-center gap-2">
-            {messages.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleClearChat}
-                title="Clear conversation"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            <ReportSelector
+              availableReports={availableReports}
+              selectedReports={selectedReports}
+              onReportsChange={onReportsChange}
+            />
+            {availableReports.length > 0 && selectedReports.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Add completed reports to chat context
+              </p>
             )}
-            <Button variant="ghost" size="icon" onClick={handleMinimize}>
-              <X className="h-5 w-5" />
-            </Button>
           </div>
         </div>
 
@@ -371,9 +403,14 @@ export const BusinessContextChat = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="gemini-pro" className="text-xs">Gemini Pro 2.5</SelectItem>
-                <SelectItem value="gemini-flash" className="text-xs">Gemini Flash</SelectItem>
-                <SelectItem value="perplexity" className="text-xs">Perplexity</SelectItem>
+                <SelectItem value="gemini-pro" className="text-xs">
+                  <div className="flex flex-col">
+                    <span>Gemini Pro 2.5</span>
+                    <span className="text-[10px] text-muted-foreground">1M context - Best for multi-report analysis</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="gemini-flash" className="text-xs">Gemini Flash 2.5</SelectItem>
+                <SelectItem value="perplexity" className="text-xs">Perplexity (Research)</SelectItem>
               </SelectContent>
             </Select>
             <Badge variant="outline" className="text-xs">

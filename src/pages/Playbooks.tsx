@@ -16,6 +16,7 @@ import { getCategoryColor } from "@/data/dummy-frameworks";
 import { BusinessContextChat } from "@/components/BusinessContextChat";
 import { FrameworkDetailModal } from "@/components/FrameworkDetailModal";
 import { ReportViewerDrawer } from "@/components/ReportViewerDrawer";
+import { FloatingChatButton } from "@/components/FloatingChatButton";
 
 interface SavedAnalysis {
   id: string;
@@ -61,6 +62,8 @@ const Playbooks = () => {
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
+  const [selectedReports, setSelectedReports] = useState<string[]>([]);
+  const [availableReports, setAvailableReports] = useState<any[]>([]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -73,6 +76,16 @@ const Playbooks = () => {
       fetchFrameworks();
     }
   }, [user, loading, navigate]);
+
+  // Fetch available reports when company is selected
+  useEffect(() => {
+    if (selectedAnalysis && user) {
+      fetchAvailableReports();
+    } else {
+      setAvailableReports([]);
+      setSelectedReports([]);
+    }
+  }, [selectedAnalysis?.id, user]);
 
   // Load pre-selected context from sessionStorage if available
   useEffect(() => {
@@ -143,6 +156,34 @@ const Playbooks = () => {
     }));
 
     setFrameworks(mappedFrameworks);
+  };
+
+  const fetchAvailableReports = async () => {
+    if (!selectedAnalysis || !user) return;
+
+    const { data, error } = await supabase
+      .from("generated_reports")
+      .select(`
+        id,
+        framework_id,
+        report_content,
+        created_at,
+        frameworks:framework_id (
+          title,
+          shortcut,
+          category
+        )
+      `)
+      .eq("company_id", selectedAnalysis.id)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching reports:", error);
+      return;
+    }
+
+    setAvailableReports(data || []);
   };
 
   const categories = ["all", ...new Set(frameworks.map((f) => f.category))];
@@ -420,6 +461,15 @@ const Playbooks = () => {
           )}
         </div>
 
+        {/* Persistent Chat Button - Always visible when company selected */}
+        {selectedAnalysis && user && chatState === 'closed' && (
+          <FloatingChatButton
+            messageCount={0}
+            companyName={selectedAnalysis.company_name}
+            onClick={() => setChatState('open')}
+          />
+        )}
+
         {/* Business Context Chat */}
         {selectedAnalysis && user && (
           <BusinessContextChat
@@ -429,6 +479,9 @@ const Playbooks = () => {
             initialPrompt={goalInput}
             userId={user.id}
             initialResearchMode={initialResearchMode}
+            availableReports={availableReports}
+            selectedReports={selectedReports}
+            onReportsChange={setSelectedReports}
           />
         )}
 
