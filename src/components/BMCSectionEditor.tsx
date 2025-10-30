@@ -405,9 +405,9 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               </div>
             </TabsContent>
 
-            <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
+            <TabsContent value="chat" className="flex-1 flex flex-col mt-0 overflow-hidden">
               {/* Header */}
-              <div className="border-b border-white/[0.12] p-6">
+              <div className="border-b border-white/[0.12] p-6 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <span className="label-tech text-primary">AI Assistant</span>
@@ -427,7 +427,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               </div>
 
               {/* Chat Area */}
-                <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+                <ScrollArea className="flex-1 p-6 min-h-0" ref={scrollRef}>
                   <div className="space-y-4">
                   {messages.map((message, index) => (
                     <div
@@ -503,7 +503,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
               {/* Quick Start Questions - Mobile */}
               {SECTION_QUICK_QUESTIONS[section.title] && (
-                <div className="px-6 pb-3 space-y-2 border-t pt-3">
+                <div className="px-6 pb-3 space-y-2 border-t pt-3 flex-shrink-0">
                   <p className="text-xs text-muted-foreground">Quick Start:</p>
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     {SECTION_QUICK_QUESTIONS[section.title]?.map((question, idx) => (
@@ -536,7 +536,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               )}
 
               {/* Input Area */}
-              <div className="border-t border-white/[0.12] p-6">
+              <div className="border-t border-white/[0.12] p-6 flex-shrink-0">
                 <div className="flex gap-3">
                   <Input
                     value={input}
