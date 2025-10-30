@@ -407,27 +407,26 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
             <TabsContent value="chat" className="flex-1 flex flex-col mt-0 overflow-hidden">
               {/* Header */}
-              <div className="sticky top-0 z-10 bg-background border-b border-white/[0.12] p-6 flex-shrink-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="label-tech text-primary">AI Assistant</span>
-                </div>
+              <div className="sticky top-0 z-10 bg-background border-b border-white/[0.12] p-4 flex-shrink-0">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Chat & Refine</h3>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <h3 className="text-base font-semibold">AI Assistant</h3>
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={handleClearChat}
-                    className="hover:bg-white/[0.1]"
+                    className="hover:bg-white/[0.1] h-8 w-8"
                     title="Clear chat"
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCcw className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
 
               {/* Chat Area */}
-                <ScrollArea className="flex-1 p-6 min-h-0" ref={scrollRef}>
+                <ScrollArea className="flex-1 p-4 min-h-0" ref={scrollRef}>
                   <div className="space-y-4">
                   {messages.map((message, index) => (
                     <div
@@ -503,9 +502,9 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
               {/* Quick Start Questions - Mobile */}
               {SECTION_QUICK_QUESTIONS[section.title] && (
-                <div className="px-6 pb-3 space-y-2 border-t pt-3 flex-shrink-0">
-                  <p className="text-xs text-muted-foreground">Quick Start:</p>
-                  <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="px-4 py-2 space-y-2 border-t flex-shrink-0">
+                  <p className="text-[10px] text-muted-foreground font-medium">Quick Start:</p>
+                  <div className="grid grid-cols-2 gap-1.5">
                     {SECTION_QUICK_QUESTIONS[section.title]?.map((question, idx) => (
                       <Button
                         key={idx}
@@ -515,7 +514,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                           setInput(question);
                           handleSend(question);
                         }}
-                        className="text-xs h-auto py-2 px-3 whitespace-normal text-left justify-start"
+                        className="text-[10px] h-auto py-1.5 px-2 whitespace-normal text-left justify-start leading-tight"
                         disabled={isLoading}
                       >
                         {question}
@@ -526,17 +525,17 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                     variant="outline"
                     size="sm"
                     onClick={() => handleSend(generateGoalsPrompt)}
-                    className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-medium py-2.5"
+                    className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-medium py-1.5 text-[11px]"
                     disabled={isLoading}
                   >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate Strategic Goals & Targets
+                    <Sparkles className="h-3 w-3 mr-1.5" />
+                    Generate Strategic Goals
                   </Button>
                 </div>
               )}
 
               {/* Input Area */}
-              <div className="border-t border-white/[0.12] p-6 flex-shrink-0">
+              <div className="border-t border-white/[0.12] p-4 flex-shrink-0">
                 <div className="relative">
                   <Input
                     value={input}
@@ -553,8 +552,8 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  Press Enter to send, Shift+Enter for new line
+                <p className="text-[10px] text-muted-foreground mt-2">
+                  Press Enter to send
                 </p>
               </div>
             </TabsContent>
