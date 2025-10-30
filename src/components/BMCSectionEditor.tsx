@@ -390,7 +390,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="Example: Expand into healthcare market by Q2 2025, targeting $500K ARR from 5 enterprise clients. Build 3 strategic partnerships with major platforms by year-end."
-                      className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50"
+                      className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-white/[0.05] [&::-webkit-scrollbar-thumb]:bg-white/[0.2] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-white/[0.3]"
                     />
                   </div>
                 </div>
@@ -435,37 +435,12 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                       className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-[85%] rounded-2xl p-6 ${
+                        className={`max-w-[85%] rounded-2xl p-6 relative ${
                           message.role === "user"
                             ? "bg-primary text-primary-foreground"
                             : "bg-white/[0.06] border border-white/[0.12]"
                         }`}
                       >
-                        {/* Copy button header for assistant messages */}
-                        {message.role === "assistant" && message.content && (
-                          <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/[0.08]">
-                            <span className="text-xs text-muted-foreground font-medium">AI Response</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleCopyMessage(message.content, index)}
-                              className="h-7 px-2 hover:bg-white/[0.08] text-xs"
-                            >
-                              {copiedMessageIndex === index ? (
-                                <>
-                                  <Check className="h-3 w-3 mr-1 text-primary" />
-                                  <span className="text-primary">Copied!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="h-3 w-3 mr-1" />
-                                  Copy
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        )}
-                        
                         <div className={
                           message.role === "assistant"
                             ? "prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6"
@@ -503,6 +478,22 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                             <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.2s]" />
                             <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.4s]" />
                           </div>
+                        )}
+                        
+                        {/* Copy button - bottom right corner for assistant messages */}
+                        {message.role === "assistant" && message.content && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleCopyMessage(message.content, index)}
+                            className="absolute bottom-2 right-2 h-8 w-8 hover:bg-white/[0.08]"
+                          >
+                            {copiedMessageIndex === index ? (
+                              <Check className="h-4 w-4 text-primary" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -646,7 +637,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Example: Expand into healthcare market by Q2 2025, targeting $500K ARR from 5 enterprise clients. Build 3 strategic partnerships with major platforms by year-end."
-                  className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50"
+                  className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-white/[0.05] [&::-webkit-scrollbar-thumb]:bg-white/[0.2] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-white/[0.3]"
                 />
               </div>
             </div>
@@ -702,37 +693,12 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl p-6 ${
+                    className={`max-w-[85%] rounded-2xl p-6 relative ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-white/[0.06] border border-white/[0.12]"
                     }`}
                   >
-                    {/* Copy button header for assistant messages */}
-                    {message.role === "assistant" && message.content && (
-                      <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/[0.08]">
-                        <span className="text-xs text-muted-foreground font-medium">AI Response</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCopyMessage(message.content, index)}
-                          className="h-7 px-2 hover:bg-white/[0.08] text-xs"
-                        >
-                          {copiedMessageIndex === index ? (
-                            <>
-                              <Check className="h-3 w-3 mr-1 text-primary" />
-                              <span className="text-primary">Copied!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3 mr-1" />
-                              Copy
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                    
                     <div className={
                       message.role === "assistant"
                         ? "prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6"
@@ -770,6 +736,22 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                         <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.2s]" />
                         <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.4s]" />
                       </div>
+                    )}
+                    
+                    {/* Copy button - bottom right corner for assistant messages */}
+                    {message.role === "assistant" && message.content && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleCopyMessage(message.content, index)}
+                        className="absolute bottom-2 right-2 h-8 w-8 hover:bg-white/[0.08]"
+                      >
+                        {copiedMessageIndex === index ? (
+                          <Check className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
                     )}
                   </div>
                 </div>
