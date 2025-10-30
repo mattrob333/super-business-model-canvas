@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Sparkles, RotateCcw, Plus, Trash2, Save } from "lucide-react";
+import { X, Send, Sparkles, RotateCcw, Plus, Trash2, Save, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,6 +81,7 @@ export const BMCSectionEditor = ({
   const [isLoading, setIsLoading] = useState(false);
   const [editedItems, setEditedItems] = useState<string[]>(section.items);
   const [notes, setNotes] = useState(section.notes || "");
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -259,6 +260,24 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
     ]);
   };
 
+  const handleCopyMessage = async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageIndex(index);
+      toast({
+        title: "Copied to clipboard",
+        description: "Paste this into your Strategic Goals field",
+      });
+      setTimeout(() => setCopiedMessageIndex(null), 2000);
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Please try selecting and copying manually",
+        variant: "destructive",
+      });
+    }
+  };
+
   const addItem = () => {
     setEditedItems([...editedItems, ""]);
   };
@@ -338,18 +357,41 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                     ))}
                   </div>
 
-                  {/* Strategic Goals */}
-                  <div className="space-y-2 pt-4">
-                    <label className="text-sm font-medium">Strategic Goals & Improvement Targets</label>
+                  {/* Strategic Goals - Enhanced */}
+                  <div className="space-y-3 pt-6 mt-2 border-t border-primary/20">
+                    {/* Header with Icon and Badge */}
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center mt-0.5">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <label className="text-sm font-semibold">Strategic Goals & Improvement Targets</label>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-primary border border-primary/30">
+                            IMPORTANT
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
+                          <p className="font-medium text-foreground/90">
+                            🎯 This is your strategic roadmap for AI-powered growth
+                          </p>
+                          <p>
+                            Tell the AI where you want to take this part of your business. The AI will use these goals to give you personalized advice across all your framework analyses - helping you see what actions to take, what opportunities to chase, and how to get from where you are now to where you want to be.
+                          </p>
+                          <p className="text-[11px] italic">
+                            These goals stay private (won't show on your main canvas) but power all your AI recommendations.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Textarea */}
                     <Textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Define where you want to go with this section. What improvements, expansions, or strategic shifts are you targeting?"
-                      className="min-h-[150px] bg-white/[0.05] border-white/[0.12]"
+                      placeholder="Example: Expand into healthcare market by Q2 2025, targeting $500K ARR from 5 enterprise clients. Build 3 strategic partnerships with major platforms by year-end."
+                      className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      * These goals will guide AI recommendations across all framework analyses. They won't appear on the main canvas but will shape strategic advice.
-                    </p>
                   </div>
                 </div>
               </ScrollArea>
@@ -399,6 +441,31 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                             : "bg-white/[0.06] border border-white/[0.12]"
                         }`}
                       >
+                        {/* Copy button header for assistant messages */}
+                        {message.role === "assistant" && message.content && (
+                          <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/[0.08]">
+                            <span className="text-xs text-muted-foreground font-medium">AI Response</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopyMessage(message.content, index)}
+                              className="h-7 px-2 hover:bg-white/[0.08] text-xs"
+                            >
+                              {copiedMessageIndex === index ? (
+                                <>
+                                  <Check className="h-3 w-3 mr-1 text-primary" />
+                                  <span className="text-primary">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3 mr-1" />
+                                  Copy
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                        
                         <div className={
                           message.role === "assistant"
                             ? "prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6"
@@ -546,18 +613,41 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                 ))}
               </div>
 
-              {/* Strategic Goals */}
-              <div className="space-y-2 pt-4">
-                <label className="text-sm font-medium">Strategic Goals & Improvement Targets</label>
+              {/* Strategic Goals - Enhanced */}
+              <div className="space-y-3 pt-6 mt-2 border-t border-primary/20">
+                {/* Header with Icon and Badge */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center mt-0.5">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="text-sm font-semibold">Strategic Goals & Improvement Targets</label>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-primary border border-primary/30">
+                        IMPORTANT
+                      </span>
+                    </div>
+                    <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
+                      <p className="font-medium text-foreground/90">
+                        🎯 This is your strategic roadmap for AI-powered growth
+                      </p>
+                      <p>
+                        Tell the AI where you want to take this part of your business. The AI will use these goals to give you personalized advice across all your framework analyses - helping you see what actions to take, what opportunities to chase, and how to get from where you are now to where you want to be.
+                      </p>
+                      <p className="text-[11px] italic">
+                        These goals stay private (won't show on your main canvas) but power all your AI recommendations.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Textarea */}
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Define where you want to go with this section. What improvements, expansions, or strategic shifts are you targeting?"
-                  className="min-h-[150px] bg-white/[0.05] border-white/[0.12]"
+                  placeholder="Example: Expand into healthcare market by Q2 2025, targeting $500K ARR from 5 enterprise clients. Build 3 strategic partnerships with major platforms by year-end."
+                  className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50"
                 />
-                <p className="text-xs text-muted-foreground">
-                  * These goals will guide AI recommendations across all framework analyses. They won't appear on the main canvas but will shape strategic advice.
-                </p>
               </div>
             </div>
           </ScrollArea>
@@ -618,44 +708,69 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                         : "bg-white/[0.06] border border-white/[0.12]"
                     }`}
                   >
-                        <div className={
-                          message.role === "assistant"
-                            ? "prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6"
-                            : "prose prose-invert max-w-none [&>p]:mb-0"
-                        }>
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              table: ({ node, ...props }) => (
-                                <div className="my-6 w-full overflow-x-auto">
-                                  <Table {...props} />
-                                </div>
-                              ),
-                              thead: ({ node, ...props }) => <TableHeader {...props} />,
-                              tbody: ({ node, ...props }) => <TableBody {...props} />,
-                              tr: ({ node, ...props }) => <TableRow {...props} />,
-                              th: ({ node, ...props }) => (
-                                <TableHead {...props} />
-                              ),
-                              td: ({ node, ...props }) => (
-                                <TableCell {...props} />
-                              ),
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
-                        </div>
-                        {/* Show loading dots only for last assistant message with no content */}
-                        {isLoading && 
-                         index === messages.length - 1 && 
-                         message.role === "assistant" && 
-                         !message.content && (
-                          <div className="flex gap-1 mt-2">
-                            <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse" />
-                            <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.2s]" />
-                            <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.4s]" />
-                          </div>
-                        )}
+                    {/* Copy button header for assistant messages */}
+                    {message.role === "assistant" && message.content && (
+                      <div className="flex items-center justify-between mb-3 pb-3 border-b border-white/[0.08]">
+                        <span className="text-xs text-muted-foreground font-medium">AI Response</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyMessage(message.content, index)}
+                          className="h-7 px-2 hover:bg-white/[0.08] text-xs"
+                        >
+                          {copiedMessageIndex === index ? (
+                            <>
+                              <Check className="h-3 w-3 mr-1 text-primary" />
+                              <span className="text-primary">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                    
+                    <div className={
+                      message.role === "assistant"
+                        ? "prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6"
+                        : "prose prose-invert max-w-none [&>p]:mb-0"
+                    }>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          table: ({ node, ...props }) => (
+                            <div className="my-6 w-full overflow-x-auto">
+                              <Table {...props} />
+                            </div>
+                          ),
+                          thead: ({ node, ...props }) => <TableHeader {...props} />,
+                          tbody: ({ node, ...props }) => <TableBody {...props} />,
+                          tr: ({ node, ...props }) => <TableRow {...props} />,
+                          th: ({ node, ...props }) => (
+                            <TableHead {...props} />
+                          ),
+                          td: ({ node, ...props }) => (
+                            <TableCell {...props} />
+                          ),
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                    {/* Show loading dots only for last assistant message with no content */}
+                    {isLoading && 
+                     index === messages.length - 1 && 
+                     message.role === "assistant" && 
+                     !message.content && (
+                      <div className="flex gap-1 mt-2">
+                        <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse" />
+                        <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.2s]" />
+                        <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.4s]" />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
