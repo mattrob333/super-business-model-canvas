@@ -168,11 +168,11 @@ const Playbooks = () => {
         framework_id,
         report_content,
         created_at,
-        frameworks:framework_id (
-          title,
-          shortcut,
-          category
-        )
+      frameworks (
+        title,
+        shortcut,
+        category
+      )
       `)
       .eq("company_id", selectedAnalysis.id)
       .eq("user_id", user.id)

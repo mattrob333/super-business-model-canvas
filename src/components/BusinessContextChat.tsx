@@ -402,16 +402,11 @@ export const BusinessContextChat = ({
               <SelectTrigger className="w-[180px] h-7 text-xs">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gemini-pro" className="text-xs">
-                  <div className="flex flex-col">
-                    <span>Gemini Pro 2.5</span>
-                    <span className="text-[10px] text-muted-foreground">1M context - Best for multi-report analysis</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="gemini-flash" className="text-xs">Gemini Flash 2.5</SelectItem>
-                <SelectItem value="perplexity" className="text-xs">Perplexity (Research)</SelectItem>
-              </SelectContent>
+          <SelectContent>
+            <SelectItem value="gemini-pro" className="text-xs">Gemini 2.5 Pro</SelectItem>
+            <SelectItem value="gemini-flash" className="text-xs">Gemini 2.5 Flash</SelectItem>
+            <SelectItem value="perplexity" className="text-xs">Perplexity</SelectItem>
+          </SelectContent>
             </Select>
             <Badge variant="outline" className="text-xs">
               {selectedAnalysis.company_name}
