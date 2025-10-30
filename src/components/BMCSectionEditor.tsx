@@ -9,6 +9,46 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+const SECTION_QUICK_QUESTIONS: Record<string, string[]> = {
+  "Key Partners": [
+    "What strategic partners are we missing in our value chain?",
+    "Which partnerships could accelerate our market expansion?"
+  ],
+  "Key Activities": [
+    "What critical activities should we be focusing on to differentiate?",
+    "Are there activities we could outsource to focus on core strengths?"
+  ],
+  "Key Resources": [
+    "What unique resources give us competitive advantage?",
+    "What resources do we need to acquire for our growth goals?"
+  ],
+  "Value Propositions": [
+    "How can we better articulate our unique value to customers?",
+    "What unmet customer needs could we address?"
+  ],
+  "Customer Relationships": [
+    "How can we deepen engagement with our customer base?",
+    "What relationship strategies do leading competitors use?"
+  ],
+  "Channels": [
+    "Are there underutilized distribution channels we should explore?",
+    "Which channels provide the best ROI for customer acquisition?"
+  ],
+  "Customer Segments": [
+    "What adjacent customer segments should we target for expansion?",
+    "Are there high-value segments we're currently overlooking?"
+  ],
+  "Cost Structure": [
+    "Where can we optimize costs without compromising quality?",
+    "What are the most significant cost drivers in our model?"
+  ],
+  "Revenue Streams": [
+    "What new revenue streams could we develop from existing assets?",
+    "How can we increase recurring revenue in our model?"
+  ]
+};
 
 interface BMCSectionEditorProps {
   open: boolean;
@@ -38,6 +78,7 @@ export const BMCSectionEditor = ({
 }: BMCSectionEditorProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [editedItems, setEditedItems] = useState<string[]>(section.items);
   const [notes, setNotes] = useState(section.notes || "");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -70,43 +111,114 @@ export const BMCSectionEditor = ({
     });
   };
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (messageText?: string) => {
+    const messageToSend = messageText || input.trim();
+    if (!messageToSend || isLoading) return;
 
-    const userMessage: Message = { role: "user", content: input };
+    const userMessage: Message = {
+      role: "user",
+      content: messageToSend,
+    };
+
     setMessages((prev) => [...prev, userMessage]);
-    const userInput = input;
     setInput("");
+    setIsLoading(true);
 
     try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      
-      const { data, error } = await supabase.functions.invoke('bmc-chat', {
-        body: {
-          section: section.title,
-          sectionContent: editedItems.join(', '),
-          sectionNotes: notes,
-          userMessage: userInput,
-          conversationHistory: messages,
-          companyName: companyName,
-          businessContext: businessContext
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bmc-chat`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            section: section.title,
+            sectionContent: editedItems.join(", "),
+            sectionNotes: notes,
+            userMessage: messageToSend,
+            conversationHistory: messages.map(m => ({
+              role: m.role,
+              content: m.content
+            })),
+            companyName,
+            businessContext,
+          }),
         }
-      });
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to get response");
+      }
 
-      const aiMessage: Message = {
-        role: "assistant",
-        content: data.response
-      };
-      setMessages((prev) => [...prev, aiMessage]);
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantMessage = "";
+
+      // Add placeholder for assistant message
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "" },
+      ]);
+
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                assistantMessage += content;
+                // Update the last message with accumulated content
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    role: "assistant",
+                    content: assistantMessage,
+                  };
+                  return updated;
+                });
+              }
+            } catch (e) {
+              // Ignore JSON parse errors for incomplete chunks
+              console.debug("Parse error:", e);
+            }
+          }
+        }
+      }
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
       const errorMessage: Message = {
         role: "assistant",
-        content: "Sorry, I encountered an error. Please try again."
+        content: "Sorry, I encountered an error. Please try again.",
       };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -290,11 +402,46 @@ export const BMCSectionEditor = ({
                             {message.content}
                           </ReactMarkdown>
                         </div>
+                        {/* Show loading dots only for last assistant message with no content */}
+                        {isLoading && 
+                         index === messages.length - 1 && 
+                         message.role === "assistant" && 
+                         !message.content && (
+                          <div className="flex gap-1 mt-2">
+                            <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse" />
+                            <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.2s]" />
+                            <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.4s]" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               </ScrollArea>
+
+              {/* Quick Start Questions - Mobile */}
+              {messages.length <= 1 && SECTION_QUICK_QUESTIONS[section.title] && (
+                <div className="px-6 pb-3 space-y-2 border-t pt-3">
+                  <p className="text-xs text-muted-foreground">Quick Start:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {SECTION_QUICK_QUESTIONS[section.title]?.map((question, idx) => (
+                      <Button
+                        key={idx}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setInput(question);
+                          handleSend(question);
+                        }}
+                        className="text-xs h-auto py-2 px-3 whitespace-normal text-left justify-start"
+                        disabled={isLoading}
+                      >
+                        {question}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Input Area */}
               <div className="border-t border-white/[0.12] p-6">
@@ -307,8 +454,8 @@ export const BMCSectionEditor = ({
                     className="flex-1 bg-white/[0.05] border-white/[0.12] focus:border-primary"
                   />
                   <Button
-                    onClick={handleSend}
-                    disabled={!input.trim()}
+                    onClick={() => handleSend()}
+                    disabled={!input.trim() || isLoading}
                     className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
                   >
                     <Send className="h-4 w-4" />
@@ -437,38 +584,73 @@ export const BMCSectionEditor = ({
                         : "bg-white/[0.06] border border-white/[0.12]"
                     }`}
                   >
-                    <div className={
-                      message.role === "assistant"
-                        ? "prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6"
-                        : "prose prose-invert max-w-none [&>p]:mb-0"
-                    }>
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            table: ({ node, ...props }) => (
-                              <div className="my-6 w-full overflow-x-auto">
-                                <Table {...props} />
-                              </div>
-                            ),
-                            thead: ({ node, ...props }) => <TableHeader {...props} />,
-                            tbody: ({ node, ...props }) => <TableBody {...props} />,
-                            tr: ({ node, ...props }) => <TableRow {...props} />,
-                            th: ({ node, ...props }) => (
-                              <TableHead {...props} />
-                            ),
-                            td: ({ node, ...props }) => (
-                              <TableCell {...props} />
-                            ),
-                          }}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
-                    </div>
+                        <div className={
+                          message.role === "assistant"
+                            ? "prose prose-invert max-w-none [&>p]:mb-5 [&>p]:leading-relaxed [&>ul]:space-y-2 [&>ol]:space-y-2 [&>ul]:mb-5 [&>ol]:mb-5 [&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:font-semibold [&>h2]:mt-6 [&>h2]:mb-3 [&>h2]:font-semibold [&>h3]:mt-5 [&>h3]:mb-2 [&>h3]:font-semibold [&>li]:leading-relaxed [&>strong]:font-semibold [&>hr]:my-6"
+                            : "prose prose-invert max-w-none [&>p]:mb-0"
+                        }>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              table: ({ node, ...props }) => (
+                                <div className="my-6 w-full overflow-x-auto">
+                                  <Table {...props} />
+                                </div>
+                              ),
+                              thead: ({ node, ...props }) => <TableHeader {...props} />,
+                              tbody: ({ node, ...props }) => <TableBody {...props} />,
+                              tr: ({ node, ...props }) => <TableRow {...props} />,
+                              th: ({ node, ...props }) => (
+                                <TableHead {...props} />
+                              ),
+                              td: ({ node, ...props }) => (
+                                <TableCell {...props} />
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                        {/* Show loading dots only for last assistant message with no content */}
+                        {isLoading && 
+                         index === messages.length - 1 && 
+                         message.role === "assistant" && 
+                         !message.content && (
+                          <div className="flex gap-1 mt-2">
+                            <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse" />
+                            <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.2s]" />
+                            <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse [animation-delay:0.4s]" />
+                          </div>
+                        )}
                   </div>
                 </div>
               ))}
             </div>
           </ScrollArea>
+
+          {/* Quick Start Questions - Desktop */}
+          {messages.length <= 1 && SECTION_QUICK_QUESTIONS[section.title] && (
+            <div className="px-6 pb-3 space-y-2 border-t pt-3">
+              <p className="text-xs text-muted-foreground">Quick Start:</p>
+              <div className="flex flex-wrap gap-2">
+                {SECTION_QUICK_QUESTIONS[section.title]?.map((question, idx) => (
+                  <Button
+                    key={idx}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setInput(question);
+                      handleSend(question);
+                    }}
+                    className="text-xs h-auto py-2 px-3 whitespace-normal text-left justify-start"
+                    disabled={isLoading}
+                  >
+                    {question}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Input Area */}
           <div className="border-t border-white/[0.12] p-6 h-[88px] flex flex-col justify-center">
@@ -481,8 +663,8 @@ export const BMCSectionEditor = ({
                 className="flex-1 bg-white/[0.05] border-white/[0.12] focus:border-primary"
               />
               <Button
-                onClick={handleSend}
-                disabled={!input.trim()}
+                onClick={() => handleSend()}
+                disabled={!input.trim() || isLoading}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
               >
                 <Send className="h-4 w-4" />
