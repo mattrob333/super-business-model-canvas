@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, Save, RefreshCw, X } from "lucide-react";
+import { Copy, Download, Save, RefreshCw, X, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { copyHtmlToClipboard, exportReportToPdf } from "@/lib/report-export";
 import { REPORT_TEMPLATES } from "@/data/report-templates";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 
 interface ReportViewerDrawerProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface ReportViewerDrawerProps {
   companyId: string;
   companyName: string;
   onRegenerate?: () => void;
+  isGenerating?: boolean;
 }
 
 export function ReportViewerDrawer({
@@ -25,7 +27,8 @@ export function ReportViewerDrawer({
   frameworkId,
   companyId,
   companyName,
-  onRegenerate
+  onRegenerate,
+  isGenerating = false
 }: ReportViewerDrawerProps) {
   const [reportHtml, setReportHtml] = useState<string>("");
   const [originalHtml, setOriginalHtml] = useState<string>("");
@@ -211,7 +214,20 @@ export function ReportViewerDrawer({
 
         {/* Report Content */}
         <div className="flex-1 overflow-y-auto px-6 py-6">
-          {isLoading ? (
+          {isGenerating && !reportId ? (
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="text-center space-y-6 max-w-md">
+                <Loader2 className="h-16 w-16 animate-spin mx-auto text-primary" />
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold">Generating Your Strategic Report</h3>
+                  <p className="text-muted-foreground">
+                    Analyzing business context and applying strategic frameworks...
+                  </p>
+                </div>
+                <Progress value={33} className="w-full" />
+              </div>
+            </div>
+          ) : isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-8 w-3/4" />
               <Skeleton className="h-64 w-full" />

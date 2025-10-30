@@ -450,6 +450,7 @@ const Playbooks = () => {
             companyId={selectedAnalysis.id}
             companyName={selectedAnalysis.company_name}
             onRegenerate={handleRegenerateReport}
+            isGenerating={isGenerating}
           />
         )}
       </main>
