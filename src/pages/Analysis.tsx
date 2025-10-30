@@ -140,40 +140,82 @@ const Analysis = () => {
     }
   };
 
-  const handleBusinessOverviewUpdate = (updatedData: any) => {
-    setAnalysisData({
+  const handleBusinessOverviewUpdate = async (updatedData: any) => {
+    const newAnalysisData = {
       ...analysisData,
       company: updatedData
-    });
+    };
+    
+    setAnalysisData(newAnalysisData);
     
     // Mark section as reviewed
     setReviewedSections(prev => prev + 1);
     
     // Auto-save if user is logged in
-    if (user && analysisData) {
-      supabase
-        .from('saved_analyses')
-        .update({
-          analysis_data: {
-            ...analysisData,
-            company: updatedData
-          }
-        })
-        .eq('user_id', user.id)
-        .eq('company_name', analysisData.company?.name || 'Unknown Company')
-        .then(() => {
-          toast({
-            title: "Saved",
-            description: "Business overview updated and saved",
-          });
-        });
-    } else {
-      toast({
-        title: "Updated",
-        description: "Business overview updated successfully",
-      });
+    if (user) {
+      try {
+        const companyName = updatedData.name || 'Unknown Company';
+        
+        // Check for existing analysis
+        const { data: existing } = await supabase
+          .from('saved_analyses')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('company_name', companyName)
+          .maybeSingle();
+
+        if (existing) {
+          // Update existing
+          await supabase
+            .from('saved_analyses')
+            .update({ analysis_data: newAnalysisData })
+            .eq('id', existing.id);
+        } else {
+          // Insert new
+          await supabase
+            .from('saved_analyses')
+            .insert({
+              user_id: user.id,
+              company_name: companyName,
+              analysis_data: newAnalysisData,
+            });
+        }
+      } catch (error) {
+        console.error('Auto-save error:', error);
+      }
     }
   };
+
+  // Auto-save on initial analysis completion
+  useEffect(() => {
+    if (hasAnalyzed && analysisData && user && isNewAnalysis) {
+      const autoSave = async () => {
+        try {
+          const companyName = analysisData.company?.name || 'Unknown Company';
+          
+          const { data: existing } = await supabase
+            .from('saved_analyses')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('company_name', companyName)
+            .maybeSingle();
+
+          if (!existing) {
+            await supabase
+              .from('saved_analyses')
+              .insert({
+                user_id: user.id,
+                company_name: companyName,
+                analysis_data: analysisData,
+              });
+          }
+        } catch (error) {
+          console.error('Initial auto-save error:', error);
+        }
+      };
+      autoSave();
+    }
+  }, [hasAnalyzed, analysisData, user, isNewAnalysis]);
 
   const handleBMCSectionUpdate = (sectionTitle: string, updatedData: { items: string[]; notes: string }) => {
     const sectionKeyMap: Record<string, string> = {
@@ -579,37 +621,6 @@ Website: ${comp.website || 'N/A'}
               />
             )}
 
-            {/* Save Button - Desktop Only */}
-            <div className="w-full max-w-7xl mx-auto mb-6 hidden sm:flex justify-end">
-              <Button
-                onClick={saveAnalysis}
-                disabled={isSaving || !user}
-                variant="outline"
-                size="default"
-                className="gap-2 min-h-[44px] w-full sm:w-auto"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Save Analysis
-                  </>
-                )}
-              </Button>
-            </div>
-            
-            {/* Inline prompt to scroll if user hasn't scrolled much */}
-            {!showPlaybooksCTA && scrollPercentage < 20 && (
-              <FloatingCTA 
-                show={true}
-                onNavigate={() => navigate('/playbooks')}
-                variant="inline"
-              />
-            )}
             
             <section>
               <BusinessOverview 
