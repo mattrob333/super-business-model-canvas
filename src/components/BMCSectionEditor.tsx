@@ -308,8 +308,8 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
         onWheel={(e) => e.stopPropagation()}
       >
         {/* Mobile Tabs Layout */}
-        <div className="flex-1 md:hidden flex flex-col">
-          <Tabs defaultValue="edit" className="flex-1 flex flex-col">
+          <div className="h-full w-full md:hidden flex flex-col overflow-hidden">
+            <Tabs defaultValue="edit" className="h-full w-full flex flex-col">
             <div className="border-b border-white/[0.12] px-6 pt-6 pb-4 flex items-center justify-between">
               <TabsList className="bg-white/[0.05]">
                 <TabsTrigger value="edit">Edit</TabsTrigger>
@@ -416,7 +416,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               </div>
             </TabsContent>
 
-            <TabsContent value="chat" className="flex-1 flex flex-col mt-0 overflow-hidden">
+            <TabsContent value="chat" className="flex-1 flex flex-col !mt-0 h-full overflow-hidden">
               {/* Chat Area - Full Height */}
                 <ScrollArea className="flex-1 p-4 min-h-0" ref={scrollRef}>
                   <div className="space-y-4">
