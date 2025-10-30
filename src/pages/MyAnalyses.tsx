@@ -5,7 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Trash2, ExternalLink } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Trash2, ExternalLink, FileText, Eye } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -17,12 +18,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ReportViewerDrawer } from "@/components/ReportViewerDrawer";
 
 interface SavedAnalysis {
   id: string;
   company_name: string;
   analysis_data: any;
   created_at: string;
+  generated_reports?: {
+    id: string;
+    framework_id: string;
+    report_content: string;
+    created_at: string;
+    frameworks: {
+      title: string;
+      icon: string | null;
+      category: string | null;
+    } | null;
+  }[];
 }
 
 const MyAnalyses = () => {
@@ -31,6 +44,8 @@ const MyAnalyses = () => {
   const [analyses, setAnalyses] = useState<SavedAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [reportDrawerOpen, setReportDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -48,7 +63,20 @@ const MyAnalyses = () => {
     try {
       const { data, error } = await supabase
         .from('saved_analyses')
-        .select('*')
+        .select(`
+          *,
+          generated_reports (
+            id,
+            framework_id,
+            report_content,
+            created_at,
+            frameworks (
+              title,
+              icon,
+              category
+            )
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -79,7 +107,7 @@ const MyAnalyses = () => {
       setAnalyses(analyses.filter(a => a.id !== deleteId));
       toast({
         title: "Deleted",
-        description: "Analysis deleted successfully"
+        description: "Analysis and all associated reports deleted successfully"
       });
     } catch (error) {
       console.error('Error deleting analysis:', error);
@@ -94,7 +122,6 @@ const MyAnalyses = () => {
   };
 
   const loadAnalysis = (analysis: SavedAnalysis) => {
-    // Store in sessionStorage to load on analysis page
     sessionStorage.setItem('loadedAnalysis', JSON.stringify(analysis.analysis_data));
     navigate('/analyze');
   };
@@ -115,7 +142,6 @@ const MyAnalyses = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <Navigation />
       <div className="container mx-auto px-6 py-8 max-w-6xl">
-
         <div className="space-y-6">
           <div>
             <h1 className="text-4xl font-bold tracking-tight">My Analyses</h1>
@@ -138,16 +164,25 @@ const MyAnalyses = () => {
               {analyses.map((analysis) => (
                 <Card key={analysis.id} className="flex flex-col">
                   <CardHeader>
-                    <CardTitle className="text-lg">{analysis.company_name}</CardTitle>
-                    <CardDescription>
-                      {new Date(analysis.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </CardDescription>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{analysis.company_name}</CardTitle>
+                        <CardDescription>
+                          {new Date(analysis.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </CardDescription>
+                      </div>
+                      {analysis.generated_reports && analysis.generated_reports.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {analysis.generated_reports.length} {analysis.generated_reports.length === 1 ? 'report' : 'reports'}
+                        </Badge>
+                      )}
+                    </div>
                   </CardHeader>
-                  <CardContent className="flex-1 flex flex-col justify-end gap-2">
+                  <CardContent className="flex-1 flex flex-col gap-3">
                     <Button
                       variant="default"
                       className="w-full"
@@ -156,9 +191,48 @@ const MyAnalyses = () => {
                       <ExternalLink className="mr-2 h-4 w-4" />
                       View Analysis
                     </Button>
+
+                    {/* Reports Section */}
+                    {analysis.generated_reports && analysis.generated_reports.length > 0 && (
+                      <div className="mt-2 pt-3 border-t space-y-2">
+                        <h4 className="text-sm font-medium flex items-center gap-2 mb-2">
+                          <FileText className="h-4 w-4" />
+                          Generated Reports
+                        </h4>
+                        {analysis.generated_reports.map((report) => (
+                          <div
+                            key={report.id}
+                            className="flex items-center justify-between p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="text-xl">{report.frameworks?.icon || "📊"}</div>
+                              <div>
+                                <p className="font-medium text-xs">
+                                  {report.frameworks?.title || "Report"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(report.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setSelectedReportId(report.id);
+                                setReportDrawerOpen(true);
+                              }}
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <Button
                       variant="destructive"
-                      className="w-full"
+                      className="w-full mt-auto"
                       onClick={() => setDeleteId(analysis.id)}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
@@ -174,9 +248,9 @@ const MyAnalyses = () => {
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle>Delete Analysis?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this analysis.
+                This will permanently delete this analysis and all associated reports. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -185,6 +259,12 @@ const MyAnalyses = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <ReportViewerDrawer
+          reportId={selectedReportId}
+          isOpen={reportDrawerOpen}
+          onClose={() => setReportDrawerOpen(false)}
+        />
       </div>
     </div>
   );

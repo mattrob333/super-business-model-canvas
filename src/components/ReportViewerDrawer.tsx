@@ -13,9 +13,9 @@ interface ReportViewerDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   reportId: string | null;
-  frameworkId: string;
-  companyId: string;
-  companyName: string;
+  frameworkId?: string;
+  companyId?: string;
+  companyName?: string;
   onRegenerate?: () => void;
   isGenerating?: boolean;
 }
@@ -37,6 +37,8 @@ export function ReportViewerDrawer({
   const [isLoading, setIsLoading] = useState(false);
   const [frameworkTitle, setFrameworkTitle] = useState("");
   const [customCss, setCustomCss] = useState("");
+  const [loadedCompanyName, setLoadedCompanyName] = useState("");
+  const [loadedFrameworkId, setLoadedFrameworkId] = useState("");
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,6 +73,8 @@ export function ReportViewerDrawer({
       setIsEdited(data.is_edited || false);
       setFrameworkTitle(data.frameworks?.title || "Strategic Report");
       setCustomCss(data.frameworks?.custom_css || "");
+      setLoadedCompanyName(data.company_name || "");
+      setLoadedFrameworkId(data.framework_id || "");
     }
     
     setIsLoading(false);
@@ -132,7 +136,9 @@ export function ReportViewerDrawer({
   };
 
   const handleExportPdf = () => {
-    const filename = `${companyName}-${frameworkId}-report.pdf`;
+    const effectiveCompanyName = companyName || loadedCompanyName || "company";
+    const effectiveFrameworkId = frameworkId || loadedFrameworkId || "report";
+    const filename = `${effectiveCompanyName}-${effectiveFrameworkId}-report.pdf`;
     exportReportToPdf(reportHtml, filename);
     toast({
       title: "Exporting",
@@ -158,7 +164,9 @@ export function ReportViewerDrawer({
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-xl font-bold">{frameworkTitle}</div>
-              <div className="text-sm font-normal text-muted-foreground mt-1">{companyName}</div>
+              <div className="text-sm font-normal text-muted-foreground mt-1">
+                {companyName || loadedCompanyName}
+              </div>
             </div>
             <Button variant="ghost" size="icon" onClick={handleClose}>
               <X className="h-4 w-4" />

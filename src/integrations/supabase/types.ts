@@ -277,6 +277,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_generated_reports_analysis"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "saved_analyses"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "generated_reports_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
