@@ -61,11 +61,14 @@ const MyAnalyses = () => {
 
   const fetchAnalyses = async () => {
     try {
+      console.log('🔍 DEBUG: Current user ID:', user?.id);
+      console.log('🔍 DEBUG: Fetching analyses...');
+      
       const { data, error } = await supabase
         .from('saved_analyses')
         .select(`
           *,
-          generated_reports (
+          generated_reports!generated_reports_company_id_fkey (
             id,
             framework_id,
             report_content,
@@ -79,10 +82,13 @@ const MyAnalyses = () => {
         `)
         .order('created_at', { ascending: false });
 
+      console.log('🔍 DEBUG: Query result:', { data, error });
+      console.log('🔍 DEBUG: Number of analyses found:', data?.length || 0);
+
       if (error) throw error;
       setAnalyses(data || []);
     } catch (error) {
-      console.error('Error fetching analyses:', error);
+      console.error('❌ Error fetching analyses:', error);
       toast({
         title: "Error",
         description: "Failed to fetch saved analyses",
