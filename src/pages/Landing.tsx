@@ -148,8 +148,8 @@ const Landing = () => {
             </div>
 
             {/* Email Signup Form */}
-            <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-8 sm:mt-12 px-4 sm:px-0">
-              <div className="card-mono p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="max-w-5xl mx-auto mt-8 sm:mt-12 px-4 sm:px-0">
+              <div className="card-mono p-6 sm:p-8 space-y-4 max-w-md mx-auto">
                 <Input
                   type="email"
                   placeholder="Enter your email"
