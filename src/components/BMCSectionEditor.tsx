@@ -105,6 +105,18 @@ export const BMCSectionEditor = ({
     }
   }, [messages]);
 
+  // Prevent body scroll when drawer is open
+  useEffect(() => {
+    if (open) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
+
   const handleSave = () => {
     onSave({ items: editedItems, notes });
     toast({
@@ -265,7 +277,10 @@ export const BMCSectionEditor = ({
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300">
+      <div 
+        className="fixed right-0 top-0 h-full w-full md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300"
+        onWheel={(e) => e.stopPropagation()}
+      >
         {/* Mobile Tabs Layout */}
         <div className="flex-1 md:hidden flex flex-col">
           <Tabs defaultValue="edit" className="flex-1 flex flex-col">
