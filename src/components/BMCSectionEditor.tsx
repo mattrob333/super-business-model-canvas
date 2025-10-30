@@ -315,14 +315,25 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                 <TabsTrigger value="edit">Edit</TabsTrigger>
                 <TabsTrigger value="chat">AI Chat</TabsTrigger>
               </TabsList>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onOpenChange(false)}
-                className="hover:bg-white/[0.1]"
-              >
-                <X className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleClearChat}
+                  className="hover:bg-white/[0.1] h-8 w-8"
+                  title="Clear chat"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onOpenChange(false)}
+                  className="hover:bg-white/[0.1]"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
 
             <TabsContent value="edit" className="flex-1 flex flex-col mt-0">
@@ -406,26 +417,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
             </TabsContent>
 
             <TabsContent value="chat" className="flex-1 flex flex-col mt-0 overflow-hidden">
-              {/* Header */}
-              <div className="sticky top-0 z-10 bg-background border-b border-white/[0.12] p-4 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <h3 className="text-base font-semibold">AI Assistant</h3>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleClearChat}
-                    className="hover:bg-white/[0.1] h-8 w-8"
-                    title="Clear chat"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Chat Area */}
+              {/* Chat Area - Full Height */}
                 <ScrollArea className="flex-1 p-4 min-h-0" ref={scrollRef}>
                   <div className="space-y-4">
                   {messages.map((message, index) => (
