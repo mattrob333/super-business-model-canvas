@@ -58,28 +58,105 @@ COMPANY CONTEXT:
 ` : '';
 
     // Build conversation context with strategic goals focus
-    const systemPrompt = `You are a strategic growth advisor helping ${companyName || 'the company'} set improvement goals for their "${section}" section of the Business Model Canvas.
+    const systemPrompt = `You are a strategic growth advisor helping ${companyName || 'the company'} develop their "${section}" section of the Business Model Canvas.
 ${contextInfo}
+
 CURRENT STATE:
 ${sectionContent}
 
 ${sectionNotes ? `STRATEGIC GOALS & IMPROVEMENT TARGETS:
 ${sectionNotes}
-` : 'No strategic goals defined yet. Help the user identify opportunities for improvement, expansion, or strategic shifts in this section.'}
+` : 'No strategic goals defined yet.'}
 
-You have access to real-time information via web search. Use this to:
-- Find current market trends and data specific to ${businessContext?.industry || 'the industry'}
-- Research competitors and industry benchmarks
-- Identify emerging opportunities and best practices
-- Validate strategic recommendations based on real-world data
+YOUR ROLE:
+1. **General Discussion**: Provide strategic insights, ask clarifying questions, explore options
+2. **When Generating Goals**: Respond ONLY with clean, copy-paste-ready bullet points in this format:
 
-Your role is to help users think strategically about where they want to take this section:
-- What new customer segments, partners, or channels should they target?
-- What activities, resources, or value propositions need enhancement?
-- What specific, measurable goals will drive growth in this area?
-- How do industry leaders approach this section differently?
+• **[Goal Category]**: [Specific, measurable objective with timeline]
 
-Guide users to articulate specific, actionable goals that can be saved and referenced across all strategic frameworks. Be insightful, data-driven, and focused on strategic opportunities. Cite sources when using web data.`;
+Example format:
+• **Market Expansion**: Enter healthcare vertical by Q2 2025, targeting $500K ARR from 5 clients
+• **Partnership Strategy**: Secure 3 platform integrations by Q4 2024
+
+Use SMART framework (Specific, Measurable, Achievable, Relevant, Time-bound).
+
+Note: If you need current market data to answer a question, web research capabilities will be activated automatically for you.`;
+
+    // Auto-detect if web research is needed
+    const needsWebResearch = (
+      userMessage.toLowerCase().includes('trend') ||
+      userMessage.toLowerCase().includes('market data') ||
+      userMessage.toLowerCase().includes('competitor') ||
+      userMessage.toLowerCase().includes('industry') ||
+      userMessage.toLowerCase().includes('benchmark') ||
+      userMessage.toLowerCase().includes('statistics') ||
+      userMessage.toLowerCase().includes('current') ||
+      userMessage.toLowerCase().includes('latest') ||
+      userMessage.toLowerCase().includes('what are companies doing') ||
+      userMessage.toLowerCase().includes('industry standard') ||
+      userMessage.toLowerCase().includes('validate')
+    );
+
+    // Handle Perplexity research mode
+    if (needsWebResearch) {
+      const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
+      if (!PERPLEXITY_API_KEY) {
+        console.warn('Perplexity API key not configured, falling back to Gemini');
+      } else {
+        console.log('Web research detected, using Perplexity');
+
+        try {
+          const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'sonar-pro',
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userMessage }
+              ],
+              temperature: 0.2,
+              max_tokens: 2000,
+            }),
+          });
+
+          if (perplexityResponse.ok) {
+            const result = await perplexityResponse.json();
+            const content = result.choices[0].message.content;
+
+            // Return as SSE format for consistency with streaming responses
+            const encoder = new TextEncoder();
+            const stream = new ReadableStream({
+              start(controller) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  choices: [{
+                    delta: { content }
+                  }]
+                })}\n\n`));
+                controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                controller.close();
+              }
+            });
+
+            return new Response(stream, {
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'text/event-stream',
+              },
+            });
+          } else {
+            console.error('Perplexity API error:', perplexityResponse.status);
+            // Fall through to use Gemini
+          }
+        } catch (error) {
+          console.error('Perplexity error, falling back to Gemini:', error);
+          // Fall through to use Gemini
+        }
+      }
+    }
 
     // Filter conversation history to ensure proper user-assistant alternation
     const filteredHistory: any[] = [];

@@ -84,6 +84,13 @@ export const BMCSectionEditor = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Generate Goals prompt
+  const generateGoalsPrompt = `Based on our current ${section.title} content and strategic context, generate 3-5 SMART strategic goals in clean bullet-point format. Use this exact structure:
+
+• **[Goal Category]**: [Specific, measurable objective with clear metrics and timeline]
+
+Make them specific, measurable, achievable, relevant, and time-bound. No additional commentary - just the bullet points I can copy and paste directly into my Strategic Goals field.`;
+
   useEffect(() => {
     setEditedItems(section.items);
     setNotes(section.notes || "");
@@ -440,7 +447,7 @@ export const BMCSectionEditor = ({
               {messages.length <= 1 && SECTION_QUICK_QUESTIONS[section.title] && (
                 <div className="px-6 pb-3 space-y-2 border-t pt-3">
                   <p className="text-xs text-muted-foreground">Quick Start:</p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-2 gap-2 mb-3">
                     {SECTION_QUICK_QUESTIONS[section.title]?.map((question, idx) => (
                       <Button
                         key={idx}
@@ -457,6 +464,16 @@ export const BMCSectionEditor = ({
                       </Button>
                     ))}
                   </div>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleSend(generateGoalsPrompt)}
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-lg py-2.5"
+                    disabled={isLoading}
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate Strategic Goals & Targets
+                  </Button>
                 </div>
               )}
 
@@ -649,7 +666,7 @@ export const BMCSectionEditor = ({
           {messages.length <= 1 && SECTION_QUICK_QUESTIONS[section.title] && (
             <div className="px-6 pb-3 space-y-2 border-t pt-3">
               <p className="text-xs text-muted-foreground">Quick Start:</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2 mb-3">
                 {SECTION_QUICK_QUESTIONS[section.title]?.map((question, idx) => (
                   <Button
                     key={idx}
@@ -666,6 +683,16 @@ export const BMCSectionEditor = ({
                   </Button>
                 ))}
               </div>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleSend(generateGoalsPrompt)}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-lg py-2.5"
+                disabled={isLoading}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate Strategic Goals & Targets
+              </Button>
             </div>
           )}
 
