@@ -56,6 +56,19 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
+    // Fetch available frameworks for recommendations
+    const { data: frameworks, error: frameworksError } = await supabaseClient
+      .from('frameworks')
+      .select('id, title, shortcut, category, description, when_to_use, estimated_time')
+      .eq('status', 'active')
+      .order('category');
+
+    if (frameworksError) {
+      console.error('Error fetching frameworks:', frameworksError);
+    }
+
+    console.log(`Fetched ${frameworks?.length || 0} active frameworks`);
+
     // Fetch company analysis data
     const { data: analysisData, error: analysisError } = await supabaseClient
       .from('saved_analyses')
@@ -102,7 +115,68 @@ ${companyData.similarCompanies?.length > 0 ?
   : 'Not specified'}
 `;
 
-    const systemPrompt = useResearchMode 
+    // Build frameworks section for system prompt
+    const frameworksSection = frameworks && frameworks.length > 0 
+      ? `
+AVAILABLE STRATEGIC FRAMEWORKS IN YOUR TOOLKIT:
+${frameworks.map(f => `
+- **${f.title}** (${f.shortcut})
+  Category: ${f.category}
+  Description: ${f.description || 'Strategic analysis framework'}
+  When to use: ${f.when_to_use || 'Strategic planning and analysis'}
+  Estimated time: ${f.estimated_time || 15} minutes
+`).join('\n')}
+
+FRAMEWORK RECOMMENDATION PROTOCOL:
+You are a deeply knowledgeable McKinsey consultant with encyclopedic knowledge of ALL strategic frameworks including:
+- Classic frameworks (Porter's Five Forces, BCG Matrix, SWOT, PESTLE, Ansoff, Value Chain, etc.)
+- Modern frameworks (Blue Ocean Strategy, Jobs-to-be-Done, Lean Canvas, Business Model Canvas, etc.)
+- Specialized frameworks (McKinsey 7S, Balanced Scorecard, Three Horizons, Core Competencies, etc.)
+- Industry-specific frameworks (SaaS Metrics, Retail Analytics, Manufacturing Excellence, etc.)
+
+When the user describes a strategic challenge or goal (like "increase revenue by 50%"), you should:
+
+1. **Analyze** which frameworks would be most valuable for their specific situation
+2. **Recommend 2-3 specific frameworks** in priority order
+3. **Format your recommendation as:**
+
+**Recommended Playbooks:**
+
+1. **[Framework Title]** - [One clear sentence explaining why this framework is specifically relevant to their stated goal and business context]
+   - **Best for:** [Specific outcome this will achieve]
+   - **Time commitment:** [X minutes]
+
+2. **[Framework Title]** - [Rationale connected to their specific challenge]
+   - **Best for:** [Specific outcome]
+   - **Time commitment:** [X minutes]
+
+3. **[Framework Title]** - [Why this is valuable for their situation]
+   - **Best for:** [Specific outcome]  
+   - **Time commitment:** [X minutes]
+
+**Recommended Sequence:** [Framework 1] → [Framework 2] → [Framework 3]
+[One sentence explaining why this order makes strategic sense]
+
+4. **After recommending**, invite them to ask questions about these frameworks before running them
+
+IMPORTANT RULES:
+- FIRST recommend frameworks from the AVAILABLE FRAMEWORKS list above (these can be run immediately in the system)
+- If a better framework exists that's not in our system, mention it with: "⚡ *Note: [Framework Name] would also be highly valuable here, though it's not available in the system yet*"
+- ALWAYS explain WHY you're recommending each framework in the context of their specific business, industry, and stated goal
+- Consider their business model, competitive landscape, and strategic context when selecting frameworks
+- Tailor your recommendations to their company stage, industry dynamics, and the specific challenge they've described
+- Be specific about what insights each framework will provide for their unique situation
+- Only recommend frameworks when the user describes a strategic goal or challenge
+
+CONVERSATION STYLE:
+- Be conversational and supportive like a trusted advisor
+- After recommending frameworks, ask if they'd like you to explain how to apply any of them to ${companyName}'s specific situation
+- If they have follow-up questions, dive deep into strategic advice
+- Reference their business model, competitors, and industry context naturally in your responses
+`
+      : '';
+
+    const systemPrompt = useResearchMode
       ? `You are a senior strategy consultant with real-time web search capabilities. You're having a strategic conversation with the leadership team of ${companyName}.
 
 CRITICAL INSTRUCTIONS FOR COMPETITIVE ANALYSIS:
@@ -115,12 +189,15 @@ CRITICAL INSTRUCTIONS FOR COMPETITIVE ANALYSIS:
 
 ${baseContext}
 
+${frameworksSection}
+
 YOUR ROLE:
 1. Use web search to research the SPECIFIC similar companies listed above, along with market trends and industry developments
 2. Provide strategic advice backed by current market intelligence about those companies
-3. Ask clarifying questions when needed to understand their goals better
-4. Reference specific aspects of their business model in your responses
-5. Suggest concrete next steps based on real-time competitive intelligence
+3. When users describe strategic goals or challenges, recommend relevant frameworks from the toolkit above
+4. Ask clarifying questions when needed to understand their goals better
+5. Reference specific aspects of their business model in your responses
+6. Suggest concrete next steps based on real-time competitive intelligence
 
 GUIDELINES:
 - Search for current information about the SPECIFIC similar companies listed and industry trends
@@ -128,7 +205,6 @@ GUIDELINES:
 - Reference their specific business context and competitors in your answers
 - Ask follow-up questions to dig deeper into their challenges
 - Be encouraging but realistic about what's achievable
-- Suggest specific frameworks or methodologies when relevant
 - Draw on both web search results and your knowledge of industry best practices
 
 Remember: You're helping them navigate strategic challenges with the wisdom of a McKinsey consultant but the approachability of a trusted advisor.`
@@ -136,20 +212,23 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
 
 ${baseContext}
 
+${frameworksSection}
+
 YOUR ROLE:
 1. Provide strategic advice and actionable recommendations
-2. Ask clarifying questions when needed to understand their goals better
-3. Reference specific aspects of their business model in your responses
-4. Suggest concrete next steps they can take
-5. Be conversational, supportive, and like a trusted advisor
+2. When users describe strategic goals or challenges, recommend 2-3 relevant frameworks from your toolkit
+3. Ask clarifying questions when needed to understand their goals better
+4. Reference specific aspects of their business model in your responses
+5. Suggest concrete next steps they can take
+6. Be conversational, supportive, and like a trusted advisor
 
 GUIDELINES:
 - Keep responses focused and actionable (300-500 words typically)
 - Reference their specific business context in your answers
 - Ask follow-up questions to dig deeper into their challenges
 - Be encouraging but realistic about what's achievable
-- Suggest specific frameworks or methodologies when relevant
-- Draw on your knowledge of industry trends, competitor strategies, and best practices for ${companyData.industry || 'their industry'}
+- Draw on your encyclopedic knowledge of strategic frameworks and business best practices
+- Tailor framework recommendations to ${companyName}'s industry (${companyData.industry || 'their industry'}), business model, and competitive context
 
 Remember: You're helping them navigate strategic challenges with the wisdom of a McKinsey consultant but the approachability of a trusted advisor.`;
 
@@ -184,13 +263,13 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
         }),
       });
     } else {
-      // Use Lovable AI Gateway with Gemini Flash for fast mode
+      // Use Lovable AI Gateway with Claude Sonnet 4.5 for superior reasoning
       const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
       if (!LOVABLE_API_KEY) {
         throw new Error('LOVABLE_API_KEY not configured');
       }
 
-      console.log('Calling Lovable AI Gateway with Gemini Flash...');
+      console.log('Calling Lovable AI Gateway with Claude Sonnet 4.5...');
       aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -198,9 +277,11 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
+          model: 'claude-sonnet-4-5',
           messages,
           stream: true,
+          temperature: 0.7,
+          max_tokens: 3000,
         }),
       });
     }
