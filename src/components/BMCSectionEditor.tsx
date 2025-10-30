@@ -98,8 +98,10 @@ export const BMCSectionEditor = ({
 
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    // ScrollArea uses a [data-radix-scroll-area-viewport] internally
+    const viewport = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
     }
   }, [messages]);
 
@@ -361,8 +363,8 @@ export const BMCSectionEditor = ({
               </div>
 
               {/* Chat Area */}
-              <ScrollArea className="flex-1 p-6">
-                <div ref={scrollRef} className="space-y-4">
+                <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+                  <div className="space-y-4">
                   {messages.map((message, index) => (
                     <div
                       key={index}
@@ -570,8 +572,8 @@ export const BMCSectionEditor = ({
           </div>
 
           {/* Chat Area */}
-          <ScrollArea className="flex-1 p-6">
-            <div ref={scrollRef} className="space-y-4">
+              <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+                <div className="space-y-4">
               {messages.map((message, index) => (
                 <div
                   key={index}
