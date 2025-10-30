@@ -444,7 +444,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               </ScrollArea>
 
               {/* Quick Start Questions - Mobile */}
-              {messages.length <= 1 && SECTION_QUICK_QUESTIONS[section.title] && (
+              {SECTION_QUICK_QUESTIONS[section.title] && (
                 <div className="px-6 pb-3 space-y-2 border-t pt-3">
                   <p className="text-xs text-muted-foreground">Quick Start:</p>
                   <div className="grid grid-cols-2 gap-2 mb-3">
@@ -465,10 +465,10 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                     ))}
                   </div>
                   <Button
-                    variant="default"
+                    variant="outline"
                     size="sm"
                     onClick={() => handleSend(generateGoalsPrompt)}
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-lg py-2.5"
+                    className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-medium py-2.5"
                     disabled={isLoading}
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
@@ -663,7 +663,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
           </ScrollArea>
 
           {/* Quick Start Questions - Desktop */}
-          {messages.length <= 1 && SECTION_QUICK_QUESTIONS[section.title] && (
+          {SECTION_QUICK_QUESTIONS[section.title] && (
             <div className="px-6 pb-3 space-y-2 border-t pt-3">
               <p className="text-xs text-muted-foreground">Quick Start:</p>
               <div className="grid grid-cols-2 gap-2 mb-3">
@@ -684,10 +684,10 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                 ))}
               </div>
               <Button
-                variant="default"
+                variant="outline"
                 size="sm"
                 onClick={() => handleSend(generateGoalsPrompt)}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-lg py-2.5"
+                className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-medium py-2.5"
                 disabled={isLoading}
               >
                 <Sparkles className="h-4 w-4 mr-2" />
