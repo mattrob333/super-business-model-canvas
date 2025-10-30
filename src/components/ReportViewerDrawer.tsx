@@ -160,7 +160,7 @@ export function ReportViewerDrawer({
     <Sheet open={isOpen} onOpenChange={handleClose}>
       <SheetContent side="right" className="w-full sm:w-[1100px] sm:max-w-[1100px] xl:w-[1200px] xl:max-w-[1200px] overflow-y-auto p-0 flex flex-col">
         {/* Sticky Header with Actions */}
-        <div className="sticky top-0 z-10 bg-background border-b px-6 py-4">
+        <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-xl font-bold">{frameworkTitle}</div>
