@@ -304,7 +304,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
       {/* Drawer */}
       <div 
-        className="fixed right-0 top-0 h-full w-full md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300"
+        className="fixed right-0 top-0 h-full w-full md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex flex-col animate-in slide-in-from-right duration-300"
         onWheel={(e) => e.stopPropagation()}
       >
         {/* Mobile Tabs Layout */}
