@@ -122,13 +122,36 @@ export const DUMMY_FRAMEWORKS: DummyFramework[] = [
 
 export const getCategoryColor = (category: string): string => {
   const colors: Record<string, string> = {
+    // Core Strategy Categories
     "Strategy": "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    "Strategic Planning": "bg-blue-500/10 text-blue-600 border-blue-500/20",
     "Strategic Planning & Growth": "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    
+    // Market & Competition
     "Market Analysis": "bg-purple-500/10 text-purple-600 border-purple-500/20",
     "Market Intelligence & Competition": "bg-purple-500/10 text-purple-600 border-purple-500/20",
-    "Technology": "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    
+    // Growth & Expansion
     "Growth": "bg-orange-500/10 text-orange-600 border-orange-500/20",
+    "Growth Strategy": "bg-orange-500/10 text-orange-600 border-orange-500/20",
     "Expansion": "bg-pink-500/10 text-pink-600 border-pink-500/20",
+    
+    // Operations & Finance
+    "Operations": "bg-amber-500/10 text-amber-600 border-amber-500/20",
+    "Financial": "bg-green-500/10 text-green-600 border-green-500/20",
+    "Finance": "bg-green-500/10 text-green-600 border-green-500/20",
+    
+    // Innovation & Technology
+    "Innovation": "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
+    "Technology": "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    
+    // Additional categories
+    "Sales": "bg-red-500/10 text-red-600 border-red-500/20",
+    "Marketing": "bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/20",
+    "Product": "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
+    "Customer Success": "bg-teal-500/10 text-teal-600 border-teal-500/20",
+    "HR & Culture": "bg-rose-500/10 text-rose-600 border-rose-500/20",
   };
-  return colors[category] || "bg-muted text-muted-foreground";
+  
+  return colors[category] || "bg-slate-500/10 text-slate-600 border-slate-500/20";
 };

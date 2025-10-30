@@ -6,7 +6,7 @@ import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Trash2, ExternalLink, FileText, Eye } from 'lucide-react';
+import { Loader2, Trash2, ExternalLink, FileText, Eye, Target } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -183,13 +183,37 @@ const MyAnalyses = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 flex flex-col gap-3">
+                    {/* Business Context Summary */}
+                    {analysis.analysis_data && (
+                      <div className="p-3 rounded-lg bg-muted/30 border border-muted">
+                        <h4 className="text-xs font-semibold mb-2 text-muted-foreground">Business Context</h4>
+                        <div className="space-y-1">
+                          {analysis.analysis_data.company?.industry && (
+                            <p className="text-xs">
+                              <span className="font-medium">Industry:</span> {analysis.analysis_data.company.industry}
+                            </p>
+                          )}
+                          {analysis.analysis_data.company?.businessModel && (
+                            <p className="text-xs">
+                              <span className="font-medium">Model:</span> {analysis.analysis_data.company.businessModel}
+                            </p>
+                          )}
+                          {analysis.analysis_data.company?.stage && (
+                            <p className="text-xs">
+                              <span className="font-medium">Stage:</span> {analysis.analysis_data.company.stage}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <Button
                       variant="default"
                       className="w-full"
                       onClick={() => loadAnalysis(analysis)}
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      View Analysis
+                      View Full Analysis
                     </Button>
 
                     {/* Reports Section */}
@@ -229,6 +253,22 @@ const MyAnalyses = () => {
                         ))}
                       </div>
                     )}
+
+                    {/* Run More Frameworks Button */}
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        sessionStorage.setItem('playbookContext', JSON.stringify({
+                          companyName: analysis.company_name,
+                          businessContext: analysis.analysis_data
+                        }));
+                        navigate('/playbooks');
+                      }}
+                    >
+                      <Target className="mr-2 h-4 w-4" />
+                      Run More Frameworks
+                    </Button>
 
                     <Button
                       variant="destructive"
