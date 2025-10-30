@@ -263,13 +263,13 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
         }),
       });
     } else {
-      // Use Lovable AI Gateway with Claude Sonnet 4.5 for superior reasoning
+      // Use Lovable AI Gateway with Gemini 2.5 Pro for superior reasoning
       const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
       if (!LOVABLE_API_KEY) {
         throw new Error('LOVABLE_API_KEY not configured');
       }
 
-      console.log('Calling Lovable AI Gateway with Claude Sonnet 4.5...');
+      console.log('Calling Lovable AI Gateway with Gemini 2.5 Pro...');
       aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -277,7 +277,7 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
+          model: 'google/gemini-2.5-pro',
           messages,
           stream: true,
           temperature: 0.7,
