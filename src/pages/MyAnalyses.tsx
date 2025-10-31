@@ -105,6 +105,15 @@ const MyAnalyses = () => {
     if (!deleteId) return;
 
     try {
+      // First, delete related strategy coaching sessions
+      const { error: coachingError } = await supabase
+        .from('strategy_coaching_sessions')
+        .delete()
+        .eq('company_id', deleteId);
+
+      if (coachingError) throw coachingError;
+
+      // Then delete the saved analysis (generated_reports will be handled by cascade or already deleted)
       const { error } = await supabase
         .from('saved_analyses')
         .delete()
