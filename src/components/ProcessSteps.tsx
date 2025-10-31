@@ -21,7 +21,7 @@ export const ProcessSteps = () => {
           </TooltipContent>
         </Tooltip>
         
-        <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0" />
+        <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0 mb-8 sm:mb-10 md:mb-12" />
         
         <Tooltip>
           <TooltipTrigger asChild>
@@ -38,7 +38,7 @@ export const ProcessSteps = () => {
           </TooltipContent>
         </Tooltip>
         
-        <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0" />
+        <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0 mb-8 sm:mb-10 md:mb-12" />
         
         <Tooltip>
           <TooltipTrigger asChild>
