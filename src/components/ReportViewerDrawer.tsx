@@ -221,7 +221,7 @@ export function ReportViewerDrawer({
         </div>
 
         {/* Report Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto px-6 py-6 bg-background">
           {isGenerating && !reportId ? (
             <div className="flex-1 flex items-center justify-center p-6">
               <div className="text-center space-y-6 max-w-md">
