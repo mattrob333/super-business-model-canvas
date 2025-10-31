@@ -163,37 +163,90 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
         if (framework.output_template.includes('{{#each') || framework.output_template.includes('{{#if')) {
           console.log('Processing Handlebars template with JSON data...');
           
-          // Clean the response - remove markdown code blocks if present
-          let jsonContent = reportContent.trim();
-          if (jsonContent.startsWith('```json')) {
-            jsonContent = jsonContent.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
-          } else if (jsonContent.startsWith('```')) {
-            jsonContent = jsonContent.replace(/```\n?/g, '').replace(/```\n?$/g, '');
-          }
+          // Helper to clean and validate JSON
+          const cleanAndValidateJson = (content: string): string => {
+            let cleaned = content.trim();
+            
+            // Remove markdown code blocks
+            if (cleaned.startsWith('```json')) {
+              cleaned = cleaned.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+            } else if (cleaned.startsWith('```')) {
+              cleaned = cleaned.replace(/^```\n?/, '').replace(/\n?```$/, '');
+            }
+            
+            // Remove any leading/trailing whitespace
+            cleaned = cleaned.trim();
+            
+            // Basic JSON validation - must start with { and end with }
+            if (!cleaned.startsWith('{') || !cleaned.endsWith('}')) {
+              throw new Error('Response does not appear to be valid JSON');
+            }
+            
+            return cleaned;
+          };
           
-          console.log('Cleaned JSON content, first 200 chars:', jsonContent.substring(0, 200));
+          let jsonContent: string;
+          let analysisData: any;
+          let parseAttempts = 0;
+          const maxAttempts = 3;
           
-          let analysisData;
-          try {
-            analysisData = JSON.parse(jsonContent);
-            console.log('Successfully parsed JSON, keys:', Object.keys(analysisData));
-          } catch (jsonError) {
-            console.error('JSON Parse Error:', jsonError);
-            console.error('Failed to parse content:', jsonContent.substring(0, 500));
-            const errorMsg = jsonError instanceof Error ? jsonError.message : 'Unknown error';
-            throw new Error(`Failed to parse AI response as JSON: ${errorMsg}`);
+          // Try to parse JSON with retries
+          while (parseAttempts < maxAttempts) {
+            try {
+              jsonContent = cleanAndValidateJson(reportContent);
+              console.log(`Parse attempt ${parseAttempts + 1}, cleaned JSON (first 200 chars):`, jsonContent.substring(0, 200));
+              
+              analysisData = JSON.parse(jsonContent);
+              console.log('✅ Successfully parsed JSON, keys:', Object.keys(analysisData));
+              
+              // Validate that we have the expected structure
+              if (analysisData.analysis || analysisData.financial || analysisData.customer) {
+                console.log('✅ JSON structure validated');
+                break;
+              } else {
+                throw new Error('JSON parsed but missing expected keys (analysis, financial, customer)');
+              }
+            } catch (jsonError) {
+              parseAttempts++;
+              console.error(`❌ JSON Parse Error (attempt ${parseAttempts}/${maxAttempts}):`, jsonError);
+              
+              if (parseAttempts >= maxAttempts) {
+                console.error('Failed content sample (first 1000 chars):', reportContent.substring(0, 1000));
+                console.error('Failed content sample (last 500 chars):', reportContent.substring(Math.max(0, reportContent.length - 500)));
+                
+                // Last resort: try to extract JSON from response
+                const jsonMatch = reportContent.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  try {
+                    analysisData = JSON.parse(jsonMatch[0]);
+                    console.log('✅ Recovered JSON from regex match');
+                    break;
+                  } catch (e) {
+                    // Give up
+                  }
+                }
+                
+                const errorMsg = jsonError instanceof Error ? jsonError.message : 'Unknown error';
+                throw new Error(`Failed to parse AI response as valid JSON after ${maxAttempts} attempts: ${errorMsg}`);
+              }
+              
+              // Wait a bit before retry (not necessary but good practice)
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
           }
           
           // Compile and render template with data
           const template = Handlebars.compile(framework.output_template);
-          reportContent = template({
+          const templateData = {
             companyName,
             strategicGoal: strategic_goal,
-            analysis: analysisData,
             ...analysisData
-          });
+          };
           
-          console.log('Template rendered successfully, length:', reportContent.length);
+          console.log('Rendering template with data keys:', Object.keys(templateData));
+          reportContent = template(templateData);
+          
+          console.log('✅ Template rendered successfully, length:', reportContent.length);
         } else {
           console.log('Using simple variable substitution...');
           // Simple variable substitution
@@ -204,24 +257,27 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
           });
         }
       } catch (templateError) {
-        console.error('Template processing error:', templateError);
+        console.error('❌ Template processing error:', templateError);
         const errorDetails = templateError instanceof Error ? {
           message: templateError.message,
           stack: templateError.stack,
         } : { message: String(templateError), stack: undefined };
         console.error('Error details:', errorDetails);
-        console.log('Raw AI response (full):', reportContent);
         
-        // If template processing fails, wrap in basic HTML
+        // Create a user-friendly error report with the raw AI response
         reportContent = `<div class="framework-report">
           <h1>${framework.title}</h1>
           <h2>${companyName}</h2>
           <div class="error-notice" style="background: #fee; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #fcc;">
-            <strong>⚠️ Template Processing Error</strong>
-            <p>The report was generated but could not be formatted properly. Raw content is displayed below.</p>
-            <p style="font-size: 12px; color: #666;">Error: ${errorDetails.message}</p>
+            <strong>⚠️ Report Generation Error</strong>
+            <p>The AI generated content but it could not be properly formatted.</p>
+            <details style="margin-top: 8px;">
+              <summary style="cursor: pointer; font-weight: 600;">Technical Details</summary>
+              <p style="font-size: 12px; color: #666; margin-top: 8px;">Error: ${errorDetails.message}</p>
+              <p style="font-size: 11px; color: #888; margin-top: 4px; font-family: monospace; max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 8px; border-radius: 4px;">${reportContent.substring(0, 2000)}</p>
+            </details>
+            <p style="margin-top: 12px; font-size: 14px;">Please try generating the report again. If the issue persists, contact support.</p>
           </div>
-          <div class="content">${reportContent}</div>
         </div>`;
       }
     }
