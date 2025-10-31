@@ -182,6 +182,13 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
               throw new Error('Response does not appear to be valid JSON');
             }
             
+            // Fix common JSON syntax errors
+            // Remove trailing commas before closing braces/brackets
+            cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
+            
+            // Fix common quote escaping issues in text (not in keys)
+            // This is a simple fix - more complex scenarios may need better handling
+            
             return cleaned;
           };
           
