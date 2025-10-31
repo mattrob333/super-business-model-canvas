@@ -513,10 +513,10 @@ Website: ${comp.website || 'N/A'}
       {/* Main Content */}
       <main className="container mx-auto px-3 sm:px-6 py-4 sm:py-8 md:py-12 space-y-4 sm:space-y-8 md:space-y-12">
         
-        {/* Mobile Copy Button - Top Right Corner */}
+        {/* Copy Button - Top Right Corner */}
         {hasAnalyzed && !isLoading && analysisData && (
-          <div className="md:hidden fixed top-16 right-4 z-50">
-            <Button 
+          <div className="fixed top-16 right-4 z-50">
+            <Button
               onClick={copyToMarkdown}
               variant="outline" 
               size="icon"
