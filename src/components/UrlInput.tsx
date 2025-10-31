@@ -97,14 +97,22 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
                   className="h-14 w-full md:w-auto md:px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold uppercase tracking-tech transition-all hover:scale-105"
                 >
                   <Search className="mr-2 h-5 w-5" />
-                  {isLoading ? "Building..." : "Start Building"}
+                  {isLoading ? "Building..." : "Generate Context"}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Works with any company—analyze competitors, partners, or your own business.
+                Works with any company — analyze your own, a competitor, or a client. AI uses public sources only; you can edit and refine everything later.
               </p>
             </div>
           </form>
+
+          {/* User Guidance Tip */}
+          <div className="flex items-start gap-2 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+            <span className="text-base">💡</span>
+            <p className="text-xs text-muted-foreground flex-1">
+              <strong>Tip:</strong> You can refine and reuse your Context File anytime. It's your AI-ready business foundation.
+            </p>
+          </div>
           
           <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
             <p className="text-center md:text-left">

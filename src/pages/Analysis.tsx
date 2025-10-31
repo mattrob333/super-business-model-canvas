@@ -537,7 +537,7 @@ Website: ${comp.website || 'N/A'}
                 <div className="space-y-1 text-center">
                   <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">Build Your Business Source of Truth</h2>
                   <p className="text-muted-foreground text-sm sm:text-base max-w-3xl mx-auto px-4 sm:px-0">
-                    Enter a company URL below. Our AI will research public data, analyze business models, and create a comprehensive strategic foundation—ready in 60 seconds.
+                    Turn any company website into a complete <strong>AI-ready business profile.</strong> The AI gathers data, you verify it, and your business model becomes interactive across strategy frameworks.
                   </p>
                 </div>
                 <ProcessSteps />
@@ -563,12 +563,18 @@ Website: ${comp.website || 'N/A'}
         </section>
         )}
 
-        {/* Recent Analyses Section */}
-        {!searchCollapsed && !hasAnalyzed && !isLoading && recentAnalyses.length > 0 && (
+        {/* Recent Analyses / Empty State Section */}
+        {!searchCollapsed && !hasAnalyzed && !isLoading && (
+          recentAnalyses.length > 0 ? (
           <section className="w-full max-w-7xl mx-auto">
-            <h2 className="text-2xl font-semibold text-white mb-8">
-              Recent Analyses
-            </h2>
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-white mb-2">
+                Your Saved Contexts
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Continue refining or launch new strategy sessions from previous analyses.
+              </p>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {recentAnalyses.map((analysis) => (
@@ -597,12 +603,34 @@ Website: ${comp.website || 'N/A'}
                     <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
                       {analysis.company_name}
                     </h3>
-                    <span className="text-sm text-primary font-medium whitespace-nowrap ml-4">View analysis</span>
+                    <span className="text-sm text-primary font-medium whitespace-nowrap ml-4">View Context</span>
                   </div>
                 </button>
               ))}
             </div>
           </section>
+          ) : (
+            <section className="w-full max-w-2xl mx-auto text-center py-12">
+              <div className="card-mono p-12">
+                <Search className="w-16 h-16 text-primary mx-auto mb-6 opacity-50" />
+                <h3 className="text-xl font-semibold text-white mb-3">
+                  No contexts yet.
+                </h3>
+                <p className="text-muted-foreground mb-6">
+                  Paste a company URL to create your first AI-powered business model.
+                </p>
+                <Button
+                  onClick={() => {
+                    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                    input?.focus();
+                  }}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold uppercase tracking-tech px-8"
+                >
+                  GENERATE CONTEXT
+                </Button>
+              </div>
+            </section>
+          )
         )}
 
         {/* Results Section */}

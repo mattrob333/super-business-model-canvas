@@ -1,29 +1,61 @@
 import { Search, Edit, Repeat } from "lucide-react";
 import { ArrowRight } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const ProcessSteps = () => {
   return (
-    <div className="flex flex-row items-center justify-center gap-3 sm:gap-6 md:gap-8 mb-6 md:mb-8 px-4 overflow-x-auto">
-      <ProcessStep 
-        icon={<Search className="w-8 h-8 sm:w-10 md:w-12" />}
-        label="AI Research"
-        sublabel="60 seconds"
-      />
-      <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0" />
-      
-      <ProcessStep 
-        icon={<Edit className="w-8 h-8 sm:w-10 md:w-12" />}
-        label="You Refine"
-        sublabel="5-10 minutes"
-      />
-      <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0" />
-      
-      <ProcessStep 
-        icon={<Repeat className="w-8 h-8 sm:w-10 md:w-12" />}
-        label="Reuse Forever"
-        sublabel="Apply frameworks"
-      />
-    </div>
+    <TooltipProvider>
+      <div className="flex flex-row items-center justify-center gap-3 sm:gap-6 md:gap-8 mb-6 md:mb-8 px-4 overflow-x-auto">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <ProcessStep 
+                icon={<Search className="w-8 h-8 sm:w-10 md:w-12" />}
+                label="AI Research"
+                sublabel="60 seconds"
+              />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>We'll fetch and summarize public data about the company.</p>
+          </TooltipContent>
+        </Tooltip>
+        
+        <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0" />
+        
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <ProcessStep 
+                icon={<Edit className="w-8 h-8 sm:w-10 md:w-12" />}
+                label="You Refine"
+                sublabel="5-10 minutes"
+              />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Review and edit for accuracy — these become your verified facts.</p>
+          </TooltipContent>
+        </Tooltip>
+        
+        <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0" />
+        
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <ProcessStep 
+                icon={<Repeat className="w-8 h-8 sm:w-10 md:w-12" />}
+                label="Reuse Forever"
+                sublabel="Apply frameworks"
+              />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Your Context File powers strategy playbooks and reports.</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
   );
 };
 
