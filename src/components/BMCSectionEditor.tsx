@@ -634,7 +634,6 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               <p className="text-xs uppercase tracking-wide text-primary font-medium mb-1">
                 {section.title}
               </p>
-              <h2 className="text-xl font-semibold">{section.title}</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {SECTION_DESCRIPTIONS[section.title]}
               </p>
