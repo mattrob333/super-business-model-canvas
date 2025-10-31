@@ -146,6 +146,8 @@ const Playbooks = () => {
       'BCG': Target,
       'BSC': Target,
       'BLUE_OCEAN': Target,
+      'COMPETE': Users,
+      'JTBD': Target,
     };
 
     const mappedFrameworks = (data || []).map(f => ({

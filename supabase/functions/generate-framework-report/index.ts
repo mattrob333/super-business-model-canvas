@@ -68,8 +68,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    const businessContext = analysis.analysis_data;
+    let businessContext = analysis.analysis_data;
     const companyName = analysis.company_name;
+
+    // Special handling for Competitive Research framework
+    if (framework.shortcut === 'COMPETE') {
+      console.log('Competitive Research framework detected, fetching competitor data...');
+      try {
+        const { data: competitorData, error: competitorError } = await supabase.functions.invoke('research-competitors', {
+          body: {
+            companyName,
+            industry: businessContext.industry || '',
+            size: businessContext.size || '',
+            location: businessContext.location || ''
+          }
+        });
+
+        if (competitorError) {
+          console.error('Error fetching competitor research:', competitorError);
+        } else if (competitorData) {
+          console.log('Competitor research data received, injecting into context');
+          businessContext = {
+            ...businessContext,
+            competitorResearch: competitorData
+          };
+        }
+      } catch (error) {
+        console.error('Failed to fetch competitor research:', error);
+        // Continue without competitor data
+      }
+    }
 
     console.log(`Generating ${framework.title} for ${companyName}`);
 
