@@ -107,7 +107,7 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
           </form>
 
           {/* User Guidance Tip */}
-          <div className="flex items-start gap-2 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+          <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 border border-primary/20 rounded-lg">
             <span className="text-base">💡</span>
             <p className="text-xs text-muted-foreground flex-1">
               <strong>Tip:</strong> You can refine and reuse your Context File anytime. It's your AI-ready business foundation.
