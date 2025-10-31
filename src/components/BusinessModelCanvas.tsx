@@ -106,7 +106,7 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
       >
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <h3 className="label-tech text-muted-foreground">{title}</h3>
+            <h3 className="text-xs sm:text-sm font-medium uppercase tracking-wide text-muted-foreground">{title}</h3>
             {notes && (
               <span title="Strategic goals defined">
                 <Target className="w-3.5 h-3.5 text-primary opacity-70" />
@@ -156,16 +156,15 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
       <div className="w-full max-w-7xl mx-auto">
       {/* Mobile: Simplified header */}
       <div className="md:hidden mb-4">
-        <h2 className="text-xl font-bold">Business Model Canvas</h2>
+        <h2 className="text-xl font-bold">Strategic Framework — Your Business Model Canvas</h2>
       </div>
 
       {/* Desktop: Full verbose header */}
       <div className="hidden md:flex items-start justify-between mb-6 gap-6">
         <div>
-          <span className="label-tech text-muted-foreground">Business Model Canvas</span>
-          <h2 className="text-3xl font-semibold tracking-tight">Strategic Framework</h2>
+          <h2 className="text-3xl font-semibold tracking-tight">Strategic Framework — Your Business Model Canvas</h2>
           <p className="text-muted-foreground text-sm mt-1">
-            Strategic framework showing how the business creates, delivers, and captures value
+            Explore how this organization creates, delivers, and captures value. Click any section to refine or expand with AI.
           </p>
         </div>
         

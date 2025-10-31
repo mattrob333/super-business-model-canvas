@@ -1,5 +1,6 @@
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface FloatingCTAProps {
   show: boolean;
@@ -27,16 +28,23 @@ export const FloatingCTA = ({ show, onNavigate, variant = 'floating' }: Floating
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:right-6 sm:left-auto z-50 animate-fade-in">
-      <Button
-        onClick={onNavigate}
-        size="lg"
-        className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xl hover:scale-105 transition-all rounded-full px-6 py-3.5 sm:px-6 sm:py-6 font-semibold w-full sm:w-auto min-h-[44px] text-sm sm:text-base"
-      >
-        <span className="mr-2">
-          <span className="hidden xs:inline">Ready to </span>Generate Insights
-        </span>
-        <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            onClick={onNavigate}
+            size="lg"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xl hover:scale-105 transition-all rounded-full px-6 py-3.5 sm:px-6 sm:py-6 font-semibold w-full sm:w-auto min-h-[44px] text-sm sm:text-base"
+          >
+            <span className="mr-2">
+              <span className="hidden xs:inline">Ready to </span>Run Strategy Insights
+            </span>
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Run AI-driven frameworks like SWOT, Ansoff, and Porter using this verified context.</p>
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 };

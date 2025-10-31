@@ -1,6 +1,7 @@
 import { Globe, Briefcase, MessageSquare, User, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { BusinessOverviewEditor } from "@/components/BusinessOverviewEditor";
 
 interface KeyExecutive {
@@ -50,20 +51,32 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
         <p className="text-base sm:text-lg md:text-xl text-primary font-medium">
           {data.industry}
         </p>
+        
+        {/* AI-generated microcopy */}
+        <p className="text-sm text-muted-foreground mt-1">
+          AI-generated profile — review and edit for accuracy.
+        </p>
       </div>
 
       {/* Section Header with Edit Button */}
       <div className="flex items-center justify-between gap-2">
-        <div className="label-tech text-muted-foreground">Business Overview</div>
-        <Button 
-          onClick={() => setEditorOpen(true)} 
-          size="sm" 
-          variant="outline"
-          className="h-9 px-3 gap-2"
-        >
-          <MessageSquare className="h-4 w-4" />
-          <span className="hidden sm:inline">Edit & Chat</span>
-        </Button>
+        <div className="label-tech text-muted-foreground">Business Overview — AI Drafted (Editable)</div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              onClick={() => setEditorOpen(true)} 
+              size="sm" 
+              variant="outline"
+              className="h-9 px-3 gap-2"
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Refine with AI</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Edit this section or chat with AI to refine descriptions and add missing details.</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Card Content */}
@@ -74,7 +87,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
         <div className="space-y-4 sm:space-y-6">
           {/* Description */}
           <div>
-            <p className={`text-foreground/80 text-sm sm:text-base md:text-lg leading-relaxed ${
+            <p className={`text-foreground/80 text-sm sm:text-base md:text-lg leading-loose ${
               !isExpanded ? 'line-clamp-5 sm:line-clamp-3' : ''
             }`}>
               {data.description}

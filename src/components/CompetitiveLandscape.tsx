@@ -16,9 +16,11 @@ export const CompetitiveLandscape = ({ competitors, onSimilarCompanyChat }: Comp
   return (
     <div className="w-full max-w-7xl mx-auto">
       <div className="space-y-6">
-        <div className="space-y-1">
-          <span className="label-tech text-muted-foreground">Industry Landscape</span>
-          <h2 className="text-3xl font-semibold tracking-tight">Similar Companies</h2>
+        <div className="space-y-2">
+          <h2 className="text-3xl font-semibold tracking-tight">Industry Landscape — Compare & Learn</h2>
+          <p className="text-muted-foreground text-sm">
+            Companies with comparable missions or models. Click any to analyze or compare strategy.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
