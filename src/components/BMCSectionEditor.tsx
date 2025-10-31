@@ -6,47 +6,72 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+const SECTION_ORDER: Record<string, number> = {
+  "Value Propositions": 1,
+  "Customer Segments": 2,
+  "Customer Relationships": 3,
+  "Channels": 4,
+  "Revenue Streams": 5,
+  "Key Resources": 6,
+  "Key Activities": 7,
+  "Key Partners": 8,
+  "Cost Structure": 9
+};
+
+const SECTION_DESCRIPTIONS: Record<string, string> = {
+  "Value Propositions": "Define why customers choose your business. Update or add new statements that describe what makes your offer unique.",
+  "Customer Segments": "Identify the specific groups you serve. Refine who your ideal customers are and what defines each segment.",
+  "Customer Relationships": "Describe how you interact with customers. Define engagement strategies and relationship-building approaches.",
+  "Channels": "Map how you reach and deliver to customers. Add distribution channels, touchpoints, and delivery methods.",
+  "Revenue Streams": "Outline how you generate income. Define pricing models, revenue sources, and monetization strategies.",
+  "Key Resources": "List critical assets powering your business. Add intellectual property, infrastructure, people, and capital resources.",
+  "Key Activities": "Define essential operations for success. Include core processes, production activities, and critical tasks.",
+  "Key Partners": "Identify strategic alliances and suppliers. List partners who help you create and deliver value.",
+  "Cost Structure": "Detail your major expenses. Break down fixed costs, variable costs, and key cost drivers."
+};
+
 const SECTION_QUICK_QUESTIONS: Record<string, string[]> = {
   "Key Partners": [
-    "What strategic partners are we missing in our value chain?",
+    "Identify strategic partners we're missing in our value chain",
     "Which partnerships could accelerate our market expansion?"
   ],
   "Key Activities": [
-    "What critical activities should we be focusing on to differentiate?",
-    "Are there activities we could outsource to focus on core strengths?"
+    "What critical activities should we focus on to differentiate?",
+    "Identify activities we could outsource to focus on core strengths"
   ],
   "Key Resources": [
     "What unique resources give us competitive advantage?",
     "What resources do we need to acquire for our growth goals?"
   ],
   "Value Propositions": [
-    "How can we better articulate our unique value to customers?",
-    "What unmet customer needs could we address?"
+    "Refine our value propositions for clarity and differentiation",
+    "Identify new customer needs or market opportunities"
   ],
   "Customer Relationships": [
-    "How can we deepen engagement with our customer base?",
-    "What relationship strategies do leading competitors use?"
+    "Explore strategies to deepen engagement with our customer base",
+    "Analyze relationship strategies used by leading competitors"
   ],
   "Channels": [
-    "Are there underutilized distribution channels we should explore?",
-    "Which channels provide the best ROI for customer acquisition?"
+    "Explore underutilized distribution channels",
+    "Analyze which channels provide the best ROI"
   ],
   "Customer Segments": [
-    "What adjacent customer segments should we target for expansion?",
-    "Are there high-value segments we're currently overlooking?"
+    "Identify adjacent customer segments we should target for expansion",
+    "Identify high-value segments we're currently overlooking"
   ],
   "Cost Structure": [
-    "Where can we optimize costs without compromising quality?",
-    "What are the most significant cost drivers in our model?"
+    "Identify opportunities to optimize costs without compromising quality",
+    "Analyze the most significant cost drivers in our model"
   ],
   "Revenue Streams": [
-    "What new revenue streams could we develop from existing assets?",
-    "How can we increase recurring revenue in our model?"
+    "Explore new revenue streams we could develop from existing assets",
+    "Identify strategies to increase recurring revenue in our model"
   ]
 };
 
@@ -82,6 +107,8 @@ export const BMCSectionEditor = ({
   const [editedItems, setEditedItems] = useState<string[]>(section.items);
   const [notes, setNotes] = useState(section.notes || "");
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -99,7 +126,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
     setMessages([
       {
         role: "assistant",
-        content: `I'm your **Strategy Assistant** for ${companyName}'s **${section.title}**. I can help you:\n\n• Identify improvement opportunities and strategic goals\n• Suggest expansion targets and new segments/partners/channels\n• Analyze gaps between current state and industry leaders\n• Define measurable objectives for this section\n\nYour goals will be saved and used to guide all future framework analyses.`,
+        content: `**Strategy Assistant — ${section.title}**\n\n*AI guidance for this section of your Context File.*\n\n• **Identify improvement opportunities and strategic goals**\n• Suggest expansion targets and new segments/partners/channels\n• Analyze gaps between current state and industry leaders\n• Define measurable objectives for this section\n\nYour goals will be saved and used to guide all future framework analyses.`,
       },
     ]);
   }, [section, companyName]);
@@ -126,11 +153,21 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
   }, [open]);
 
   const handleSave = () => {
-    onSave({ items: editedItems, notes });
-    toast({
-      title: "Saved",
-      description: `${section.title} updated successfully`,
-    });
+    setIsSaving(true);
+    setSaveSuccess(false);
+    
+    setTimeout(() => {
+      onSave({ items: editedItems, notes });
+      setIsSaving(false);
+      setSaveSuccess(true);
+      
+      toast({
+        title: "Saved",
+        description: `${section.title} updated successfully`,
+      });
+      
+      setTimeout(() => setSaveSuccess(false), 2000);
+    }, 300);
   };
 
   const handleSend = async (messageText?: string) => {
@@ -255,7 +292,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
     setMessages([
       {
         role: "assistant",
-        content: `I'm your **Strategy Assistant** for ${companyName}'s **${section.title}**. I can help you:\n\n• Identify improvement opportunities and strategic goals\n• Suggest expansion targets and new segments/partners/channels\n• Analyze gaps between current state and industry leaders\n• Define measurable objectives for this section\n\nYour goals will be saved and used to guide all future framework analyses.`,
+        content: `**Strategy Assistant — ${section.title}**\n\n*AI guidance for this section of your Context File.*\n\n• **Identify improvement opportunities and strategic goals**\n• Suggest expansion targets and new segments/partners/channels\n• Analyze gaps between current state and industry leaders\n• Define measurable objectives for this section\n\nYour goals will be saved and used to guide all future framework analyses.`,
       },
     ]);
   };
@@ -339,17 +376,39 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
             <TabsContent value="edit" className="flex-1 flex flex-col mt-0">
               <ScrollArea className="flex-1 p-6">
                 <div className="space-y-4">
-                  {/* Bullet Points */}
+                  {/* Section Breadcrumb */}
+                  <div className="mb-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      <span className="text-primary font-medium">Section {SECTION_ORDER[section.title]} of 9</span>
+                      {" — "}
+                      {section.title}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                      {SECTION_DESCRIPTIONS[section.title]}
+                    </p>
+                  </div>
+
+                  {/* Content Items */}
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground mb-2">Current {section.title}</p>
+                    <div className="flex items-center justify-between mb-3">
                       <label className="text-sm font-medium">Content Items</label>
-                      <Button onClick={addItem} size="sm" variant="outline" className="h-8">
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button onClick={addItem} size="sm" variant="outline" className="h-8 hover:bg-primary/10">
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Add another {section.title.toLowerCase()} item</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                     {editedItems.map((item, index) => (
-                      <div key={index} className="flex gap-2">
+                      <div key={index} className="flex gap-2 pb-3 border-b border-white/[0.06] last:border-0">
                         <Input
                           value={item}
                           onChange={(e) => updateItem(index, e.target.value)}
@@ -369,38 +428,44 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   </div>
 
                   {/* Strategic Goals - Enhanced */}
-                  <div className="space-y-3 pt-6 mt-2 border-t border-primary/20">
+                  <div className="space-y-3 pt-6 mt-2 bg-white/[0.02] border-l-[3px] border-primary pl-4 pr-3 py-4 rounded-r-lg">
                     {/* Header with Icon and Badge */}
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center mt-0.5">
                         <Sparkles className="h-4 w-4 text-primary" />
                       </div>
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <label className="text-sm font-semibold">Strategic Goals & Improvement Targets</label>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-primary border border-primary/30">
-                            IMPORTANT
-                          </span>
-                        </div>
-                        <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
-                          <p className="font-medium text-foreground/90">
-                            🎯 This is your strategic roadmap for AI-powered growth
-                          </p>
-                          <p>
-                            Tell the AI where you want to take this part of your business. The AI will use these goals to give you personalized advice across all your framework analyses - helping you see what actions to take, what opportunities to chase, and how to get from where you are now to where you want to be.
-                          </p>
-                          <p className="text-[11px] italic">
-                            These goals stay private (won't show on your main canvas) but power all your AI recommendations.
-                          </p>
-                        </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <label className="text-sm font-semibold">🎯 Strategic Goals & Improvement Targets</label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-primary border border-primary/30 cursor-help">
+                                IMPORTANT
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>These goals stay private but influence all AI recommendations</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
+                      <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
+                        <p>
+                          Set measurable goals for this area. The AI uses them to personalize future strategy recommendations.
+                        </p>
+                        <p className="text-[11px] italic text-muted-foreground/80">
+                          Example: Expand into healthcare by Q2 2025, targeting $500K ARR from 5 enterprise clients.
+                        </p>
+                      </div>
+                    </div>
                     </div>
                     
                     {/* Textarea */}
                     <Textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Example: Expand into healthcare market by Q2 2025, targeting $500K ARR from 5 enterprise clients. Build 3 strategic partnerships with major platforms by year-end."
+                      placeholder="Set specific, measurable goals with clear timelines..."
                       className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-white/[0.05] [&::-webkit-scrollbar-thumb]:bg-white/[0.2] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-white/[0.3]"
                     />
                   </div>
@@ -409,9 +474,10 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
               {/* Save Button */}
               <div className="border-t border-white/[0.12] p-6">
-                <Button onClick={handleSave} className="w-full" size="lg">
+                <p className="text-xs text-muted-foreground mb-2">All changes save to your Context File.</p>
+                <Button onClick={handleSave} className="w-full" size="lg" disabled={isSaving}>
                   <Save className="h-4 w-4 mr-2" />
-                  Save Changes
+                  {isSaving ? "Saving..." : saveSuccess ? "Saved ✓" : "Save Changes"}
                 </Button>
               </div>
             </TabsContent>
@@ -513,16 +579,25 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                       </Button>
                     ))}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSend(generateGoalsPrompt)}
-                    className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-medium py-1.5 text-[11px]"
-                    disabled={isLoading}
-                  >
-                    <Sparkles className="h-3 w-3 mr-1.5" />
-                    Generate Strategic Goals
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSend(generateGoalsPrompt)}
+                          className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-medium py-1.5 text-[11px]"
+                          disabled={isLoading}
+                        >
+                          <Sparkles className="h-3 w-3 mr-1.5" />
+                          Generate Strategic Goals
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>AI will propose measurable objectives based on your current statements and company context</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               )}
 
@@ -533,7 +608,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Ask for suggestions or improvements..."
+                    placeholder="Ask anything about refining this section—e.g., 'Make this sound more outcome-focused.'"
                     className="w-full pr-12 bg-white/[0.05] border-white/[0.12] focus:border-primary"
                   />
                   <Button
@@ -554,29 +629,46 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
         {/* Desktop Side-by-Side Layout */}
         {/* Left Panel - Edit Form */}
-        <div className="hidden md:flex md:w-[55%] border-r border-white/[0.12] flex-col">
+        <div className="hidden md:flex md:w-[55%] border-r border-white/[0.15] flex-col">
           {/* Header */}
           <div className="border-b border-white/[0.12] p-6 h-[88px] flex items-center justify-between">
             <div className="space-y-1">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                <span className="text-primary font-medium">Section {SECTION_ORDER[section.title]} of 9</span>
+                {" — "}
+                {section.title}
+              </p>
               <h2 className="text-xl font-semibold">{section.title}</h2>
-              <p className="text-sm text-muted-foreground">Edit and refine your content</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {SECTION_DESCRIPTIONS[section.title]}
+              </p>
             </div>
           </div>
 
           {/* Form Content */}
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-4">
-              {/* Bullet Points */}
+              {/* Content Items */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground mb-2">Current {section.title}</p>
+                <div className="flex items-center justify-between mb-3">
                   <label className="text-sm font-medium">Content Items</label>
-                  <Button onClick={addItem} size="sm" variant="outline" className="h-8">
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button onClick={addItem} size="sm" variant="outline" className="h-8 hover:bg-primary/10">
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Add another {section.title.toLowerCase()} item</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 {editedItems.map((item, index) => (
-                  <div key={index} className="flex gap-2">
+                  <div key={index} className="flex gap-2 pb-3 border-b border-white/[0.06] last:border-0">
                     <Input
                       value={item}
                       onChange={(e) => updateItem(index, e.target.value)}
@@ -596,7 +688,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               </div>
 
               {/* Strategic Goals - Enhanced */}
-              <div className="space-y-3 pt-6 mt-2 border-t border-primary/20">
+              <div className="space-y-3 pt-6 mt-2 bg-white/[0.02] border-l-[3px] border-primary pl-4 pr-3 py-4 rounded-r-lg">
                 {/* Header with Icon and Badge */}
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center mt-0.5">
@@ -604,20 +696,26 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   </div>
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <label className="text-sm font-semibold">Strategic Goals & Improvement Targets</label>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-primary border border-primary/30">
-                        IMPORTANT
-                      </span>
+                      <label className="text-sm font-semibold">🎯 Strategic Goals & Improvement Targets</label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/20 text-primary border border-primary/30 cursor-help">
+                              IMPORTANT
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>These goals stay private but influence all AI recommendations</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                     <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
-                      <p className="font-medium text-foreground/90">
-                        🎯 This is your strategic roadmap for AI-powered growth
-                      </p>
                       <p>
-                        Tell the AI where you want to take this part of your business. The AI will use these goals to give you personalized advice across all your framework analyses - helping you see what actions to take, what opportunities to chase, and how to get from where you are now to where you want to be.
+                        Set measurable goals for this area. The AI uses them to personalize future strategy recommendations.
                       </p>
-                      <p className="text-[11px] italic">
-                        These goals stay private (won't show on your main canvas) but power all your AI recommendations.
+                      <p className="text-[11px] italic text-muted-foreground/80">
+                        Example: Expand into healthcare by Q2 2025, targeting $500K ARR from 5 enterprise clients.
                       </p>
                     </div>
                   </div>
@@ -627,7 +725,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Example: Expand into healthcare market by Q2 2025, targeting $500K ARR from 5 enterprise clients. Build 3 strategic partnerships with major platforms by year-end."
+                  placeholder="Set specific, measurable goals with clear timelines..."
                   className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-white/[0.05] [&::-webkit-scrollbar-thumb]:bg-white/[0.2] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-white/[0.3]"
                 />
               </div>
@@ -635,10 +733,11 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
           </ScrollArea>
 
           {/* Save Button */}
-          <div className="border-t border-white/[0.12] p-6 h-[88px] flex items-center">
-            <Button onClick={handleSave} className="w-full" size="lg">
+          <div className="border-t border-white/[0.12] p-6 h-[88px] flex flex-col justify-center">
+            <p className="text-xs text-muted-foreground mb-2">All changes save to your Context File.</p>
+            <Button onClick={handleSave} className="w-full" size="lg" disabled={isSaving}>
               <Save className="h-4 w-4 mr-2" />
-              Save Changes
+              {isSaving ? "Saving..." : saveSuccess ? "Saved ✓" : "Save Changes"}
             </Button>
           </div>
         </div>
@@ -646,13 +745,10 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
         {/* Right Panel - AI Chat */}
         <div className="hidden md:flex md:w-[45%] flex-col">
           {/* Header */}
-          <div className="border-b border-white/[0.12] p-6 h-[88px] flex items-center justify-between">
+          <div className="border-b-2 border-primary p-6 h-[88px] flex items-center justify-between">
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="label-tech text-primary">AI Assistant</span>
-              </div>
-              <h3 className="text-lg font-semibold">Chat & Refine</h3>
+              <h3 className="text-lg font-semibold">Strategy Assistant — {section.title}</h3>
+              <p className="text-xs text-muted-foreground italic">AI guidance for this section of your Context File.</p>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -771,16 +867,25 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   </Button>
                 ))}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleSend(generateGoalsPrompt)}
-                className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-medium py-2.5"
-                disabled={isLoading}
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate Strategic Goals & Targets
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSend(generateGoalsPrompt)}
+                      className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:border-primary font-medium py-2.5"
+                      disabled={isLoading}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate Strategic Goals & Targets
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>AI will propose measurable objectives based on your current statements and company context</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           )}
 
@@ -791,7 +896,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask for suggestions or improvements..."
+                placeholder="Ask anything about refining this section—e.g., 'Make this sound more outcome-focused.'"
                 className="flex-1 bg-white/[0.05] border-white/[0.12] focus:border-primary"
               />
               <Button
