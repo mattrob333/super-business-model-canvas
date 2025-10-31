@@ -131,7 +131,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
                   <h3 className="label-tech text-muted-foreground">Key Leadership</h3>
                   <div className="space-y-2">
                     {data.keyExecutives.map((exec, index) => (
-                      <div key={index} className="flex items-start gap-3">
+                      <div key={index} className="flex items-start gap-3 p-2 rounded-lg hover:bg-primary/5 transition-colors">
                         <User className="h-4 w-4 text-primary mt-1" />
                         <div className="flex-1">
                           <div className="text-foreground font-medium text-sm">{exec.name}</div>

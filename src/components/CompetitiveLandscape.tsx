@@ -25,7 +25,7 @@ export const CompetitiveLandscape = ({ competitors, onSimilarCompanyChat }: Comp
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {competitors.map((competitor, index) => (
-            <div key={index} className="card-mono">
+            <div key={index} className="card-mono hover:border-primary/50 transition-colors">
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
