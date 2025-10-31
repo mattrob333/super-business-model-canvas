@@ -378,9 +378,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                 <div className="space-y-4">
                   {/* Section Breadcrumb */}
                   <div className="mb-4">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      <span className="text-primary font-medium">Section {SECTION_ORDER[section.title]} of 9</span>
-                      {" — "}
+                    <p className="text-xs uppercase tracking-wide text-primary font-medium">
                       {section.title}
                     </p>
                     <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
@@ -395,12 +393,12 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                       <label className="text-sm font-medium">Content Items</label>
                       <TooltipProvider>
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button onClick={addItem} size="sm" variant="outline" className="h-8 hover:bg-primary/10">
-                              <Plus className="h-3 w-3 mr-1" />
-                              Add
-                            </Button>
-                          </TooltipTrigger>
+                      <TooltipTrigger asChild>
+                        <Button onClick={addItem} size="sm" variant="ghost" className="h-8 border border-primary/30 hover:border-primary hover:bg-transparent">
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add
+                        </Button>
+                      </TooltipTrigger>
                           <TooltipContent>
                             <p>Add another {section.title.toLowerCase()} item</p>
                           </TooltipContent>
@@ -452,7 +450,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                       </div>
                       <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
                         <p>
-                          Set measurable goals for this area. The AI uses them to personalize future strategy recommendations.
+                          Set measurable goals. The AI uses them to personalize future strategy recommendations.
                         </p>
                         <p className="text-[11px] italic text-muted-foreground/80">
                           Example: Expand into healthcare by Q2 2025, targeting $500K ARR from 5 enterprise clients.
@@ -475,7 +473,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               {/* Save Button */}
               <div className="border-t border-white/[0.12] p-6">
                 <p className="text-xs text-muted-foreground mb-2">All changes save to your Context File.</p>
-                <Button onClick={handleSave} className="w-full" size="lg" disabled={isSaving}>
+                <Button onClick={handleSave} className="w-full h-12 text-base font-medium" disabled={isSaving}>
                   <Save className="h-4 w-4 mr-2" />
                   {isSaving ? "Saving..." : saveSuccess ? "Saved ✓" : "Save Changes"}
                 </Button>
@@ -633,9 +631,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
           {/* Header */}
           <div className="border-b border-white/[0.12] p-6 h-[88px] flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                <span className="text-primary font-medium">Section {SECTION_ORDER[section.title]} of 9</span>
-                {" — "}
+              <p className="text-xs uppercase tracking-wide text-primary font-medium mb-1">
                 {section.title}
               </p>
               <h2 className="text-xl font-semibold">{section.title}</h2>
@@ -655,12 +651,12 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   <label className="text-sm font-medium">Content Items</label>
                   <TooltipProvider>
                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button onClick={addItem} size="sm" variant="outline" className="h-8 hover:bg-primary/10">
-                          <Plus className="h-3 w-3 mr-1" />
-                          Add
-                        </Button>
-                      </TooltipTrigger>
+                    <TooltipTrigger asChild>
+                      <Button onClick={addItem} size="sm" variant="ghost" className="h-8 border border-primary/30 hover:border-primary hover:bg-transparent">
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add
+                      </Button>
+                    </TooltipTrigger>
                       <TooltipContent>
                         <p>Add another {section.title.toLowerCase()} item</p>
                       </TooltipContent>
@@ -712,7 +708,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                     </div>
                     <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
                       <p>
-                        Set measurable goals for this area. The AI uses them to personalize future strategy recommendations.
+                        Set measurable goals. The AI uses them to personalize future strategy recommendations.
                       </p>
                       <p className="text-[11px] italic text-muted-foreground/80">
                         Example: Expand into healthcare by Q2 2025, targeting $500K ARR from 5 enterprise clients.
@@ -735,7 +731,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
           {/* Save Button */}
           <div className="border-t border-white/[0.12] p-6 h-[88px] flex flex-col justify-center">
             <p className="text-xs text-muted-foreground mb-2">All changes save to your Context File.</p>
-            <Button onClick={handleSave} className="w-full" size="lg" disabled={isSaving}>
+            <Button onClick={handleSave} className="w-full h-12 text-base font-medium" disabled={isSaving}>
               <Save className="h-4 w-4 mr-2" />
               {isSaving ? "Saving..." : saveSuccess ? "Saved ✓" : "Save Changes"}
             </Button>
