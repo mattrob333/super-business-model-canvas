@@ -88,7 +88,7 @@ export const Navigation = () => {
                 <DropdownMenuContent align="end">
                   {isAdmin && (
                     <>
-                      <DropdownMenuItem onClick={() => navigate('/admin/frameworks')}>
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
                         <Shield className="mr-2 h-4 w-4" />
                         Admin Dashboard
                       </DropdownMenuItem>
