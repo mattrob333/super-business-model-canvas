@@ -586,7 +586,12 @@ Website: ${comp.website || 'N/A'}
                 setIsNewAnalysis(false);
                 setSearchCollapsed(true);
               }}
-              className="card-mono card-mono-hover text-left h-36 flex flex-col p-6 group"
+              className="group cursor-pointer bg-gradient-to-b from-[#151515] to-[#0C0C0C] border border-white/[0.08] rounded-xl 
+                         shadow-[0_4px_12px_rgba(0,0,0,0.4)]
+                         hover:border-primary hover:shadow-[0_8px_24px_rgba(0,0,0,0.5),0_0_20px_rgba(196,248,42,0.15)] 
+                         hover:-translate-y-1 hover:scale-[1.02]
+                         transition-all duration-300
+                         text-left h-36 flex flex-col p-6"
             >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
