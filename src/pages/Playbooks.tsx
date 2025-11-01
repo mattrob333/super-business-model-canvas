@@ -520,10 +520,10 @@ const Playbooks = () => {
 
           {/* Large Prominent Chat Input - Centered */}
           <div className="max-w-5xl mx-auto space-y-2">
-            <label className="block text-sm font-medium text-muted-foreground text-center">
+            <label className="block text-sm font-medium text-muted-foreground text-center mb-2">
               Tell the Strategy Coach your goal
             </label>
-            <div className="relative border-2 border-primary/40 rounded-lg bg-card p-4 sm:p-6 shadow-lg hover:border-primary/60 hover:shadow-primary/20 transition-all duration-200 ring-2 ring-primary/10">
+            <div className="relative border-2 border-primary rounded-lg bg-card p-5 sm:p-7 shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:border-primary hover:shadow-[0_8px_24px_rgba(132,204,22,0.25)] transition-all duration-200 ring-1 ring-primary/20">
               <Textarea 
                 value={goalInput}
                 onChange={(e) => setGoalInput(e.target.value)}
@@ -575,7 +575,7 @@ const Playbooks = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => setGoalInput(chipText)}
-                  className="text-xs border-primary/30 hover:border-primary hover:bg-primary/10"
+                  className="text-xs px-4 py-2 border-primary/30 hover:border-primary hover:bg-primary/10"
                 >
                   {chipText}
                 </Button>
@@ -601,30 +601,32 @@ const Playbooks = () => {
                       setSelectedFramework(framework.id);
                       setShowFrameworkModal(true);
                     }}
-                    className="group cursor-pointer border border-muted/40 hover:border-primary hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-200 relative"
+                    className="group cursor-pointer bg-[#111111] border border-muted/60 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.25)] hover:border-primary hover:shadow-[0_8px_20px_rgba(0,0,0,0.4)] hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-200 relative"
                   >
                     <Badge 
                       variant="secondary" 
-                      className="absolute top-3 right-3 text-xs bg-primary/10 text-primary border-primary/30"
+                      className="absolute top-3 right-3 z-10 text-xs bg-primary/10 text-primary border-primary/30"
                     >
                       Recommended
                     </Badge>
                     <CardHeader>
-                      <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-start mb-3">
                         <div className={`p-3 rounded-lg ${getCategoryColor(framework.category)} border`}>
                           <IconComponent className="h-6 w-6" />
                         </div>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge 
+                          variant="outline" 
+                          className={`w-fit opacity-85 ${getCategoryColor(framework.category)}`}
+                        >
+                          {framework.category}
+                        </Badge>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                           <Clock className="h-3 w-3" />
                           {framework.estimated_time}m
                         </div>
                       </div>
-                      <Badge 
-                        variant="outline" 
-                        className={`w-fit mb-2 ${getCategoryColor(framework.category)}`}
-                      >
-                        {framework.category}
-                      </Badge>
                       <CardTitle className="text-xl group-hover:text-primary transition-colors">
                         {framework.title}
                       </CardTitle>
@@ -669,7 +671,7 @@ const Playbooks = () => {
         <div>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2">All Playbooks</h2>
+              <h2 className="text-2xl font-bold mb-2 mt-4">All Playbooks</h2>
               <p className="text-muted-foreground">Browse and select frameworks to run on your business</p>
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -696,24 +698,26 @@ const Playbooks = () => {
                     setSelectedFramework(framework.id);
                     setShowFrameworkModal(true);
                   }}
-                  className="group cursor-pointer border border-muted/40 hover:border-primary hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-200"
+                  className="group cursor-pointer bg-[#111111] border border-muted/60 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.25)] hover:border-primary hover:shadow-[0_8px_20px_rgba(0,0,0,0.4)] hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-200"
                 >
                   <CardHeader>
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-start mb-3">
                       <div className={`p-3 rounded-lg ${getCategoryColor(framework.category)} border`}>
                         <IconComponent className="h-6 w-6" />
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge 
+                        variant="outline" 
+                        className={`w-fit opacity-85 ${getCategoryColor(framework.category)}`}
+                      >
+                        {framework.category}
+                      </Badge>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                         <Clock className="h-3 w-3" />
                         {framework.estimated_time}m
                       </div>
                     </div>
-                    <Badge 
-                      variant="outline" 
-                      className={`w-fit mb-2 ${getCategoryColor(framework.category)}`}
-                    >
-                      {framework.category}
-                    </Badge>
                     <CardTitle className="text-xl group-hover:text-primary transition-colors">
                       {framework.title}
                     </CardTitle>
