@@ -283,18 +283,8 @@ export const BusinessContextChat = ({
                 <Sparkles className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Strategy Coach</h3>
-                <div className="flex items-center gap-2 text-sm">
-                  <Badge variant="outline" className="gap-1.5 text-xs">
-                    <Building className="h-3 w-3" />
-                    {selectedAnalysis.company_name}
-                  </Badge>
-                  {selectedReports.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      {selectedReports.length} report{selectedReports.length > 1 ? 's' : ''} loaded
-                    </Badge>
-                  )}
-                </div>
+                <h3 className="font-semibold text-lg">Strategy Coach — {selectedAnalysis.company_name}</h3>
+                <p className="text-xs text-muted-foreground">Recommendations use your Context File (v1).</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -315,17 +305,17 @@ export const BusinessContextChat = ({
           </div>
 
           {/* Report Selector */}
-          <div className="flex items-center gap-2">
+          <div className="space-y-1">
             <ReportSelector
               availableReports={availableReports}
               selectedReports={selectedReports}
               onReportsChange={onReportsChange}
             />
-            {availableReports.length > 0 && selectedReports.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Add completed reports to chat context
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {availableReports.length === 0 
+                ? "No reports yet—run any playbook to add one." 
+                : "Select completed reports to include in chat reasoning."}
+            </p>
           </div>
         </div>
 
@@ -336,12 +326,10 @@ export const BusinessContextChat = ({
               <div className="text-center text-muted-foreground py-12">
                 <Sparkles className="h-12 w-12 mx-auto mb-4 text-primary/50" />
                 <p className="text-lg font-medium mb-2">
-                  Ready to discuss strategy
+                  Ready to discuss strategy. Tell me a goal—or pick a playbook below.
                 </p>
                 <p className="text-sm">
                   I've reviewed {selectedAnalysis.company_name}'s business context.
-                  <br />
-                  What would you like to explore?
                 </p>
               </div>
             )}

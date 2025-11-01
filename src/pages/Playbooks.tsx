@@ -22,6 +22,7 @@ interface SavedAnalysis {
   id: string;
   company_name: string;
   analysis_data: any;
+  created_at?: string;
 }
 
 interface Framework {
@@ -193,6 +194,130 @@ const Playbooks = () => {
     ? frameworks 
     : frameworks.filter((f) => f.category === selectedCategory);
 
+  // Get recommended frameworks based on deterministic rules
+  const getRecommendedFrameworks = (): Framework[] => {
+    if (!selectedAnalysis) return [];
+    
+    const recommended: Framework[] = [];
+    const analysisData = selectedAnalysis.analysis_data;
+    const canvas = analysisData?.canvas || {};
+    
+    // Check for missing critical inputs
+    const hasICP = canvas.customerSegments && canvas.customerSegments.length > 0;
+    const hasChannels = canvas.channels && canvas.channels.length > 0;
+    const hasCompetitors = analysisData.competitors && analysisData.competitors.length > 0;
+    
+    // Rule: Missing ICP → suggest JTBD
+    if (!hasICP) {
+      const jtbd = frameworks.find(f => f.shortcut === 'JTBD');
+      if (jtbd) recommended.push(jtbd);
+    }
+    
+    // Rule: Missing Channels → suggest channel strategy frameworks
+    if (!hasChannels) {
+      const channelFramework = frameworks.find(f => 
+        f.category.toLowerCase().includes('channel') || 
+        f.title.toLowerCase().includes('channel')
+      );
+      if (channelFramework && !recommended.find(r => r.id === channelFramework.id)) {
+        recommended.push(channelFramework);
+      }
+    }
+    
+    // Rule: Has competitors but no competitive analysis → suggest competitive frameworks
+    if (hasCompetitors) {
+      const competitive = frameworks.find(f => 
+        f.shortcut === 'PORTER' || 
+        f.shortcut === 'COMPETE' ||
+        f.title.toLowerCase().includes('competitive')
+      );
+      if (competitive && !recommended.find(r => r.id === competitive.id)) {
+        recommended.push(competitive);
+      }
+    }
+    
+    // Check goalInput for keywords
+    const goalLower = goalInput.toLowerCase();
+    
+    // Rule: Expansion/new market keywords → suggest Ansoff
+    if (goalLower.includes('expansion') || goalLower.includes('new market') || goalLower.includes('geographic')) {
+      const ansoff = frameworks.find(f => f.shortcut === 'ANSOFF');
+      if (ansoff && !recommended.find(r => r.id === ansoff.id)) {
+        recommended.push(ansoff);
+      }
+    }
+    
+    // Rule: Ops/cost/efficiency keywords → suggest Value Chain or McKinsey 7S
+    if (goalLower.includes('ops') || goalLower.includes('cost') || goalLower.includes('efficiency') || goalLower.includes('margin')) {
+      const valueChain = frameworks.find(f => f.shortcut === 'VALUE_CHAIN' || f.shortcut === '7S');
+      if (valueChain && !recommended.find(r => r.id === valueChain.id)) {
+        recommended.push(valueChain);
+      }
+    }
+    
+    // Rule: Revenue/growth keywords → suggest growth frameworks
+    if (goalLower.includes('revenue') || goalLower.includes('growth') || goalLower.includes('pipeline')) {
+      const growth = frameworks.find(f => 
+        f.shortcut === 'ANSOFF' || 
+        f.shortcut === 'BCG' ||
+        f.title.toLowerCase().includes('growth')
+      );
+      if (growth && !recommended.find(r => r.id === growth.id)) {
+        recommended.push(growth);
+      }
+    }
+    
+    // If still empty, add popular frameworks
+    if (recommended.length === 0) {
+      const popular = frameworks.filter(f => 
+        ['SWOT', 'BMC', 'PORTER'].includes(f.shortcut || '')
+      ).slice(0, 3);
+      recommended.push(...popular);
+    }
+    
+    return recommended.slice(0, 6);
+  };
+
+  // Check input availability for a framework
+  const checkInputAvailability = (framework: Framework) => {
+    if (!selectedAnalysis) return {};
+    
+    const analysisData = selectedAnalysis.analysis_data;
+    const canvas = analysisData?.canvas || {};
+    
+    return {
+      valueProps: canvas.valuePropositions && canvas.valuePropositions.length > 0,
+      icp: canvas.customerSegments && canvas.customerSegments.length > 0,
+      channels: canvas.channels && canvas.channels.length > 0,
+      products: analysisData.company?.productsServices && analysisData.company.productsServices.length > 0,
+      competitors: analysisData.competitors && analysisData.competitors.length > 0,
+    };
+  };
+
+  // Generate input status text
+  const getInputStatusText = (framework: Framework) => {
+    if (!selectedAnalysis) return null;
+    
+    const availability = checkInputAvailability(framework);
+    
+    return (
+      <div className="text-xs text-muted-foreground pt-2 border-t">
+        <span className="font-medium">Inputs from context: </span>
+        <span className={availability.valueProps ? "text-green-600" : ""}>
+          Value Props {availability.valueProps ? "✓" : "•"}
+        </span>
+        {" "}
+        <span className={availability.icp ? "text-green-600" : ""}>
+          ICP {availability.icp ? "✓" : "•"}
+        </span>
+        {" "}
+        <span className={availability.channels ? "text-green-600" : ""}>
+          Channels {availability.channels ? "✓" : "•"}
+        </span>
+      </div>
+    );
+  };
+
   const handleStartChat = () => {
     if (!selectedAnalysis) {
       toast({
@@ -243,9 +368,16 @@ const Playbooks = () => {
 
       if (data?.report_id) {
         setCurrentReportId(data.report_id);
+        
+        // Auto-add report to selected reports
+        setSelectedReports(prev => [...prev, data.report_id]);
+        
+        // Refresh available reports
+        await fetchAvailableReports();
+        
         toast({
           title: "Report Generated",
-          description: "Your strategic report is ready",
+          description: `Report saved to ${selectedAnalysis.company_name} and added to chat context.`,
         });
       }
     } catch (error) {
@@ -280,7 +412,7 @@ const Playbooks = () => {
               Strategy Playbooks
             </h1>
             <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
-              Get AI-powered strategy recommendations tailored to your business
+              Use your Context File to get tailored strategy moves. Describe a goal or pick a playbook—then save the report to this company.
             </p>
           </div>
 
@@ -324,11 +456,21 @@ const Playbooks = () => {
                 </Button>
               </p>
             )}
-            {selectedAnalysis && (
+            {selectedAnalysis ? (
               <div className="flex items-center justify-center gap-1.5 text-xs text-green-600 mt-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>Context loaded</span>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-muted-foreground">
+                  Last verified: {new Date(selectedAnalysis.created_at || Date.now()).toLocaleDateString()}
+                </span>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-muted-foreground">Version v1</span>
               </div>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1.5 text-center">
+                Select a company to tailor recommendations
+              </p>
             )}
           </div>
 
@@ -373,8 +515,101 @@ const Playbooks = () => {
                 </div>
               </div>
             </div>
+
+            {/* Quick-start chips */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+              {[
+                "Increase revenue / reduce CAC",
+                "Enter a new market / launch a product",
+                "Improve margins / cut ops waste"
+              ].map((chipText) => (
+                <Button
+                  key={chipText}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setGoalInput(chipText)}
+                  className="text-xs border-primary/30 hover:border-primary hover:bg-primary/10"
+                >
+                  {chipText}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* Recommended Section */}
+        {selectedAnalysis && getRecommendedFrameworks().length > 0 && (
+          <div className="mb-12">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold mb-2">Recommended for {selectedAnalysis.company_name}</h2>
+              <p className="text-muted-foreground">Based on your goals, stage, ICP, and channels.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {getRecommendedFrameworks().slice(0, 6).map((framework) => {
+                const IconComponent = framework.icon || Target;
+                return (
+                  <Card 
+                    key={framework.id}
+                    onClick={() => {
+                      setSelectedFramework(framework.id);
+                      setShowFrameworkModal(true);
+                    }}
+                    className="group cursor-pointer hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1 duration-300 relative"
+                  >
+                    <Badge 
+                      variant="secondary" 
+                      className="absolute top-3 right-3 text-xs bg-primary/10 text-primary border-primary/30"
+                    >
+                      Recommended
+                    </Badge>
+                    <CardHeader>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className={`p-3 rounded-lg ${getCategoryColor(framework.category)} border`}>
+                          <IconComponent className="h-6 w-6" />
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                          <Clock className="h-3 w-3" />
+                          {framework.estimated_time}m
+                        </div>
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className={`w-fit mb-2 ${getCategoryColor(framework.category)}`}
+                      >
+                        {framework.category}
+                      </Badge>
+                      <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                        {framework.title}
+                      </CardTitle>
+                      <CardDescription className="line-clamp-2 text-sm">
+                        {framework.description}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                        <Users className="h-3 w-3" />
+                        <span>{framework.departments?.length || 0} departments</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {(framework.departments || []).slice(0, 3).map((dept) => (
+                          <Badge key={dept} variant="secondary" className="text-xs">
+                            {dept}
+                          </Badge>
+                        ))}
+                        {(framework.departments || []).length > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{(framework.departments || []).length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                      {getInputStatusText(framework)}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Framework Library */}
         <div>
@@ -437,7 +672,7 @@ const Playbooks = () => {
                       <Users className="h-3 w-3" />
                       <span>{framework.departments?.length || 0} departments</span>
                     </div>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1 mb-3">
                       {(framework.departments || []).slice(0, 3).map((dept) => (
                         <Badge key={dept} variant="secondary" className="text-xs">
                           {dept}
@@ -449,6 +684,7 @@ const Playbooks = () => {
                         </Badge>
                       )}
                     </div>
+                    {getInputStatusText(framework)}
                   </CardContent>
                 </Card>
               );
@@ -488,12 +724,16 @@ const Playbooks = () => {
         )}
 
         {/* Framework Detail Modal */}
-      <FrameworkDetailModal
-        isOpen={showFrameworkModal}
-        onClose={() => setShowFrameworkModal(false)}
-        framework={frameworks.find(f => f.id === selectedFramework) || null}
-        onRunFramework={handleRunFramework}
-      />
+        <FrameworkDetailModal
+          isOpen={showFrameworkModal}
+          onClose={() => {
+            setShowFrameworkModal(false);
+            setSelectedFramework(null);
+          }}
+          framework={frameworks.find(f => f.id === selectedFramework) || null}
+          onRunFramework={handleRunFramework}
+          selectedAnalysis={selectedAnalysis}
+        />
 
         {/* Report Viewer Drawer */}
         {selectedAnalysis && selectedFramework && (
