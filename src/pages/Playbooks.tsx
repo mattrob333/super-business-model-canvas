@@ -452,10 +452,10 @@ const Playbooks = () => {
         {/* Hero Section - Centered */}
         <div className="mb-12">
           <div className="text-center mb-8">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 pb-2 bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-              Strategy Playbooks
-            </h1>
-            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 pb-2 text-primary tracking-tight">
+          Strategy Playbooks
+        </h1>
+            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto font-light">
               Use your Context File to get tailored strategy moves. Describe a goal or pick a playbook—then save the report to this company.
             </p>
           </div>
@@ -523,7 +523,7 @@ const Playbooks = () => {
             <label className="block text-sm font-medium text-muted-foreground text-center mb-2">
               Tell the Strategy Coach your goal
             </label>
-            <div className="relative border-2 border-primary rounded-lg bg-card p-5 sm:p-7 shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:border-primary hover:shadow-[0_8px_24px_rgba(132,204,22,0.25)] transition-all duration-200 ring-1 ring-primary/20">
+            <div className="relative border-2 border-primary rounded-xl bg-card p-5 sm:p-7 shadow-[0_0_40px_rgba(196,248,42,0.15),0_4px_16px_rgba(0,0,0,0.4)] hover:shadow-[0_0_60px_rgba(196,248,42,0.25),0_8px_24px_rgba(0,0,0,0.5)] transition-all duration-300">
               <Textarea 
                 value={goalInput}
                 onChange={(e) => setGoalInput(e.target.value)}
@@ -554,7 +554,7 @@ const Playbooks = () => {
                   <Button 
                     onClick={handleStartChat}
                     disabled={!selectedAnalysis || !goalInput.trim()}
-                    className="w-full sm:w-auto min-h-[44px]"
+                    className="w-full sm:w-auto min-h-[44px] hover:shadow-[0_0_20px_rgba(196,248,42,0.3)] transition-all duration-300"
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
                     Start Strategy Session
@@ -575,7 +575,7 @@ const Playbooks = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => setGoalInput(chipText)}
-                  className="text-xs px-4 py-2 border-primary/30 hover:border-primary hover:bg-primary/10"
+                  className="text-xs px-4 py-2 border-primary/20 hover:border-primary hover:bg-primary/10 hover:shadow-[0_0_12px_rgba(196,248,42,0.2)] active:scale-95 transition-all duration-200"
                 >
                   {chipText}
                 </Button>
@@ -588,10 +588,10 @@ const Playbooks = () => {
         {selectedAnalysis && getRecommendedFrameworks().length > 0 && (
           <div className="mt-16 mb-12">
             <div className="mb-6">
-              <h2 className="text-2xl font-semibold mb-2 text-foreground/90">Recommended for {selectedAnalysis.company_name}</h2>
-              <p className="text-muted-foreground">Based on your goals, stage, ICP, and channels.</p>
+              <h2 className="text-2xl font-medium mb-2 text-foreground tracking-wide">Recommended for {selectedAnalysis.company_name}</h2>
+              <p className="text-muted-foreground font-light">Based on your goals, stage, ICP, and channels.</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-fade-in">
               {getRecommendedFrameworks().slice(0, 6).map((framework) => {
                 const IconComponent = framework.icon || Target;
                 return (
@@ -601,7 +601,7 @@ const Playbooks = () => {
                       setSelectedFramework(framework.id);
                       setShowFrameworkModal(true);
                     }}
-                    className="group cursor-pointer bg-[#111111] border border-muted/60 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.25)] hover:border-primary hover:shadow-[0_8px_20px_rgba(0,0,0,0.4)] hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-200 relative"
+                    className="group cursor-pointer bg-gradient-to-b from-[#151515] to-[#0C0C0C] border border-white/[0.08] rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.4)] hover:border-primary hover:shadow-[0_8px_24px_rgba(0,0,0,0.5),0_0_20px_rgba(196,248,42,0.15)] hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 relative"
                   >
                     <Badge 
                       variant="secondary" 
@@ -615,21 +615,21 @@ const Playbooks = () => {
                           <IconComponent className="h-6 w-6" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge 
-                          variant="outline" 
-                          className={`w-fit opacity-85 ${getCategoryColor(framework.category)}`}
-                        >
-                          {framework.category}
-                        </Badge>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge 
+                        variant="outline" 
+                        className={`w-fit opacity-70 ${getCategoryColor(framework.category)}`}
+                      >
+                        {framework.category}
+                      </Badge>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                           <Clock className="h-3 w-3" />
                           {framework.estimated_time}m
                         </div>
                       </div>
-                      <CardTitle className="text-xl group-hover:text-primary transition-colors">
-                        {framework.title}
-                      </CardTitle>
+                    <CardTitle className="text-xl font-medium group-hover:text-primary transition-colors tracking-tight">
+                      {framework.title}
+                    </CardTitle>
                       <CardDescription className="line-clamp-2 text-sm">
                         {framework.description}
                       </CardDescription>
@@ -660,10 +660,10 @@ const Playbooks = () => {
           </div>
         )}
 
-        {/* Subtle separator */}
+        {/* Premium section separator */}
         {selectedAnalysis && getRecommendedFrameworks().length > 0 && (
-          <div className="my-12">
-            <div className="h-px bg-gradient-to-r from-transparent via-muted/50 to-transparent" />
+          <div className="my-16">
+            <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           </div>
         )}
 
@@ -671,8 +671,8 @@ const Playbooks = () => {
         <div>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2 mt-4">All Playbooks</h2>
-              <p className="text-muted-foreground">Browse and select frameworks to run on your business</p>
+              <h2 className="text-2xl font-semibold mb-2 tracking-wide" style={{ marginTop: '70px' }}>All Playbooks</h2>
+              <p className="text-muted-foreground font-light">Browse and select frameworks to run on your business</p>
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="w-[200px]">
@@ -688,7 +688,7 @@ const Playbooks = () => {
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-fade-in">
             {filteredFrameworks.map((framework) => {
               const IconComponent = framework.icon || Target;
               return (
@@ -698,7 +698,7 @@ const Playbooks = () => {
                     setSelectedFramework(framework.id);
                     setShowFrameworkModal(true);
                   }}
-                  className="group cursor-pointer bg-[#111111] border border-muted/60 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.25)] hover:border-primary hover:shadow-[0_8px_20px_rgba(0,0,0,0.4)] hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-200"
+                  className="group cursor-pointer bg-gradient-to-b from-[#151515] to-[#0C0C0C] border border-white/[0.08] rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.4)] hover:border-primary hover:shadow-[0_8px_24px_rgba(0,0,0,0.5),0_0_20px_rgba(196,248,42,0.15)] hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300"
                 >
                   <CardHeader>
                     <div className="flex items-start mb-3">
@@ -709,7 +709,7 @@ const Playbooks = () => {
                     <div className="flex items-center gap-2 mb-2">
                       <Badge 
                         variant="outline" 
-                        className={`w-fit opacity-85 ${getCategoryColor(framework.category)}`}
+                        className={`w-fit opacity-70 ${getCategoryColor(framework.category)}`}
                       >
                         {framework.category}
                       </Badge>
@@ -718,7 +718,7 @@ const Playbooks = () => {
                         {framework.estimated_time}m
                       </div>
                     </div>
-                    <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                    <CardTitle className="text-xl font-medium group-hover:text-primary transition-colors tracking-tight">
                       {framework.title}
                     </CardTitle>
                     <CardDescription className="line-clamp-2 text-sm">

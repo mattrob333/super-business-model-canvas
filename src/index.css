@@ -9,7 +9,7 @@ All colors MUST be HSL.
 @layer base {
   :root {
     /* Monochrome Futurism Design System */
-    --background: 0 0% 1.6%; /* #040404 - near-black base */
+    --background: 0 0% 0%; /* #000000 - pure black */
     --foreground: 0 0% 96.1%; /* #F5F5F5 - off-white text */
 
     --card: 0 0% 1.6%; /* same as background for cards */
