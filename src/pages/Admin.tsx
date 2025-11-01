@@ -15,13 +15,22 @@ interface Lead {
   created_at: string;
 }
 
+interface Profile {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
 const Admin = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, isAdmin, adminLoading } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [filteredProfiles, setFilteredProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [profileSearchTerm, setProfileSearchTerm] = useState('');
+  const [leadSearchTerm, setLeadSearchTerm] = useState('');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -39,20 +48,33 @@ const Admin = () => {
   useEffect(() => {
     if (user && isAdmin) {
       fetchLeads();
+      fetchProfiles();
     }
   }, [user, isAdmin]);
 
   useEffect(() => {
-    if (searchTerm) {
+    if (profileSearchTerm) {
+      setFilteredProfiles(
+        profiles.filter(profile =>
+          profile.email.toLowerCase().includes(profileSearchTerm.toLowerCase())
+        )
+      );
+    } else {
+      setFilteredProfiles(profiles);
+    }
+  }, [profileSearchTerm, profiles]);
+
+  useEffect(() => {
+    if (leadSearchTerm) {
       setFilteredLeads(
         leads.filter(lead =>
-          lead.email.toLowerCase().includes(searchTerm.toLowerCase())
+          lead.email.toLowerCase().includes(leadSearchTerm.toLowerCase())
         )
       );
     } else {
       setFilteredLeads(leads);
     }
-  }, [searchTerm, leads]);
+  }, [leadSearchTerm, leads]);
 
   const fetchLeads = async () => {
     try {
@@ -76,8 +98,51 @@ const Admin = () => {
     }
   };
 
-  const exportToCSV = () => {
-    const headers = ['Email', 'Created At'];
+  const fetchProfiles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProfiles(data || []);
+      setFilteredProfiles(data || []);
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch registered users",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportProfilesToCSV = () => {
+    const headers = ['Email', 'Account Created'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredProfiles.map(profile =>
+        [profile.email, new Date(profile.created_at).toLocaleString()].join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `registered_users_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export successful",
+      description: "Registered users exported to CSV"
+    });
+  };
+
+  const exportLeadsToCSV = () => {
+    const headers = ['Email', 'Captured At'];
     const csvContent = [
       headers.join(','),
       ...filteredLeads.map(lead =>
@@ -89,25 +154,25 @@ const Admin = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `leads_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `email_leads_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
 
     toast({
       title: "Export successful",
-      description: "Leads exported to CSV"
+      description: "Email leads exported to CSV"
     });
   };
 
   const getStats = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     return {
-      total: leads.length,
-      today: leads.filter(lead => new Date(lead.created_at) >= today).length,
-      week: leads.filter(lead => new Date(lead.created_at) >= weekAgo).length
+      totalUsers: profiles.length,
+      totalLeads: leads.length,
+      usersToday: profiles.filter(profile => new Date(profile.created_at) >= today).length,
+      leadsToday: leads.filter(lead => new Date(lead.created_at) >= today).length
     };
   };
 
@@ -153,29 +218,35 @@ const Admin = () => {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Lead Management</CardTitle>
-                <CardDescription>View and export email leads</CardDescription>
+                <CardTitle>User & Lead Management</CardTitle>
+                <CardDescription>View registered users and email leads</CardDescription>
               </CardHeader>
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardDescription>Total Leads</CardDescription>
-                <CardTitle className="text-3xl">{stats.total}</CardTitle>
+                <CardDescription>Total Registered Users</CardDescription>
+                <CardTitle className="text-3xl">{stats.totalUsers}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
               <CardHeader className="pb-3">
-                <CardDescription>Today</CardDescription>
-                <CardTitle className="text-3xl">{stats.today}</CardTitle>
+                <CardDescription>Total Email Leads</CardDescription>
+                <CardTitle className="text-3xl">{stats.totalLeads}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
               <CardHeader className="pb-3">
-                <CardDescription>This Week</CardDescription>
-                <CardTitle className="text-3xl">{stats.week}</CardTitle>
+                <CardDescription>New Users Today</CardDescription>
+                <CardTitle className="text-3xl">{stats.usersToday}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>New Leads Today</CardDescription>
+                <CardTitle className="text-3xl">{stats.leadsToday}</CardTitle>
               </CardHeader>
             </Card>
           </div>
@@ -184,12 +255,12 @@ const Admin = () => {
             <CardHeader>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <CardTitle>All Leads</CardTitle>
-                  <CardDescription>Search and export your leads</CardDescription>
+                  <CardTitle>Registered Users</CardTitle>
+                  <CardDescription>Authenticated accounts with full access</CardDescription>
                 </div>
-                <Button onClick={exportToCSV} disabled={filteredLeads.length === 0}>
+                <Button onClick={exportProfilesToCSV} disabled={filteredProfiles.length === 0}>
                   <Download className="mr-2 h-4 w-4" />
-                  Export CSV
+                  Export Users
                 </Button>
               </div>
             </CardHeader>
@@ -197,8 +268,8 @@ const Admin = () => {
               <div className="space-y-4">
                 <Input
                   placeholder="Search by email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={profileSearchTerm}
+                  onChange={(e) => setProfileSearchTerm(e.target.value)}
                   className="max-w-sm"
                 />
                 
@@ -207,14 +278,68 @@ const Admin = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Email</TableHead>
-                        <TableHead>Created At</TableHead>
+                        <TableHead>Account Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProfiles.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={2} className="text-center text-muted-foreground">
+                            No registered users found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredProfiles.map((profile) => (
+                          <TableRow key={profile.id}>
+                            <TableCell className="font-medium">{profile.email}</TableCell>
+                            <TableCell>
+                              {new Date(profile.created_at).toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <CardTitle>Email Leads</CardTitle>
+                  <CardDescription>Email captures from landing page (not yet registered)</CardDescription>
+                </div>
+                <Button onClick={exportLeadsToCSV} disabled={filteredLeads.length === 0}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Leads
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Search by email..."
+                  value={leadSearchTerm}
+                  onChange={(e) => setLeadSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                />
+                
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Captured At</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredLeads.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={2} className="text-center text-muted-foreground">
-                            No leads found
+                            No email leads found
                           </TableCell>
                         </TableRow>
                       ) : (
