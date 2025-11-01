@@ -575,7 +575,7 @@ const Playbooks = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => setGoalInput(chipText)}
-                  className="text-xs px-4 py-2 border-primary/20 hover:border-primary hover:bg-primary/10 hover:shadow-[0_0_12px_rgba(196,248,42,0.2)] active:scale-95 transition-all duration-200"
+                  className="text-xs px-4 py-2 text-white hover:text-white border-primary/20 hover:border-primary hover:bg-primary/10 hover:shadow-[0_0_12px_rgba(196,248,42,0.2)] active:scale-95 transition-all duration-200"
                 >
                   {chipText}
                 </Button>
