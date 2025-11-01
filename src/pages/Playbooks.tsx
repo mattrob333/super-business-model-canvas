@@ -194,88 +194,132 @@ const Playbooks = () => {
     ? frameworks 
     : frameworks.filter((f) => f.category === selectedCategory);
 
-  // Get recommended frameworks based on deterministic rules
+  // Helper to add frameworks by shortcut
+  const addFramework = (set: Set<Framework>, shortcuts: string[]) => {
+    shortcuts.forEach(shortcut => {
+      const framework = frameworks.find(f => f.shortcut === shortcut);
+      if (framework && set.size < 10) {
+        set.add(framework);
+      }
+    });
+  };
+
+  // Helper to extract numeric employee count
+  const extractEmployeeCount = (count: string | undefined): number | null => {
+    if (!count) return null;
+    const match = count.match(/(\d+)/);
+    return match ? parseInt(match[1]) : null;
+  };
+
+  // Helper to check if competitive analysis exists
+  const hasCompetitiveAnalysis = (): boolean => {
+    return availableReports.some(r => 
+      r.frameworks?.shortcut === 'PORTER' || 
+      r.frameworks?.shortcut === 'SWOT'
+    );
+  };
+
+  // Enhanced context-driven recommendation logic
   const getRecommendedFrameworks = (): Framework[] => {
     if (!selectedAnalysis) return [];
     
-    const recommended: Framework[] = [];
+    const recommended: Set<Framework> = new Set();
     const analysisData = selectedAnalysis.analysis_data;
     const canvas = analysisData?.canvas || {};
+    const company = analysisData?.company || {};
     
-    // Check for missing critical inputs
-    const hasICP = canvas.customerSegments && canvas.customerSegments.length > 0;
-    const hasChannels = canvas.channels && canvas.channels.length > 0;
-    const hasCompetitors = analysisData.competitors && analysisData.competitors.length > 0;
+    // === BASELINE: Industry-Specific Recommendations ===
+    const industry = (company.industry || '').toLowerCase();
     
-    // Rule: Missing ICP → suggest JTBD
+    if (industry.includes('saas') || industry.includes('software') || industry.includes('tech')) {
+      addFramework(recommended, ['ANSOFF', 'BCG', 'BLUE_OCEAN', 'VALUE_CHAIN']);
+    } else if (industry.includes('nonprofit') || industry.includes('foundation') || industry.includes('scholarship')) {
+      addFramework(recommended, ['BSC', 'VALUE_CHAIN', 'SWOT']);
+    } else if (industry.includes('healthcare') || industry.includes('medical')) {
+      addFramework(recommended, ['VALUE_CHAIN', 'PORTER', 'SWOT']);
+    } else if (industry.includes('ecommerce') || industry.includes('retail') || industry.includes('marketplace')) {
+      addFramework(recommended, ['JTBD', 'BMC', 'PORTER']);
+    } else if (industry.includes('manufacturing')) {
+      addFramework(recommended, ['VALUE_CHAIN', '7S']);
+    }
+    
+    // === COMPANY STAGE/SIZE RECOMMENDATIONS ===
+    const employeeCount = extractEmployeeCount(company.employeeCount);
+    const foundingYear = company.foundingYear ? parseInt(company.foundingYear) : null;
+    const companyAge = foundingYear ? new Date().getFullYear() - foundingYear : null;
+    
+    if (employeeCount && employeeCount < 50) {
+      addFramework(recommended, ['BMC', 'JTBD', 'SWOT']);
+    } else if (employeeCount && employeeCount > 1000) {
+      addFramework(recommended, ['7S', 'BSC', 'PORTER']);
+    }
+    
+    if (companyAge && companyAge < 5) {
+      addFramework(recommended, ['JTBD', 'BMC', 'BLUE_OCEAN']);
+    }
+    
+    // === MISSING CRITICAL CONTEXT ===
+    const hasICP = canvas.customerSegments?.length > 0;
+    const hasChannels = canvas.channels?.length > 0;
+    const hasValueProps = canvas.valuePropositions?.length > 0;
+    const hasCompetitors = analysisData.competitors?.length > 0;
+    
     if (!hasICP) {
-      const jtbd = frameworks.find(f => f.shortcut === 'JTBD');
-      if (jtbd) recommended.push(jtbd);
+      addFramework(recommended, ['JTBD', 'BMC']);
     }
     
-    // Rule: Missing Channels → suggest channel strategy frameworks
     if (!hasChannels) {
-      const channelFramework = frameworks.find(f => 
-        f.category.toLowerCase().includes('channel') || 
-        f.title.toLowerCase().includes('channel')
-      );
-      if (channelFramework && !recommended.find(r => r.id === channelFramework.id)) {
-        recommended.push(channelFramework);
-      }
+      addFramework(recommended, ['BMC', 'ANSOFF']);
     }
     
-    // Rule: Has competitors but no competitive analysis → suggest competitive frameworks
-    if (hasCompetitors) {
-      const competitive = frameworks.find(f => 
-        f.shortcut === 'PORTER' || 
-        f.shortcut === 'COMPETE' ||
-        f.title.toLowerCase().includes('competitive')
-      );
-      if (competitive && !recommended.find(r => r.id === competitive.id)) {
-        recommended.push(competitive);
-      }
+    if (!hasValueProps) {
+      addFramework(recommended, ['VALUE_CHAIN', 'BLUE_OCEAN']);
     }
     
-    // Check goalInput for keywords
+    if (hasCompetitors && !hasCompetitiveAnalysis()) {
+      addFramework(recommended, ['PORTER', 'SWOT']);
+    }
+    
+    // === GOAL-BASED REFINEMENT ===
     const goalLower = goalInput.toLowerCase();
     
-    // Rule: Expansion/new market keywords → suggest Ansoff
     if (goalLower.includes('expansion') || goalLower.includes('new market') || goalLower.includes('geographic')) {
-      const ansoff = frameworks.find(f => f.shortcut === 'ANSOFF');
-      if (ansoff && !recommended.find(r => r.id === ansoff.id)) {
-        recommended.push(ansoff);
-      }
+      addFramework(recommended, ['ANSOFF', 'PORTER', 'BLUE_OCEAN']);
     }
     
-    // Rule: Ops/cost/efficiency keywords → suggest Value Chain or McKinsey 7S
-    if (goalLower.includes('ops') || goalLower.includes('cost') || goalLower.includes('efficiency') || goalLower.includes('margin')) {
-      const valueChain = frameworks.find(f => f.shortcut === 'VALUE_CHAIN' || f.shortcut === '7S');
-      if (valueChain && !recommended.find(r => r.id === valueChain.id)) {
-        recommended.push(valueChain);
-      }
+    if (goalLower.includes('cost') || goalLower.includes('efficiency') || goalLower.includes('margin') || goalLower.includes('ops')) {
+      addFramework(recommended, ['VALUE_CHAIN', '7S']);
     }
     
-    // Rule: Revenue/growth keywords → suggest growth frameworks
-    if (goalLower.includes('revenue') || goalLower.includes('growth') || goalLower.includes('pipeline')) {
-      const growth = frameworks.find(f => 
-        f.shortcut === 'ANSOFF' || 
-        f.shortcut === 'BCG' ||
-        f.title.toLowerCase().includes('growth')
-      );
-      if (growth && !recommended.find(r => r.id === growth.id)) {
-        recommended.push(growth);
-      }
+    if (goalLower.includes('revenue') || goalLower.includes('growth') || goalLower.includes('pipeline') || goalLower.includes('acquisition')) {
+      addFramework(recommended, ['BCG', 'ANSOFF', 'JTBD']);
     }
     
-    // If still empty, add popular frameworks
-    if (recommended.length === 0) {
-      const popular = frameworks.filter(f => 
-        ['SWOT', 'BMC', 'PORTER'].includes(f.shortcut || '')
-      ).slice(0, 3);
-      recommended.push(...popular);
+    if (goalLower.includes('position') || goalLower.includes('differentiat') || goalLower.includes('competitive')) {
+      addFramework(recommended, ['PORTER', 'BLUE_OCEAN', 'SWOT']);
     }
     
-    return recommended.slice(0, 6);
+    if (goalLower.includes('innovation') || goalLower.includes('disrupt')) {
+      addFramework(recommended, ['BLUE_OCEAN', 'JTBD', 'ANSOFF']);
+    }
+    
+    // === FILTER OUT ALREADY COMPLETED ===
+    const completedFrameworks = new Set(
+      availableReports.map(r => r.framework_id)
+    );
+    
+    const filtered = Array.from(recommended).filter(f => 
+      !completedFrameworks.has(f.id)
+    );
+    
+    // === FALLBACK ===
+    if (filtered.length === 0) {
+      return frameworks.filter(f => 
+        ['SWOT', 'BMC', 'PORTER', 'JTBD'].includes(f.shortcut || '')
+      ).slice(0, 4);
+    }
+    
+    return filtered.slice(0, 6);
   };
 
   // Check input availability for a framework
@@ -475,8 +519,11 @@ const Playbooks = () => {
           </div>
 
           {/* Large Prominent Chat Input - Centered */}
-          <div className="max-w-5xl mx-auto">
-            <div className="relative border-2 border-primary/20 rounded-lg bg-card p-3 sm:p-4 shadow-sm hover:border-primary/40 transition-colors">
+          <div className="max-w-5xl mx-auto space-y-2">
+            <label className="block text-sm font-medium text-muted-foreground text-center">
+              Tell the Strategy Coach your goal
+            </label>
+            <div className="relative border-2 border-primary/40 rounded-lg bg-card p-4 sm:p-6 shadow-lg hover:border-primary/60 hover:shadow-primary/20 transition-all duration-200 ring-2 ring-primary/10">
               <Textarea 
                 value={goalInput}
                 onChange={(e) => setGoalInput(e.target.value)}
@@ -539,9 +586,9 @@ const Playbooks = () => {
 
         {/* Recommended Section */}
         {selectedAnalysis && getRecommendedFrameworks().length > 0 && (
-          <div className="mb-12">
+          <div className="mt-16 mb-12">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold mb-2">Recommended for {selectedAnalysis.company_name}</h2>
+              <h2 className="text-2xl font-semibold mb-2 text-foreground/90">Recommended for {selectedAnalysis.company_name}</h2>
               <p className="text-muted-foreground">Based on your goals, stage, ICP, and channels.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -554,7 +601,7 @@ const Playbooks = () => {
                       setSelectedFramework(framework.id);
                       setShowFrameworkModal(true);
                     }}
-                    className="group cursor-pointer hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1 duration-300 relative"
+                    className="group cursor-pointer border border-muted/40 hover:border-primary hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-200 relative"
                   >
                     <Badge 
                       variant="secondary" 
@@ -611,11 +658,18 @@ const Playbooks = () => {
           </div>
         )}
 
+        {/* Subtle separator */}
+        {selectedAnalysis && getRecommendedFrameworks().length > 0 && (
+          <div className="my-12">
+            <div className="h-px bg-gradient-to-r from-transparent via-muted/50 to-transparent" />
+          </div>
+        )}
+
         {/* Framework Library */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Available Playbooks</h2>
+              <h2 className="text-2xl font-bold mb-2">All Playbooks</h2>
               <p className="text-muted-foreground">Browse and select frameworks to run on your business</p>
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -642,7 +696,7 @@ const Playbooks = () => {
                     setSelectedFramework(framework.id);
                     setShowFrameworkModal(true);
                   }}
-                  className="group cursor-pointer hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1 duration-300"
+                  className="group cursor-pointer border border-muted/40 hover:border-primary hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1 transition-all duration-200"
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between mb-3">
