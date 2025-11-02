@@ -243,26 +243,32 @@ export const ChatDrawer = ({
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="border-t border-white/[0.12] p-6">
-          <div className="flex gap-3">
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask about this section..."
-              className="flex-1 bg-white/[0.05] border-white/[0.12] focus:border-primary"
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+        <div className="relative p-6">
+          {/* Ambient neon underglow */}
+          <div className="absolute inset-x-6 -top-6 h-6 bg-gradient-to-t from-primary/10 to-transparent pointer-events-none" />
+          
+          {/* Main input container */}
+          <div className="relative rounded-2xl bg-[#111111] p-4 shadow-[0_8px_16px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.06)]">
+            <div className="flex items-center gap-3">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask about this section..."
+                className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm placeholder:text-muted-foreground/60"
+              />
+              <Button
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="shrink-0 h-9 w-9 rounded-xl bg-white/[0.08] hover:bg-primary/20 hover:shadow-[0_0_12px_rgba(196,248,42,0.3)] transition-all duration-200 group"
+              >
+                <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground/60 mt-2">
+              Press Enter to send, Shift+Enter for new line
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground mt-3">
-            Press Enter to send, Shift+Enter for new line
-          </p>
         </div>
       </div>
     </>

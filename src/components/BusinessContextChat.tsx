@@ -377,45 +377,52 @@ export const BusinessContextChat = ({
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="p-4 border-t border-gray-800 bg-muted/30">
-          <div className="flex items-center gap-2 mb-2">
-            <Select
-              value={selectedModel}
-              onValueChange={(value) => {
-                setSelectedModel(value);
-                setUseResearchMode(value === "perplexity");
-              }}
-              disabled={isLoading}
-            >
-              <SelectTrigger className="w-[180px] h-7 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="gemini-pro" className="text-xs">Gemini 2.5 Pro</SelectItem>
-            <SelectItem value="gemini-flash" className="text-xs">Gemini 2.5 Flash</SelectItem>
-            <SelectItem value="perplexity" className="text-xs">Perplexity</SelectItem>
-          </SelectContent>
-            </Select>
-            <Badge variant="outline" className="text-xs">
-              {selectedAnalysis.company_name}
-            </Badge>
-          </div>
-          <div className="flex gap-2">
-            <Input
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message..."
-              disabled={isLoading}
-              className="flex-1"
-            />
-            <Button
-              onClick={() => handleSendMessage()}
-              disabled={!inputValue.trim() || isLoading}
-              size="icon"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+        <div className="relative p-6">
+          {/* Ambient neon underglow */}
+          <div className="absolute inset-x-6 -top-6 h-6 bg-gradient-to-t from-primary/10 to-transparent pointer-events-none" />
+          
+          {/* Main input container */}
+          <div className="relative rounded-2xl bg-[#111111] p-4 shadow-[0_8px_16px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.06)]">
+            <div className="flex items-center gap-2 mb-3">
+              <Select
+                value={selectedModel}
+                onValueChange={(value) => {
+                  setSelectedModel(value);
+                  setUseResearchMode(value === "perplexity");
+                }}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="w-[180px] h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gemini-pro" className="text-xs">Gemini 2.5 Pro</SelectItem>
+                  <SelectItem value="gemini-flash" className="text-xs">Gemini 2.5 Flash</SelectItem>
+                  <SelectItem value="perplexity" className="text-xs">Perplexity</SelectItem>
+                </SelectContent>
+              </Select>
+              <Badge variant="outline" className="text-xs border-white/[0.08] bg-white/[0.02]">
+                {selectedAnalysis.company_name}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-3">
+              <Input
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                disabled={isLoading}
+                className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm placeholder:text-muted-foreground/60"
+              />
+              <Button
+                onClick={() => handleSendMessage()}
+                disabled={!inputValue.trim() || isLoading}
+                size="icon"
+                className="shrink-0 h-9 w-9 rounded-xl bg-white/[0.08] hover:bg-primary/20 hover:shadow-[0_0_12px_rgba(196,248,42,0.3)] transition-all duration-200 group"
+              >
+                <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
