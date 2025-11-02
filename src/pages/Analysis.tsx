@@ -657,8 +657,8 @@ Website: ${comp.website || 'N/A'}
             
             <section className="relative">
               {/* Ambient glow layer - beneath Business Overview */}
-              <div className="absolute inset-0 rounded-2xl opacity-90 
-                              shadow-[0_0_40px_rgba(196,248,42,0.18),0_0_20px_rgba(196,248,42,0.12)] 
+              <div className="absolute inset-0 rounded-2xl
+                              shadow-[0_0_45px_rgba(196,248,42,0.20),0_0_25px_rgba(196,248,42,0.14),0_8px_24px_rgba(0,0,0,0.3)] 
                               pointer-events-none -z-10" 
                    style={{ transform: 'scale(1.02)' }} 
               />

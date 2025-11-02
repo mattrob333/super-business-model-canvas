@@ -102,10 +102,10 @@ export const BusinessModelCanvas = ({ data, companyName, businessContext, onSect
     return (
       <div 
         className={`relative ${span} ${height} flex flex-col p-3 sm:p-4 cursor-pointer transition-all duration-300 group
-                    border border-border/60 rounded-lg overflow-hidden
+                    border border-white/[0.08] rounded-lg overflow-hidden
                     bg-gradient-to-b from-[#161616] to-[#0B0B0B]
                     shadow-[0_8px_16px_rgba(0,0,0,0.25)]
-                    hover:border-primary/50 hover:shadow-[0_10px_20px_rgba(0,0,0,0.35)]`}
+                    hover:border-primary/50 hover:shadow-[0_10px_20px_rgba(0,0,0,0.35),0_0_20px_rgba(196,248,42,0.15)]`}
         onClick={() => handleSectionClick(title, items)}
       >
         <div className="flex items-center justify-between mb-3">
