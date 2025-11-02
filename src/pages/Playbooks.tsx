@@ -531,13 +531,13 @@ const Playbooks = () => {
                 className="min-h-[120px] sm:min-h-[150px] border-none bg-transparent resize-none focus-visible:ring-0 text-sm sm:text-base"
               />
               
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-3 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-4 pt-3">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center sm:justify-start">
                   <Sparkles className="h-4 w-4" />
                   <span className="text-xs sm:text-sm">AI Strategy Assistant</span>
                 </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-                  <div className="flex items-center gap-2 justify-center sm:justify-start sm:border-l sm:pl-4">
+                  <div className="flex items-center gap-2 justify-center sm:justify-start sm:ml-4">
                     <Switch
                       id="initial-research-mode"
                       checked={initialResearchMode}
