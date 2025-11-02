@@ -81,7 +81,11 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
 
       {/* Card Content */}
       <div 
-        className="card-mono cursor-pointer md:cursor-default shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+        className="card-mono cursor-pointer md:cursor-default 
+                   border border-white/[0.08] 
+                   shadow-[0_8px_24px_rgba(0,0,0,0.4)]
+                   hover:border-primary/50 hover:shadow-[0_10px_20px_rgba(0,0,0,0.35),0_0_20px_rgba(196,248,42,0.15)]
+                   transition-all duration-300"
         onClick={() => window.innerWidth < 768 && setIsExpanded(!isExpanded)}
       >
         <div className="space-y-4 sm:space-y-6">
