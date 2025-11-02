@@ -343,9 +343,11 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
       <div 
         className="fixed right-0 top-0 h-full w-full md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300"
         onWheel={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
       >
         {/* Mobile Tabs Layout */}
-          <div className="h-full w-full md:hidden flex flex-col overflow-hidden">
+          <div className="h-full w-full md:hidden flex flex-col overflow-hidden min-h-0">
             <Tabs defaultValue="edit" className="h-full w-full flex flex-col min-h-0">
             <div className="border-b border-white/[0.12] px-6 pt-6 pb-4 flex items-center justify-between">
               <TabsList className="bg-white/[0.05]">
@@ -373,8 +375,8 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               </div>
             </div>
 
-            <TabsContent value="edit" className="flex-1 flex flex-col mt-0">
-              <ScrollArea className="flex-1 p-6">
+            <TabsContent value="edit" className="flex-1 flex flex-col mt-0 min-h-0 overflow-hidden">
+              <ScrollArea className="flex-1 p-6 overscroll-contain">
                 <div className="space-y-4">
                   {/* Section Breadcrumb */}
                   <div className="mb-4">
@@ -482,7 +484,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
             <TabsContent value="chat" className="flex-1 flex flex-col !mt-0 overflow-hidden min-h-0">
               {/* Chat Area - Full Height */}
-                <ScrollArea className="flex-1 p-4 min-h-0" ref={scrollRef}>
+                <ScrollArea className="flex-1 p-4 min-h-0 overscroll-contain" ref={scrollRef}>
                   <div className="space-y-4">
                   {messages.map((message, index) => (
                     <div
