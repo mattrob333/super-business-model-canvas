@@ -75,10 +75,10 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
 
   return (
     <div className="w-full max-w-7xl mx-auto">
-      <div className="relative border-2 border-primary rounded-xl bg-card p-6 sm:p-8
-                shadow-[0_0_60px_rgba(196,248,42,0.2),0_0_30px_rgba(196,248,42,0.15),0_4px_20px_rgba(0,0,0,0.5),inset_0_0_20px_rgba(196,248,42,0.08)]
-                hover:shadow-[0_0_80px_rgba(196,248,42,0.3),0_0_40px_rgba(196,248,42,0.2),0_8px_28px_rgba(0,0,0,0.6),inset_0_0_24px_rgba(196,248,42,0.1)]
-                focus-within:shadow-[0_0_80px_rgba(196,248,42,0.28),0_0_40px_rgba(196,248,42,0.18),0_4px_20px_rgba(0,0,0,0.5),inset_0_0_24px_rgba(196,248,42,0.1)]
+      <div className="relative border border-primary/90 rounded-xl bg-card p-6 sm:p-8
+                shadow-[0_0_60px_rgba(196,248,42,0.2),0_0_30px_rgba(196,248,42,0.15),0_4px_20px_rgba(0,0,0,0.5),inset_0_2px_8px_rgba(0,0,0,0.3),inset_0_0_20px_rgba(196,248,42,0.08)]
+                hover:shadow-[0_0_80px_rgba(196,248,42,0.3),0_0_40px_rgba(196,248,42,0.2),0_8px_28px_rgba(0,0,0,0.6),inset_0_2px_8px_rgba(0,0,0,0.3),inset_0_0_24px_rgba(196,248,42,0.1)]
+                focus-within:shadow-[0_0_80px_rgba(196,248,42,0.28),0_0_40px_rgba(196,248,42,0.18),0_4px_20px_rgba(0,0,0,0.5),inset_0_2px_8px_rgba(0,0,0,0.3),inset_0_0_24px_rgba(196,248,42,0.1)]
                 transition-all duration-300">
         <div className="space-y-5">
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -655,8 +655,14 @@ Website: ${comp.website || 'N/A'}
             )}
 
             
-            <section>
-              <BusinessOverview 
+            <section className="relative">
+              {/* Ambient glow layer - beneath Business Overview */}
+              <div className="absolute inset-0 rounded-2xl opacity-90 
+                              shadow-[0_0_40px_rgba(196,248,42,0.18),0_0_20px_rgba(196,248,42,0.12)] 
+                              pointer-events-none -z-10" 
+                   style={{ transform: 'scale(1.02)' }} 
+              />
+              <BusinessOverview
                 data={{
                   name: analysisData.company?.name || "Unknown Company",
                   industry: analysisData.company?.industry || "Unknown",
@@ -674,7 +680,13 @@ Website: ${comp.website || 'N/A'}
               />
             </section>
 
-            <section className="w-full max-w-7xl mx-auto">
+            <section className="w-full max-w-7xl mx-auto relative">
+              {/* Unified soft light beneath Canvas grid */}
+              <div className="absolute inset-0 rounded-2xl opacity-80
+                              shadow-[0_0_35px_rgba(196,248,42,0.14),0_0_18px_rgba(196,248,42,0.10)]
+                              pointer-events-none -z-10"
+                   style={{ transform: 'scale(1.015)' }}
+              />
               <BusinessModelCanvas
                 data={{
                   keyPartners: Array.isArray(analysisData.canvas?.keyPartners) ? analysisData.canvas.keyPartners : [],
@@ -709,7 +721,13 @@ Website: ${comp.website || 'N/A'}
               />
             </section>
 
-            <section className="w-full max-w-7xl mx-auto">
+            <section className="w-full max-w-7xl mx-auto relative">
+              {/* Faint ambient glow beneath competitor cards */}
+              <div className="absolute inset-0 rounded-2xl opacity-70
+                              shadow-[0_0_30px_rgba(196,248,42,0.12),0_0_15px_rgba(196,248,42,0.08)]
+                              pointer-events-none -z-10"
+                   style={{ transform: 'scale(1.01)' }}
+              />
               <CompetitiveLandscape
                 competitors={Array.isArray(analysisData.similarCompanies) ? analysisData.similarCompanies : []} 
                 onSimilarCompanyChat={handleSimilarCompanyChat}

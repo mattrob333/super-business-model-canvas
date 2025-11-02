@@ -81,7 +81,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
 
       {/* Card Content */}
       <div 
-        className="card-mono cursor-pointer md:cursor-default"
+        className="card-mono cursor-pointer md:cursor-default shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
         onClick={() => window.innerWidth < 768 && setIsExpanded(!isExpanded)}
       >
         <div className="space-y-4 sm:space-y-6">
