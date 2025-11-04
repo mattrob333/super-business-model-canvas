@@ -16,8 +16,10 @@ const urlSchema = z.string()
   .min(3, "URL is too short")
   .max(500, "URL is too long")
   .refine((val) => {
-    // Remove common prefixes for validation
-    const cleaned = val.replace(/^(https?:\/\/)?(www\.)?/i, '');
+    // Remove common prefixes and trailing slashes/paths for validation
+    const cleaned = val
+      .replace(/^(https?:\/\/)?(www\.)?/i, '') // Remove protocol and www
+      .replace(/\/.*$/, ''); // Remove trailing slash and any path
     // Check if it looks like a domain (contains at least one dot and valid characters)
     return /^[a-zA-Z0-9][a-zA-Z0-9-_.]+\.[a-zA-Z]{2,}$/i.test(cleaned);
   }, "Please enter a valid domain (e.g., example.com)");
