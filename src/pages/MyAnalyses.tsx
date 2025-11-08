@@ -48,6 +48,7 @@ const MyAnalyses = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [reportDrawerOpen, setReportDrawerOpen] = useState(false);
+  const [expandedAnalyses, setExpandedAnalyses] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -166,6 +167,18 @@ const MyAnalyses = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const toggleReportsExpanded = (analysisId: string) => {
+    setExpandedAnalyses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(analysisId)) {
+        newSet.delete(analysisId);
+      } else {
+        newSet.add(analysisId);
+      }
+      return newSet;
+    });
   };
 
   const handleExportPackage = async (analysis: SavedAnalysis) => {
@@ -303,42 +316,72 @@ const MyAnalyses = () => {
                           <FileText className="h-4 w-4" />
                           Generated Reports
                         </h4>
-                        {analysis.generated_reports.map((report) => {
-                          const IconComponent = getIconComponent(report.frameworks?.icon);
+                        
+                        {/* Show first 3 reports or all if expanded */}
+                        {(() => {
+                          const INITIAL_DISPLAY_COUNT = 3;
+                          const isExpanded = expandedAnalyses.has(analysis.id);
+                          const reportsToShow = isExpanded 
+                            ? analysis.generated_reports 
+                            : analysis.generated_reports.slice(0, INITIAL_DISPLAY_COUNT);
+                          const remainingCount = analysis.generated_reports.length - INITIAL_DISPLAY_COUNT;
+                          
                           return (
-                            <div
-                              key={report.id}
-                              className="flex items-center justify-between p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
-                              onClick={() => {
-                                setSelectedReportId(report.id);
-                                setReportDrawerOpen(true);
-                              }}
-                            >
-                              <div className="flex items-center gap-2 flex-1">
-                                <IconComponent className="h-4 w-4 text-primary" />
-                                <div>
-                                  <p className="font-medium text-xs">
-                                    {report.frameworks?.title || "Report"}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {new Date(report.created_at).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteReport(report.id);
-                                }}
-                                className="opacity-70 group-hover:opacity-100"
-                              >
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
-                            </div>
+                            <>
+                              {reportsToShow.map((report) => {
+                                const IconComponent = getIconComponent(report.frameworks?.icon);
+                                return (
+                                  <div
+                                    key={report.id}
+                                    className="flex items-center justify-between p-2 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
+                                    onClick={() => {
+                                      setSelectedReportId(report.id);
+                                      setReportDrawerOpen(true);
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <IconComponent className="h-4 w-4 text-primary" />
+                                      <div>
+                                        <p className="font-medium text-xs">
+                                          {report.frameworks?.title || "Report"}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {new Date(report.created_at).toLocaleDateString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteReport(report.id);
+                                      }}
+                                      className="opacity-70 group-hover:opacity-100"
+                                    >
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+                              
+                              {/* Show More / Show Less Button */}
+                              {analysis.generated_reports.length > INITIAL_DISPLAY_COUNT && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full text-xs"
+                                  onClick={() => toggleReportsExpanded(analysis.id)}
+                                >
+                                  {isExpanded 
+                                    ? "Show less" 
+                                    : `Show ${remainingCount} more ${remainingCount === 1 ? 'report' : 'reports'}`
+                                  }
+                                </Button>
+                              )}
+                            </>
                           );
-                        })}
+                        })()}
                       </div>
                     )}
 
