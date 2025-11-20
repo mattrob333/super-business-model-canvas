@@ -38,10 +38,10 @@ serve(async (req) => {
       throw new Error('URL is required');
     }
 
-    const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
+    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
 
-    if (!PERPLEXITY_API_KEY) {
-      throw new Error('Perplexity API key not configured');
+    if (!XAI_API_KEY) {
+      throw new Error('xAI API key not configured');
     }
 
     console.log('Analyzing company:', url);
@@ -123,23 +123,18 @@ Return in this exact JSON format:
   ]
 }`;
 
-        const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+        const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+            'Authorization': `Bearer ${XAI_API_KEY}`,
             'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Origin': 'https://api.perplexity.ai',
-            'Referer': 'https://api.perplexity.ai/',
           },
           body: JSON.stringify({
-            model: 'sonar-pro',
+            model: 'grok-4-1-fast-non-reasoning',
             messages: [
               {
                 role: 'system',
-                content: 'You are a business research analyst. Research companies thoroughly using web search and return detailed, accurate information in JSON format without markdown. When finding similar companies, focus on companies with similar business models, services, or target markets in the same industry, not just name similarity.'
+                content: 'You are a business research analyst. Use your web_search tool to research companies thoroughly and return detailed, accurate information in JSON format without markdown. When finding similar companies, focus on companies with similar business models, services, or target markets in the same industry, not just name similarity.'
               },
               {
                 role: 'user',
@@ -148,16 +143,17 @@ Return in this exact JSON format:
             ],
             temperature: 0.3,
             max_tokens: 4000,
+            tools: [{ type: 'web_search' }],
           }),
         });
 
-        if (!perplexityResponse.ok) {
-          const errorText = await perplexityResponse.text();
-          console.error(`Attempt ${attempt} - Perplexity API error (${perplexityResponse.status}):`, errorText.substring(0, 500));
+        if (!grokResponse.ok) {
+          const errorText = await grokResponse.text();
+          console.error(`Attempt ${attempt} - Grok API error (${grokResponse.status}):`, errorText.substring(0, 500));
           
-          // If it's a Cloudflare challenge, wait and retry
-          if (errorText.includes('Just a moment') || errorText.includes('cloudflare')) {
-            lastError = new Error('API rate limit or bot protection detected');
+          // If rate limited, wait and retry
+          if (grokResponse.status === 429) {
+            lastError = new Error('API rate limit exceeded');
             if (attempt < maxRetries) {
               const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
               console.log(`Waiting ${waitTime}ms before retry...`);
@@ -166,11 +162,11 @@ Return in this exact JSON format:
             }
           }
           
-          throw new Error(`API request failed with status ${perplexityResponse.status}`);
+          throw new Error(`API request failed with status ${grokResponse.status}`);
         }
 
-        const perplexityData = await perplexityResponse.json();
-        const analysisText = perplexityData.choices[0].message.content;
+        const grokData = await grokResponse.json();
+        const analysisText = grokData.choices[0].message.content;
         
         console.log('Analysis received successfully');
 
