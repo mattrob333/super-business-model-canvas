@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { streamGrokChat } from "../_shared/grok-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +35,7 @@ serve(async (req) => {
 
     console.log('Authenticated request received');
 
-    const { sessionId, companyId, userMessage, conversationHistory, useResearchMode, selectedModel, selectedReports } = await req.json();
+    const { sessionId, companyId, userMessage, conversationHistory, selectedReports } = await req.json();
     
     console.log('Received request:', { sessionId, companyId, hasMessage: !!userMessage });
     
@@ -222,8 +223,7 @@ CONVERSATION STYLE:
 `
       : '';
 
-    const systemPrompt = useResearchMode
-      ? `You are a senior strategy consultant with real-time web search capabilities. You're having a strategic conversation with the leadership team of ${companyName}.
+    const systemPrompt = `You are a senior strategy consultant with real-time web search capabilities. You're having a strategic conversation with the leadership team of ${companyName}.
 
 CRITICAL INSTRUCTIONS FOR COMPETITIVE ANALYSIS:
 1. The "SIMILAR COMPANIES" section below lists the user's direct competitors - treat them as such
@@ -240,7 +240,7 @@ ${reportsContext}
 ${frameworksSection}
 
 YOUR ROLE:
-1. Use web search to research the SPECIFIC similar companies listed above, along with market trends and industry developments
+1. Use web search (automatically activated when needed) to research the SPECIFIC similar companies listed above, along with market trends and industry developments
 2. Provide strategic advice backed by current market intelligence about those companies
 3. When users describe strategic goals or challenges, recommend relevant frameworks from the toolkit above
 4. Ask clarifying questions when needed to understand their goals better
@@ -254,116 +254,23 @@ GUIDELINES:
 - Ask follow-up questions to dig deeper into their challenges
 - Be encouraging but realistic about what's achievable
 - Draw on both web search results and your knowledge of industry best practices
-
-Remember: You're helping them navigate strategic challenges with the wisdom of a McKinsey consultant but the approachability of a trusted advisor.`
-      : `You are a senior strategy consultant with expertise across all business functions. You're having a strategic conversation with the leadership team of ${companyName}.
-
-${baseContext}
-
-${reportsContext}
-
-${frameworksSection}
-
-YOUR ROLE:
-1. Provide strategic advice and actionable recommendations
-2. When users describe strategic goals or challenges, recommend 2-3 relevant frameworks from your toolkit
-3. Ask clarifying questions when needed to understand their goals better
-4. Reference specific aspects of their business model in your responses
-5. Suggest concrete next steps they can take
-6. Be conversational, supportive, and like a trusted advisor
-
-GUIDELINES:
-- Keep responses focused and actionable (300-500 words typically)
-- Reference their specific business context in your answers
-- Ask follow-up questions to dig deeper into their challenges
-- Be encouraging but realistic about what's achievable
-- Draw on your encyclopedic knowledge of strategic frameworks and business best practices
 - Tailor framework recommendations to ${companyName}'s industry (${companyData.industry || 'their industry'}), business model, and competitive context
 
 Remember: You're helping them navigate strategic challenges with the wisdom of a McKinsey consultant but the approachability of a trusted advisor.`;
 
     // Build message history
     const messages = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system' as const, content: systemPrompt },
       ...(conversationHistory || []),
-      { role: 'user', content: userMessage }
+      { role: 'user' as const, content: userMessage }
     ];
 
-    let aiResponse;
-
-    if (useResearchMode) {
-      // Use Perplexity for research mode with web search
-      const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
-      if (!PERPLEXITY_API_KEY) {
-        throw new Error('PERPLEXITY_API_KEY not configured');
-      }
-
-      console.log('Calling Perplexity API with sonar-pro for research...');
-      aiResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'sonar-pro',
-          messages,
-          temperature: 0.5,
-          max_tokens: 2500,
-        }),
-      });
-    } else {
-      // Use Lovable AI Gateway with selected model
-      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-      if (!LOVABLE_API_KEY) {
-        throw new Error('LOVABLE_API_KEY not configured');
-      }
-
-      // Map selected model to API model name
-      const modelMap: { [key: string]: string } = {
-        'gemini-pro': 'google/gemini-2.5-pro',
-        'gemini-flash': 'google/gemini-2.5-flash',
-      };
-      
-      const aiModel = modelMap[selectedModel] || 'google/gemini-2.5-pro';
-
-      console.log(`Calling Lovable AI Gateway with ${aiModel}...`);
-      aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: aiModel,
-          messages,
-          stream: true,
-          temperature: 0.7,
-          max_tokens: 3000,
-        }),
-      });
+    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
+    if (!XAI_API_KEY) {
+      throw new Error('XAI_API_KEY not configured');
     }
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI Gateway error:', aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: 'AI credits depleted. Please add credits to your workspace.' }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
-    }
+    console.log('Calling Grok API with streaming and auto web search...');
 
     // Store or update session
     let currentSessionId = sessionId;
@@ -388,34 +295,50 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
       }
     }
 
-    // Return the response (streaming for Gemini, non-streaming for Perplexity)
-    if (useResearchMode) {
-      // Perplexity returns non-streaming JSON response
-      const data = await aiResponse.json();
-      const content = data.choices?.[0]?.message?.content || 'No response generated';
-      
-      // Convert to SSE format for consistency with frontend
-      const sseData = `data: ${JSON.stringify({
-        choices: [{ delta: { content } }]
-      })}\n\ndata: [DONE]\n\n`;
-      
-      return new Response(sseData, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/event-stream',
-          'X-Session-Id': currentSessionId || '',
-        },
-      });
-    } else {
-      // Return Gemini streaming response as-is
-      return new Response(aiResponse.body, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/event-stream',
-          'X-Session-Id': currentSessionId || '',
-        },
-      });
-    }
+    // Create streaming response using Grok
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          await streamGrokChat({
+            messages,
+            search_parameters: {
+              mode: 'auto', // Let Grok autonomously decide when to search
+              sources: ['web', 'x'],
+              return_citations: false
+            },
+            temperature: 0.7,
+            maxTokens: 3000,
+            onChunk: (text: string) => {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                choices: [{
+                  delta: { content: text }
+                }]
+              })}\n\n`));
+            },
+            onDone: () => {
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+            },
+            onError: (error: Error) => {
+              console.error('Grok streaming error:', error);
+              controller.error(error);
+            }
+          });
+        } catch (error) {
+          console.error('Stream error:', error);
+          controller.error(error);
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        'X-Session-Id': currentSessionId || '',
+      },
+    });
 
   } catch (error) {
     console.error('Error in strategy-coach-chat:', error);

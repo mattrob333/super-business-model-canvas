@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { streamGrokChat } from "../_shared/grok-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -123,50 +124,25 @@ Return in this exact JSON format:
   ]
 }`;
 
-        const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${XAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'grok-4-1-fast-non-reasoning',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a business research analyst. Use your web_search tool to research companies thoroughly and return detailed, accurate information in JSON format without markdown. When finding similar companies, focus on companies with similar business models, services, or target markets in the same industry, not just name similarity.'
-              },
-              {
-                role: 'user',
-                content: analysisPrompt
-              }
-            ],
-            temperature: 0.3,
-            max_tokens: 4000,
-            tools: [{ type: 'web_search' }],
-          }),
-        });
-
-        if (!grokResponse.ok) {
-          const errorText = await grokResponse.text();
-          console.error(`Attempt ${attempt} - Grok API error (${grokResponse.status}):`, errorText.substring(0, 500));
-          
-          // If rate limited, wait and retry
-          if (grokResponse.status === 429) {
-            lastError = new Error('API rate limit exceeded');
-            if (attempt < maxRetries) {
-              const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
-              console.log(`Waiting ${waitTime}ms before retry...`);
-              await new Promise(resolve => setTimeout(resolve, waitTime));
-              continue;
+        const analysisText = await streamGrokChat({
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a business research analyst. Use web search to research companies thoroughly and return detailed, accurate information in JSON format without markdown. When finding similar companies, focus on companies with similar business models, services, or target markets in the same industry, not just name similarity.'
+            },
+            {
+              role: 'user',
+              content: analysisPrompt
             }
-          }
-          
-          throw new Error(`API request failed with status ${grokResponse.status}`);
-        }
-
-        const grokData = await grokResponse.json();
-        const analysisText = grokData.choices[0].message.content;
+          ],
+          search_parameters: {
+            mode: 'on',
+            sources: ['web'],
+            return_citations: false
+          },
+          temperature: 0.3,
+          maxTokens: 4000,
+        });
         
         console.log('Analysis received successfully');
 

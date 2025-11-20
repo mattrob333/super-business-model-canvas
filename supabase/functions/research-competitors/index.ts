@@ -1,3 +1,5 @@
+import { callGrokChat } from "../_shared/grok-client.ts";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -11,10 +13,10 @@ Deno.serve(async (req) => {
   try {
     const { company_name, industry, sector } = await req.json();
     
-    const perplexityApiKey = Deno.env.get('PERPLEXITY_API_KEY');
+    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
     
-    if (!perplexityApiKey) {
-      console.log('Perplexity API key not configured, using fallback');
+    if (!XAI_API_KEY) {
+      console.log('XAI API key not configured, using fallback');
       return new Response(
         JSON.stringify({ 
           research: '',
@@ -34,41 +36,27 @@ Deno.serve(async (req) => {
     
     Be specific and factual. Only include verified implementations from the last 2 years. Format as a concise list.`;
 
-    console.log('Calling Perplexity API for competitive research...');
+    console.log('Calling Grok API for competitive research...');
 
-    const response = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${perplexityApiKey}`,
-        'Content-Type': 'application/json',
+    const researchData = await callGrokChat({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a business intelligence researcher. Provide factual, verified information about company AI implementations with sources.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      search_parameters: {
+        mode: 'on',
+        sources: ['web'],
+        return_citations: false
       },
-      body: JSON.stringify({
-        model: 'llama-3.1-sonar-large-128k-online',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a business intelligence researcher. Provide factual, verified information about company AI implementations with sources.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 1000,
-      }),
+      temperature: 0.2,
+      maxTokens: 1000,
     });
-
-    if (!response.ok) {
-      console.error('Perplexity API error:', response.status, await response.text());
-      return new Response(
-        JSON.stringify({ research: '', fallback: true }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const data = await response.json();
-    const researchData = data.choices[0].message.content;
 
     console.log('Competitive research completed successfully');
 
