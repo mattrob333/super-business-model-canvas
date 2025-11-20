@@ -123,8 +123,7 @@ Note: Grok will automatically use web search when needed to answer questions req
           await streamGrokChat({
             messages,
             search_parameters: {
-              mode: 'auto', // Let Grok decide when web search is needed
-              sources: ['web'],
+              mode: 'auto',
               return_citations: false
             },
             temperature: 0.7,

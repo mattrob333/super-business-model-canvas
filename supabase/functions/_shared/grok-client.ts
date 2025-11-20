@@ -5,7 +5,6 @@ interface GrokMessage {
 
 interface GrokSearchParameters {
   mode: 'on' | 'off' | 'auto';
-  sources?: ('web' | 'x')[];
   return_citations?: boolean;
 }
 

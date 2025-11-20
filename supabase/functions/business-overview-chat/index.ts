@@ -104,8 +104,7 @@ Always consider the full context including the additional notes field when provi
           await streamGrokChat({
             messages,
             search_parameters: {
-              mode: 'auto', // Let Grok decide when to search
-              sources: ['web'],
+              mode: 'auto',
               return_citations: false
             },
             maxTokens: 1500,

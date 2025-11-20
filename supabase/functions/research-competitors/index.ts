@@ -51,7 +51,6 @@ Deno.serve(async (req) => {
       ],
       search_parameters: {
         mode: 'on',
-        sources: ['web'],
         return_citations: false
       },
       temperature: 0.2,

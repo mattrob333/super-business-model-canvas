@@ -135,11 +135,10 @@ Return in this exact JSON format:
               content: analysisPrompt
             }
           ],
-          search_parameters: {
-            mode: 'on',
-            sources: ['web'],
-            return_citations: false
-          },
+        search_parameters: {
+          mode: 'on',
+          return_citations: false
+        },
           temperature: 0.3,
           maxTokens: 4000,
         });
