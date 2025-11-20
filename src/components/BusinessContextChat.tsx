@@ -8,13 +8,6 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ReportSelector } from "@/components/ReportSelector";
 
 interface Message {
@@ -29,7 +22,6 @@ interface BusinessContextChatProps {
   selectedAnalysis: any;
   initialPrompt: string;
   userId: string;
-  initialResearchMode?: boolean;
   availableReports: any[];
   selectedReports: string[];
   onReportsChange: (reportIds: string[]) => void;
@@ -41,7 +33,6 @@ export const BusinessContextChat = ({
   selectedAnalysis,
   initialPrompt,
   userId,
-  initialResearchMode = false,
   availableReports,
   selectedReports,
   onReportsChange,
@@ -50,8 +41,6 @@ export const BusinessContextChat = ({
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [useResearchMode, setUseResearchMode] = useState(initialResearchMode);
-  const [selectedModel, setSelectedModel] = useState<string>("gemini-pro");
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -61,13 +50,6 @@ export const BusinessContextChat = ({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
-
-  // Sync research mode with initial prop when drawer opens
-  useEffect(() => {
-    if (chatState === 'open') {
-      setUseResearchMode(initialResearchMode);
-    }
-  }, [chatState, initialResearchMode]);
 
   // Send initial prompt when chat opens
   useEffect(() => {
@@ -112,8 +94,6 @@ export const BusinessContextChat = ({
             sessionId,
             companyId: selectedAnalysis.id,
             userMessage: textToSend,
-            useResearchMode,
-            selectedModel,
             selectedReports,
             conversationHistory: messages.map((m) => ({
               role: m.role,
@@ -384,25 +364,12 @@ export const BusinessContextChat = ({
           {/* Main input container */}
           <div className="relative rounded-2xl bg-[#111111] p-4 shadow-[0_8px_16px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.06)]">
             <div className="flex items-center gap-2 mb-3">
-              <Select
-                value={selectedModel}
-                onValueChange={(value) => {
-                  setSelectedModel(value);
-                  setUseResearchMode(value === "perplexity");
-                }}
-                disabled={isLoading}
-              >
-                <SelectTrigger className="w-[180px] h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gemini-pro" className="text-xs">Gemini 2.5 Pro</SelectItem>
-                  <SelectItem value="gemini-flash" className="text-xs">Gemini 2.5 Flash</SelectItem>
-                  <SelectItem value="perplexity" className="text-xs">Perplexity</SelectItem>
-                </SelectContent>
-              </Select>
               <Badge variant="outline" className="text-xs border-white/[0.08] bg-white/[0.02]">
                 {selectedAnalysis.company_name}
+              </Badge>
+              <Badge variant="outline" className="text-xs border-white/[0.08] bg-white/[0.02]">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Grok 4.1 Fast
               </Badge>
             </div>
             <div className="flex items-center gap-3">

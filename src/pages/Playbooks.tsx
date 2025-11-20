@@ -58,7 +58,6 @@ const Playbooks = () => {
   const [chatState, setChatState] = useState<'closed' | 'minimized' | 'open'>('closed');
   const [selectedFramework, setSelectedFramework] = useState<string | null>(null);
   const [showFrameworkModal, setShowFrameworkModal] = useState(false);
-  const [initialResearchMode, setInitialResearchMode] = useState(false);
   const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false);
   const [currentReportId, setCurrentReportId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -536,30 +535,14 @@ const Playbooks = () => {
                   <Sparkles className="h-4 w-4" />
                   <span className="text-xs sm:text-sm">AI Strategy Assistant</span>
                 </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-                  <div className="flex items-center gap-2 justify-center sm:justify-start sm:ml-4">
-                    <Switch
-                      id="initial-research-mode"
-                      checked={initialResearchMode}
-                      onCheckedChange={setInitialResearchMode}
-                    />
-                    <Label 
-                      htmlFor="initial-research-mode" 
-                      className="text-xs sm:text-sm cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Globe className="h-3.5 w-3.5" />
-                      Research Mode
-                    </Label>
-                  </div>
-                  <Button 
-                    onClick={handleStartChat}
-                    disabled={!selectedAnalysis || !goalInput.trim()}
-                    className="w-full sm:w-auto min-h-[44px] hover:shadow-[0_0_20px_rgba(196,248,42,0.3)] transition-all duration-300"
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Start Strategy Session
-                  </Button>
-                </div>
+                <Button 
+                  onClick={handleStartChat}
+                  disabled={!selectedAnalysis || !goalInput.trim()}
+                  className="w-full sm:w-auto min-h-[44px] hover:shadow-[0_0_20px_rgba(196,248,42,0.3)] transition-all duration-300"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Start Strategy Session
+                </Button>
               </div>
             </div>
 
@@ -774,7 +757,6 @@ const Playbooks = () => {
             selectedAnalysis={selectedAnalysis}
             initialPrompt={goalInput}
             userId={user.id}
-            initialResearchMode={initialResearchMode}
             availableReports={availableReports}
             selectedReports={selectedReports}
             onReportsChange={setSelectedReports}

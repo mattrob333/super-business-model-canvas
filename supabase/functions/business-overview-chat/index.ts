@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { streamGrokChat } from "../_shared/grok-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,9 +30,9 @@ serve(async (req) => {
       hasOverviewData: !!overviewData
     });
 
-    const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
-    if (!PERPLEXITY_API_KEY) {
-      throw new Error('PERPLEXITY_API_KEY not configured');
+    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
+    if (!XAI_API_KEY) {
+      throw new Error('XAI_API_KEY not configured');
     }
 
     // Build comprehensive context from overview data
@@ -87,47 +88,58 @@ Always consider the full context including the additional notes field when provi
     }
 
     const messages = [
-      { role: "system", content: systemPrompt },
+      { role: "system" as const, content: systemPrompt },
       ...filteredHistory,
-      { role: "user", content: userMessage }
+      { role: "user" as const, content: userMessage }
     ];
 
-    console.log('Calling Perplexity API...');
+    console.log('Calling Grok API with streaming...');
 
-    const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'sonar',
-        messages: messages,
-        max_tokens: 1500,
-        temperature: 0.7,
-      }),
+    // Create streaming response
+    let fullResponse = '';
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          await streamGrokChat({
+            messages,
+            search_parameters: {
+              mode: 'auto', // Let Grok decide when to search
+              sources: ['web'],
+              return_citations: false
+            },
+            maxTokens: 1500,
+            temperature: 0.7,
+            onChunk: (text: string) => {
+              fullResponse += text;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                choices: [{
+                  delta: { content: text }
+                }]
+              })}\n\n`));
+            },
+            onDone: () => {
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+            },
+            onError: (error: Error) => {
+              console.error('Grok streaming error:', error);
+              controller.error(error);
+            }
+          });
+        } catch (error) {
+          console.error('Stream error:', error);
+          controller.error(error);
+        }
+      }
     });
 
-    if (!perplexityResponse.ok) {
-      const errorText = await perplexityResponse.text();
-      console.error('Perplexity API error:', errorText);
-      throw new Error(`Perplexity API error: ${perplexityResponse.status}`);
-    }
-
-    const data = await perplexityResponse.json();
-    console.log('Perplexity API response received');
-
-    const response = data.choices[0].message.content;
-
-    return new Response(
-      JSON.stringify({ response }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
-      }
-    );
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+      },
+    });
 
   } catch (error) {
     console.error('Error in business-overview-chat function:', error);

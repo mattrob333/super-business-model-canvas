@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { streamGrokChat } from "../_shared/grok-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,83 +81,7 @@ Example format:
 
 Use SMART framework (Specific, Measurable, Achievable, Relevant, Time-bound).
 
-Note: If you need current market data to answer a question, web research capabilities will be activated automatically for you.`;
-
-    // Auto-detect if web research is needed
-    const needsWebResearch = (
-      userMessage.toLowerCase().includes('trend') ||
-      userMessage.toLowerCase().includes('market data') ||
-      userMessage.toLowerCase().includes('competitor') ||
-      userMessage.toLowerCase().includes('industry') ||
-      userMessage.toLowerCase().includes('benchmark') ||
-      userMessage.toLowerCase().includes('statistics') ||
-      userMessage.toLowerCase().includes('current') ||
-      userMessage.toLowerCase().includes('latest') ||
-      userMessage.toLowerCase().includes('what are companies doing') ||
-      userMessage.toLowerCase().includes('industry standard') ||
-      userMessage.toLowerCase().includes('validate')
-    );
-
-    // Handle Perplexity research mode
-    if (needsWebResearch) {
-      const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
-      if (!PERPLEXITY_API_KEY) {
-        console.warn('Perplexity API key not configured, falling back to Gemini');
-      } else {
-        console.log('Web research detected, using Perplexity');
-
-        try {
-          const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'sonar-pro',
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userMessage }
-              ],
-              temperature: 0.2,
-              max_tokens: 2000,
-            }),
-          });
-
-          if (perplexityResponse.ok) {
-            const result = await perplexityResponse.json();
-            const content = result.choices[0].message.content;
-
-            // Return as SSE format for consistency with streaming responses
-            const encoder = new TextEncoder();
-            const stream = new ReadableStream({
-              start(controller) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                  choices: [{
-                    delta: { content }
-                  }]
-                })}\n\n`));
-                controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-                controller.close();
-              }
-            });
-
-            return new Response(stream, {
-              headers: {
-                ...corsHeaders,
-                'Content-Type': 'text/event-stream',
-              },
-            });
-          } else {
-            console.error('Perplexity API error:', perplexityResponse.status);
-            // Fall through to use Gemini
-          }
-        } catch (error) {
-          console.error('Perplexity error, falling back to Gemini:', error);
-          // Fall through to use Gemini
-        }
-      }
-    }
+Note: Grok will automatically use web search when needed to answer questions requiring current market data.`;
 
     // Filter conversation history to ensure proper user-assistant alternation
     const filteredHistory: any[] = [];
@@ -178,47 +103,56 @@ Note: If you need current market data to answer a question, web research capabil
     }
 
     const messages = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system' as const, content: systemPrompt },
       ...filteredHistory,
-      { role: 'user', content: userMessage }
+      { role: 'user' as const, content: userMessage }
     ];
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages,
-        stream: true,
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI Gateway error:', aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'AI credits depleted. Please add credits to your workspace.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      throw new Error('AI chat failed');
+    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
+    if (!XAI_API_KEY) {
+      throw new Error('XAI_API_KEY not configured');
     }
 
-    // Return streaming response
-    return new Response(aiResponse.body, {
+    console.log('Calling Grok API with streaming...');
+
+    // Create streaming response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          await streamGrokChat({
+            messages,
+            search_parameters: {
+              mode: 'auto', // Let Grok decide when web search is needed
+              sources: ['web'],
+              return_citations: false
+            },
+            temperature: 0.7,
+            maxTokens: 2000,
+            onChunk: (text: string) => {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                choices: [{
+                  delta: { content: text }
+                }]
+              })}\n\n`));
+            },
+            onDone: () => {
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+            },
+            onError: (error: Error) => {
+              console.error('Grok streaming error:', error);
+              controller.error(error);
+            }
+          });
+        } catch (error) {
+          console.error('Stream error:', error);
+          controller.error(error);
+        }
+      }
+    });
+
+    return new Response(stream, {
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/event-stream',

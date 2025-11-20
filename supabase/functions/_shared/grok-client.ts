@@ -3,13 +3,15 @@ interface GrokMessage {
   content: string;
 }
 
-interface GrokToolCall {
-  type: 'web_search' | 'x_search' | 'code_execution';
+interface GrokSearchParameters {
+  mode: 'on' | 'off' | 'auto';
+  sources?: ('web' | 'x')[];
+  return_citations?: boolean;
 }
 
 interface StreamGrokChatOptions {
   messages: GrokMessage[];
-  tools?: GrokToolCall[];
+  search_parameters?: GrokSearchParameters;
   model?: string;
   temperature?: number;
   maxTokens?: number;
@@ -34,7 +36,7 @@ export async function streamGrokChat(options: StreamGrokChatOptions): Promise<st
       temperature: options.temperature || 0.7,
       max_tokens: options.maxTokens,
       stream: true,
-      tools: options.tools || [],
+      ...(options.search_parameters && { search_parameters: options.search_parameters }),
     }),
   });
 
@@ -115,7 +117,7 @@ export async function callGrokChat(options: Omit<StreamGrokChatOptions, 'onChunk
       temperature: options.temperature || 0.7,
       max_tokens: options.maxTokens,
       stream: false,
-      tools: options.tools || [],
+      ...(options.search_parameters && { search_parameters: options.search_parameters }),
     }),
   });
 
