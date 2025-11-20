@@ -303,8 +303,7 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
           await streamGrokChat({
             messages,
             search_parameters: {
-              mode: 'auto', // Let Grok autonomously decide when to search
-              sources: ['web', 'x'],
+              mode: 'auto',
               return_citations: false
             },
             temperature: 0.7,
