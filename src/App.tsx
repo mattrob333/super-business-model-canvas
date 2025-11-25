@@ -29,6 +29,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/admin/frameworks" element={<AdminFrameworks />} />
+          <Route path="/admin/frameworks/new" element={<FrameworkEditor />} />
           <Route path="/admin/frameworks/:id/edit" element={<FrameworkEditor />} />
           <Route path="/my-analyses" element={<MyAnalyses />} />
           <Route path="/playbooks" element={<Playbooks />} />
