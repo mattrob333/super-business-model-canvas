@@ -88,6 +88,73 @@ export function ReportViewerDrawer({
     }
   };
 
+  // Wire up the "Copy JSON" button for Org Chart reports and protect the JSON block from edits
+  useEffect(() => {
+    if (!isOpen || !contentRef.current) return;
+
+    const root = contentRef.current;
+
+    // Make JSON section non-editable even though the whole report wrapper is contentEditable
+    const jsonSections = root.querySelectorAll<HTMLElement>(".json-section");
+    jsonSections.forEach((section) => {
+      section.setAttribute("contenteditable", "false");
+    });
+
+    const button = root.querySelector<HTMLButtonElement>(".copy-btn");
+    if (!button) return;
+
+    const handleCopyClick = async (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const jsonElement = root.querySelector<HTMLElement>("#json-data");
+      if (!jsonElement) return;
+
+      const jsonText = jsonElement.textContent || "";
+
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(jsonText);
+          button.textContent = "✓ Copied!";
+        } else {
+          const textArea = document.createElement("textarea");
+          textArea.value = jsonText;
+          textArea.style.position = "fixed";
+          textArea.style.left = "-999999px";
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+
+          try {
+            document.execCommand("copy");
+            button.textContent = "✓ Copied!";
+          } catch (err) {
+            console.error("Fallback copy failed:", err);
+            button.textContent = "❌ Failed";
+          }
+
+          document.body.removeChild(textArea);
+        }
+
+        setTimeout(() => {
+          button.textContent = "📋 Copy JSON";
+        }, 2000);
+      } catch (err) {
+        console.error("Copy failed:", err);
+        button.textContent = "❌ Failed";
+        setTimeout(() => {
+          button.textContent = "📋 Copy JSON";
+        }, 2000);
+      }
+    };
+
+    button.addEventListener("click", handleCopyClick);
+
+    return () => {
+      button.removeEventListener("click", handleCopyClick);
+    };
+  }, [isOpen, reportHtml]);
+
   const handleSaveChanges = async () => {
     if (!reportId) return;
     
