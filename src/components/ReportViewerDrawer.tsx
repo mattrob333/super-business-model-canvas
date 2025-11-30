@@ -201,16 +201,36 @@ export function ReportViewerDrawer({
 
   const handleCopyHtml = async () => {
     try {
-      await copyHtmlToClipboard(reportHtml);
+      let textToCopy = reportHtml;
+
+      // Prefer copying the visible text version so it works well when pasting into other apps
+      if (contentRef.current) {
+        textToCopy = contentRef.current.innerText;
+      }
+
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(textToCopy);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = textToCopy;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+
       toast({
         title: "Copied",
-        description: "HTML copied to clipboard"
+        description: "Content copied to clipboard as text",
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to copy HTML",
-        variant: "destructive"
+        description: "Failed to copy content",
+        variant: "destructive",
       });
     }
   };
