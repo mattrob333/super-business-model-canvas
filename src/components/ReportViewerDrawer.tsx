@@ -100,8 +100,21 @@ export function ReportViewerDrawer({
       section.setAttribute("contenteditable", "false");
     });
 
+    const jsonCode = root.querySelector<HTMLElement>("#json-data");
+    if (jsonCode) {
+      jsonCode.setAttribute("contenteditable", "false");
+    }
+
+    const jsonPre = root.querySelector<HTMLElement>(".json-output");
+    if (jsonPre) {
+      jsonPre.setAttribute("contenteditable", "false");
+    }
+
     const button = root.querySelector<HTMLButtonElement>(".copy-btn");
     if (!button) return;
+
+    // Remove any inline onclick handler from the template since scripts don't execute in this context
+    button.removeAttribute("onclick");
 
     const handleCopyClick = async (event: Event) => {
       event.preventDefault();
