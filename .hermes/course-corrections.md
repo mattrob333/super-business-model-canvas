@@ -15,6 +15,15 @@ _(none — inner loop in alignment as of last audit)_
 
 ## Resolved Corrections
 
+### CORR-003: `useCanvasSectionRun` hardcodes `modelProvider: "mock"` — breaks live mode (HIGH)
+**Resolved:** 2026-06-24 (commit 6db28f0) — In live mode, `modelProvider`/`modelName` are now omitted from the `startRun()` call so the edge function auto-detects from env vars. In mock mode, the values are still passed (harmless, ignored by MockAgentRuntime).
+
+### CORR-004: `.env` tracked in git — add to `.gitignore` (LOW)
+**Resolved:** 2026-06-24 (commit 7181228) — `.env` added to `.gitignore` and `git rm --cached .env` executed. File remains on disk, no longer tracked.
+
+### CORR-005: Phase 7 remaining tasks — guidance for next tick (MEDIUM)
+**Resolved:** 2026-06-24 (commit 6db28f0) — Guidance applied: CORR-003 fixed first (blocks live mode), then model routing (task 3) addressed as part of Phase 7 continuation. The model routing wiring reads `model_route_key` from agent_profiles and passes provider info to the edge function. Tasks 1 (config persistence) and 2 (health check) remain as Phase 7 continuation work.
+
 ### CORR-001: Lint baseline is wrong — do NOT attempt to fix pre-existing errors
 **Resolved:** 2026-06-24 (commit d51c1df) — Build-state.md updated with correct lint baseline (52 errors / 16 warnings on main). Confirmed current branch: 52 errors, 20 warnings (zero new errors, +4 warnings from new pages — all useMemo dependency warnings, acceptable). Did not attempt to fix pre-existing errors.
 
