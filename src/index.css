@@ -2,51 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    /* Monochrome Futurism Design System */
-    --background: 0 0% 0%; /* #000000 - pure black */
-    --foreground: 0 0% 96.1%; /* #F5F5F5 - off-white text */
+    /* Enterprise Light Mode (default) */
+    --background: 210 20% 98%;       /* near-white cool gray */
+    --foreground: 222 47% 11%;       /* near-black slate text */
 
-    --card: 0 0% 1.6%; /* same as background for cards */
-    --card-foreground: 0 0% 96.1%;
+    --card: 0 0% 100%;               /* white surfaces */
+    --card-foreground: 222 47% 11%;
 
-    --popover: 0 0% 6%; /* slightly lighter for popovers */
-    --popover-foreground: 0 0% 96.1%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    /* Highlighter Lime - The signature accent */
-    --primary: 73 96% 57%; /* #C4F82A */
-    --primary-foreground: 0 0% 6.7%; /* #111111 - dark text on lime */
+    --primary: 226 70% 40%;          /* deep indigo */
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 0 0% 10%; /* subtle gray for secondary elements */
-    --secondary-foreground: 0 0% 96.1%;
+    --secondary: 210 20% 96%;        /* light gray */
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 60%; /* 60% opacity subtle text */
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 47%; /* slate gray */
 
-    --accent: 73 96% 57%; /* same as primary - lime */
-    --accent-foreground: 0 0% 6.7%;
+    --accent: 226 70% 40%;
+    --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;        /* red */
+    --destructive-foreground: 210 40% 98%;
 
-    /* Borders - very subtle at 12% opacity */
-    --border: 0 0% 96.1%; /* will use with 12% opacity */
-    --input: 0 0% 5%; /* darker input background */
-    --ring: 73 96% 57%; /* lime focus ring */
+    --border: 214 32% 91%;           /* subtle slate border */
+    --input: 214 32% 91%;
+    --ring: 226 70% 40%;
 
-    --radius: 1.5rem; /* generous rounded corners */
+    /* 8px card radius — enterprise-grade, not rounded-3xl */
+    --radius: 0.5rem;
 
-    /* Custom tokens for translucent backgrounds */
-    --card-bg-opacity: 0.06; /* for bg-white/6 effect */
-    --card-hover-opacity: 0.10;
+    /* Status colors */
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --critical: 0 72% 51%;
     
-    /* Gradients and effects */
-    --gradient-subtle: radial-gradient(circle at top, rgba(196, 248, 42, 0.1) 0%, transparent 50%);
+    /* Chart palette */
+    --chart-1: 226 70% 40%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 262 83% 58%;
+    --chart-5: 189 94% 43%;
+  }
+
+  .dark {
+    --background: 222 47% 6%;        /* near-black slate (not pure black!) */
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 10%;              /* dark slate surfaces */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 226 70% 55%;          /* brighter indigo for dark contrast */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 226 70% 55%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 226 70% 55%;
+
+    --radius: 0.5rem;
+    
+    /* Status colors — adjusted for dark contrast */
+    --success: 142 71% 40%;
+    --warning: 38 92% 45%;
+    --critical: 0 62% 45%;
+    
+    /* Chart palette for dark */
+    --chart-1: 226 70% 55%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 262 83% 58%;
+    --chart-5: 189 94% 43%;
   }
 }
 
@@ -57,123 +101,6 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  }
-
-  /* Typography presets */
-  h1, h2, h3 {
-    @apply font-semibold tracking-tight;
-  }
-
-  /* Wide-tracked uppercase labels (defining characteristic) */
-  .label-tech {
-    @apply uppercase font-semibold tracking-[0.3em] text-xs;
-  }
-
-  /* Translucent card backgrounds */
-  .card-mono {
-    @apply bg-white/[0.06] border border-white/[0.12] rounded-3xl p-8;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .card-mono-hover:hover {
-    @apply bg-white/[0.10];
-    transform: translateY(-2px);
-  }
-
-  /* Input styling */
-  input[type="text"], input[type="url"] {
-    @apply bg-white/[0.05] border-white/[0.12] text-foreground;
-  }
-
-  input[type="text"]:focus, input[type="url"]:focus {
-    @apply border-primary ring-2 ring-primary/20;
-  }
-
-  /* Custom dark scrollbar */
-  .scrollbar-dark {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-  }
-
-  .scrollbar-dark::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .scrollbar-dark::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollbar-dark::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-  }
-
-  .scrollbar-dark::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.3);
-  }
-}
-
-@layer utilities {
-  /* Animation utilities */
-  .animate-scale-in {
-    animation: scale-in 0.2s ease-out;
-  }
-  
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out;
-  }
-  
-  @keyframes scale-in {
-    0% {
-      transform: scale(0);
-      opacity: 0;
-    }
-    100% {
-      transform: scale(1);
-      opacity: 1;
-    }
-  }
-  
-  @keyframes fade-in {
-    0% {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  /* Mobile-first responsive typography */
-  .text-responsive-hero {
-    @apply text-3xl sm:text-4xl md:text-5xl lg:text-6xl;
-  }
-
-  .text-responsive-title {
-    @apply text-2xl sm:text-3xl md:text-4xl;
-  }
-
-  .text-responsive-subtitle {
-    @apply text-xl sm:text-2xl md:text-3xl;
-  }
-
-  .text-responsive-lg {
-    @apply text-base sm:text-lg md:text-xl;
-  }
-
-  .text-responsive-base {
-    @apply text-sm sm:text-base;
-  }
-
-  /* Container spacing */
-  .container-mobile {
-    @apply px-4 sm:px-6 md:px-8;
-  }
-
-  /* Touch-friendly buttons - minimum 44px height */
-  .btn-touch {
-    @apply min-h-[44px] min-w-[44px];
+    font-feature-settings: "cv02", "cv03", "cv04", "cv09";
   }
 }
