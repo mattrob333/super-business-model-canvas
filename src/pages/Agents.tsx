@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, Clock, CheckCircle2, AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { Bot, Plus, Clock, CheckCircle2, AlertCircle, Loader2, RefreshCw, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
 import { AgentRunDetailDialog } from "@/components/AgentRunDetailDialog";
+import { AgentInstructionsDialog } from "@/components/AgentInstructionsDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 /**
@@ -45,6 +46,8 @@ export default function Agents() {
   const [error, setError] = useState<string | null>(null);
   const [detailRunId, setDetailRunId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [instructionsAgent, setInstructionsAgent] = useState<AgentProfile | null>(null);
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (accountLoading) return;
@@ -206,6 +209,20 @@ export default function Agents() {
                           </Badge>
                         )}
                     </div>
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs gap-1.5"
+                        onClick={() => {
+                          setInstructionsAgent(agent);
+                          setInstructionsOpen(true);
+                        }}
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        Instructions
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );
@@ -283,6 +300,13 @@ export default function Agents() {
         runId={detailRunId}
         open={detailOpen}
         onOpenChange={setDetailOpen}
+      />
+
+      <AgentInstructionsDialog
+        agent={instructionsAgent}
+        open={instructionsOpen}
+        onOpenChange={setInstructionsOpen}
+        onSaved={() => void fetchData()}
       />
     </div>
   );
