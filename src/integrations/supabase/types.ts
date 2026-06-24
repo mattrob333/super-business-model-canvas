@@ -810,6 +810,7 @@ export type Database = {
           allowed_mcp_server_ids: string[]
           status: Database["public"]["Enums"]["agent_status"]
           system_instructions_summary: string | null
+          system_instructions: string | null
           created_at: string
           updated_at: string
         }
@@ -825,6 +826,7 @@ export type Database = {
           allowed_mcp_server_ids?: string[]
           status?: Database["public"]["Enums"]["agent_status"]
           system_instructions_summary?: string | null
+          system_instructions?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -840,6 +842,7 @@ export type Database = {
           allowed_mcp_server_ids?: string[]
           status?: Database["public"]["Enums"]["agent_status"]
           system_instructions_summary?: string | null
+          system_instructions?: string | null
           created_at?: string
           updated_at?: string
         }

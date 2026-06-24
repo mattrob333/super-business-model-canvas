@@ -18,21 +18,27 @@ interface AgentRunRequest {
 
 /**
  * System prompt builder for BMC section analysis.
- * Generates a section-specific prompt that asks the LLM to produce
- * structured JSON output matching the canvas_section_versions schema.
+ * If agent-specific instructions are provided (from DB), uses them as the base.
+ * Otherwise, falls back to a generic section analysis prompt.
  */
-function buildSystemPrompt(agentKey: string, sectionLabel: string): string {
-  return `You are an expert business strategy analyst AI agent specializing in Business Model Canvas analysis.
-
-Your task: Analyze the "${sectionLabel}" section of a Business Model Canvas and produce actionable, evidence-backed insights.
-
+function buildSystemPrompt(agentKey: string, sectionLabel: string, agentInstructions?: string | null): string {
+  const outputFormat = `
 You MUST respond with valid JSON only (no markdown, no code blocks) in this exact structure:
 {
   "items": ["specific, actionable item 1", "specific, actionable item 2", ...],
   "notes": "2-3 sentence analysis noting strengths, risks, and recommendations",
   "confidence": 0.0-1.0,
   "summary": "1 sentence summary of findings"
-}
+}`;
+
+  if (agentInstructions && agentInstructions.trim().length > 0) {
+    return `${agentInstructions}\n${outputFormat}`;
+  }
+
+  return `You are an expert business strategy analyst AI agent specializing in Business Model Canvas analysis.
+
+Your task: Analyze the "${sectionLabel}" section of a Business Model Canvas and produce actionable, evidence-backed insights.
+${outputFormat}
 
 Guidelines:
 - Provide 3-5 specific, actionable items (not generic platitudes)
@@ -313,8 +319,35 @@ serve(async (req) => {
 
     console.log(`Agent run: agent=${agentKey}, section=${sectionLabel}, account=${accountId}`);
 
-    // Build prompts
-    const systemPrompt = buildSystemPrompt(agentKey, sectionLabel);
+    // Load agent-specific system instructions from the database
+    let agentInstructions: string | null = null;
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      if (supabaseUrl && serviceRoleKey) {
+        const profileResponse = await fetch(
+          `${supabaseUrl}/rest/v1/agent_profiles?id=eq.${agentProfileId}&select=system_instructions`,
+          {
+            headers: {
+              'apikey': serviceRoleKey,
+              'Authorization': `Bearer ${serviceRoleKey}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          if (Array.isArray(profileData) && profileData.length > 0) {
+            agentInstructions = profileData[0].system_instructions || null;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load agent instructions from DB, using fallback:', e);
+    }
+
+    // Build prompts (uses agent-specific instructions if available)
+    const systemPrompt = buildSystemPrompt(agentKey, sectionLabel, agentInstructions);
     const userPrompt = buildUserPrompt(input);
 
     // Call LLM
