@@ -6,6 +6,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { ProviderCredentialsManager } from "@/components/settings/ProviderCredentialsManager";
+import { ModelRoutingPanel } from "@/components/settings/ModelRoutingPanel";
+import { McpConnectionsManager } from "@/components/settings/McpConnectionsManager";
+import { useAccountId } from "@/hooks/useAccountId";
 
 const tabSections = [
   { id: "general", label: "General" },
@@ -42,6 +46,11 @@ function PlaceholderTab({ sectionName, description }: PlaceholderTabProps) {
 
 const Settings = () => {
   const { theme, setTheme } = useTheme();
+  const { accountId, loading: accountLoading } = useAccountId();
+
+  // Fallback: use a placeholder UUID when no account is resolved yet
+  // (prevents queries from erroring — they'll return empty results)
+  const effectiveAccountId = accountId ?? "00000000-0000-0000-0000-000000000000";
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -156,26 +165,43 @@ const Settings = () => {
           </Card>
         </TabsContent>
 
-        {/* Placeholder tabs */}
-        <TabsContent value="ai-providers">
-          <PlaceholderTab
-            sectionName="AI Providers"
-            description="Connect and manage external AI model providers such as OpenAI, Anthropic, DeepSeek, and local models. Configure API keys, rate limits, and per-model settings."
-          />
+        {/* AI Providers Tab */}
+        <TabsContent value="ai-providers" className="space-y-6">
+          {accountLoading ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">Loading workspace...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <ProviderCredentialsManager accountId={effectiveAccountId} />
+          )}
         </TabsContent>
 
-        <TabsContent value="model-routing">
-          <PlaceholderTab
-            sectionName="Model Routing"
-            description="Define rules for routing requests to specific AI models based on task type, complexity, cost, or latency requirements. Includes fallback chains and load balancing."
-          />
+        {/* Model Routing Tab */}
+        <TabsContent value="model-routing" className="space-y-6">
+          {accountLoading ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">Loading workspace...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <ModelRoutingPanel accountId={effectiveAccountId} />
+          )}
         </TabsContent>
 
-        <TabsContent value="mcp">
-          <PlaceholderTab
-            sectionName="MCP Connections"
-            description="Manage Model Context Protocol server connections. Connect to external tools, APIs, and data sources that agents can access during execution."
-          />
+        {/* MCP Connections Tab */}
+        <TabsContent value="mcp" className="space-y-6">
+          {accountLoading ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">Loading workspace...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <McpConnectionsManager accountId={effectiveAccountId} />
+          )}
         </TabsContent>
 
         <TabsContent value="hermes">
