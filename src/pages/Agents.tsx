@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, Clock, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Bot, Plus, Clock, CheckCircle2, AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAccountId } from "@/hooks/useAccountId";
+import type { Database } from "@/integrations/supabase/types";
 
 /**
  * Agents page (/agents)
@@ -11,133 +14,11 @@ import { Bot, Plus, Clock, CheckCircle2, AlertCircle, Loader2 } from "lucide-rea
  * BMC section agents) plus any custom agents. Also shows recent agent runs.
  *
  * Data source: `agent_profiles` + `agent_runs` tables (Phase 2 schema).
- * Currently shows static registry from seed migration + empty state for runs.
+ * Falls back to static defaults if no data is in the database yet.
  */
 
-interface AgentProfile {
-  id: string;
-  agent_key: string;
-  display_name: string;
-  agent_type: string;
-  description: string | null;
-  assigned_sections: string[];
-  status: string;
-  model_route_key: string | null;
-}
-
-// Static agent registry — matches the seed migration
-const DEFAULT_AGENTS: AgentProfile[] = [
-  {
-    id: "static-orchestrator",
-    agent_key: "orchestrator",
-    display_name: "Strategy Orchestrator",
-    agent_type: "orchestrator",
-    description:
-      "Coordinates multi-agent analysis, routes tasks to section agents, and synthesizes cross-section insights.",
-    assigned_sections: [],
-    status: "active",
-    model_route_key: "premium",
-  },
-  {
-    id: "static-key-partnerships",
-    agent_key: "agent_key_partnerships",
-    display_name: "Key Partnerships Agent",
-    agent_type: "section_agent",
-    description:
-      "Analyzes strategic alliances, supplier relationships, and partnership networks.",
-    assigned_sections: ["key_partners"],
-    status: "active",
-    model_route_key: "standard",
-  },
-  {
-    id: "static-key-activities",
-    agent_key: "agent_key_activities",
-    display_name: "Key Activities Agent",
-    agent_type: "section_agent",
-    description:
-      "Evaluates core operational activities, production processes, and critical workflows.",
-    assigned_sections: ["key_activities"],
-    status: "active",
-    model_route_key: "standard",
-  },
-  {
-    id: "static-key-resources",
-    agent_key: "agent_key_resources",
-    display_name: "Key Resources Agent",
-    agent_type: "section_agent",
-    description:
-      "Assesses intellectual, human, financial, and physical resource assets.",
-    assigned_sections: ["key_resources"],
-    status: "active",
-    model_route_key: "standard",
-  },
-  {
-    id: "static-value-propositions",
-    agent_key: "agent_value_propositions",
-    display_name: "Value Propositions Agent",
-    agent_type: "section_agent",
-    description:
-      "Refines and validates value propositions against customer needs and competitive alternatives.",
-    assigned_sections: ["value_propositions"],
-    status: "active",
-    model_route_key: "premium",
-  },
-  {
-    id: "static-customer-relationships",
-    agent_key: "agent_customer_relationships",
-    display_name: "Customer Relationships Agent",
-    agent_type: "section_agent",
-    description:
-      "Analyzes engagement strategies, retention mechanisms, and relationship-building approaches.",
-    assigned_sections: ["customer_relationships"],
-    status: "active",
-    model_route_key: "standard",
-  },
-  {
-    id: "static-channels",
-    agent_key: "agent_channels",
-    display_name: "Channels Agent",
-    agent_type: "section_agent",
-    description:
-      "Maps distribution channels, touchpoints, and delivery methods.",
-    assigned_sections: ["channels"],
-    status: "active",
-    model_route_key: "standard",
-  },
-  {
-    id: "static-customer-segments",
-    agent_key: "agent_customer_segments",
-    display_name: "Customer Segments Agent",
-    agent_type: "section_agent",
-    description:
-      "Identifies and profiles target customer segments and personas.",
-    assigned_sections: ["customer_segments"],
-    status: "active",
-    model_route_key: "premium",
-  },
-  {
-    id: "static-cost-structure",
-    agent_key: "agent_cost_structure",
-    display_name: "Cost Structure Agent",
-    agent_type: "section_agent",
-    description:
-      "Breaks down fixed and variable costs, cost drivers, and efficiency opportunities.",
-    assigned_sections: ["cost_structure"],
-    status: "active",
-    model_route_key: "standard",
-  },
-  {
-    id: "static-revenue-streams",
-    agent_key: "agent_revenue_streams",
-    display_name: "Revenue Streams Agent",
-    agent_type: "section_agent",
-    description:
-      "Analyzes pricing models, revenue sources, and monetization strategies.",
-    assigned_sections: ["revenue_streams"],
-    status: "active",
-    model_route_key: "premium",
-  },
-];
+type AgentProfile = Database["public"]["Tables"]["agent_profiles"]["Row"];
+type AgentRun = Database["public"]["Tables"]["agent_runs"]["Row"];
 
 const STATUS_CONFIG: Record<string, { label: string; className: string; icon: typeof Bot }> = {
   active: { label: "Active", className: "bg-success/10 text-success", icon: CheckCircle2 },
@@ -146,8 +27,63 @@ const STATUS_CONFIG: Record<string, { label: string; className: string; icon: ty
   archived: { label: "Archived", className: "bg-muted/50 text-muted-foreground", icon: AlertCircle },
 };
 
+const RUN_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  pending: { label: "Pending", className: "bg-muted text-muted-foreground" },
+  running: { label: "Running", className: "bg-primary/10 text-primary" },
+  completed: { label: "Completed", className: "bg-success/10 text-success" },
+  failed: { label: "Failed", className: "bg-destructive/10 text-destructive" },
+  cancelled: { label: "Cancelled", className: "bg-muted text-muted-foreground" },
+  timeout: { label: "Timeout", className: "bg-warning/10 text-warning" },
+};
+
 export default function Agents() {
-  const [agents] = useState<AgentProfile[]>(DEFAULT_AGENTS);
+  const { accountId, loading: accountLoading } = useAccountId();
+  const [agents, setAgents] = useState<AgentProfile[]>([]);
+  const [recentRuns, setRecentRuns] = useState<AgentRun[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    if (accountLoading) return;
+
+    const effectiveAccountId = accountId ?? "00000000-0000-0000-0000-000000000000";
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [agentsRes, runsRes] = await Promise.all([
+        supabase
+          .from("agent_profiles")
+          .select("*")
+          .eq("account_id", effectiveAccountId)
+          .order("agent_type", { ascending: true })
+          .order("display_name", { ascending: true }),
+        supabase
+          .from("agent_runs")
+          .select("id, agent_profile_id, run_type, status, started_at, completed_at, summary, trigger_type")
+          .eq("account_id", effectiveAccountId)
+          .order("started_at", { ascending: false })
+          .limit(10),
+      ]);
+
+      if (agentsRes.error) throw agentsRes.error;
+      // Runs error is non-fatal — just show empty
+      setAgents((agentsRes.data ?? []) as unknown as AgentProfile[]);
+      setRecentRuns(
+        runsRes.error ? [] : ((runsRes.data ?? []) as unknown as AgentRun[])
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load agents");
+      setAgents([]);
+      setRecentRuns([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [accountId, accountLoading]);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -161,83 +97,180 @@ export default function Agents() {
             evidence-backed claims.
           </p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Agent
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title="Refresh"
+            onClick={() => void fetchData()}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Agent
+          </Button>
+        </div>
       </div>
 
-      {/* Agent grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {agents.map((agent) => {
-          const statusCfg = STATUS_CONFIG[agent.status] ?? STATUS_CONFIG.active;
-          return (
-            <Card key={agent.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Bot className="h-4 w-4 text-primary" />
-                    </div>
-                    <CardTitle className="text-sm font-medium truncate">
-                      {agent.display_name}
-                    </CardTitle>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={`text-xs shrink-0 ${statusCfg.className}`}
-                  >
-                    <statusCfg.icon className="h-2.5 w-2.5 mr-1" />
-                    {statusCfg.label}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {agent.description && (
-                  <p className="text-xs text-muted-foreground mb-3 line-clamp-3">
-                    {agent.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="secondary" className="text-xs">
-                    {agent.agent_type}
-                  </Badge>
-                  {agent.model_route_key && (
-                    <Badge variant="outline" className="text-xs">
-                      Model: {agent.model_route_key}
-                    </Badge>
-                  )}
-                  {agent.assigned_sections.length > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      {agent.assigned_sections.length} section
-                      {agent.assigned_sections.length > 1 ? "s" : ""}
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Recent runs placeholder */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Loader2 className="h-4 w-4 text-muted-foreground" />
-            Recent Agent Runs
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="py-8 text-center">
+      {/* Loading state */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <AlertCircle className="h-8 w-8 text-destructive/40 mx-auto mb-3" />
+            <p className="text-sm text-destructive">{error}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => void fetchData()}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : agents.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center">
             <Bot className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">
-              No agent runs yet. Runs will appear here when agents execute
-              analysis tasks.
+              No agent profiles found. Agent profiles are seeded during
+              workspace initialization. Run the seed migration to create the
+              10 default agents.
             </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => void fetchData()}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Agent grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {agents.map((agent) => {
+              const statusCfg = STATUS_CONFIG[agent.status] ?? STATUS_CONFIG.active;
+              return (
+                <Card key={agent.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Bot className="h-4 w-4 text-primary" />
+                        </div>
+                        <CardTitle className="text-sm font-medium truncate">
+                          {agent.display_name}
+                        </CardTitle>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs shrink-0 ${statusCfg.className}`}
+                      >
+                        <statusCfg.icon className="h-2.5 w-2.5 mr-1" />
+                        {statusCfg.label}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {agent.description && (
+                      <p className="text-xs text-muted-foreground mb-3 line-clamp-3">
+                        {agent.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="secondary" className="text-xs">
+                        {agent.agent_type}
+                      </Badge>
+                      {agent.model_route_key && (
+                        <Badge variant="outline" className="text-xs">
+                          Model: {agent.model_route_key}
+                        </Badge>
+                      )}
+                      {agent.assigned_sections &&
+                        agent.assigned_sections.length > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            {agent.assigned_sections.length} section
+                            {agent.assigned_sections.length > 1 ? "s" : ""}
+                          </Badge>
+                        )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Recent runs */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Loader2 className="h-4 w-4 text-muted-foreground" />
+                Recent Agent Runs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recentRuns.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Bot className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    No agent runs yet. Runs will appear here when agents execute
+                    analysis tasks.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {recentRuns.map((run) => {
+                    const statusCfg =
+                      RUN_STATUS_CONFIG[run.status] ?? RUN_STATUS_CONFIG.pending;
+                    return (
+                      <div
+                        key={run.id}
+                        className="flex items-center justify-between gap-3 rounded-lg border p-2.5"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="secondary" className="text-xs">
+                              {run.run_type}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${statusCfg.className}`}
+                            >
+                              {statusCfg.label}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {run.trigger_type}
+                            </Badge>
+                          </div>
+                          {run.summary && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                              {run.summary}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {run.started_at
+                            ? new Date(run.started_at).toLocaleString()
+                            : "—"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
