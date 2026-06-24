@@ -3,7 +3,7 @@
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)
 **Repo:** https://github.com/mattrob333/super-business-model-canvas
 **Workspace:** C:\Users\mrobe\Documents\Projects\SuperBMCenterprise\super-business-model-canvas
-**Status:** Phase 7 In Progress — Hermes runtime integration wired (env-gated factory, live mode, edge function). Next: runtime config persistence + model routing.
+**Status:** Phase 7 In Progress — Model routing wired (CORR-003 fixed, model_route_key → provider+model resolution). Next: runtime config persistence + health check.
 
 ## Architecture: Two-Tier Autonomous Build Loop
 - Inner Loop (cron 779c6bf918c9) — every 10m: Check -> Test -> Advance -> Repeat
@@ -79,7 +79,7 @@
 7. [x] .env.example: VITE_HERMES_RUNTIME_ENDPOINT + VITE_HERMES_RUNTIME_API_KEY (commit e778252)
 8. [ ] Runtime config persistence (save to DB, load on startup)
 9. [ ] Runtime health check / connection test button
-10. [ ] Model routing: wire provider_credentials + model_route_key to edge function LLM selection
+10. [x] Model routing: wire provider_credentials + model_route_key to edge function LLM selection (commit c1957fa)
 ### Phase 8: Framework Skills [ ]
 ### Phase 9: Expand Agents and Loops [ ]
 ### Phase 10: Polish and Hardening [ ]
@@ -94,12 +94,14 @@
 - Phase 4 (commits 2787fae + a9f3caf): ProviderCredentialsManager (encrypted_secret never selected, add via edge function), ModelRoutingPanel (4 route tiers per agent), McpConnectionsManager (stdio/http/sse/websocket transports, tool discovery), useAccountId hook, HermesRuntimePanel (AgentRuntime interface boundary in src/lib/agent-runtime/, MockAgentRuntime, config UI), ScheduledLoopsManager (CRUD for scheduled_loops, cron presets, budget/failure limits), 5 Settings placeholder tabs replaced with functional components
 - Phase 6 (commit d51c1df): useCanvasSectionRun hook (full agent run loop: resolve agent profile → startRun → poll → write canvas_section_versions), CanvasSectionCard Analyze button + loading overlay + error banner, Canvas page wired to live canvas_section_versions + agent_profiles with auto-refresh, 9 section-specific mock analysis datasets, toast notifications
 - Phase 7 (commit e778252): Env-gated runtime factory (HermesAgentRuntime when VITE_HERMES_RUNTIME_ENDPOINT set, MockAgentRuntime otherwise), HermesAgentRuntime class (calls Supabase Edge Function, browser never calls LLM directly), agent-run Edge Function (multi-provider: OpenAI/Anthropic/OpenRouter/xAI, structured JSON output, cost estimation), agent-runtime/config.ts (env detection), useCanvasSectionRun live mode (fetches real LLM output from agent_runs), HermesRuntimePanel shows actual runtime mode badge, .env.example updated with runtime env vars
+- Phase 7 (commit 6db28f0): Fixed CORR-003 — useCanvasSectionRun no longer hardcodes modelProvider: "mock" in live mode; omits it so edge function auto-detects from env vars
+- Phase 7 (commit c1957fa): Model routing — new model-routing.ts module maps route tiers to provider+model, HermesAgentRuntime.startRun() resolves model_route_key from agent_profiles before calling edge function, ModelRoutingPanel shows resolved provider/model in route legend
 
 ## Open Issues / Blockers
 - None
 
 ## Next Action
-- Phase 7 continued: Runtime config persistence (save runtime config to a settings table or localStorage with DB sync), runtime health check button, and model routing wiring (provider_credentials + model_route_key → edge function provider selection). The core env-gated factory + HermesAgentRuntime + edge function are done (commit e778252). Remaining Phase 7 tasks are enhancements to make the runtime configurable from the UI without code changes.
+- Phase 7 continued: Runtime config persistence (save runtime config to a settings table or localStorage with DB sync) and runtime health check button. The core runtime integration + model routing are done. Remaining tasks are enhancements to make the runtime configurable from the UI without code changes.
 
 ## Pitfalls / Notes
 - Pre-existing lint errors (52 errors, 16 warnings on main @ 6c6d3d2) are all `no-explicit-any` + `no-require-imports` + `no-empty-object-type` in pre-existing/shadcn files — do NOT fix, just ensure errors don't increase. Current branch: 52 errors, 20 warnings (zero new errors, +4 warnings from new page useMemo deps — acceptable)
@@ -110,4 +112,4 @@
 - Commit each green slice before starting the next file
 - Orphaned work recovery: prior tick wrote canvas/ files without committing — recovered, quality-gated, committed as 061b6ab
 
-**Last Updated:** 2026-06-24 — Phase 7 in progress: Hermes runtime integration wired (env-gated factory, live mode, edge function). Commit e778252.
+**Last Updated:** 2026-06-24 — Phase 7 in progress: CORR-003/004/005 resolved, model routing wired (commit c1957fa). Remaining: runtime config persistence + health check.
