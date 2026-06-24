@@ -3,7 +3,7 @@
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)
 **Repo:** https://github.com/mattrob333/super-business-model-canvas
 **Workspace:** C:\Users\mrobe\Documents\Projects\SuperBMCenterprise\super-business-model-canvas
-**Status:** Phase 0 — Baseline Audit Complete
+**Status:** Phase 1 Complete — Enterprise UI Foundation Deployed
 
 ## Architecture: Two-Tier Autonomous Build Loop
 - Inner Loop (cron TBD) — every 10m: Check -> Test -> Advance -> Repeat
@@ -21,14 +21,15 @@
 7. [x] UI inventory (dark-only, black/lime neon, rounded-3xl, Lovable-style)
 8. [x] Branch created: `enterprise-strategy-workspace` (pushed to origin)
 
-### Phase 1: Enterprise UI Foundation [ ]
-1. [ ] Theme provider with light-mode default (leverage `next-themes` already installed)
-2. [ ] Light/dark CSS variables (replace black/lime neon with enterprise palette)
-3. [ ] AppShell with left nav (SidebarNav, TopBar, AccountSwitcher)
-4. [ ] Dashboard route (`/dashboard`)
-5. [ ] Settings route shell (`/settings`)
-6. [ ] Authenticated redirect to dashboard
-7. [ ] Create `.env.example`
+### Phase 1: Enterprise UI Foundation ✅ (commit 1c924df)
+1. [x] Theme provider with light-mode default (ThemeProvider wrapping next-themes)
+2. [x] Light/dark CSS variables (deep indigo/cool gray enterprise palette, 8px radius)
+3. [x] AppShell with left nav (SidebarNav, TopBar, AccountSwitcher)
+4. [x] Dashboard route (`/dashboard`)
+5. [x] Settings route shell (`/settings` — 7 tabs, General functional)
+6. [x] Authenticated routes wrapped in AppShell layout
+7. [x] Create `.env.example`
+8. [x] Remove `lovable-tagger` devDep
 
 ### Phase 2: Context Store Schema [ ]
 ### Phase 3: Canvas Workspace Upgrade [ ]
@@ -42,18 +43,15 @@
 
 ## Completed Tasks
 - Created `enterprise-strategy-workspace` branch from main (6c6d3d2)
-- Verified `npm run build` passes
-- Documented Hermes architecture constraints (docs/hermes-architecture-notes.md)
-- Documented pre-existing lint issues (22 errors, 9 warnings — all no-explicit-any + hook deps)
-- Mapped all existing pages, components, Supabase functions, migrations
+- Phase 0: Verified `npm run build` passes, documented Hermes architecture, lint audit
+- Phase 1 (commit 1c924df): Enterprise theme (deep indigo/cool gray, light-mode default), AppShell layout (SidebarNav + TopBar), Dashboard page, Settings page (7 tabs), ThemeProvider, .env.example, removed lovable-tagger
+- 15 files changed: 9 new, 4 modified, 2 docs
 
 ## Open Issues / Blockers
-- `.env` file exists in repo — need to verify no secrets committed, create `.env.example`
-- `lovable-tagger` devDep — Lovable remnant, should be removed
-- `next-themes` already installed — can leverage for theme provider
+- None
 
 ## Next Action
-- Phase 1 Step 0: Create `.env.example`, remove `lovable-tagger`, commit
+- Phase 2: Context Store Schema — write Supabase migration for canonical tables (accounts, business_context_versions, canvas_section_versions, evidence_items, gaps, agent_profiles, agent_runs, scheduled_loops, provider_credentials, mcp_servers, mcp_server_tools)
 
 ## Pitfalls / Notes
 - Pre-existing lint errors are all `no-explicit-any` + React hooks deps — document only, don't fix
