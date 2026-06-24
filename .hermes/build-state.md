@@ -3,7 +3,7 @@
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)
 **Repo:** https://github.com/mattrob333/super-business-model-canvas
 **Workspace:** C:\Users\mrobe\Documents\Projects\SuperBMCenterprise\super-business-model-canvas
-**Status:** Phase 4 Complete — all Settings tabs functional, Phase 5 next (wire Agents/Activity to live data)
+**Status:** Phase 5 Complete — Agents + Activity wired to live data + run detail dialog. Phase 6 next (first agentic vertical slice).
 
 ## Architecture: Two-Tier Autonomous Build Loop
 - Inner Loop (cron 779c6bf918c9) — every 10m: Check -> Test -> Advance -> Repeat
@@ -55,12 +55,12 @@
 6. [x] Schedules tab (commit a9f3caf) — ScheduledLoopsManager, CRUD for scheduled_loops, cron presets, budget/failure limits
 7. [x] Security tab — remains placeholder (will be built during hardening phase)
 
-### Phase 5: Agent Profiles + Activity ✅ (partial — commit 74e737e)
+### Phase 5: Agent Profiles + Activity ✅ (commits 74e737e + 8c5b148 + 83881e4)
 - [x] Agents page (/agents) — 10-agent registry grid, status badges, section ownership
 - [x] Activity page (/activity) — activity stream with type legend + empty state
-- [ ] Wire Agents page to live agent_profiles data (currently static)
-- [ ] Wire Activity page to live agent_runs data
-- [ ] Agent run logging + detail view
+- [x] Wire Agents page to live agent_profiles data (commit 8c5b148)
+- [x] Wire Activity page to live agent_runs data (commit 8c5b148)
+- [x] Agent run detail view (commit 83881e4) — AgentRunDetailDialog with full run info (input/output JSON, tokens, cost, timing, errors), clickable run rows in both Agents + Activity pages
 
 ### Phase 6: First Agentic Vertical Slice [ ]
 ### Phase 7: Hermes Runtime Integration [ ]
@@ -74,14 +74,14 @@
 - Phase 1 (commit 1c924df): Enterprise theme (deep indigo/cool gray, light-mode default), AppShell layout (SidebarNav + TopBar), Dashboard page, Settings page (7 tabs), ThemeProvider, .env.example, removed lovable-tagger
 - Phase 2 (commit 35cf3f6): 12 canonical tables migration (accounts, account_members, business_context_versions, canvas_section_versions, evidence_items, gaps, agent_profiles, agent_runs, scheduled_loops, provider_credentials, mcp_servers, mcp_server_tools), 14 Postgres enums, RLS policies on all tables, updated_at triggers, seed migration with 10 agent profiles, TypeScript types updated
 - Phase 3 (commits 061b6ab + f528991 + e97eecf + b1741d7 + b684f0e): CanvasSectionCard, section-types.ts, EnterpriseBusinessModelCanvas, Canvas page, Analysis.tsx wiring, Gap Register page, Knowledge/Evidence page
-- Phase 5 partial (commit 74e737e): Agents + Activity page shells with routes wired (orphaned-work recovery from prior tick)
+- Phase 5 (commits 74e737e + 8c5b148 + 83881e4): Agents + Activity page shells, then wired to live Supabase data (agent_profiles + agent_runs queries via useAccountId), AgentRunDetailDialog component (full run details: status, timing, model, tokens, cost, input/output JSON with copy button), clickable run rows in both pages
 - Phase 4 (commits 2787fae + a9f3caf): ProviderCredentialsManager (encrypted_secret never selected, add via edge function), ModelRoutingPanel (4 route tiers per agent), McpConnectionsManager (stdio/http/sse/websocket transports, tool discovery), useAccountId hook, HermesRuntimePanel (AgentRuntime interface boundary in src/lib/agent-runtime/, MockAgentRuntime, config UI), ScheduledLoopsManager (CRUD for scheduled_loops, cron presets, budget/failure limits), 5 Settings placeholder tabs replaced with functional components
 
 ## Open Issues / Blockers
 - None
 
 ## Next Action
-- Phase 5: Wire Agents page to live agent_profiles data (currently uses static DEFAULT_AGENTS array). Replace the static array with a supabase query to the agent_profiles table, filtered by account_id. Also wire Activity page to live agent_runs data — fetch recent runs from agent_runs table ordered by started_at desc, display with status badges + run type + agent name.
+- Phase 6: First Agentic Vertical Slice — implement the first end-to-end agent run using the AgentRuntime interface. This should be a "canvas section analysis" run: user clicks a canvas section → MockAgentRuntime.startRun() creates an agent_runs record → simulates analysis → result stored in canvas_section_versions. This proves the full loop: UI → AgentRuntime → DB → UI update. Key files: src/lib/agent-runtime/index.ts (MockAgentRuntime already creates runs), src/components/canvas/EnterpriseBusinessModelCanvas.tsx (add "Run Analysis" button to CanvasSectionCard), src/components/canvas/CanvasSectionCard.tsx (trigger button + loading state).
 
 ## Pitfalls / Notes
 - Pre-existing lint errors are all `no-explicit-any` + React hooks deps — document only, don't fix
@@ -92,4 +92,4 @@
 - Commit each green slice before starting the next file
 - Orphaned work recovery: prior tick wrote canvas/ files without committing — recovered, quality-gated, committed as 061b6ab
 
-**Last Updated:** 2026-06-24 — Phase 4 complete (all 7 Settings tabs functional + AgentRuntime interface), Phase 5 next
+**Last Updated:** 2026-06-24 — Phase 5 complete (Agents + Activity live data + run detail dialog), Phase 6 next
