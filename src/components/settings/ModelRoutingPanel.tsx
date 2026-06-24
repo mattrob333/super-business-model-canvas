@@ -19,6 +19,7 @@ import { Cpu, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { resolveModelRoute } from "@/lib/agent-runtime/model-routing";
 
 type AgentProfile = Database["public"]["Tables"]["agent_profiles"]["Row"];
 
@@ -138,15 +139,23 @@ export function ModelRoutingPanel({ accountId }: { accountId: string }) {
       <CardContent className="space-y-4">
         {/* Route legend */}
         <div className="flex flex-wrap gap-2">
-          {MODEL_ROUTES.map((route) => (
-            <Badge
-              key={route.value}
-              variant="outline"
-              className={`text-xs ${route.color}`}
-            >
-              {route.label}: {route.description}
-            </Badge>
-          ))}
+          {MODEL_ROUTES.map((route) => {
+            const resolved = resolveModelRoute(route.value);
+            return (
+              <Badge
+                key={route.value}
+                variant="outline"
+                className={`text-xs ${route.color}`}
+              >
+                {route.label}: {route.description}
+                {resolved && (
+                  <span className="ml-1 opacity-60 font-mono">
+                    ({resolved.provider}/{resolved.modelName})
+                  </span>
+                )}
+              </Badge>
+            );
+          })}
         </div>
 
         {loading ? (

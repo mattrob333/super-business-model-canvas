@@ -32,6 +32,7 @@ import type {
 } from "./index";
 import { DEFAULT_RUNTIME_CONFIG } from "./index";
 import { getRuntimeEndpoint, getRuntimeApiKey } from "./config";
+import { resolveModelRoute } from "./model-routing";
 
 export class HermesAgentRuntime implements AgentRuntime {
   private config: RuntimeConfig = { ...DEFAULT_RUNTIME_CONFIG };
@@ -52,6 +53,25 @@ export class HermesAgentRuntime implements AgentRuntime {
   async startRun(
     input: StartRunInput
   ): Promise<{ runId: string; status: AgentRunStatus }> {
+    // Resolve model routing early so the agent_runs record has the correct provider
+    let resolvedProvider = input.modelProvider;
+    let resolvedModelName = input.modelName;
+
+    if (!resolvedProvider) {
+      const { data: profile } = await supabase
+        .from("agent_profiles")
+        .select("model_route_key")
+        .eq("id", input.agentProfileId)
+        .maybeSingle();
+
+      const routeKey = (profile as { model_route_key: string | null } | null)?.model_route_key;
+      const resolved = resolveModelRoute(routeKey);
+      if (resolved) {
+        resolvedProvider = resolved.provider;
+        resolvedModelName = resolved.modelName;
+      }
+    }
+
     // Step 1: Create durable agent_runs record
     const { data, error } = await supabase
       .from("agent_runs")
@@ -63,8 +83,8 @@ export class HermesAgentRuntime implements AgentRuntime {
         triggered_by: input.triggeredBy,
         status: "pending" as AgentRunStatus,
         input: input.input,
-        model_provider: input.modelProvider ?? null,
-        model_name: input.modelName ?? null,
+        model_provider: resolvedProvider ?? null,
+        model_name: resolvedModelName ?? null,
         started_at: new Date().toISOString(),
       })
       .select("id, status")
@@ -83,7 +103,12 @@ export class HermesAgentRuntime implements AgentRuntime {
 
     // Step 3: Call the edge function (non-blocking — fire and forget)
     // The edge function call happens in background; the UI polls for status
-    void this.executeRun(runId, input);
+    // Pass resolved provider/model through to executeRun
+    void this.executeRun(runId, {
+      ...input,
+      modelProvider: resolvedProvider,
+      modelName: resolvedModelName,
+    });
 
     return { runId, status: runStatus };
   }
@@ -94,6 +119,9 @@ export class HermesAgentRuntime implements AgentRuntime {
    */
   private async executeRun(runId: string, input: StartRunInput): Promise<void> {
     try {
+      // Provider/model are resolved in startRun() via model routing —
+      // input.modelProvider/modelName now contain the resolved values
+      // (or undefined, meaning the edge function should auto-detect)
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };

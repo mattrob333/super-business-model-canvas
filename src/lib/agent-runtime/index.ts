@@ -249,6 +249,8 @@ export class MockAgentRuntime implements AgentRuntime {
 
 export { getRuntimeMode, getRuntimeModeLabel, getRuntimeEndpoint } from "./config";
 export { HermesAgentRuntime } from "./hermes-runtime";
+export { resolveModelRoute, getAvailableRouteTiers } from "./model-routing";
+export type { ResolvedModelRoute } from "./model-routing";
 
 import { getRuntimeMode } from "./config";
 import { HermesAgentRuntime } from "./hermes-runtime";
