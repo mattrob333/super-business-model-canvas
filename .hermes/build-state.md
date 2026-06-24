@@ -3,7 +3,7 @@
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)
 **Repo:** https://github.com/mattrob333/super-business-model-canvas
 **Workspace:** C:\Users\mrobe\Documents\Projects\SuperBMCenterprise\super-business-model-canvas
-**Status:** Phase 6 Complete — first agentic vertical slice (canvas section analysis loop). Phase 7 next (Hermes runtime integration).
+**Status:** Phase 7 In Progress — Hermes runtime integration wired (env-gated factory, live mode, edge function). Next: runtime config persistence + model routing.
 
 ## Architecture: Two-Tier Autonomous Build Loop
 - Inner Loop (cron 779c6bf918c9) — every 10m: Check -> Test -> Advance -> Repeat
@@ -69,7 +69,17 @@
 4. [x] 9 section-specific mock analysis datasets (realistic BMC content per section)
 5. [x] Toast notifications (start/complete/error) via sonner
 6. [x] Full circuit proven: UI trigger → agent_runs record → canvas_section_versions → UI refresh
-### Phase 7: Hermes Runtime Integration [ ]
+### Phase 7: Hermes Runtime Integration (in progress)
+1. [x] Env-gated factory: getAgentRuntime() returns HermesAgentRuntime when VITE_HERMES_RUNTIME_ENDPOINT is set, MockAgentRuntime otherwise (commit e778252)
+2. [x] HermesAgentRuntime class: calls Supabase Edge Function for real LLM execution (commit e778252)
+3. [x] agent-run Edge Function: multi-provider LLM support (OpenAI/Anthropic/OpenRouter/xAI) with structured JSON output (commit e778252)
+4. [x] agent-runtime/config.ts: env detection module (commit e778252)
+5. [x] useCanvasSectionRun: live mode fetches real LLM output from agent_runs (commit e778252)
+6. [x] HermesRuntimePanel: shows actual runtime mode badge (Live/Mock) (commit e778252)
+7. [x] .env.example: VITE_HERMES_RUNTIME_ENDPOINT + VITE_HERMES_RUNTIME_API_KEY (commit e778252)
+8. [ ] Runtime config persistence (save to DB, load on startup)
+9. [ ] Runtime health check / connection test button
+10. [ ] Model routing: wire provider_credentials + model_route_key to edge function LLM selection
 ### Phase 8: Framework Skills [ ]
 ### Phase 9: Expand Agents and Loops [ ]
 ### Phase 10: Polish and Hardening [ ]
@@ -83,12 +93,13 @@
 - Phase 5 (commits 74e737e + 8c5b148 + 83881e4): Agents + Activity page shells, then wired to live Supabase data (agent_profiles + agent_runs queries via useAccountId), AgentRunDetailDialog component (full run details: status, timing, model, tokens, cost, input/output JSON with copy button), clickable run rows in both pages
 - Phase 4 (commits 2787fae + a9f3caf): ProviderCredentialsManager (encrypted_secret never selected, add via edge function), ModelRoutingPanel (4 route tiers per agent), McpConnectionsManager (stdio/http/sse/websocket transports, tool discovery), useAccountId hook, HermesRuntimePanel (AgentRuntime interface boundary in src/lib/agent-runtime/, MockAgentRuntime, config UI), ScheduledLoopsManager (CRUD for scheduled_loops, cron presets, budget/failure limits), 5 Settings placeholder tabs replaced with functional components
 - Phase 6 (commit d51c1df): useCanvasSectionRun hook (full agent run loop: resolve agent profile → startRun → poll → write canvas_section_versions), CanvasSectionCard Analyze button + loading overlay + error banner, Canvas page wired to live canvas_section_versions + agent_profiles with auto-refresh, 9 section-specific mock analysis datasets, toast notifications
+- Phase 7 (commit e778252): Env-gated runtime factory (HermesAgentRuntime when VITE_HERMES_RUNTIME_ENDPOINT set, MockAgentRuntime otherwise), HermesAgentRuntime class (calls Supabase Edge Function, browser never calls LLM directly), agent-run Edge Function (multi-provider: OpenAI/Anthropic/OpenRouter/xAI, structured JSON output, cost estimation), agent-runtime/config.ts (env detection), useCanvasSectionRun live mode (fetches real LLM output from agent_runs), HermesRuntimePanel shows actual runtime mode badge, .env.example updated with runtime env vars
 
 ## Open Issues / Blockers
 - None
 
 ## Next Action
-- Phase 7: Hermes Runtime Integration — replace MockAgentRuntime with real HermesAgentRuntime that connects to a live Hermes instance. The AgentRuntime interface boundary is already in place (src/lib/agent-runtime/index.ts). The factory (getAgentRuntime) currently always returns MockAgentRuntime; Phase 7 adds env/config detection to choose HermesAgentRuntime when configured. Key files: src/lib/agent-runtime/index.ts (add HermesAgentRuntime class), src/lib/agent-runtime/config.ts (runtime config detection), Settings > Hermes Runtime tab (already has config UI).
+- Phase 7 continued: Runtime config persistence (save runtime config to a settings table or localStorage with DB sync), runtime health check button, and model routing wiring (provider_credentials + model_route_key → edge function provider selection). The core env-gated factory + HermesAgentRuntime + edge function are done (commit e778252). Remaining Phase 7 tasks are enhancements to make the runtime configurable from the UI without code changes.
 
 ## Pitfalls / Notes
 - Pre-existing lint errors (52 errors, 16 warnings on main @ 6c6d3d2) are all `no-explicit-any` + `no-require-imports` + `no-empty-object-type` in pre-existing/shadcn files — do NOT fix, just ensure errors don't increase. Current branch: 52 errors, 20 warnings (zero new errors, +4 warnings from new page useMemo deps — acceptable)
@@ -99,4 +110,4 @@
 - Commit each green slice before starting the next file
 - Orphaned work recovery: prior tick wrote canvas/ files without committing — recovered, quality-gated, committed as 061b6ab
 
-**Last Updated:** 2026-06-24 — Phase 6 complete (first agentic vertical slice: canvas section analysis loop), Phase 7 next (Hermes runtime integration)
+**Last Updated:** 2026-06-24 — Phase 7 in progress: Hermes runtime integration wired (env-gated factory, live mode, edge function). Commit e778252.
