@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { ProviderCredentialsManager } from "@/components/settings/ProviderCredentialsManager";
 import { ModelRoutingPanel } from "@/components/settings/ModelRoutingPanel";
 import { McpConnectionsManager } from "@/components/settings/McpConnectionsManager";
+import { HermesRuntimePanel } from "@/components/settings/HermesRuntimePanel";
+import { ScheduledLoopsManager } from "@/components/settings/ScheduledLoopsManager";
 import { useAccountId } from "@/hooks/useAccountId";
 
 const tabSections = [
@@ -204,18 +206,20 @@ const Settings = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="hermes">
-          <PlaceholderTab
-            sectionName="Hermes Runtime"
-            description="Configure the Hermes agent runtime: concurrency limits, execution sandboxing, logging verbosity, and agent lifecycle policies."
-          />
+        <TabsContent value="hermes" className="space-y-6">
+          <HermesRuntimePanel accountId={effectiveAccountId} />
         </TabsContent>
 
-        <TabsContent value="schedules">
-          <PlaceholderTab
-            sectionName="Schedules"
-            description="Set up recurring agent runs, monitor health check intervals, and manage cron-based execution schedules for automated strategy analysis."
-          />
+        <TabsContent value="schedules" className="space-y-6">
+          {accountLoading ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">Loading workspace...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <ScheduledLoopsManager accountId={effectiveAccountId} />
+          )}
         </TabsContent>
 
         <TabsContent value="security">
