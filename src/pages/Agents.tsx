@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Bot, Plus, Clock, CheckCircle2, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
+import { AgentRunDetailDialog } from "@/components/AgentRunDetailDialog";
 import type { Database } from "@/integrations/supabase/types";
 
 /**
@@ -42,6 +43,8 @@ export default function Agents() {
   const [recentRuns, setRecentRuns] = useState<AgentRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailRunId, setDetailRunId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (accountLoading) return;
@@ -234,7 +237,11 @@ export default function Agents() {
                     return (
                       <div
                         key={run.id}
-                        className="flex items-center justify-between gap-3 rounded-lg border p-2.5"
+                        className="flex items-center justify-between gap-3 rounded-lg border p-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
+                        onClick={() => {
+                          setDetailRunId(run.id);
+                          setDetailOpen(true);
+                        }}
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -271,6 +278,12 @@ export default function Agents() {
           </Card>
         </>
       )}
+
+      <AgentRunDetailDialog
+        runId={detailRunId}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+      />
     </div>
   );
 }
