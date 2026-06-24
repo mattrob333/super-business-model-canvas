@@ -17,6 +17,7 @@ import ReportViewer from "./pages/ReportViewer";
 import Dashboard from "./pages/Dashboard";
 import Canvas from "./pages/Canvas";
 import Gaps from "./pages/Gaps";
+import Knowledge from "./pages/Knowledge";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/canvas" element={<Canvas />} />
             <Route path="/gaps" element={<Gaps />} />
+            <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/analyze" element={<Analysis />} />
             <Route path="/my-analyses" element={<MyAnalyses />} />
             <Route path="/playbooks" element={<Playbooks />} />
