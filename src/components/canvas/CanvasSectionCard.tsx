@@ -8,6 +8,9 @@ import {
   Target,
   Edit3,
   ChevronRight,
+  Sparkles,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 export type FreshnessStatus =
@@ -40,6 +43,12 @@ export interface CanvasSectionCardProps {
   span?: string;
   height?: string;
   onClick?: () => void;
+  /** Whether an agent analysis is running for this section */
+  isAnalyzing?: boolean;
+  /** Callback when user clicks "Run Analysis" */
+  onAnalyze?: () => void;
+  /** Error message from the last analysis run */
+  analysisError?: string;
 }
 
 const freshnessConfig: Record<
@@ -84,12 +93,20 @@ export function CanvasSectionCard({
   span = "col-span-1 row-span-1",
   height = "h-[180px] sm:h-[200px]",
   onClick,
+  isAnalyzing = false,
+  onAnalyze,
+  analysisError,
 }: CanvasSectionCardProps) {
   const previewItems = items.slice(0, 3);
   const remainingCount = items.length - 3;
   const freshness = meta?.freshness ?? "unverified";
   const freshnessCfg = freshnessConfig[freshness];
   const confidence = meta?.confidence ?? null;
+
+  const handleAnalyzeClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onAnalyze?.();
+  };
 
   return (
     <Card
@@ -101,7 +118,7 @@ export function CanvasSectionCard({
       )}
       onClick={onClick}
     >
-      {/* Header row: title + edit icon */}
+      {/* Header row: title + actions */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <h3 className="text-xs sm:text-sm font-medium uppercase tracking-wide text-muted-foreground truncate">
@@ -111,8 +128,50 @@ export function CanvasSectionCard({
             <Target className="w-3.5 h-3.5 text-primary opacity-70 flex-shrink-0" />
           ) : null}
         </div>
-        <Edit3 className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {onAnalyze && !isAnalyzing && (
+            <button
+              type="button"
+              onClick={handleAnalyzeClick}
+              className="flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors px-1.5 py-0.5 rounded hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring"
+              title={`Run agent analysis on ${title}`}
+              aria-label={`Run agent analysis on ${title}`}
+            >
+              <Sparkles className="w-3 h-3" />
+              Analyze
+            </button>
+          )}
+          {isAnalyzing && (
+            <span className="flex items-center gap-1 text-[10px] font-medium text-primary px-1.5 py-0.5">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Analyzing…
+            </span>
+          )}
+          {!isAnalyzing && !onAnalyze && (
+            <Edit3 className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+          )}
+        </div>
       </div>
+
+      {/* Analysis error banner */}
+      {analysisError && !isAnalyzing && (
+        <div className="flex items-center gap-1 mb-2 text-[10px] text-destructive">
+          <AlertCircle className="w-3 h-3 flex-shrink-0" />
+          <span className="truncate">{analysisError}</span>
+        </div>
+      )}
+
+      {/* Loading overlay when analyzing */}
+      {isAnalyzing && (
+        <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center z-10">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-5 h-5 text-primary animate-spin" />
+            <span className="text-[10px] text-muted-foreground">
+              Agent analyzing…
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Meta badges row */}
       {(meta?.agentName ||

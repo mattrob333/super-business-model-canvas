@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CanvasSectionCard,
@@ -9,25 +9,31 @@ import {
   CANVAS_SECTION_KEYS,
   CANVAS_SECTION_LABELS,
   LEGACY_SECTION_KEYS,
+  CANVAS_SECTION_AGENT_KEYS,
 } from "@/components/canvas/section-types";
+import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Info, Grid3X3, Sparkles } from "lucide-react";
+import { Info, Grid3X3, Sparkles, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAccountId } from "@/hooks/useAccountId";
+import { useCanvasSectionRun } from "@/hooks/useCanvasSectionRun";
+import { toast } from "sonner";
 
 /**
  * Standalone Canvas Workspace page (/canvas).
  *
- * This is the enterprise-grade BMC workspace. It renders all 9 sections
- * using the new CanvasSectionCard with agent badges, confidence indicators,
- * evidence counts, and gap badges.
+ * Enterprise-grade BMC workspace with 9 sections rendered using
+ * CanvasSectionCard. Supports agent-assisted analysis runs via the
+ * AgentRuntime interface (Phase 6 vertical slice).
  *
  * Data flow:
- * - Currently reads from legacy saved_analyses JSON (backward compatible)
- * - Will be upgraded to read canvas_section_versions table in a later phase
- * - The section card meta (agent, confidence, evidence, gaps) is currently
- *   empty/defaulted — it will be populated when agent runs start producing
- *   canvas_section_versions rows
+ * - Reads canvas_section_versions from the database (latest per section)
+ * - Falls back to legacy saved_analyses JSON if no versioned data exists
+ * - "Analyze" button on each card triggers MockAgentRuntime.startRun()
+ * - Run creates agent_runs record → completes → writes canvas_section_versions
+ * - UI refreshes to show the agent-produced analysis
  */
 
 interface LegacyCanvasData {
@@ -58,47 +64,191 @@ const TALL_SECTIONS = new Set([
   "customer_segments",
 ]);
 
-function getSectionItems(
-  data: LegacyCanvasData | null,
-  sectionKey: string,
-): string[] {
-  if (!data) return [];
-  const legacyKey = LEGACY_SECTION_KEYS[sectionKey as keyof typeof LEGACY_SECTION_KEYS];
-  const items = data[legacyKey as keyof LegacyCanvasData];
-  return Array.isArray(items) ? items : [];
+// ─── Types for canvas_section_versions data ─────────────────────────────────
+
+interface CanvasSectionVersion {
+  id: string;
+  section_key: string;
+  section_title: string | null;
+  items: string[] | { items: string[] } | unknown;
+  notes: string | null;
+  confidence: number | null;
+  freshness_status: FreshnessStatus;
+  last_verified_at: string | null;
+  created_by_agent_profile_id: string | null;
+  created_at: string;
 }
 
-function getSectionNotes(
-  data: LegacyCanvasData | null,
-  sectionKey: string,
-): string | undefined {
-  if (!data) return undefined;
-  const legacyKey = LEGACY_SECTION_KEYS[sectionKey as keyof typeof LEGACY_SECTION_KEYS];
-  const notesKey = `${legacyKey}_notes` as keyof LegacyCanvasData;
-  return data[notesKey] as string | undefined;
+interface AgentProfileBrief {
+  id: string;
+  display_name: string;
+  agent_key: string;
+  assigned_sections: string[];
+}
+
+/**
+ * Normalizes the `items` field from the DB (JSON) to a string array.
+ * The items column is Json — it may be a string[] or an object with items.
+ */
+function normalizeItems(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw as string[];
+  if (raw && typeof raw === "object" && "items" in raw) {
+    const inner = (raw as { items: unknown }).items;
+    if (Array.isArray(inner)) return inner as string[];
+  }
+  return [];
 }
 
 export default function Canvas() {
   const navigate = useNavigate();
-  const [activeVersion, setActiveVersion] = useState<number | null>(null);
+  const { accountId, loading: accountLoading } = useAccountId();
+  const {
+    runSectionAnalysis,
+    isSectionRunning,
+    getSectionError,
+    getSectionResult,
+  } = useCanvasSectionRun();
 
-  // Placeholder: no data yet — in later phases this comes from
-  // business_context_versions + canvas_section_versions queries
-  const canvasData: LegacyCanvasData | null = null;
-  const sectionMetas: Partial<Record<string, CanvasSectionMeta>> = {};
+  const [sectionVersions, setSectionVersions] = useState<
+    Record<string, CanvasSectionVersion>
+  >({});
+  const [agentProfiles, setAgentProfiles] = useState<
+    Record<string, AgentProfileBrief>
+  >({});
+  const [versionsLoading, setVersionsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Load canvas_section_versions + agent_profiles from DB
+  const loadCanvasData = useCallback(async () => {
+    if (accountLoading || !accountId) {
+      setVersionsLoading(false);
+      return;
+    }
+
+    setVersionsLoading(true);
+    try {
+      // Fetch latest canvas_section_version per section_key
+      const [versionsRes, profilesRes] = await Promise.all([
+        supabase
+          .from("canvas_section_versions")
+          .select(
+            "id, section_key, section_title, items, notes, confidence, freshness_status, last_verified_at, created_by_agent_profile_id, created_at",
+          )
+          .eq("account_id", accountId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("agent_profiles")
+          .select("id, display_name, agent_key, assigned_sections")
+          .eq("account_id", accountId),
+      ]);
+
+      // Deduplicate: keep only the latest version per section_key
+      const latestPerSection: Record<string, CanvasSectionVersion> = {};
+      if (versionsRes.data) {
+        for (const row of versionsRes.data as CanvasSectionVersion[]) {
+          if (!latestPerSection[row.section_key]) {
+            latestPerSection[row.section_key] = row;
+          }
+        }
+      }
+      setSectionVersions(latestPerSection);
+
+      // Index agent profiles by agent_key for section meta
+      const profilesByKey: Record<string, AgentProfileBrief> = {};
+      if (profilesRes.data) {
+        for (const p of profilesRes.data as AgentProfileBrief[]) {
+          profilesByKey[p.agent_key] = p;
+        }
+      }
+      setAgentProfiles(profilesByKey);
+    } catch (err) {
+      console.error("Failed to load canvas data:", err);
+    } finally {
+      setVersionsLoading(false);
+    }
+  }, [accountId, accountLoading]);
+
+  useEffect(() => {
+    void loadCanvasData();
+  }, [loadCanvasData, refreshKey]);
+
+  // Refresh canvas data when a run completes (lastResults changes)
+  const lastResultKeys = Object.keys(getSectionResult);
+  const lastResultJson = lastResultKeys
+    .map((k) => `${k}:${getSectionResult[k as CanvasSectionKey]?.runId}`)
+    .join(",");
+
+  useEffect(() => {
+    if (lastResultKeys.length > 0) {
+      void loadCanvasData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastResultJson]);
+
+  // Build section meta from agent profiles + version data
+  const sectionMetas = useMemo(() => {
+    const metas: Partial<Record<string, CanvasSectionMeta>> = {};
+    for (const sectionKey of CANVAS_SECTION_KEYS) {
+      const agentKey = CANVAS_SECTION_AGENT_KEYS[sectionKey];
+      const profile = agentProfiles[agentKey];
+      const version = sectionVersions[sectionKey];
+
+      metas[sectionKey] = {
+        agentName: profile?.display_name ?? null,
+        confidence: version?.confidence ?? null,
+        freshness: version?.freshness_status ?? "unverified",
+        hasNotes: !!version?.notes,
+      };
+    }
+    return metas;
+  }, [sectionVersions, agentProfiles]);
+
+  // Get items for a section — from DB version, or from hook result, or empty
+  const getSectionItems = useCallback(
+    (sectionKey: CanvasSectionKey): string[] => {
+      // If a run just completed, show the result
+      const result = getSectionResult(sectionKey);
+      if (result) return result.items;
+
+      // Otherwise, use the DB version
+      const version = sectionVersions[sectionKey];
+      if (version) return normalizeItems(version.items);
+
+      return [];
+    },
+    [sectionVersions, getSectionResult],
+  );
+
+  const getSectionNotes = useCallback(
+    (sectionKey: CanvasSectionKey): string | undefined => {
+      const result = getSectionResult(sectionKey);
+      if (result) return result.notes;
+
+      const version = sectionVersions[sectionKey];
+      return version?.notes ?? undefined;
+    },
+    [sectionVersions, getSectionResult],
+  );
 
   const totalItems = useMemo(() => {
-    if (!canvasData) return 0;
     return CANVAS_SECTION_KEYS.reduce((sum, key) => {
-      return sum + getSectionItems(canvasData, key).length;
+      return sum + getSectionItems(key).length;
     }, 0);
-  }, [canvasData]);
+  }, [getSectionItems]);
 
   const sectionsWithGaps = useMemo(() => {
     return CANVAS_SECTION_KEYS.filter(
       (key) => (sectionMetas[key]?.gapCount ?? 0) > 0,
     ).length;
   }, [sectionMetas]);
+
+  const hasCanvasData = totalItems > 0 || Object.keys(sectionVersions).length > 0;
+  const isAnalyzingAny = CANVAS_SECTION_KEYS.some((k) => isSectionRunning(k));
+
+  const handleRefresh = () => {
+    setRefreshKey((k) => k + 1);
+    toast.info("Refreshing canvas data…");
+  };
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -114,6 +264,16 @@ export default function Canvas() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={versionsLoading || isAnalyzingAny}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${versionsLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -137,13 +297,16 @@ export default function Canvas() {
             {sectionsWithGaps} sections with open gaps
           </Badge>
         )}
-        {activeVersion !== null && (
-          <Badge variant="secondary">Context v{activeVersion}</Badge>
+        {isAnalyzingAny && (
+          <Badge variant="secondary" className="gap-1.5">
+            <Sparkles className="h-3 w-3 animate-pulse" />
+            Agent analysis in progress…
+          </Badge>
         )}
       </div>
 
       {/* Empty state when no canvas data */}
-      {!canvasData && (
+      {!hasCanvasData && !versionsLoading && !accountLoading && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -151,9 +314,9 @@ export default function Canvas() {
             </div>
             <h3 className="text-lg font-medium mb-2">No canvas yet</h3>
             <p className="text-sm text-muted-foreground max-w-md mb-6">
-              Run a business analysis to generate your first Business Model
-              Canvas. Once created, agent-assisted sections will appear here with
-              confidence scores, evidence links, and gap indicators.
+              Click <span className="font-medium text-primary">Analyze</span> on
+              any section below to run an agent analysis, or start a full
+              business analysis to generate all sections at once.
             </p>
             <Button onClick={() => navigate("/analyze")} className="gap-2">
               <Sparkles className="h-4 w-4" />
@@ -163,8 +326,8 @@ export default function Canvas() {
         </Card>
       )}
 
-      {/* Canvas grid — 5 columns on desktop */}
-      {canvasData && (
+      {/* Canvas grid — always show sections so users can run per-section analysis */}
+      {(hasCanvasData || !versionsLoading) && (
         <>
           {/* Top rows: 5-column grid with tall side sections */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3 auto-rows-[200px]">
@@ -174,12 +337,15 @@ export default function Canvas() {
                 <CanvasSectionCard
                   key={sectionKey}
                   title={CANVAS_SECTION_LABELS[sectionKey]}
-                  items={getSectionItems(canvasData, sectionKey)}
-                  notes={getSectionNotes(canvasData, sectionKey)}
+                  items={getSectionItems(sectionKey)}
+                  notes={getSectionNotes(sectionKey)}
                   meta={sectionMetas[sectionKey]}
                   span={isTall ? "col-span-1 row-span-2" : "col-span-1 row-span-1"}
                   height="h-full"
                   onClick={() => navigate("/analyze")}
+                  isAnalyzing={isSectionRunning(sectionKey)}
+                  onAnalyze={() => void runSectionAnalysis(sectionKey)}
+                  analysisError={getSectionError(sectionKey)}
                 />
               );
             })}
@@ -191,12 +357,15 @@ export default function Canvas() {
               <CanvasSectionCard
                 key={sectionKey}
                 title={CANVAS_SECTION_LABELS[sectionKey]}
-                items={getSectionItems(canvasData, sectionKey)}
-                notes={getSectionNotes(canvasData, sectionKey)}
+                items={getSectionItems(sectionKey)}
+                notes={getSectionNotes(sectionKey)}
                 meta={sectionMetas[sectionKey]}
                 span="flex-1"
                 height="h-[200px]"
                 onClick={() => navigate("/analyze")}
+                isAnalyzing={isSectionRunning(sectionKey)}
+                onAnalyze={() => void runSectionAnalysis(sectionKey)}
+                analysisError={getSectionError(sectionKey)}
               />
             ))}
           </div>
@@ -212,9 +381,24 @@ export default function Canvas() {
             <CardContent>
               <p className="text-sm text-muted-foreground">
                 Each section card shows agent ownership, confidence level, data
-                freshness, linked evidence count, and open gaps. Click any section
-                to edit items and notes. Canvas data is versioned — changes
-                create new versions tracked in the context store.
+                freshness, linked evidence count, and open gaps. Click{" "}
+                <span className="font-medium text-primary">Analyze</span> to run
+                an agent analysis on a section — this creates an{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                  agent_runs
+                </code>{" "}
+                record and saves the result as a new{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                  canvas_section_versions
+                </code>{" "}
+                entry. View all runs in the{" "}
+                <button
+                  onClick={() => navigate("/activity")}
+                  className="text-primary hover:underline"
+                >
+                  Activity page
+                </button>
+                .
               </p>
             </CardContent>
           </Card>
