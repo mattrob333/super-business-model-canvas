@@ -261,8 +261,12 @@ export function useCanvasSectionRun() {
             section_label: CANVAS_SECTION_LABELS[sectionKey],
             context_version_id: contextVersionId,
           },
-          modelProvider: "mock",
-          modelName: "mock-analyzer",
+          // In live mode, omit modelProvider/modelName so the edge function
+          // auto-detects from env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+          // In mock mode, these values are ignored by MockAgentRuntime.
+          ...(getRuntimeMode() === "live"
+            ? {}
+            : { modelProvider: "mock", modelName: "mock-analyzer" }),
         });
 
         toast.info(`Analysis started for ${CANVAS_SECTION_LABELS[sectionKey]}…`);
