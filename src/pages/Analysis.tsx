@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
 import { LoadingState } from "@/components/LoadingState";
 import { BusinessOverview } from "@/components/BusinessOverview";
-import { BusinessModelCanvas } from "@/components/BusinessModelCanvas";
+import { EnterpriseBusinessModelCanvas } from "@/components/canvas/EnterpriseBusinessModelCanvas";
+import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
 import { ChatDrawer } from "@/components/ChatDrawer";
 import { ProcessSteps } from "@/components/ProcessSteps";
@@ -217,29 +218,42 @@ const Analysis = () => {
     }
   }, [hasAnalyzed, analysisData, user, isNewAnalysis]);
 
-  const handleBMCSectionUpdate = (sectionTitle: string, updatedData: { items: string[]; notes: string }) => {
-    const sectionKeyMap: Record<string, string> = {
-      'Key Partners': 'keyPartners',
-      'Key Activities': 'keyActivities',
-      'Key Resources': 'keyResources',
-      'Value Propositions': 'valuePropositions',
-      'Customer Relationships': 'customerRelationships',
-      'Channels': 'channels',
-      'Customer Segments': 'customerSegments',
-      'Cost Structure': 'costStructure',
-      'Revenue Streams': 'revenueStreams'
+  const handleBMCSectionUpdate = (sectionKey: CanvasSectionKey, updatedData: { items: string[]; notes: string }) => {
+    const legacyKeyMap: Record<CanvasSectionKey, string> = {
+      key_partners: 'keyPartners',
+      key_activities: 'keyActivities',
+      key_resources: 'keyResources',
+      value_propositions: 'valuePropositions',
+      customer_relationships: 'customerRelationships',
+      channels: 'channels',
+      customer_segments: 'customerSegments',
+      cost_structure: 'costStructure',
+      revenue_streams: 'revenueStreams'
     };
     
-    const sectionKey = sectionKeyMap[sectionTitle];
-    if (!sectionKey) return;
+    const legacyKey = legacyKeyMap[sectionKey];
+    if (!legacyKey) return;
+
+    const sectionTitleMap: Record<CanvasSectionKey, string> = {
+      key_partners: 'Key Partners',
+      key_activities: 'Key Activities',
+      key_resources: 'Key Resources',
+      value_propositions: 'Value Propositions',
+      customer_relationships: 'Customer Relationships',
+      channels: 'Channels',
+      customer_segments: 'Customer Segments',
+      cost_structure: 'Cost Structure',
+      revenue_streams: 'Revenue Streams'
+    };
+    const sectionTitle = sectionTitleMap[sectionKey];
 
     // Track unique reviewed sections
     setReviewedSections(prev => Math.min(prev + 1, 11));
 
     const updatedCanvas = {
       ...analysisData.canvas,
-      [sectionKey]: updatedData.items,
-      [`${sectionKey}_notes`]: updatedData.notes
+      [legacyKey]: updatedData.items,
+      [`${legacyKey}_notes`]: updatedData.notes
     };
 
     setAnalysisData({
@@ -687,7 +701,7 @@ Website: ${comp.website || 'N/A'}
                               pointer-events-none -z-10"
                    style={{ transform: 'scale(1.015)' }}
               />
-              <BusinessModelCanvas
+              <EnterpriseBusinessModelCanvas
                 data={{
                   keyPartners: Array.isArray(analysisData.canvas?.keyPartners) ? analysisData.canvas.keyPartners : [],
                   keyActivities: Array.isArray(analysisData.canvas?.keyActivities) ? analysisData.canvas.keyActivities : [],

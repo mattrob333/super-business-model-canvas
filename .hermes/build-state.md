@@ -3,11 +3,11 @@
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)
 **Repo:** https://github.com/mattrob333/super-business-model-canvas
 **Workspace:** C:\Users\mrobe\Documents\Projects\SuperBMCenterprise\super-business-model-canvas
-**Status:** Phase 3 Complete — Canvas Workspace Upgraded
+**Status:** Phase 3 In Progress — Canvas workspace page + components shipped, wire to Analysis page next
 
 ## Architecture: Two-Tier Autonomous Build Loop
-- Inner Loop (cron TBD) — every 10m: Check -> Test -> Advance -> Repeat
-- Outer Loop (cron TBD) — every 60m: Audit -> Write Corrections -> Fix Trivial -> Escalate
+- Inner Loop (cron 779c6bf918c9) — every 10m: Check -> Test -> Advance -> Repeat
+- Outer Loop (cron 14e78388ccf6) — every 60m: Audit -> Write Corrections -> Fix Trivial -> Escalate
 
 ## Phases / Waves
 
@@ -37,18 +37,16 @@
 3. [x] TypeScript types updated: all 12 tables + 14 new enums + Constants
 4. [x] Build passes (6.61s)
 
-### Phase 3: Canvas Workspace Upgrade ✅ (commits 061b6ab, f528991)
-1. [x] CanvasSectionCard component: enterprise-themed (light/dark, 8px radius, shadcn Card)
-2. [x] Agent badge (Bot icon + name), confidence indicator (High/Medium/Low + color)
-3. [x] Freshness badge (Fresh/Stale/Outdated/Unverified)
-4. [x] Evidence count (FileCheck icon), gap count (AlertTriangle icon)
-5. [x] Section types module: canonical keys, labels, agent key mapping, legacy compat
-6. [x] EnterpriseBusinessModelCanvas: standard BMC grid layout with CanvasSectionCard
-7. [x] Canvas workspace page (/canvas) with empty state + summary bar
-8. [x] Route wired in App.tsx, nav link in SidebarNav
-9. [x] Build passes (6.67s)
+### Phase 3: Canvas Workspace Upgrade (IN PROGRESS)
+1. [x] CanvasSectionCard component (commit 061b6ab) — agent badges, confidence indicators, freshness badges, evidence/gap counts, enterprise 8px-radius Card
+2. [x] section-types.ts — canonical section keys + legacy camelCase mapping + agent key mapping
+3. [x] EnterpriseBusinessModelCanvas component (commit f528991) — full BMC grid using CanvasSectionCard, backward-compatible with legacy data, BMCSectionEditor integration
+4. [x] Canvas page at `/canvas` (commit f528991) — standalone workspace with empty state, summary bar, route wired in App.tsx
+5. [ ] Wire EnterpriseBusinessModelCanvas into Analysis.tsx page (replace old BusinessModelCanvas)
+6. [ ] Gap Register page at `/gaps`
+7. [ ] Knowledge/Evidence page shell at `/knowledge`
 
-### Phase 4: Settings + Provider Keys + MCP Registry [ ] (NEXT)
+### Phase 4: Settings + Provider Keys + MCP Registry [ ]
 ### Phase 5: Agent Profiles + Activity [ ]
 ### Phase 6: First Agentic Vertical Slice [ ]
 ### Phase 7: Hermes Runtime Integration [ ]
@@ -60,15 +58,14 @@
 - Created `enterprise-strategy-workspace` branch from main (6c6d3d2)
 - Phase 0: Verified `npm run build` passes, documented Hermes architecture, lint audit
 - Phase 1 (commit 1c924df): Enterprise theme (deep indigo/cool gray, light-mode default), AppShell layout (SidebarNav + TopBar), Dashboard page, Settings page (7 tabs), ThemeProvider, .env.example, removed lovable-tagger
-- 15 files changed: 9 new, 4 modified, 2 docs
 - Phase 2 (commit 35cf3f6): 12 canonical tables migration (accounts, account_members, business_context_versions, canvas_section_versions, evidence_items, gaps, agent_profiles, agent_runs, scheduled_loops, provider_credentials, mcp_servers, mcp_server_tools), 14 Postgres enums, RLS policies on all tables, updated_at triggers, seed migration with 10 agent profiles, TypeScript types updated
-- Phase 3 (commits 061b6ab, f528991): CanvasSectionCard with agent/confidence/evidence/gap badges, section types module, EnterpriseBusinessModelCanvas with standard BMC grid, Canvas workspace page (/canvas) with empty state
+- Phase 3 (commits 061b6ab + f528991): CanvasSectionCard with agent/confidence/freshness/evidence/gap badges, section-types.ts with canonical+legacy key mapping, EnterpriseBusinessModelCanvas with standard BMC grid layout, Canvas page at /canvas with empty state + summary bar, route wired in App.tsx, barrel index.ts
 
 ## Open Issues / Blockers
 - None
 
 ## Next Action
-- Phase 4: Settings + Provider Keys + MCP Registry — functional provider key management (masked, never returned to browser), model routing config, MCP server configuration UI. Read existing Settings page to see current tabs.
+- Phase 3 Task 5: Wire EnterpriseBusinessModelCanvas into Analysis.tsx, replacing the old BusinessModelCanvas component. The Analysis page currently imports and renders `<BusinessModelCanvas>` — swap it for `<EnterpriseBusinessModelCanvas>` which accepts the same legacy data shape but adds sectionMeta support. Keep BMCSectionEditor integration working.
 
 ## Pitfalls / Notes
 - Pre-existing lint errors are all `no-explicit-any` + React hooks deps — document only, don't fix
@@ -77,5 +74,6 @@
 - Supabase types are manually defined (not via `supabase gen types`) — need careful schema evolution
 - `bun.lockb` present but `package-lock.json` also exists — npm used for build
 - Commit each green slice before starting the next file
+- Orphaned work recovery: prior tick wrote canvas/ files without committing — recovered, quality-gated, committed as 061b6ab
 
-**Last Updated:** 2026-06-24 — Phase 3 complete (canvas workspace upgrade)
+**Last Updated:** 2026-06-24 — Phase 3 in progress (canvas components + page shipped, Analysis.tsx wiring next)
