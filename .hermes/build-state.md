@@ -3,7 +3,7 @@
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)
 **Repo:** https://github.com/mattrob333/super-business-model-canvas
 **Workspace:** C:\Users\mrobe\Documents\Projects\SuperBMCenterprise\super-business-model-canvas
-**Status:** Phase 5 Complete — Agents + Activity wired to live data + run detail dialog. Phase 6 next (first agentic vertical slice).
+**Status:** Phase 6 Complete — first agentic vertical slice (canvas section analysis loop). Phase 7 next (Hermes runtime integration).
 
 ## Architecture: Two-Tier Autonomous Build Loop
 - Inner Loop (cron 779c6bf918c9) — every 10m: Check -> Test -> Advance -> Repeat
@@ -62,7 +62,13 @@
 - [x] Wire Activity page to live agent_runs data (commit 8c5b148)
 - [x] Agent run detail view (commit 83881e4) — AgentRunDetailDialog with full run info (input/output JSON, tokens, cost, timing, errors), clickable run rows in both Agents + Activity pages
 
-### Phase 6: First Agentic Vertical Slice [ ]
+### Phase 6: First Agentic Vertical Slice ✅ (commit d51c1df)
+1. [x] useCanvasSectionRun hook — orchestrates full loop: resolve agent_profile → ensure business_context_version → AgentRuntime.startRun() → poll for completion → write canvas_section_versions → update UI
+2. [x] CanvasSectionCard: "Analyze" button, loading overlay, error banner, focus-visible ring
+3. [x] Canvas page: wired to live canvas_section_versions + agent_profiles data, auto-refresh on run completion
+4. [x] 9 section-specific mock analysis datasets (realistic BMC content per section)
+5. [x] Toast notifications (start/complete/error) via sonner
+6. [x] Full circuit proven: UI trigger → agent_runs record → canvas_section_versions → UI refresh
 ### Phase 7: Hermes Runtime Integration [ ]
 ### Phase 8: Framework Skills [ ]
 ### Phase 9: Expand Agents and Loops [ ]
@@ -76,15 +82,16 @@
 - Phase 3 (commits 061b6ab + f528991 + e97eecf + b1741d7 + b684f0e): CanvasSectionCard, section-types.ts, EnterpriseBusinessModelCanvas, Canvas page, Analysis.tsx wiring, Gap Register page, Knowledge/Evidence page
 - Phase 5 (commits 74e737e + 8c5b148 + 83881e4): Agents + Activity page shells, then wired to live Supabase data (agent_profiles + agent_runs queries via useAccountId), AgentRunDetailDialog component (full run details: status, timing, model, tokens, cost, input/output JSON with copy button), clickable run rows in both pages
 - Phase 4 (commits 2787fae + a9f3caf): ProviderCredentialsManager (encrypted_secret never selected, add via edge function), ModelRoutingPanel (4 route tiers per agent), McpConnectionsManager (stdio/http/sse/websocket transports, tool discovery), useAccountId hook, HermesRuntimePanel (AgentRuntime interface boundary in src/lib/agent-runtime/, MockAgentRuntime, config UI), ScheduledLoopsManager (CRUD for scheduled_loops, cron presets, budget/failure limits), 5 Settings placeholder tabs replaced with functional components
+- Phase 6 (commit d51c1df): useCanvasSectionRun hook (full agent run loop: resolve agent profile → startRun → poll → write canvas_section_versions), CanvasSectionCard Analyze button + loading overlay + error banner, Canvas page wired to live canvas_section_versions + agent_profiles with auto-refresh, 9 section-specific mock analysis datasets, toast notifications
 
 ## Open Issues / Blockers
 - None
 
 ## Next Action
-- Phase 6: First Agentic Vertical Slice — implement the first end-to-end agent run using the AgentRuntime interface. This should be a "canvas section analysis" run: user clicks a canvas section → MockAgentRuntime.startRun() creates an agent_runs record → simulates analysis → result stored in canvas_section_versions. This proves the full loop: UI → AgentRuntime → DB → UI update. Key files: src/lib/agent-runtime/index.ts (MockAgentRuntime already creates runs), src/components/canvas/EnterpriseBusinessModelCanvas.tsx (add "Run Analysis" button to CanvasSectionCard), src/components/canvas/CanvasSectionCard.tsx (trigger button + loading state).
+- Phase 7: Hermes Runtime Integration — replace MockAgentRuntime with real HermesAgentRuntime that connects to a live Hermes instance. The AgentRuntime interface boundary is already in place (src/lib/agent-runtime/index.ts). The factory (getAgentRuntime) currently always returns MockAgentRuntime; Phase 7 adds env/config detection to choose HermesAgentRuntime when configured. Key files: src/lib/agent-runtime/index.ts (add HermesAgentRuntime class), src/lib/agent-runtime/config.ts (runtime config detection), Settings > Hermes Runtime tab (already has config UI).
 
 ## Pitfalls / Notes
-- Pre-existing lint errors are all `no-explicit-any` + React hooks deps — document only, don't fix
+- Pre-existing lint errors (52 errors, 16 warnings on main @ 6c6d3d2) are all `no-explicit-any` + `no-require-imports` + `no-empty-object-type` in pre-existing/shadcn files — do NOT fix, just ensure errors don't increase. Current branch: 52 errors, 20 warnings (zero new errors, +4 warnings from new page useMemo deps — acceptable)
 - The app uses both `react-router-dom` (for routing) and `next-themes` (for theme) — can use `next-themes` directly
 - shadcn/ui components are in `src/components/ui/` — modify with care as they're auto-generated
 - Supabase types are manually defined (not via `supabase gen types`) — need careful schema evolution
@@ -92,4 +99,4 @@
 - Commit each green slice before starting the next file
 - Orphaned work recovery: prior tick wrote canvas/ files without committing — recovered, quality-gated, committed as 061b6ab
 
-**Last Updated:** 2026-06-24 — Phase 5 complete (Agents + Activity live data + run detail dialog), Phase 6 next
+**Last Updated:** 2026-06-24 — Phase 6 complete (first agentic vertical slice: canvas section analysis loop), Phase 7 next (Hermes runtime integration)
