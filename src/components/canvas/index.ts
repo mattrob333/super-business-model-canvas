@@ -4,6 +4,8 @@ export type {
   CanvasSectionMeta,
   FreshnessStatus,
 } from "./CanvasSectionCard";
+export { EnterpriseBusinessModelCanvas } from "./EnterpriseBusinessModelCanvas";
+export type { EnterpriseBusinessModelCanvasProps, LegacyCanvasData } from "./EnterpriseBusinessModelCanvas";
 export {
   CANVAS_SECTION_KEYS,
   CANVAS_SECTION_LABELS,

@@ -15,6 +15,7 @@ import Playbooks from "./pages/Playbooks";
 import FrameworkDetail from "./pages/FrameworkDetail";
 import ReportViewer from "./pages/ReportViewer";
 import Dashboard from "./pages/Dashboard";
+import Canvas from "./pages/Canvas";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +35,7 @@ const App = () => (
           {/* Authenticated routes — inside AppShell */}
           <Route element={<AppShell />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/canvas" element={<Canvas />} />
             <Route path="/analyze" element={<Analysis />} />
             <Route path="/my-analyses" element={<MyAnalyses />} />
             <Route path="/playbooks" element={<Playbooks />} />
