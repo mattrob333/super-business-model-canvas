@@ -247,21 +247,30 @@ export class MockAgentRuntime implements AgentRuntime {
 
 // ─── Factory ────────────────────────────────────────────────────────────────
 
+export { getRuntimeMode, getRuntimeModeLabel, getRuntimeEndpoint } from "./config";
+export { HermesAgentRuntime } from "./hermes-runtime";
+
+import { getRuntimeMode } from "./config";
+import { HermesAgentRuntime } from "./hermes-runtime";
+
 let runtimeInstance: AgentRuntime | null = null;
 
 /**
  * Get the singleton AgentRuntime instance.
  *
- * Currently returns MockAgentRuntime. When Hermes is integrated,
- * this factory will check for Hermes configuration and return
- * HermesAgentRuntime if available, falling back to Mock otherwise.
+ * Env-gated: when VITE_HERMES_RUNTIME_ENDPOINT is set, returns
+ * HermesAgentRuntime (calls Supabase Edge Function for real LLM execution).
+ * Otherwise, returns MockAgentRuntime (development, no real AI).
+ *
+ * Guardrail: "Hermes is the agent runtime, not the backend."
  */
 export function getAgentRuntime(accountId?: string): AgentRuntime {
   if (!runtimeInstance) {
-    // Future: check env/config for Hermes instance URL
-    // If configured, return new HermesAgentRuntime(config)
-    // Otherwise, return mock
-    runtimeInstance = new MockAgentRuntime(accountId);
+    if (getRuntimeMode() === "live") {
+      runtimeInstance = new HermesAgentRuntime(accountId);
+    } else {
+      runtimeInstance = new MockAgentRuntime(accountId);
+    }
   }
   return runtimeInstance;
 }

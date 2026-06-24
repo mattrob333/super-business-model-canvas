@@ -14,7 +14,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getAgentRuntime } from "@/lib/agent-runtime";
+import { getAgentRuntime, getRuntimeMode } from "@/lib/agent-runtime";
 import type { AgentRunStatus } from "@/lib/agent-runtime";
 import {
   CANVAS_SECTION_AGENT_KEYS,
@@ -316,10 +316,40 @@ export function useCanvasSectionRun() {
                 return;
               }
 
-              // Step 5: Run completed — write result to canvas_section_versions
-              const analysis = generateMockAnalysis(sectionKey);
+              // Step 5: Run completed — get the analysis output
+              // In live mode: fetch the real LLM output from agent_runs
+              // In mock mode: use the local mock generator
+              const fetchAnalysis = async (): Promise<{
+                items: string[];
+                notes: string;
+                confidence: number;
+                summary: string;
+              }> => {
+                if (getRuntimeMode() === "live") {
+                  const runOutput = await runtime.getRunOutput(runId);
+                  const output = runOutput?.output as Record<string, unknown> | null;
+                  if (output && Array.isArray(output.items)) {
+                    return {
+                      items: (output.items as unknown[]).filter(
+                        (i): i is string => typeof i === "string" && i.length > 0,
+                      ),
+                      notes: typeof output.notes === "string" ? output.notes : "",
+                      confidence: typeof output.confidence === "number"
+                        ? Math.max(0, Math.min(1, output.confidence))
+                        : 0.7,
+                      summary: typeof output.summary === "string"
+                        ? output.summary
+                        : runOutput?.summary ?? "Analysis complete.",
+                    };
+                  }
+                  // Fallback to mock if edge function didn't produce structured output
+                  console.warn("Live run produced no structured output, falling back to mock");
+                }
+                return generateMockAnalysis(sectionKey);
+              };
 
-              supabase
+              fetchAnalysis().then((analysis) => {
+                supabase
                 .from("canvas_section_versions")
                 .insert({
                   account_id: accountId,
@@ -370,6 +400,7 @@ export function useCanvasSectionRun() {
                     `Analysis complete for ${CANVAS_SECTION_LABELS[sectionKey]} — ${analysis.items.length} items identified.`,
                   );
                 });
+              });
               return;
             }
 

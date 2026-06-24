@@ -23,6 +23,8 @@ import { useToast } from "@/components/ui/use-toast";
 import {
   getAgentRuntime,
   DEFAULT_RUNTIME_CONFIG,
+  getRuntimeMode,
+  getRuntimeModeLabel,
   type RuntimeConfig,
 } from "@/lib/agent-runtime";
 
@@ -150,8 +152,8 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground mb-1">Mode</p>
-              <Badge variant="outline" className="text-xs">
-                Mock Runtime
+              <Badge variant={getRuntimeMode() === "live" ? "default" : "outline"} className="text-xs">
+                {getRuntimeModeLabel()}
               </Badge>
             </div>
           </div>
