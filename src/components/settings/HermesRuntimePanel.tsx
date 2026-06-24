@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Cpu, Activity, Loader2, Save, RotateCcw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   getAgentRuntime,
   DEFAULT_RUNTIME_CONFIG,
@@ -54,15 +55,31 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setConfig(runtime.getConfig());
+      // Load persisted config from accounts table
+      const { data: account } = await supabase
+        .from("accounts")
+        .select("runtime_config")
+        .eq("id", accountId)
+        .maybeSingle();
+
+      const persistedConfig = (account as { runtime_config: unknown } | null)?.runtime_config;
+      if (persistedConfig && typeof persistedConfig === "object" && !Array.isArray(persistedConfig)) {
+        const merged = { ...DEFAULT_RUNTIME_CONFIG, ...(persistedConfig as Partial<RuntimeConfig>) };
+        setConfig(merged);
+        // Also update the in-memory runtime
+        await runtime.updateConfig(merged);
+      } else {
+        setConfig(runtime.getConfig());
+      }
       const count = await runtime.getActiveRunCount();
       setActiveRuns(count);
     } catch (err) {
       console.error("Failed to load runtime config:", err);
+      setConfig(runtime.getConfig());
     } finally {
       setLoading(false);
     }
-  }, [runtime]);
+  }, [runtime, accountId]);
 
   useEffect(() => {
     void refresh();
@@ -84,13 +101,22 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Update in-memory runtime
       const { success } = await runtime.updateConfig(config);
-      if (success) {
-        toast({
-          title: "Runtime configuration saved",
-          description: "Changes will apply to new agent runs.",
-        });
-      }
+      if (!success) throw new Error("Runtime rejected configuration");
+
+      // Persist to accounts table
+      const { error: updateError } = await supabase
+        .from("accounts")
+        .update({ runtime_config: config as unknown as Record<string, unknown> })
+        .eq("id", accountId);
+
+      if (updateError) throw new Error(`Failed to persist: ${updateError.message}`);
+
+      toast({
+        title: "Runtime configuration saved",
+        description: "Changes will apply to new agent runs.",
+      });
     } catch (err) {
       toast({
         title: "Failed to save",

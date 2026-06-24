@@ -512,6 +512,7 @@ export type Database = {
           id: string
           name: string
           slug: string | null
+          runtime_config: Json | null
           created_at: string
           updated_at: string
         }
@@ -519,6 +520,7 @@ export type Database = {
           id?: string
           name: string
           slug?: string | null
+          runtime_config?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -526,6 +528,7 @@ export type Database = {
           id?: string
           name?: string
           slug?: string | null
+          runtime_config?: Json | null
           created_at?: string
           updated_at?: string
         }
