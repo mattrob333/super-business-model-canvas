@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Cpu, Activity, Loader2, Save, RotateCcw } from "lucide-react";
+import { Cpu, Activity, Loader2, Save, RotateCcw, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -49,6 +49,8 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
   const [activeRuns, setActiveRuns] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [healthResult, setHealthResult] = useState<{ healthy: boolean; message: string; latencyMs?: number } | null>(null);
 
   const runtime = getAgentRuntime(accountId);
 
@@ -136,6 +138,32 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
     });
   };
 
+  const handleHealthCheck = async () => {
+    setTesting(true);
+    setHealthResult(null);
+    try {
+      const result = await runtime.healthCheck();
+      setHealthResult(result);
+      toast({
+        title: result.healthy ? "Connection healthy" : "Connection failed",
+        description: result.latencyMs != null
+          ? `${result.message} (${result.latencyMs}ms)`
+          : result.message,
+        variant: result.healthy ? "default" : "destructive",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setHealthResult({ healthy: false, message: msg });
+      toast({
+        title: "Connection test failed",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Runtime status */}
@@ -183,6 +211,63 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
               </Badge>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Connection test */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium">
+            Connection Test
+          </CardTitle>
+          <CardDescription>
+            Test connectivity to the runtime backend. In mock mode, this verifies database connectivity.
+            In live mode, this pings the edge function endpoint.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleHealthCheck}
+            disabled={testing}
+            className="gap-2"
+          >
+            {testing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Wifi className="h-4 w-4" />
+            )}
+            Test Connection
+          </Button>
+          {healthResult && (
+            <div
+              className={`flex items-start gap-3 rounded-lg border p-3 ${
+                healthResult.healthy
+                  ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950"
+                  : "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950"
+              }`}
+            >
+              {healthResult.healthy ? (
+                <Wifi className="h-4 w-4 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <WifiOff className="h-4 w-4 mt-0.5 text-red-600 dark:text-red-400" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">
+                  {healthResult.healthy ? "Healthy" : "Unhealthy"}
+                  {healthResult.latencyMs != null && (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      {healthResult.latencyMs}ms
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                  {healthResult.message}
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

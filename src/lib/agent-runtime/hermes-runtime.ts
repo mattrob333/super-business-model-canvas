@@ -267,4 +267,61 @@ export class HermesAgentRuntime implements AgentRuntime {
     if (error || count === null) return 0;
     return count;
   }
+
+  async healthCheck(): Promise<{ healthy: boolean; message: string; latencyMs?: number }> {
+    const start = Date.now();
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      // Attach auth — use Supabase session token if available
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session?.access_token) {
+        headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+      } else if (this.apiKey) {
+        headers["Authorization"] = `Bearer ${this.apiKey}`;
+      }
+
+      const response = await fetch(this.endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ healthCheck: true }),
+      });
+
+      const latencyMs = Date.now() - start;
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        return {
+          healthy: false,
+          message: `Edge function returned ${response.status}: ${errorText.slice(0, 200)}`,
+          latencyMs,
+        };
+      }
+
+      const data = await response.json();
+
+      if (data.healthy === true) {
+        return {
+          healthy: true,
+          message: data.message || "Edge function is operational.",
+          latencyMs,
+        };
+      }
+
+      return {
+        healthy: false,
+        message: data.message || data.error || "Health check failed (no detail).",
+        latencyMs,
+      };
+    } catch (err) {
+      const latencyMs = Date.now() - start;
+      return {
+        healthy: false,
+        message: `Connection failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+        latencyMs,
+      };
+    }
+  }
 }

@@ -98,6 +98,9 @@ export interface AgentRuntime {
 
   /** Get the count of currently running agents. */
   getActiveRunCount(): Promise<number>;
+
+  /** Check runtime health/connectivity. Returns status + message. */
+  healthCheck(): Promise<{ healthy: boolean; message: string; latencyMs?: number }>;
 }
 
 // ─── Mock Implementation ────────────────────────────────────────────────────
@@ -242,6 +245,31 @@ export class MockAgentRuntime implements AgentRuntime {
 
     if (error || count === null) return 0;
     return count;
+  }
+
+  async healthCheck(): Promise<{ healthy: boolean; message: string; latencyMs?: number }> {
+    const start = Date.now();
+    try {
+      // Mock runtime is always "healthy" — just verify DB connectivity
+      const { error } = await supabase
+        .from("agent_runs")
+        .select("id", { count: "exact", head: true })
+        .limit(0);
+      if (error) throw error;
+      const latencyMs = Date.now() - start;
+      return {
+        healthy: true,
+        message: "Mock runtime is operational. Database connection verified.",
+        latencyMs,
+      };
+    } catch (err) {
+      const latencyMs = Date.now() - start;
+      return {
+        healthy: false,
+        message: `Database connection failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+        latencyMs,
+      };
+    }
   }
 }
 

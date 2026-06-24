@@ -271,7 +271,32 @@ serve(async (req) => {
       );
     }
 
-    const body: AgentRunRequest = await req.json();
+    const body: AgentRunRequest & { healthCheck?: boolean } = await req.json();
+
+    // Health check mode — respond quickly without executing an LLM call
+    if (body.healthCheck === true) {
+      const openaiKey = Deno.env.get('OPENAI_API_KEY');
+      const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+      const openrouterKey = Deno.env.get('OPENROUTER_API_KEY');
+      const xaiKey = Deno.env.get('XAI_API_KEY');
+      const configuredProviders: string[] = [];
+      if (openaiKey) configuredProviders.push('openai');
+      if (anthropicKey) configuredProviders.push('anthropic');
+      if (openrouterKey) configuredProviders.push('openrouter');
+      if (xaiKey) configuredProviders.push('xai');
+
+      return new Response(
+        JSON.stringify({
+          healthy: true,
+          message: configuredProviders.length > 0
+            ? `Edge function operational. Configured providers: ${configuredProviders.join(', ')}.`
+            : 'Edge function operational. No LLM providers configured (set OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, or XAI_API_KEY).',
+          providers: configuredProviders,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { agentProfileId, accountId, input, modelProvider, modelName } = body;
 
     if (!agentProfileId || !accountId) {
