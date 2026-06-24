@@ -507,6 +507,650 @@ export type Database = {
         }
         Relationships: []
       }
+      accounts: {
+        Row: {
+          id: string
+          name: string
+          slug: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      account_members: {
+        Row: {
+          id: string
+          account_id: string
+          user_id: string
+          role: Database["public"]["Enums"]["account_member_role"]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          user_id: string
+          role?: Database["public"]["Enums"]["account_member_role"]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          user_id?: string
+          role?: Database["public"]["Enums"]["account_member_role"]
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_members_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_context_versions: {
+        Row: {
+          id: string
+          account_id: string
+          source_analysis_id: string | null
+          version_number: number
+          summary: string | null
+          company_name: string | null
+          website: string | null
+          industry: string | null
+          data: Json
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          source_analysis_id?: string | null
+          version_number?: number
+          summary?: string | null
+          company_name?: string | null
+          website?: string | null
+          industry?: string | null
+          data?: Json
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          source_analysis_id?: string | null
+          version_number?: number
+          summary?: string | null
+          company_name?: string | null
+          website?: string | null
+          industry?: string | null
+          data?: Json
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_context_versions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      canvas_section_versions: {
+        Row: {
+          id: string
+          account_id: string
+          business_context_version_id: string
+          section_key: string
+          section_title: string | null
+          items: Json
+          notes: string | null
+          confidence: number | null
+          freshness_status: Database["public"]["Enums"]["freshness_status"]
+          last_verified_at: string | null
+          created_by_agent_profile_id: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          business_context_version_id: string
+          section_key: string
+          section_title?: string | null
+          items?: Json
+          notes?: string | null
+          confidence?: number | null
+          freshness_status?: Database["public"]["Enums"]["freshness_status"]
+          last_verified_at?: string | null
+          created_by_agent_profile_id?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          business_context_version_id?: string
+          section_key?: string
+          section_title?: string | null
+          items?: Json
+          notes?: string | null
+          confidence?: number | null
+          freshness_status?: Database["public"]["Enums"]["freshness_status"]
+          last_verified_at?: string | null
+          created_by_agent_profile_id?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canvas_section_versions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_section_versions_business_context_version_id_fkey"
+            columns: ["business_context_version_id"]
+            isOneToOne: false
+            referencedRelation: "business_context_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evidence_items: {
+        Row: {
+          id: string
+          account_id: string
+          source_type: Database["public"]["Enums"]["evidence_source_type"]
+          source_name: string | null
+          source_url: string | null
+          source_date: string | null
+          retrieved_at: string
+          title: string
+          excerpt: string | null
+          metadata: Json
+          created_by_agent_run_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          source_type?: Database["public"]["Enums"]["evidence_source_type"]
+          source_name?: string | null
+          source_url?: string | null
+          source_date?: string | null
+          retrieved_at?: string
+          title: string
+          excerpt?: string | null
+          metadata?: Json
+          created_by_agent_run_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          source_type?: Database["public"]["Enums"]["evidence_source_type"]
+          source_name?: string | null
+          source_url?: string | null
+          source_date?: string | null
+          retrieved_at?: string
+          title?: string
+          excerpt?: string | null
+          metadata?: Json
+          created_by_agent_run_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gaps: {
+        Row: {
+          id: string
+          account_id: string
+          title: string
+          description: string | null
+          gap_type: Database["public"]["Enums"]["gap_type"]
+          severity: Database["public"]["Enums"]["gap_severity"]
+          impact: string | null
+          effort: string | null
+          confidence: number | null
+          status: Database["public"]["Enums"]["gap_status"]
+          affected_sections: string[]
+          evidence_ids: string[]
+          recommended_action: string | null
+          created_by_agent_run_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          title: string
+          description?: string | null
+          gap_type?: Database["public"]["Enums"]["gap_type"]
+          severity?: Database["public"]["Enums"]["gap_severity"]
+          impact?: string | null
+          effort?: string | null
+          confidence?: number | null
+          status?: Database["public"]["Enums"]["gap_status"]
+          affected_sections?: string[]
+          evidence_ids?: string[]
+          recommended_action?: string | null
+          created_by_agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          title?: string
+          description?: string | null
+          gap_type?: Database["public"]["Enums"]["gap_type"]
+          severity?: Database["public"]["Enums"]["gap_severity"]
+          impact?: string | null
+          effort?: string | null
+          confidence?: number | null
+          status?: Database["public"]["Enums"]["gap_status"]
+          affected_sections?: string[]
+          evidence_ids?: string[]
+          recommended_action?: string | null
+          created_by_agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gaps_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_profiles: {
+        Row: {
+          id: string
+          account_id: string | null
+          agent_key: string
+          display_name: string
+          agent_type: Database["public"]["Enums"]["agent_type"]
+          description: string | null
+          assigned_sections: string[]
+          model_route_key: string | null
+          allowed_mcp_server_ids: string[]
+          status: Database["public"]["Enums"]["agent_status"]
+          system_instructions_summary: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id?: string | null
+          agent_key: string
+          display_name: string
+          agent_type?: Database["public"]["Enums"]["agent_type"]
+          description?: string | null
+          assigned_sections?: string[]
+          model_route_key?: string | null
+          allowed_mcp_server_ids?: string[]
+          status?: Database["public"]["Enums"]["agent_status"]
+          system_instructions_summary?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string | null
+          agent_key?: string
+          display_name?: string
+          agent_type?: Database["public"]["Enums"]["agent_type"]
+          description?: string | null
+          assigned_sections?: string[]
+          model_route_key?: string | null
+          allowed_mcp_server_ids?: string[]
+          status?: Database["public"]["Enums"]["agent_status"]
+          system_instructions_summary?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      agent_runs: {
+        Row: {
+          id: string
+          account_id: string
+          agent_profile_id: string
+          run_type: string | null
+          trigger_type: Database["public"]["Enums"]["agent_run_trigger"]
+          triggered_by: string | null
+          status: Database["public"]["Enums"]["agent_run_status"]
+          input: Json | null
+          output: Json | null
+          summary: string | null
+          model_provider: string | null
+          model_name: string | null
+          tokens_in: number | null
+          tokens_out: number | null
+          estimated_cost: number | null
+          started_at: string | null
+          completed_at: string | null
+          error: string | null
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          agent_profile_id: string
+          run_type?: string | null
+          trigger_type?: Database["public"]["Enums"]["agent_run_trigger"]
+          triggered_by?: string | null
+          status?: Database["public"]["Enums"]["agent_run_status"]
+          input?: Json | null
+          output?: Json | null
+          summary?: string | null
+          model_provider?: string | null
+          model_name?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          estimated_cost?: number | null
+          started_at?: string | null
+          completed_at?: string | null
+          error?: string | null
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          agent_profile_id?: string
+          run_type?: string | null
+          trigger_type?: Database["public"]["Enums"]["agent_run_trigger"]
+          triggered_by?: string | null
+          status?: Database["public"]["Enums"]["agent_run_status"]
+          input?: Json | null
+          output?: Json | null
+          summary?: string | null
+          model_provider?: string | null
+          model_name?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          estimated_cost?: number | null
+          started_at?: string | null
+          completed_at?: string | null
+          error?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_runs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_runs_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_loops: {
+        Row: {
+          id: string
+          account_id: string
+          agent_profile_id: string
+          loop_name: string
+          schedule: string
+          skill_ids: string[]
+          prompt_template: string | null
+          max_runtime_minutes: number
+          max_consecutive_failures: number
+          monthly_budget: number | null
+          allowed_mcp_server_ids: string[]
+          status: Database["public"]["Enums"]["loop_status"]
+          last_run_at: string | null
+          next_run_at: string | null
+          failure_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          agent_profile_id: string
+          loop_name: string
+          schedule: string
+          skill_ids?: string[]
+          prompt_template?: string | null
+          max_runtime_minutes?: number
+          max_consecutive_failures?: number
+          monthly_budget?: number | null
+          allowed_mcp_server_ids?: string[]
+          status?: Database["public"]["Enums"]["loop_status"]
+          last_run_at?: string | null
+          next_run_at?: string | null
+          failure_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          agent_profile_id?: string
+          loop_name?: string
+          schedule?: string
+          skill_ids?: string[]
+          prompt_template?: string | null
+          max_runtime_minutes?: number
+          max_consecutive_failures?: number
+          monthly_budget?: number | null
+          allowed_mcp_server_ids?: string[]
+          status?: Database["public"]["Enums"]["loop_status"]
+          last_run_at?: string | null
+          next_run_at?: string | null
+          failure_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_loops_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_loops_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_credentials: {
+        Row: {
+          id: string
+          account_id: string
+          provider: string
+          label: string | null
+          encrypted_secret: string
+          secret_last_four: string | null
+          status: Database["public"]["Enums"]["credential_status"]
+          validated_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          provider: string
+          label?: string | null
+          encrypted_secret: string
+          secret_last_four?: string | null
+          status?: Database["public"]["Enums"]["credential_status"]
+          validated_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          provider?: string
+          label?: string | null
+          encrypted_secret?: string
+          secret_last_four?: string | null
+          status?: Database["public"]["Enums"]["credential_status"]
+          validated_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_credentials_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_servers: {
+        Row: {
+          id: string
+          account_id: string
+          name: string
+          transport_type: Database["public"]["Enums"]["mcp_transport_type"]
+          command: string | null
+          args: Json
+          url: string | null
+          headers_encrypted: Json | null
+          env_encrypted: Json | null
+          auth_type: string | null
+          enabled: boolean
+          status: Database["public"]["Enums"]["mcp_server_status"]
+          last_tested_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          name: string
+          transport_type?: Database["public"]["Enums"]["mcp_transport_type"]
+          command?: string | null
+          args?: Json
+          url?: string | null
+          headers_encrypted?: Json | null
+          env_encrypted?: Json | null
+          auth_type?: string | null
+          enabled?: boolean
+          status?: Database["public"]["Enums"]["mcp_server_status"]
+          last_tested_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          name?: string
+          transport_type?: Database["public"]["Enums"]["mcp_transport_type"]
+          command?: string | null
+          args?: Json
+          url?: string | null
+          headers_encrypted?: Json | null
+          env_encrypted?: Json | null
+          auth_type?: string | null
+          enabled?: boolean
+          status?: Database["public"]["Enums"]["mcp_server_status"]
+          last_tested_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_servers_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_server_tools: {
+        Row: {
+          id: string
+          mcp_server_id: string
+          tool_name: string
+          description: string | null
+          enabled: boolean
+          risk_level: string
+          last_discovered_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mcp_server_id: string
+          tool_name: string
+          description?: string | null
+          enabled?: boolean
+          risk_level?: string
+          last_discovered_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          mcp_server_id?: string
+          tool_name?: string
+          description?: string | null
+          enabled?: boolean
+          risk_level?: string
+          last_discovered_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_server_tools_mcp_server_id_fkey"
+            columns: ["mcp_server_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -523,6 +1167,20 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       framework_status: "draft" | "active" | "archived"
+      account_member_role: "owner" | "admin" | "editor" | "viewer"
+      agent_type: "orchestrator" | "section_agent" | "utility" | "custom"
+      agent_status: "active" | "paused" | "draft" | "archived"
+      agent_run_status: "pending" | "running" | "completed" | "failed" | "cancelled" | "timeout"
+      agent_run_trigger: "manual" | "scheduled" | "api" | "cascade" | "retry"
+      gap_severity: "critical" | "high" | "medium" | "low"
+      gap_status: "open" | "acknowledged" | "in_progress" | "resolved" | "wont_fix"
+      gap_type: "missing_data" | "low_confidence" | "no_evidence" | "outdated" | "contradictory" | "assumption"
+      credential_status: "active" | "revoked" | "expired" | "untested"
+      mcp_transport_type: "stdio" | "http" | "sse" | "websocket"
+      mcp_server_status: "connected" | "disconnected" | "error" | "untested"
+      loop_status: "active" | "paused" | "error" | "exhausted_budget" | "exhausted_failures"
+      freshness_status: "fresh" | "stale" | "outdated" | "unverified"
+      evidence_source_type: "website" | "filing" | "news" | "transcript" | "social" | "api" | "document" | "manual"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -652,6 +1310,20 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       framework_status: ["draft", "active", "archived"],
+      account_member_role: ["owner", "admin", "editor", "viewer"],
+      agent_type: ["orchestrator", "section_agent", "utility", "custom"],
+      agent_status: ["active", "paused", "draft", "archived"],
+      agent_run_status: ["pending", "running", "completed", "failed", "cancelled", "timeout"],
+      agent_run_trigger: ["manual", "scheduled", "api", "cascade", "retry"],
+      gap_severity: ["critical", "high", "medium", "low"],
+      gap_status: ["open", "acknowledged", "in_progress", "resolved", "wont_fix"],
+      gap_type: ["missing_data", "low_confidence", "no_evidence", "outdated", "contradictory", "assumption"],
+      credential_status: ["active", "revoked", "expired", "untested"],
+      mcp_transport_type: ["stdio", "http", "sse", "websocket"],
+      mcp_server_status: ["connected", "disconnected", "error", "untested"],
+      loop_status: ["active", "paused", "error", "exhausted_budget", "exhausted_failures"],
+      freshness_status: ["fresh", "stale", "outdated", "unverified"],
+      evidence_source_type: ["website", "filing", "news", "transcript", "social", "api", "document", "manual"],
     },
   },
 } as const
