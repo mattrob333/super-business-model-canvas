@@ -3,7 +3,7 @@
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)
 **Repo:** https://github.com/mattrob333/super-business-model-canvas
 **Workspace:** C:\Users\mrobe\Documents\Projects\SuperBMCenterprise\super-business-model-canvas
-**Status:** Phase 9 In Progress — Starting Expand Agents and Loops. Phases 0-8 complete.
+**Status:** Phase 9 Complete — Starting Phase 10: Polish and Hardening. Phases 0-9 complete.
 
 ## Architecture: Two-Tier Autonomous Build Loop
 - Inner Loop (cron 779c6bf918c9) — every 10m: Check -> Test -> Advance -> Repeat
@@ -87,12 +87,12 @@
 4. [x] Edge function loads system_instructions from DB and uses them as the LLM system prompt (with output format appended)
 5. [x] AgentInstructionsDialog: view/edit agent system instructions per profile, save to DB, revert changes, character count (commit 8a139a0)
 6. [x] Agents page: "Instructions" button on each agent card opens the dialog
-### Phase 9: Expand Agents and Loops (in progress)
+### Phase 9: Expand Agents and Loops ✅ (commits 11b2d42 + d316d4a + 42de6f0 + e01b4d2)
 1. [x] Scheduled loop tick edge function (commit 11b2d42) — finds due loops, executes via agent-run, updates next_run_at/failure_count, budget enforcement
 2. [x] Run Now button on ScheduledLoopsManager (commit 11b2d42) — manual trigger for immediate loop execution
 3. [x] Orchestrator cascade: Run All Sections button on Canvas page (commit d316d4a) — triggers all 9 BMC section agents in sequence
-4. [ ] Add loop execution history to Activity page (show scheduled runs with loop_name)
-5. [ ] Agent profile detail page — view assigned sections, model route, recent runs, instructions
+4. [x] Loop execution history on Activity page (commit 42de6f0) — triggered_by display, trigger type filters (all/manual/scheduled/cascade), cascade icon, flex-wrap meta row
+5. [x] Agent profile detail page (commit e01b4d2) — /agents/:agentId route with assigned sections, model route, recent runs, scheduled loops, instructions summary, clickable agent cards
 ### Phase 10: Polish and Hardening [ ]
 
 ## Completed Tasks
@@ -115,7 +115,11 @@
 - None
 
 ## Next Action
-- Phase 9 Task 4: Add scheduled loop execution history to the Activity page. The Activity page currently shows agent_runs, but scheduled loop runs should show the loop_name and a scheduled trigger badge. This makes loop execution visible alongside manual runs.
+- Phase 10 Task 1: Focus-visible ring audit on all raw `<button>` and `<Link>` elements that bypass shadcn Button. Add focus-visible:ring-2 focus-visible:ring-ring classes. Priority: CanvasSectionCard, AgentDetail page back button, any custom buttons in settings components.
+- Phase 10 Task 2: Accessibility pass — aria-pressed on toggle buttons, aria-label on icon-only buttons, role attributes where needed.
+- Phase 10 Task 3: Empty/error/loading state audit across all pages — ensure consistent patterns (Dashboard, Canvas, Gaps, Knowledge, Agents, Activity, AgentDetail).
+- Phase 10 Task 4: Security tab implementation in Settings (currently placeholder).
+- Phase 10 Task 5: Final lint cleanup pass (reduce warnings if possible without touching pre-existing errors).
 
 ## Pitfalls / Notes
 - Pre-existing lint errors (52 errors, 16 warnings on main @ 6c6d3d2) are all `no-explicit-any` + `no-require-imports` + `no-empty-object-type` in pre-existing/shadcn files — do NOT fix, just ensure errors don't increase. Current branch: 52 errors, 20 warnings (zero new errors, +4 warnings from new page useMemo deps — acceptable)
@@ -126,4 +130,4 @@
 - Commit each green slice before starting the next file
 - Orphaned work recovery: prior tick wrote canvas/ files without committing — recovered, quality-gated, committed as 061b6ab
 
-**Last Updated:** 2026-06-24 — Phase 9 in progress. Tasks 1-3 complete (scheduled-loop-tick edge function, Run Now button, orchestrator cascade). Next: Activity page loop history. Commits 11b2d42, d316d4a.
+**Last Updated:** 2026-06-24 — Phase 9 complete. All 5 tasks done (scheduled-loop-tick edge function, Run Now button, orchestrator cascade, Activity page loop history, agent profile detail page). Phase 10 (Polish and Hardening) starting next tick. Commits 42de6f0, e01b4d2.
