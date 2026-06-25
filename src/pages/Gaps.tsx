@@ -117,7 +117,7 @@ export default function Gaps() {
   const [filterStatus, setFilterStatus] = useState<GapStatus | "all">("all");
 
   // Placeholder: no gaps yet — populated when agent runs produce them
-  const gaps: GapItem[] = [];
+  const gaps: GapItem[] = useMemo(() => [], []);
 
   const filteredGaps = useMemo(() => {
     return gaps.filter((g) => {

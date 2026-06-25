@@ -62,7 +62,7 @@ export default function Knowledge() {
   );
 
   // Placeholder: no evidence yet — populated when agent runs produce them
-  const evidenceItems: EvidenceItem[] = [];
+  const evidenceItems: EvidenceItem[] = useMemo(() => [], []);
 
   const filteredItems = useMemo(() => {
     return evidenceItems.filter((e) => {
