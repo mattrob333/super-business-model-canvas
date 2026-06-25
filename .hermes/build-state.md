@@ -87,7 +87,12 @@
 4. [x] Edge function loads system_instructions from DB and uses them as the LLM system prompt (with output format appended)
 5. [x] AgentInstructionsDialog: view/edit agent system instructions per profile, save to DB, revert changes, character count (commit 8a139a0)
 6. [x] Agents page: "Instructions" button on each agent card opens the dialog
-### Phase 9: Expand Agents and Loops (current)
+### Phase 9: Expand Agents and Loops (in progress)
+1. [x] Scheduled loop tick edge function (commit 11b2d42) — finds due loops, executes via agent-run, updates next_run_at/failure_count, budget enforcement
+2. [x] Run Now button on ScheduledLoopsManager (commit 11b2d42) — manual trigger for immediate loop execution
+3. [x] Orchestrator cascade: Run All Sections button on Canvas page (commit d316d4a) — triggers all 9 BMC section agents in sequence
+4. [ ] Add loop execution history to Activity page (show scheduled runs with loop_name)
+5. [ ] Agent profile detail page — view assigned sections, model route, recent runs, instructions
 ### Phase 10: Polish and Hardening [ ]
 
 ## Completed Tasks
@@ -110,7 +115,7 @@
 - None
 
 ## Next Action
-- Phase 9: Expand Agents and Loops. Implement the scheduled loop execution edge function — a `scheduled-loop-tick` edge function that reads the next due scheduled_loop, executes its agent_profile via the existing agent-run infrastructure, and updates last_run_at/next_run_at/failure_count. Then add a "Run Now" button to the ScheduledLoopsManager. After this, implement the orchestrator cascade (run all 9 BMC section agents in sequence via a single trigger).
+- Phase 9 Task 4: Add scheduled loop execution history to the Activity page. The Activity page currently shows agent_runs, but scheduled loop runs should show the loop_name and a scheduled trigger badge. This makes loop execution visible alongside manual runs.
 
 ## Pitfalls / Notes
 - Pre-existing lint errors (52 errors, 16 warnings on main @ 6c6d3d2) are all `no-explicit-any` + `no-require-imports` + `no-empty-object-type` in pre-existing/shadcn files — do NOT fix, just ensure errors don't increase. Current branch: 52 errors, 20 warnings (zero new errors, +4 warnings from new page useMemo deps — acceptable)
@@ -121,4 +126,4 @@
 - Commit each green slice before starting the next file
 - Orphaned work recovery: prior tick wrote canvas/ files without committing — recovered, quality-gated, committed as 061b6ab
 
-**Last Updated:** 2026-06-24 — Phases 0-8 complete. Phase 9 (Expand Agents and Loops) starting. Committed orphaned Phase 8 work (8a139a0), marked Phase 7 health check complete (already implemented).
+**Last Updated:** 2026-06-24 — Phase 9 in progress. Tasks 1-3 complete (scheduled-loop-tick edge function, Run Now button, orchestrator cascade). Next: Activity page loop history. Commits 11b2d42, d316d4a.
