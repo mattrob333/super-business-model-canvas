@@ -15,7 +15,7 @@ import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Info, Grid3X3, Sparkles, RefreshCw, Zap } from "lucide-react";
+import { Info, Grid3X3, Sparkles, RefreshCw, Zap, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useCanvasSectionRun } from "@/hooks/useCanvasSectionRun";
@@ -364,6 +364,16 @@ export default function Canvas() {
           </Badge>
         )}
       </div>
+
+      {/* Loading state */}
+      {(versionsLoading || accountLoading) && !hasCanvasData && (
+        <div className="flex items-center justify-center py-24">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Loading canvas…</p>
+          </div>
+        </div>
+      )}
 
       {/* Empty state when no canvas data */}
       {!hasCanvasData && !versionsLoading && !accountLoading && (
