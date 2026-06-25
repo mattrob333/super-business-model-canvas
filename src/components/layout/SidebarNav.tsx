@@ -49,7 +49,7 @@ function NavItemRow({ item }: { item: NavItem }) {
           to={item.path}
           className={({ isActive }) =>
             [
-              "flex items-center gap-3 px-3 h-10 rounded-md text-sm font-medium transition-colors",
+              "flex items-center gap-3 px-3 h-10 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isActive
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",

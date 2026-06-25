@@ -34,9 +34,11 @@ export const Navigation = () => {
       <div className="container mx-auto px-4 md:px-6 py-4">
         <nav className="flex items-center justify-between">
           {/* Logo */}
-          <div 
-            className="flex items-center gap-1.5 cursor-pointer" 
+          <button
+            type="button"
+            className="flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
             onClick={() => navigate(user ? '/analyze' : '/')}
+            aria-label="Go to home"
           >
             <div className="inline-flex items-center bg-[#C4F82A] text-black px-3 py-1 rounded-full font-montserrat">
               <span className="text-xl">SUPER</span>
@@ -45,8 +47,8 @@ export const Navigation = () => {
               <span className="md:hidden">BMC</span>
               <span className="hidden md:inline">BUSINESS MODEL CANVAS</span>
             </h1>
-          </div>
-          
+          </button>
+
           {/* Desktop Navigation */}
           {user && (
             <div className="hidden md:flex items-center gap-6">
@@ -55,7 +57,7 @@ export const Navigation = () => {
                   key={link.to}
                   to={link.to}
                   className={({ isActive }) =>
-                    `text-sm font-medium transition-colors hover:text-primary ${
+                    `text-sm font-medium transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1 ${
                       isActive ? 'text-primary border-b-2 border-primary pb-1' : 'text-muted-foreground'
                     }`
                   }
@@ -115,7 +117,7 @@ export const Navigation = () => {
             {user && (
               <Sheet>
                 <SheetTrigger asChild className="md:hidden">
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" aria-label="Open menu">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
@@ -126,7 +128,7 @@ export const Navigation = () => {
                         key={link.to}
                         to={link.to}
                         className={({ isActive }) =>
-                          `text-lg font-medium p-3 rounded-lg transition-colors ${
+                          `text-lg font-medium p-3 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                             isActive ? 'bg-primary text-black' : 'hover:bg-muted'
                           }`
                         }
