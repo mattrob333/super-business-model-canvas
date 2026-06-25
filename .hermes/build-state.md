@@ -3,7 +3,7 @@
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)
 **Repo:** https://github.com/mattrob333/super-business-model-canvas
 **Workspace:** C:\Users\mrobe\Documents\Projects\SuperBMCenterprise\super-business-model-canvas
-**Status:** Phase 7 In Progress — Model routing + config persistence done. Next: runtime health check button (final Phase 7 task).
+**Status:** Phase 9 In Progress — Starting Expand Agents and Loops. Phases 0-8 complete.
 
 ## Architecture: Two-Tier Autonomous Build Loop
 - Inner Loop (cron 779c6bf918c9) — every 10m: Check -> Test -> Advance -> Repeat
@@ -69,7 +69,7 @@
 4. [x] 9 section-specific mock analysis datasets (realistic BMC content per section)
 5. [x] Toast notifications (start/complete/error) via sonner
 6. [x] Full circuit proven: UI trigger → agent_runs record → canvas_section_versions → UI refresh
-### Phase 7: Hermes Runtime Integration (in progress)
+### Phase 7: Hermes Runtime Integration ✅ (commits e778252 + 6db28f0 + c1957fa + 1d17cd3)
 1. [x] Env-gated factory: getAgentRuntime() returns HermesAgentRuntime when VITE_HERMES_RUNTIME_ENDPOINT is set, MockAgentRuntime otherwise (commit e778252)
 2. [x] HermesAgentRuntime class: calls Supabase Edge Function for real LLM execution (commit e778252)
 3. [x] agent-run Edge Function: multi-provider LLM support (OpenAI/Anthropic/OpenRouter/xAI) with structured JSON output (commit e778252)
@@ -78,10 +78,16 @@
 6. [x] HermesRuntimePanel: shows actual runtime mode badge (Live/Mock) (commit e778252)
 7. [x] .env.example: VITE_HERMES_RUNTIME_ENDPOINT + VITE_HERMES_RUNTIME_API_KEY (commit e778252)
 8. [x] Runtime config persistence (save to DB, load on startup) (commit 1d17cd3)
-9. [ ] Runtime health check / connection test button
+9. [x] Runtime health check / connection test button — fully implemented in HermesRuntimePanel + both runtime impls + edge function healthCheck handler
 10. [x] Model routing: wire provider_credentials + model_route_key to edge function LLM selection (commit c1957fa)
-### Phase 8: Framework Skills [ ]
-### Phase 9: Expand Agents and Loops [ ]
+### Phase 8: Framework Skills ✅ (commits 20250624000004 + 8a139a0)
+1. [x] Migration: system_instructions column on agent_profiles (migration 20250624000004)
+2. [x] Seed: 10 agent profiles with detailed framework-aware system instructions (orchestrator + 9 BMC section agents)
+3. [x] TypeScript types updated: system_instructions field in agent_profiles Row/Insert/Update
+4. [x] Edge function loads system_instructions from DB and uses them as the LLM system prompt (with output format appended)
+5. [x] AgentInstructionsDialog: view/edit agent system instructions per profile, save to DB, revert changes, character count (commit 8a139a0)
+6. [x] Agents page: "Instructions" button on each agent card opens the dialog
+### Phase 9: Expand Agents and Loops (current)
 ### Phase 10: Polish and Hardening [ ]
 
 ## Completed Tasks
@@ -98,11 +104,13 @@
 - Phase 7 (commit c1957fa): Model routing — new model-routing.ts module maps route tiers to provider+model, HermesAgentRuntime.startRun() resolves model_route_key from agent_profiles before calling edge function, ModelRoutingPanel shows resolved provider/model in route legend
 - Phase 7 (commit 1d17cd3): Runtime config persistence — migration adds runtime_config JSONB to accounts, HermesRuntimePanel loads from DB on mount (merges with defaults), saves to DB on button click, config survives reloads
 
+- Phase 8 (commits 20250624000004 + 8a139a0): system_instructions column on agent_profiles, 10 detailed framework-aware system prompts seeded (orchestrator + 9 BMC section agents), edge function loads and uses agent-specific instructions, AgentInstructionsDialog for viewing/editing instructions per agent profile
+
 ## Open Issues / Blockers
 - None
 
 ## Next Action
-- Phase 7 final task: Runtime health check / connection test button. Add a "Test Connection" button to HermesRuntimePanel that pings the edge function endpoint and reports connectivity status. After this, Phase 7 is complete and Phase 8 (Framework Skills) begins.
+- Phase 9: Expand Agents and Loops. Implement the scheduled loop execution edge function — a `scheduled-loop-tick` edge function that reads the next due scheduled_loop, executes its agent_profile via the existing agent-run infrastructure, and updates last_run_at/next_run_at/failure_count. Then add a "Run Now" button to the ScheduledLoopsManager. After this, implement the orchestrator cascade (run all 9 BMC section agents in sequence via a single trigger).
 
 ## Pitfalls / Notes
 - Pre-existing lint errors (52 errors, 16 warnings on main @ 6c6d3d2) are all `no-explicit-any` + `no-require-imports` + `no-empty-object-type` in pre-existing/shadcn files — do NOT fix, just ensure errors don't increase. Current branch: 52 errors, 20 warnings (zero new errors, +4 warnings from new page useMemo deps — acceptable)
@@ -113,4 +121,4 @@
 - Commit each green slice before starting the next file
 - Orphaned work recovery: prior tick wrote canvas/ files without committing — recovered, quality-gated, committed as 061b6ab
 
-**Last Updated:** 2026-06-24 — Phase 7 near complete: model routing + config persistence done. Next: health check button. Commits c1957fa, 1d17cd3.
+**Last Updated:** 2026-06-24 — Phases 0-8 complete. Phase 9 (Expand Agents and Loops) starting. Committed orphaned Phase 8 work (8a139a0), marked Phase 7 health check complete (already implemented).
