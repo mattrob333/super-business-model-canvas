@@ -217,7 +217,7 @@ export const BusinessContextChat = ({
       <div className="fixed right-6 bottom-6 z-40">
         <button
           onClick={() => onStateChange('open')}
-          className="group bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl shadow-2xl hover:shadow-primary/20 transition-all duration-300 hover:scale-105 p-4 flex flex-col gap-2 min-w-[160px]"
+          className="group bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl shadow-2xl hover:shadow-primary/20 transition-all duration-300 hover:scale-105 p-4 flex flex-col gap-2 min-w-[160px] focus-visible:ring-2 focus-visible:ring-ring"
         >
           <div className="flex items-center gap-2">
             <div className="relative">

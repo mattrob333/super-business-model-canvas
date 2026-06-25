@@ -454,7 +454,7 @@ export default function Canvas() {
                 entry. View all runs in the{" "}
                 <button
                   onClick={() => navigate("/activity")}
-                  className="text-primary hover:underline"
+                  className="text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5"
                 >
                   Activity page
                 </button>

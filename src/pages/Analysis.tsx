@@ -605,7 +605,7 @@ Website: ${comp.website || 'N/A'}
                          hover:border-primary hover:shadow-[0_8px_24px_rgba(0,0,0,0.5),0_0_20px_rgba(196,248,42,0.15)] 
                          hover:-translate-y-1 hover:scale-[1.02]
                          transition-all duration-300
-                         text-left h-36 flex flex-col p-6"
+                         text-left h-36 flex flex-col p-6 focus-visible:ring-2 focus-visible:ring-ring"
             >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
