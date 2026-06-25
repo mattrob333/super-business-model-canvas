@@ -1,4 +1,13 @@
-import html2pdf from 'html2pdf.js';
+// Lazy-load html2pdf.js only when a user actually exports a PDF.
+// This keeps the 775KB library out of the initial bundle.
+let html2pdfModule: Promise<typeof import('html2pdf.js')> | null = null;
+
+const getHtml2pdf = (): Promise<typeof import('html2pdf.js')> => {
+  if (!html2pdfModule) {
+    html2pdfModule = import('html2pdf.js');
+  }
+  return html2pdfModule;
+};
 
 export const copyHtmlToClipboard = async (html: string): Promise<void> => {
   try {
@@ -18,7 +27,8 @@ export const copyHtmlToClipboard = async (html: string): Promise<void> => {
   }
 };
 
-export const exportReportToPdf = (html: string, filename: string): void => {
+export const exportReportToPdf = async (html: string, filename: string): Promise<void> => {
+  const { default: html2pdf } = await getHtml2pdf();
   const element = document.createElement('div');
   element.innerHTML = html;
   

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,26 +6,40 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import Landing from "./pages/Landing";
-import Analysis from "./pages/Analysis";
 import Auth from "./pages/Auth";
-import Admin from "./pages/Admin";
-import AdminFrameworks from "./pages/admin/Frameworks";
-import FrameworkEditor from "./pages/admin/FrameworkEditor";
-import MyAnalyses from "./pages/MyAnalyses";
-import Playbooks from "./pages/Playbooks";
-import FrameworkDetail from "./pages/FrameworkDetail";
-import ReportViewer from "./pages/ReportViewer";
-import Dashboard from "./pages/Dashboard";
-import Canvas from "./pages/Canvas";
-import Gaps from "./pages/Gaps";
-import Knowledge from "./pages/Knowledge";
-import Agents from "./pages/Agents";
-import AgentDetail from "./pages/AgentDetail";
-import Activity from "./pages/Activity";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
+
+// Lazy-load all other route components for code splitting
+const Analysis = lazy(() => import("./pages/Analysis"));
+const Admin = lazy(() => import("./pages/Admin"));
+const AdminFrameworks = lazy(() => import("./pages/admin/Frameworks"));
+const FrameworkEditor = lazy(() => import("./pages/admin/FrameworkEditor"));
+const MyAnalyses = lazy(() => import("./pages/MyAnalyses"));
+const Playbooks = lazy(() => import("./pages/Playbooks"));
+const FrameworkDetail = lazy(() => import("./pages/FrameworkDetail"));
+const ReportViewer = lazy(() => import("./pages/ReportViewer"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Canvas = lazy(() => import("./pages/Canvas"));
+const Gaps = lazy(() => import("./pages/Gaps"));
+const Knowledge = lazy(() => import("./pages/Knowledge"));
+const Agents = lazy(() => import("./pages/Agents"));
+const AgentDetail = lazy(() => import("./pages/AgentDetail"));
+const Activity = lazy(() => import("./pages/Activity"));
+const Settings = lazy(() => import("./pages/Settings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
+
+const PageLoader = () => (
+  <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+  </div>
+);
+
+const withSuspense = (Component: React.ComponentType) => (
+  <Suspense fallback={<PageLoader />}>
+    <Component />
+  </Suspense>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -39,27 +54,27 @@ const App = () => (
 
           {/* Authenticated routes — inside AppShell */}
           <Route element={<AppShell />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/canvas" element={<Canvas />} />
-            <Route path="/gaps" element={<Gaps />} />
-            <Route path="/knowledge" element={<Knowledge />} />
-            <Route path="/agents" element={<Agents />} />
-            <Route path="/agents/:agentId" element={<AgentDetail />} />
-            <Route path="/activity" element={<Activity />} />
-            <Route path="/analyze" element={<Analysis />} />
-            <Route path="/my-analyses" element={<MyAnalyses />} />
-            <Route path="/playbooks" element={<Playbooks />} />
-            <Route path="/playbooks/framework/:frameworkId" element={<FrameworkDetail />} />
-            <Route path="/playbooks/reports/:reportId" element={<ReportViewer />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/admin/frameworks" element={<AdminFrameworks />} />
-            <Route path="/admin/frameworks/new" element={<FrameworkEditor />} />
-            <Route path="/admin/frameworks/:id/edit" element={<FrameworkEditor />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/dashboard" element={withSuspense(Dashboard)} />
+            <Route path="/canvas" element={withSuspense(Canvas)} />
+            <Route path="/gaps" element={withSuspense(Gaps)} />
+            <Route path="/knowledge" element={withSuspense(Knowledge)} />
+            <Route path="/agents" element={withSuspense(Agents)} />
+            <Route path="/agents/:agentId" element={withSuspense(AgentDetail)} />
+            <Route path="/activity" element={withSuspense(Activity)} />
+            <Route path="/analyze" element={withSuspense(Analysis)} />
+            <Route path="/my-analyses" element={withSuspense(MyAnalyses)} />
+            <Route path="/playbooks" element={withSuspense(Playbooks)} />
+            <Route path="/playbooks/framework/:frameworkId" element={withSuspense(FrameworkDetail)} />
+            <Route path="/playbooks/reports/:reportId" element={withSuspense(ReportViewer)} />
+            <Route path="/admin" element={withSuspense(Admin)} />
+            <Route path="/admin/frameworks" element={withSuspense(AdminFrameworks)} />
+            <Route path="/admin/frameworks/new" element={withSuspense(FrameworkEditor)} />
+            <Route path="/admin/frameworks/:id/edit" element={withSuspense(FrameworkEditor)} />
+            <Route path="/settings" element={withSuspense(Settings)} />
           </Route>
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={withSuspense(NotFound)} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

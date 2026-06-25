@@ -235,15 +235,23 @@ export function ReportViewerDrawer({
     }
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     const effectiveCompanyName = companyName || loadedCompanyName || "company";
     const effectiveFrameworkId = frameworkId || loadedFrameworkId || "report";
     const filename = `${effectiveCompanyName}-${effectiveFrameworkId}-report.pdf`;
-    exportReportToPdf(reportHtml, filename);
     toast({
       title: "Exporting",
       description: "Your PDF is being generated"
     });
+    try {
+      await exportReportToPdf(reportHtml, filename);
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: "Could not generate the PDF. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleClose = () => {
