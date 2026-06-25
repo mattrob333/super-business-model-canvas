@@ -173,7 +173,7 @@ const Landing = () => {
                 <div className="text-center">
                   <a 
                     href="/auth" 
-                    className="text-sm text-primary hover:underline"
+                    className="text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
                   >
                     Already have an account? Sign in
                   </a>

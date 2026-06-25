@@ -121,7 +121,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
                       href={data.website} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline font-medium"
+                      className="text-primary hover:underline font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5"
                     >
                       {data.website}
                     </a>

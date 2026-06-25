@@ -58,7 +58,7 @@ export const CompetitiveLandscape = ({ competitors, onSimilarCompanyChat }: Comp
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors hover:underline relative z-10 cursor-pointer"
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors hover:underline relative z-10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
                 >
                   <span>Visit Website</span>
                   <ExternalLink className="h-4 w-4" />

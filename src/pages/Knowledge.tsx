@@ -229,7 +229,7 @@ export default function Knowledge() {
                             href={item.source_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+                            className="inline-flex items-center gap-1 hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
                           >
                             <LinkIcon className="h-3 w-3" />
                             Source

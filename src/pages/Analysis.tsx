@@ -766,7 +766,7 @@ Website: ${comp.website || 'N/A'}
               href="https://tier4intelligence.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="transition-opacity hover:opacity-80"
+              className="transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
             >
               <img 
                 src={logo} 
