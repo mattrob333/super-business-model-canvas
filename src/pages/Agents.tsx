@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, Clock, CheckCircle2, AlertCircle, Loader2, RefreshCw, FileText } from "lucide-react";
+import { Bot, Plus, Clock, CheckCircle2, AlertCircle, Loader2, RefreshCw, FileText, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
 import { AgentRunDetailDialog } from "@/components/AgentRunDetailDialog";
@@ -39,6 +40,7 @@ const RUN_STATUS_CONFIG: Record<string, { label: string; className: string }> = 
 };
 
 export default function Agents() {
+  const navigate = useNavigate();
   const { accountId, loading: accountLoading } = useAccountId();
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [recentRuns, setRecentRuns] = useState<AgentRun[]>([]);
@@ -166,7 +168,11 @@ export default function Agents() {
             {agents.map((agent) => {
               const statusCfg = STATUS_CONFIG[agent.status] ?? STATUS_CONFIG.active;
               return (
-                <Card key={agent.id}>
+                <Card
+                  key={agent.id}
+                  className="cursor-pointer hover:border-primary/30 hover:shadow-sm transition-all"
+                  onClick={() => navigate(`/agents/${agent.id}`)}
+                >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -214,13 +220,26 @@ export default function Agents() {
                         variant="ghost"
                         size="sm"
                         className="h-7 text-xs gap-1.5"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setInstructionsAgent(agent);
                           setInstructionsOpen(true);
                         }}
                       >
                         <FileText className="h-3.5 w-3.5" />
                         Instructions
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs gap-1 ml-auto"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/agents/${agent.id}`);
+                        }}
+                      >
+                        Details
+                        <ChevronRight className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </CardContent>
