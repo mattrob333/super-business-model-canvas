@@ -11,6 +11,7 @@ import { ModelRoutingPanel } from "@/components/settings/ModelRoutingPanel";
 import { McpConnectionsManager } from "@/components/settings/McpConnectionsManager";
 import { HermesRuntimePanel } from "@/components/settings/HermesRuntimePanel";
 import { ScheduledLoopsManager } from "@/components/settings/ScheduledLoopsManager";
+import { SecurityPanel } from "@/components/settings/SecurityPanel";
 import { useAccountId } from "@/hooks/useAccountId";
 
 const tabSections = [
@@ -223,10 +224,7 @@ const Settings = () => {
         </TabsContent>
 
         <TabsContent value="security">
-          <PlaceholderTab
-            sectionName="Security"
-            description="Manage authentication methods, role-based access control, API key rotation, audit logging, and data encryption settings."
-          />
+          <SecurityPanel />
         </TabsContent>
       </Tabs>
     </div>
