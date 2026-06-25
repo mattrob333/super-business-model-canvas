@@ -15,7 +15,7 @@ import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Info, Grid3X3, Sparkles, RefreshCw } from "lucide-react";
+import { Info, Grid3X3, Sparkles, RefreshCw, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useCanvasSectionRun } from "@/hooks/useCanvasSectionRun";
@@ -117,6 +117,7 @@ export default function Canvas() {
   >({});
   const [versionsLoading, setVersionsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [cascadeRunning, setCascadeRunning] = useState(false);
 
   // Load canvas_section_versions + agent_profiles from DB
   const loadCanvasData = useCallback(async () => {
@@ -250,6 +251,55 @@ export default function Canvas() {
     toast.info("Refreshing canvas data…");
   };
 
+  // Orchestrator cascade: run all 9 BMC section analyses in sequence
+  const handleRunAllSections = async () => {
+    if (cascadeRunning || isAnalyzingAny) return;
+    setCascadeRunning(true);
+    toast.info("Starting full canvas analysis — all 9 sections…");
+
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const sectionKey of CANVAS_SECTION_KEYS) {
+      try {
+        await runSectionAnalysis(sectionKey);
+        // Wait for this section's run to complete before starting the next
+        // The hook sets isSectionRunning to true synchronously, then false on completion
+        await new Promise<void>((resolve) => {
+          const check = () => {
+            if (!isSectionRunning(sectionKey)) {
+              resolve();
+            } else {
+              setTimeout(check, 500);
+            }
+          };
+          // Give the hook a moment to set running state
+          setTimeout(check, 300);
+        });
+
+        if (getSectionError(sectionKey)) {
+          failed++;
+        } else {
+          succeeded++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+
+    setCascadeRunning(false);
+    if (failed === 0) {
+      toast.success(
+        `Full canvas analysis complete — ${succeeded}/9 sections analyzed.`,
+      );
+    } else {
+      toast.warning(
+        `Canvas analysis finished — ${succeeded} succeeded, ${failed} failed.`,
+      );
+    }
+    void loadCanvasData();
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Page heading */}
@@ -268,11 +318,21 @@ export default function Canvas() {
             variant="ghost"
             size="sm"
             onClick={handleRefresh}
-            disabled={versionsLoading || isAnalyzingAny}
+            disabled={versionsLoading || isAnalyzingAny || cascadeRunning}
             className="gap-2"
           >
             <RefreshCw className={`h-4 w-4 ${versionsLoading ? "animate-spin" : ""}`} />
             Refresh
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => void handleRunAllSections()}
+            disabled={cascadeRunning || isAnalyzingAny || accountLoading}
+            className="gap-2"
+          >
+            <Zap className={`h-4 w-4 ${cascadeRunning ? "animate-pulse" : ""}`} />
+            {cascadeRunning ? "Analyzing All…" : "Run All Sections"}
           </Button>
           <Button
             variant="outline"
@@ -297,10 +357,10 @@ export default function Canvas() {
             {sectionsWithGaps} sections with open gaps
           </Badge>
         )}
-        {isAnalyzingAny && (
+        {(isAnalyzingAny || cascadeRunning) && (
           <Badge variant="secondary" className="gap-1.5">
             <Sparkles className="h-3 w-3 animate-pulse" />
-            Agent analysis in progress…
+            {cascadeRunning ? "Full canvas analysis in progress…" : "Agent analysis in progress…"}
           </Badge>
         )}
       </div>
