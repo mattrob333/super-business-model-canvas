@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Activity, Bot, Clock, RefreshCw, Loader2, AlertCircle } from "lucide-react";
+import { Activity, Bot, Clock, RefreshCw, Loader2, AlertCircle, Zap, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
 import { AgentRunDetailDialog } from "@/components/AgentRunDetailDialog";
@@ -33,7 +33,17 @@ const RUN_TYPE_ICONS: Record<string, typeof Bot> = {
   canvas_edit: Activity,
   gap_discovery: Clock,
   scheduled_loop: RefreshCw,
+  canvas_section_analysis: Zap,
 };
+
+type TriggerFilter = "all" | "manual" | "scheduled" | "cascade";
+
+const TRIGGER_FILTERS: { value: TriggerFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "manual", label: "Manual" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "cascade", label: "Cascade" },
+];
 
 export default function ActivityPage() {
   const { accountId, loading: accountLoading } = useAccountId();
@@ -42,6 +52,7 @@ export default function ActivityPage() {
   const [error, setError] = useState<string | null>(null);
   const [detailRunId, setDetailRunId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [triggerFilter, setTriggerFilter] = useState<TriggerFilter>("all");
 
   const fetchRuns = useCallback(async () => {
     if (accountLoading) return;
@@ -51,14 +62,24 @@ export default function ActivityPage() {
     setError(null);
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("agent_runs")
         .select(
-          "id, agent_profile_id, run_type, trigger_type, status, summary, started_at, completed_at, model_provider, model_name"
+          "id, agent_profile_id, run_type, trigger_type, triggered_by, status, summary, started_at, completed_at, model_provider, model_name"
         )
         .eq("account_id", effectiveAccountId)
         .order("started_at", { ascending: false })
         .limit(50);
+
+      if (triggerFilter === "scheduled") {
+        query = query.eq("trigger_type", "scheduled");
+      } else if (triggerFilter === "manual") {
+        query = query.eq("trigger_type", "manual");
+      } else if (triggerFilter === "cascade") {
+        query = query.eq("run_type", "canvas_section_analysis");
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setRuns((data ?? []) as unknown as AgentRun[]);
@@ -68,7 +89,7 @@ export default function ActivityPage() {
     } finally {
       setLoading(false);
     }
-  }, [accountId, accountLoading]);
+  }, [accountId, accountLoading, triggerFilter]);
 
   useEffect(() => {
     void fetchRuns();
@@ -96,24 +117,44 @@ export default function ActivityPage() {
         </Button>
       </div>
 
-      {/* Activity types legend */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge variant="outline" className="text-xs gap-1.5">
-          <Bot className="h-3 w-3" />
-          Agent Run
-        </Badge>
-        <Badge variant="outline" className="text-xs gap-1.5">
-          <Activity className="h-3 w-3" />
-          Canvas Edit
-        </Badge>
-        <Badge variant="outline" className="text-xs gap-1.5">
-          <Clock className="h-3 w-3" />
-          Gap Discovery
-        </Badge>
-        <Badge variant="outline" className="text-xs gap-1.5">
-          <RefreshCw className="h-3 w-3" />
-          Scheduled Loop
-        </Badge>
+      {/* Activity types legend + filter */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant="outline" className="text-xs gap-1.5">
+            <Bot className="h-3 w-3" />
+            Agent Run
+          </Badge>
+          <Badge variant="outline" className="text-xs gap-1.5">
+            <Activity className="h-3 w-3" />
+            Canvas Edit
+          </Badge>
+          <Badge variant="outline" className="text-xs gap-1.5">
+            <Clock className="h-3 w-3" />
+            Gap Discovery
+          </Badge>
+          <Badge variant="outline" className="text-xs gap-1.5">
+            <RefreshCw className="h-3 w-3" />
+            Scheduled Loop
+          </Badge>
+          <Badge variant="outline" className="text-xs gap-1.5">
+            <Zap className="h-3 w-3" />
+            Cascade
+          </Badge>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          {TRIGGER_FILTERS.map((f) => (
+            <Button
+              key={f.value}
+              variant={triggerFilter === f.value ? "default" : "ghost"}
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setTriggerFilter(f.value)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* Activity stream */}
@@ -191,7 +232,14 @@ export default function ActivityPage() {
                           {run.summary}
                         </p>
                       )}
-                      <div className="flex items-center gap-3 mt-1.5">
+                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                        {run.triggered_by && (
+                          <span className="text-xs text-muted-foreground font-mono">
+                            by: {run.triggered_by.length > 36
+                              ? run.triggered_by.slice(0, 36) + "…"
+                              : run.triggered_by}
+                          </span>
+                        )}
                         {run.model_provider && (
                           <span className="text-xs text-muted-foreground">
                             {run.model_provider}
