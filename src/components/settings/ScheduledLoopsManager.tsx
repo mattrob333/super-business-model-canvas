@@ -35,6 +35,7 @@ import {
   Pause,
   Trash2,
   Calendar,
+  Zap,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,6 +98,7 @@ export function ScheduledLoopsManager({ accountId }: { accountId: string }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [runningNow, setRunningNow] = useState<string | null>(null);
 
   // Add form state
   const [newLoopName, setNewLoopName] = useState("");
@@ -248,6 +250,36 @@ export function ScheduledLoopsManager({ accountId }: { accountId: string }) {
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleRunNow = async (loop: ScheduledLoop) => {
+    setRunningNow(loop.id);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "scheduled-loop-tick",
+        { body: { loopId: loop.id } },
+      );
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: "Loop executed",
+          description: data.message || `${loop.loop_name} ran successfully.`,
+        });
+        void fetchLoops();
+      } else {
+        throw new Error(data?.error || "Execution failed");
+      }
+    } catch (err) {
+      toast({
+        title: "Loop execution failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setRunningNow(null);
     }
   };
 
@@ -439,6 +471,21 @@ export function ScheduledLoopsManager({ accountId }: { accountId: string }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                      disabled={runningNow === loop.id}
+                      onClick={() => handleRunNow(loop)}
+                      title="Run this loop now"
+                    >
+                      {runningNow === loop.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Zap className="h-3.5 w-3.5" />
+                      )}
+                      <span className="hidden sm:inline">Run Now</span>
+                    </Button>
                     <Switch
                       checked={loop.status === "active"}
                       onCheckedChange={() => handleToggle(loop)}
