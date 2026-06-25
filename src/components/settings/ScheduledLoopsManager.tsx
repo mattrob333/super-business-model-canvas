@@ -496,6 +496,7 @@ export function ScheduledLoopsManager({ accountId }: { accountId: string }) {
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       title="Delete"
+                      aria-label={`Delete ${loop.loop_name}`}
                       onClick={() => handleDelete(loop)}
                     >
                       <Trash2 className="h-4 w-4" />

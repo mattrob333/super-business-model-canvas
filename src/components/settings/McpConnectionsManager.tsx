@@ -500,6 +500,7 @@ export function McpConnectionsManager({ accountId }: { accountId: string }) {
                         size="icon"
                         className="h-8 w-8"
                         title="Test connection"
+                        aria-label={`Test connection to ${server.name}`}
                         disabled={toggling === server.id}
                         onClick={() => handleTest(server)}
                       >
@@ -515,6 +516,7 @@ export function McpConnectionsManager({ accountId }: { accountId: string }) {
                           size="icon"
                           className="h-8 w-8"
                           title={isExpanded ? "Hide tools" : "Show tools"}
+                          aria-label={isExpanded ? `Hide tools for ${server.name}` : `Show tools for ${server.name}`}
                           onClick={() =>
                             setExpandedServer(isExpanded ? null : server.id)
                           }
@@ -529,6 +531,7 @@ export function McpConnectionsManager({ accountId }: { accountId: string }) {
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                         title="Delete"
+                        aria-label={`Delete ${server.name}`}
                         onClick={() => handleDelete(server)}
                       >
                         <Plus className="h-4 w-4 rotate-45" />

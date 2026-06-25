@@ -274,11 +274,12 @@ export const BusinessContextChat = ({
                   size="icon"
                   onClick={handleClearChat}
                   title="Clear conversation"
+                  aria-label="Clear conversation"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               )}
-              <Button variant="ghost" size="icon" onClick={handleMinimize} title="Minimize">
+              <Button variant="ghost" size="icon" onClick={handleMinimize} title="Minimize" aria-label="Minimize chat">
                 <Minus className="h-5 w-5" />
               </Button>
             </div>
@@ -386,6 +387,7 @@ export const BusinessContextChat = ({
                 disabled={!inputValue.trim() || isLoading}
                 size="icon"
                 className="shrink-0 h-9 w-9 rounded-xl bg-white/[0.08] hover:bg-primary/20 hover:shadow-[0_0_12px_rgba(196,248,42,0.3)] transition-all duration-200 group"
+                aria-label="Send message"
               >
                 <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </Button>

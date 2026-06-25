@@ -532,10 +532,11 @@ Website: ${comp.website || 'N/A'}
           <div className="fixed top-16 right-4 z-50">
             <Button
               onClick={copyToMarkdown}
-              variant="outline" 
+              variant="outline"
               size="icon"
               className="h-11 w-11 rounded-full shadow-xl bg-background/95 backdrop-blur-md border-2"
               title="Copy to clipboard"
+              aria-label="Copy analysis to clipboard"
             >
               {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
             </Button>

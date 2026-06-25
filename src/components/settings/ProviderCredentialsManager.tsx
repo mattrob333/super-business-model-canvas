@@ -372,6 +372,7 @@ export function ProviderCredentialsManager({ accountId }: { accountId: string })
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-warning"
                         title="Revoke"
+                        aria-label={`Revoke ${providerLabel} credential`}
                         onClick={() => handleRevoke(cred.id, providerLabel)}
                       >
                         <AlertCircle className="h-4 w-4" />
@@ -382,6 +383,7 @@ export function ProviderCredentialsManager({ accountId }: { accountId: string })
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       title="Delete permanently"
+                      aria-label={`Delete ${providerLabel} credential permanently`}
                       onClick={() => handleDelete(cred.id, providerLabel)}
                     >
                       <Trash2 className="h-4 w-4" />

@@ -268,7 +268,7 @@ export function ReportViewerDrawer({
                 {companyName || loadedCompanyName}
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleClose}>
+            <Button variant="ghost" size="icon" onClick={handleClose} aria-label="Close report viewer">
               <X className="h-4 w-4" />
             </Button>
           </div>

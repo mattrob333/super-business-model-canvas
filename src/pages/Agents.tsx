@@ -111,6 +111,7 @@ export default function Agents() {
             size="icon"
             className="h-8 w-8"
             title="Refresh"
+            aria-label="Refresh agents list"
             onClick={() => void fetchData()}
           >
             <RefreshCw className="h-4 w-4" />

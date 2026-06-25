@@ -180,6 +180,7 @@ export const ChatDrawer = ({
               onClick={handleClearChat}
               className="hover:bg-white/[0.1]"
               title="Clear chat"
+              aria-label="Clear chat history"
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -188,6 +189,7 @@ export const ChatDrawer = ({
               size="icon"
               onClick={() => onOpenChange(false)}
               className="hover:bg-white/[0.1]"
+              aria-label="Close chat drawer"
             >
               <X className="h-5 w-5" />
             </Button>

@@ -304,6 +304,7 @@ const MyAnalyses = () => {
                         size="icon"
                         onClick={() => handleExportPackage(analysis)}
                         title="Export Package"
+                        aria-label={`Export ${analysis.company_name} package`}
                       >
                         <Download className="h-4 w-4" />
                       </Button>
