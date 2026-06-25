@@ -3,7 +3,7 @@
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)
 **Repo:** https://github.com/mattrob333/super-business-model-canvas
 **Workspace:** C:\Users\mrobe\Documents\Projects\SuperBMCenterprise\super-business-model-canvas
-**Status:** Phase 10 In Progress (Tasks 1-4 complete, Task 5 complete). Polishing and hardening.
+**Status:** Phase 10 Complete. All 6 tasks done. Build ready for user review.
 
 ## Architecture: Two-Tier Autonomous Build Loop
 - Inner Loop (cron 779c6bf918c9) — every 10m: Check -> Test -> Advance -> Repeat
@@ -93,12 +93,13 @@
 3. [x] Orchestrator cascade: Run All Sections button on Canvas page (commit d316d4a) — triggers all 9 BMC section agents in sequence
 4. [x] Loop execution history on Activity page (commit 42de6f0) — triggered_by display, trigger type filters (all/manual/scheduled/cascade), cascade icon, flex-wrap meta row
 5. [x] Agent profile detail page (commit e01b4d2) — /agents/:agentId route with assigned sections, model route, recent runs, scheduled loops, instructions summary, clickable agent cards
-### Phase 10: Polish and Hardening [ ]
+### Phase 10: Polish and Hardening ✅
 1. [x] Focus-visible ring audit (commit b931fe9) — all raw `<button>` elements already had rings; added to NavLink elements in SidebarNav + Navigation, converted logo div to semantic button
 2. [x] Accessibility pass (commit b931fe9) — aria-label on mobile menu trigger, logo button aria-label, NavLink focus-visible rings
 3. [x] Empty/error/loading state audit — Dashboard, Canvas, Gaps, Knowledge, Agents, Activity, AgentDetail all have consistent loading spinners, empty states, and error banners
 4. [x] Security tab implementation — SecurityPanel already fully implemented (RLS status, credential count, MCP security, agent activity summary, guardrail compliance)
 5. [x] Lint cleanup pass (commit d1034c5) — reduced warnings from 20 to 16 by wrapping placeholder arrays in useMemo in Gaps and Knowledge pages
+6. [x] Bundle optimization / code splitting (commit 074f984) — all routes lazy-loaded via React.lazy + Suspense, html2pdf.js dynamically imported on-demand, Vite manualChunks for vendor splitting (react-vendor, ui-vendor, query-vendor, supabase-vendor, utility-vendor). Initial bundle reduced from single 2MB chunk to split vendor + per-route chunks. Largest initial load: react-vendor 164KB (53KB gzip).
 
 ## Completed Tasks
 - Created `enterprise-strategy-workspace` branch from main (6c6d3d2)
@@ -120,9 +121,9 @@
 - None
 
 ## Next Action
-- Phase 10 is substantially complete. All 5 tasks done (focus-visible audit, accessibility pass, empty/error/loading state audit, Security tab, lint cleanup).
-- Next: Final build verification + commit state file, then evaluate if any remaining polish is needed (e.g. additional aria-pressed on toggle buttons if the subagent audit found any, chunk size optimization).
-- If no further work is identified, declare Phase 10 complete and the build ready for user review.
+- Phase 10 is COMPLETE. All 6 tasks done: focus-visible audit, accessibility pass, empty/error/loading state audit, Security tab, lint cleanup, bundle optimization/code splitting.
+- All planned phases (0-10) are complete. The build is ready for user review.
+- No further autonomous work is planned. If the user identifies additional polish, hardening, or feature requests, the loop can be resumed.
 
 ## Pitfalls / Notes
 - Pre-existing lint errors (52 errors, 16 warnings on main @ 6c6d3d2) are all `no-explicit-any` + `no-require-imports` + `no-empty-object-type` in pre-existing/shadcn files — do NOT fix, just ensure errors don't increase. Current branch: 52 errors, 16 warnings (reduced from 20 — fixed 4 useMemo warnings in Gaps + Knowledge pages)
@@ -133,4 +134,4 @@
 - Commit each green slice before starting the next file
 - Orphaned work recovery: prior tick wrote canvas/ files without committing — recovered, quality-gated, committed as 061b6ab
 
-**Last Updated:** 2026-06-24 — Phase 10 (Polish and Hardening) substantially complete. All 5 tasks done: focus-visible ring audit, accessibility pass, empty/error/loading state audit, Security tab verified, lint warnings reduced 20→16. Commits d1034c5, b931fe9.
+**Last Updated:** 2026-06-24 — Phase 10 (Polish and Hardening) COMPLETE. All 6 tasks done: focus-visible ring audit, accessibility pass, empty/error/loading state audit, Security tab, lint cleanup (20→16 warnings), bundle optimization/code splitting (2MB single chunk → split vendor + per-route lazy chunks, html2pdf.js lazy-loaded). All planned phases 0-10 complete. Commits d1034c5, b931fe9, 074f984.
