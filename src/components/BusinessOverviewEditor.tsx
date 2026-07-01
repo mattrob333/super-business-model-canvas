@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { getAccessToken, readGrokSseStream } from "@/lib/supabase-auth";
 
 interface KeyExecutive {
   name: string;
@@ -45,9 +47,11 @@ export const BusinessOverviewEditor = ({
 }: BusinessOverviewEditorProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [editedData, setEditedData] = useState(data);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { session } = useAuth();
 
   useEffect(() => {
     setEditedData(data);
@@ -79,39 +83,79 @@ export const BusinessOverviewEditor = ({
   };
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
     const userInput = input;
     setInput("");
+    setIsLoading(true);
 
     try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      
-      const { data: responseData, error } = await supabase.functions.invoke('business-overview-chat', {
-        body: {
-          userMessage: userInput,
-          conversationHistory: messages,
-          companyName: companyName,
-          overviewData: editedData
+      const accessToken = await getAccessToken(session);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/business-overview-chat`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userMessage: userInput,
+            conversationHistory: messages,
+            companyName,
+            overviewData: editedData,
+          }),
         }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to get response");
+      }
+
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      let assistantMessage = "";
+      await readGrokSseStream(response, (content) => {
+        assistantMessage += content;
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: assistantMessage,
+          };
+          return updated;
+        });
       });
-
-      if (error) throw error;
-
-      const aiMessage: Message = {
-        role: "assistant",
-        content: responseData.response
-      };
-      setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
-      console.error('Chat error:', error);
-      const errorMessage: Message = {
-        role: "assistant",
-        content: "Sorry, I encountered an error. Please try again."
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      console.error("Chat error:", error);
+      const description =
+        error instanceof Error ? error.message : "Failed to send message. Please try again.";
+      toast({
+        title: "Error",
+        description,
+        variant: "destructive",
+      });
+      setMessages((prev) => {
+        const withoutEmptyPlaceholder =
+          prev.length > 0 &&
+          prev[prev.length - 1].role === "assistant" &&
+          !prev[prev.length - 1].content
+            ? prev.slice(0, -1)
+            : prev;
+        return [
+          ...withoutEmptyPlaceholder,
+          {
+            role: "assistant",
+            content: "Sorry, I encountered an error. Please try again.",
+          },
+        ];
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -182,12 +226,12 @@ export const BusinessOverviewEditor = ({
       />
 
       {/* Drawer */}
-      <div className="fixed inset-0 md:right-0 md:left-auto md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300 overflow-hidden">
+      <div className="fixed inset-0 md:right-0 md:left-auto md:max-w-[66vw] bg-card border-l border-border z-50 flex animate-in slide-in-from-right duration-300 overflow-hidden">
         {/* Mobile Tabs Layout */}
         <div className="flex-1 md:hidden flex flex-col">
           <Tabs defaultValue="edit" className="flex-1 flex flex-col">
-            <div className="border-b border-white/[0.12] px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 flex items-center justify-between">
-              <TabsList className="bg-white/[0.05]">
+            <div className="border-b border-border px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 flex items-center justify-between">
+              <TabsList>
                 <TabsTrigger value="edit">Edit</TabsTrigger>
                 <TabsTrigger value="chat">AI Chat</TabsTrigger>
               </TabsList>
@@ -195,7 +239,7 @@ export const BusinessOverviewEditor = ({
                 variant="ghost"
                 size="icon"
                 onClick={() => onOpenChange(false)}
-                className="hover:bg-white/[0.1]"
+                className="hover:bg-muted"
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -210,7 +254,6 @@ export const BusinessOverviewEditor = ({
                     <Input
                       value={editedData.name}
                       onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
-                      className="bg-white/[0.05] border-white/[0.12]"
                       placeholder="Company name"
                     />
                   </div>
@@ -221,7 +264,7 @@ export const BusinessOverviewEditor = ({
                     <Textarea
                       value={editedData.description}
                       onChange={(e) => setEditedData({ ...editedData, description: e.target.value })}
-                      className="min-h-[100px] bg-white/[0.05] border-white/[0.12]"
+                      className="min-h-[100px]"
                       placeholder="Company description..."
                     />
                   </div>
@@ -232,7 +275,6 @@ export const BusinessOverviewEditor = ({
                     <Input
                       value={editedData.industry}
                       onChange={(e) => setEditedData({ ...editedData, industry: e.target.value })}
-                      className="bg-white/[0.05] border-white/[0.12]"
                       placeholder="Industry"
                     />
                   </div>
@@ -243,7 +285,6 @@ export const BusinessOverviewEditor = ({
                     <Input
                       value={editedData.website}
                       onChange={(e) => setEditedData({ ...editedData, website: e.target.value })}
-                      className="bg-white/[0.05] border-white/[0.12]"
                       placeholder="https://..."
                     />
                   </div>
@@ -258,20 +299,18 @@ export const BusinessOverviewEditor = ({
                       </Button>
                     </div>
                     {editedData.keyExecutives.map((exec, index) => (
-                      <div key={index} className="space-y-2 p-3 bg-white/[0.03] rounded-lg border border-white/[0.08]">
+                      <div key={index} className="space-y-2 p-3 bg-muted/40 rounded-lg border border-border">
                         <div className="flex items-start gap-2">
                           <User className="h-4 w-4 text-primary mt-2" />
                           <div className="flex-1 space-y-2">
                             <Input
                               value={exec.name}
                               onChange={(e) => updateExecutive(index, 'name', e.target.value)}
-                              className="bg-white/[0.05] border-white/[0.12]"
                               placeholder="Name"
                             />
                             <Input
                               value={exec.role}
                               onChange={(e) => updateExecutive(index, 'role', e.target.value)}
-                              className="bg-white/[0.05] border-white/[0.12]"
                               placeholder="Role"
                             />
                           </div>
@@ -302,7 +341,7 @@ export const BusinessOverviewEditor = ({
                         <Input
                           value={item}
                           onChange={(e) => updateProductService(index, e.target.value)}
-                          className="flex-1 bg-white/[0.05] border-white/[0.12]"
+                          className="flex-1"
                           placeholder={`Product/Service ${index + 1}`}
                         />
                         <Button
@@ -318,13 +357,13 @@ export const BusinessOverviewEditor = ({
                   </div>
 
                   {/* Notes Field */}
-                  <div className="space-y-2 pt-4 border-t border-white/[0.08]">
+                  <div className="space-y-2 pt-4 border-t border-border">
                     <label className="text-sm font-medium">Additional Notes</label>
                     <Textarea
                       value={editedData.notes || ""}
                       onChange={(e) => setEditedData({ ...editedData, notes: e.target.value })}
                       placeholder="Add context or details for AI chat (not visible on main page)"
-                      className="min-h-[150px] bg-white/[0.05] border-white/[0.12]"
+                      className="min-h-[150px]"
                     />
                     <p className="text-xs text-muted-foreground">
                       These notes will be included in AI chat context but won't appear on the main page
@@ -334,7 +373,7 @@ export const BusinessOverviewEditor = ({
               </ScrollArea>
 
               {/* Save Button */}
-              <div className="sticky bottom-0 border-t border-white/[0.12] px-4 py-3 sm:p-6 bg-[#0a0a0a]">
+              <div className="sticky bottom-0 border-t border-border px-4 py-3 sm:p-6 bg-card">
                 <Button onClick={handleSave} className="w-full" size="lg">
                   <Save className="h-4 w-4 mr-2" />
                   Save Changes
@@ -344,10 +383,10 @@ export const BusinessOverviewEditor = ({
 
             <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
               {/* Header */}
-              <div className="border-b border-white/[0.12] px-4 py-4 sm:p-6">
+              <div className="border-b border-border px-4 py-4 sm:p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="label-tech text-primary">AI Assistant</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-primary">AI Assistant</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Chat & Refine</h3>
@@ -355,7 +394,7 @@ export const BusinessOverviewEditor = ({
                     variant="ghost"
                     size="icon"
                     onClick={handleClearChat}
-                    className="hover:bg-white/[0.1]"
+                    className="hover:bg-muted"
                     title="Clear chat"
                   >
                     <RotateCcw className="h-4 w-4" />
@@ -375,7 +414,7 @@ export const BusinessOverviewEditor = ({
                         className={`max-w-[90%] sm:max-w-[85%] rounded-2xl p-4 sm:p-6 ${
                           message.role === "user"
                             ? "bg-primary text-primary-foreground"
-                            : "bg-white/[0.06] border border-white/[0.12]"
+                            : "bg-muted border border-border"
                         }`}
                       >
                       <div className={
@@ -412,18 +451,18 @@ export const BusinessOverviewEditor = ({
               </ScrollArea>
 
               {/* Input Area */}
-              <div className="border-t border-white/[0.12] px-4 py-4 sm:p-6">
+              <div className="border-t border-border px-4 py-4 sm:p-6">
                 <div className="flex gap-3">
                   <Input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Ask for suggestions or improvements..."
-                    className="flex-1 bg-white/[0.05] border-white/[0.12] focus:border-primary"
+                    className="flex-1 focus:border-primary"
                   />
                   <Button
                     onClick={handleSend}
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || isLoading}
                     className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
                   >
                     <Send className="h-4 w-4" />
@@ -439,9 +478,9 @@ export const BusinessOverviewEditor = ({
 
         {/* Desktop Side-by-Side Layout */}
         {/* Left Panel - Edit Form */}
-        <div className="hidden md:flex md:w-[55%] border-r border-white/[0.12] flex-col">
+        <div className="hidden md:flex md:w-[55%] border-r border-border flex-col">
           {/* Header */}
-          <div className="border-b border-white/[0.12] p-6 h-[88px] flex flex-col justify-center">
+          <div className="border-b border-border p-6 h-[88px] flex flex-col justify-center">
             <h2 className="text-xl font-semibold">Business Overview</h2>
             <p className="text-sm text-muted-foreground mt-1">Edit your company information</p>
           </div>
@@ -455,7 +494,6 @@ export const BusinessOverviewEditor = ({
                 <Input
                   value={editedData.name}
                   onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
-                  className="bg-white/[0.05] border-white/[0.12]"
                   placeholder="Company name"
                 />
               </div>
@@ -466,7 +504,7 @@ export const BusinessOverviewEditor = ({
                 <Textarea
                   value={editedData.description}
                   onChange={(e) => setEditedData({ ...editedData, description: e.target.value })}
-                  className="min-h-[100px] bg-white/[0.05] border-white/[0.12]"
+                  className="min-h-[100px]"
                   placeholder="Company description..."
                 />
               </div>
@@ -477,7 +515,6 @@ export const BusinessOverviewEditor = ({
                 <Input
                   value={editedData.industry}
                   onChange={(e) => setEditedData({ ...editedData, industry: e.target.value })}
-                  className="bg-white/[0.05] border-white/[0.12]"
                   placeholder="Industry"
                 />
               </div>
@@ -488,7 +525,6 @@ export const BusinessOverviewEditor = ({
                 <Input
                   value={editedData.website}
                   onChange={(e) => setEditedData({ ...editedData, website: e.target.value })}
-                  className="bg-white/[0.05] border-white/[0.12]"
                   placeholder="https://..."
                 />
               </div>
@@ -503,20 +539,18 @@ export const BusinessOverviewEditor = ({
                   </Button>
                 </div>
                 {editedData.keyExecutives.map((exec, index) => (
-                  <div key={index} className="space-y-2 p-3 bg-white/[0.03] rounded-lg border border-white/[0.08]">
+                  <div key={index} className="space-y-2 p-3 bg-muted/40 rounded-lg border border-border">
                     <div className="flex items-start gap-2">
                       <User className="h-4 w-4 text-primary mt-2" />
                       <div className="flex-1 space-y-2">
                         <Input
                           value={exec.name}
                           onChange={(e) => updateExecutive(index, 'name', e.target.value)}
-                          className="bg-white/[0.05] border-white/[0.12]"
                           placeholder="Name"
                         />
                         <Input
                           value={exec.role}
                           onChange={(e) => updateExecutive(index, 'role', e.target.value)}
-                          className="bg-white/[0.05] border-white/[0.12]"
                           placeholder="Role"
                         />
                       </div>
@@ -547,7 +581,7 @@ export const BusinessOverviewEditor = ({
                     <Input
                       value={item}
                       onChange={(e) => updateProductService(index, e.target.value)}
-                      className="flex-1 bg-white/[0.05] border-white/[0.12]"
+                      className="flex-1"
                       placeholder={`Product/Service ${index + 1}`}
                     />
                     <Button
@@ -563,13 +597,13 @@ export const BusinessOverviewEditor = ({
               </div>
 
               {/* Notes Field */}
-              <div className="space-y-2 pt-4 border-t border-white/[0.08]">
+              <div className="space-y-2 pt-4 border-t border-border">
                 <label className="text-sm font-medium">Additional Notes</label>
                 <Textarea
                   value={editedData.notes || ""}
                   onChange={(e) => setEditedData({ ...editedData, notes: e.target.value })}
                   placeholder="Add context or details for AI chat (not visible on main page)"
-                  className="min-h-[150px] bg-white/[0.05] border-white/[0.12]"
+                  className="min-h-[150px]"
                 />
                 <p className="text-xs text-muted-foreground">
                   These notes will be included in AI chat context but won't appear on the main page
@@ -579,7 +613,7 @@ export const BusinessOverviewEditor = ({
           </ScrollArea>
 
           {/* Save Button */}
-          <div className="border-t border-white/[0.12] p-6 h-[88px] flex items-center">
+          <div className="border-t border-border p-6 h-[88px] flex items-center">
             <Button onClick={handleSave} className="w-full" size="lg">
               <Save className="h-4 w-4 mr-2" />
               Save Changes
@@ -590,11 +624,11 @@ export const BusinessOverviewEditor = ({
         {/* Right Panel - AI Chat */}
         <div className="hidden md:flex md:w-[45%] flex-col">
           {/* Header */}
-          <div className="border-b border-white/[0.12] p-6 h-[88px] flex items-center justify-between">
+          <div className="border-b border-border p-6 h-[88px] flex items-center justify-between">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
-                <span className="label-tech text-primary">AI Assistant</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-primary">AI Assistant</span>
               </div>
               <h3 className="text-lg font-semibold">Chat & Refine</h3>
             </div>
@@ -603,7 +637,7 @@ export const BusinessOverviewEditor = ({
                 variant="ghost"
                 size="icon"
                 onClick={handleClearChat}
-                className="hover:bg-white/[0.1]"
+                className="hover:bg-muted"
                 title="Clear chat"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -612,7 +646,7 @@ export const BusinessOverviewEditor = ({
                 variant="ghost"
                 size="icon"
                 onClick={() => onOpenChange(false)}
-                className="hover:bg-white/[0.1]"
+                className="hover:bg-muted"
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -631,7 +665,7 @@ export const BusinessOverviewEditor = ({
                     className={`max-w-[85%] rounded-2xl p-6 ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
-                        : "bg-white/[0.06] border border-white/[0.12]"
+                        : "bg-muted border border-border"
                     }`}
                   >
                     <div className={
@@ -668,18 +702,18 @@ export const BusinessOverviewEditor = ({
           </ScrollArea>
 
           {/* Input Area */}
-          <div className="border-t border-white/[0.12] p-6 h-[88px] flex flex-col justify-center">
+          <div className="border-t border-border p-6 h-[88px] flex flex-col justify-center">
             <div className="flex gap-3">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Ask for suggestions or improvements..."
-                className="flex-1 bg-white/[0.05] border-white/[0.12] focus:border-primary"
+                className="flex-1 focus:border-primary"
               />
               <Button
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={!input.trim() || isLoading}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
               >
                 <Send className="h-4 w-4" />

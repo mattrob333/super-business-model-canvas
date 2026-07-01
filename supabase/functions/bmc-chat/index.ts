@@ -39,11 +39,6 @@ serve(async (req) => {
       throw new Error('Section and message are required');
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
-
     console.log('Chat request for section:', section);
 
     // Build rich context from business overview
@@ -81,7 +76,7 @@ Example format:
 
 Use SMART framework (Specific, Measurable, Achievable, Relevant, Time-bound).
 
-Note: Grok will automatically use web search when needed to answer questions requiring current market data.`;
+Note: Use the company context and canvas content provided. Only search the web if the user explicitly asks for current market data.`;
 
     // Filter conversation history to ensure proper user-assistant alternation
     const filteredHistory: any[] = [];
@@ -122,10 +117,7 @@ Note: Grok will automatically use web search when needed to answer questions req
         try {
           await streamGrokChat({
             messages,
-            search_parameters: {
-              mode: 'auto',
-              return_citations: false
-            },
+            webSearch: false,
             temperature: 0.7,
             maxTokens: 2000,
             onChunk: (text: string) => {
@@ -141,12 +133,15 @@ Note: Grok will automatically use web search when needed to answer questions req
             },
             onError: (error: Error) => {
               console.error('Grok streaming error:', error);
-              controller.error(error);
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error.message })}\n\n`));
+              controller.close();
             }
           });
         } catch (error) {
           console.error('Stream error:', error);
-          controller.error(error);
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`));
+          controller.close();
         }
       }
     });

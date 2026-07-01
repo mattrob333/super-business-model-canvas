@@ -1,53 +1,50 @@
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { LoadingState } from "@/components/LoadingState";
 
 interface UrlInputProps {
   onAnalyze: (url: string) => void;
   isLoading: boolean;
+  companyName?: string;
 }
 
-// URL validation schema
-const urlSchema = z.string()
+const urlSchema = z
+  .string()
   .trim()
   .min(3, "URL is too short")
   .max(500, "URL is too long")
   .refine((val) => {
-    // Remove common prefixes and trailing slashes/paths for validation
     const cleaned = val
-      .replace(/^(https?:\/\/)?(www\.)?/i, '') // Remove protocol and www
-      .replace(/\/.*$/, ''); // Remove trailing slash and any path
-    // Check if it looks like a domain (contains at least one dot and valid characters)
+      .replace(/^(https?:\/\/)?(www\.)?/i, "")
+      .replace(/\/.*$/, "");
     return /^[a-zA-Z0-9][a-zA-Z0-9-_.]+\.[a-zA-Z]{2,}$/i.test(cleaned);
   }, "Please enter a valid domain (e.g., example.com)");
 
-// Normalize URL by adding protocol if missing
 const normalizeUrl = (input: string): string => {
   let normalized = input.trim();
-  
-  // If it doesn't start with http:// or https://, add https://www.
+
   if (!/^https?:\/\//i.test(normalized)) {
-    // Check if it already has www.
     if (!/^www\./i.test(normalized)) {
-      normalized = 'https://www.' + normalized;
+      normalized = "https://www." + normalized;
     } else {
-      normalized = 'https://' + normalized;
+      normalized = "https://" + normalized;
     }
   }
-  
+
   return normalized;
 };
 
-export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
+export function UrlInput({ onAnalyze, isLoading, companyName }: UrlInputProps) {
   const [url, setUrl] = useState("");
   const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!url.trim()) {
       toast({
         title: "URL Required",
@@ -58,12 +55,8 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
     }
 
     try {
-      // Validate the URL
       urlSchema.parse(url);
-      
-      // Normalize and send
-      const normalizedUrl = normalizeUrl(url);
-      onAnalyze(normalizedUrl);
+      onAnalyze(normalizeUrl(url));
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast({
@@ -76,62 +69,69 @@ export const UrlInput = ({ onAnalyze, isLoading }: UrlInputProps) => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto">
-      <div className="relative border border-primary/90 rounded-xl bg-card p-6 sm:p-8
-                shadow-[0_0_60px_rgba(196,248,42,0.2),0_0_30px_rgba(196,248,42,0.15),0_4px_20px_rgba(0,0,0,0.5),inset_0_2px_8px_rgba(0,0,0,0.3),inset_0_0_20px_rgba(196,248,42,0.08)]
-                hover:shadow-[0_0_80px_rgba(196,248,42,0.3),0_0_40px_rgba(196,248,42,0.2),0_8px_28px_rgba(0,0,0,0.6),inset_0_2px_8px_rgba(0,0,0,0.3),inset_0_0_24px_rgba(196,248,42,0.1)]
-                focus-within:shadow-[0_0_80px_rgba(196,248,42,0.28),0_0_40px_rgba(196,248,42,0.18),0_4px_20px_rgba(0,0,0,0.5),inset_0_2px_8px_rgba(0,0,0,0.3),inset_0_0_24px_rgba(196,248,42,0.1)]
-                transition-all duration-300">
-        <div className="space-y-5">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground block">
-                Company Website
-              </label>
-              <div className="flex flex-col md:flex-row gap-3 md:gap-4">
-                <Input
-                  type="text"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="salesforce.com or https://salesforce.com"
-                  className="flex-1 h-14 px-6 text-base md:text-lg bg-white/[0.12] border-white/[0.20] text-white placeholder:text-muted-foreground focus:bg-white/[0.15] focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  disabled={isLoading}
-                />
-                <Button
-                  type="submit"
-                  disabled={isLoading || !url.trim()}
-                  className="h-14 w-full md:w-auto md:px-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold uppercase tracking-tech transition-all hover:scale-105"
+    <div className="w-full">
+      <div className="rounded-xl border border-border bg-card shadow-sm transition-shadow duration-300 focus-within:border-primary/30 focus-within:shadow-md">
+        <div className="p-5 sm:p-6">
+          {isLoading ? (
+            <LoadingState embedded companyName={companyName} />
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label
+                  htmlFor="company-url"
+                  className="text-sm font-medium text-foreground"
                 >
-                  <Search className="mr-2 h-5 w-5" />
-                  {isLoading ? "Building..." : "Generate Context"}
-                </Button>
+                  Company website
+                </label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="company-url"
+                    type="text"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="salesforce.com"
+                    className="h-11 flex-1 text-base"
+                    disabled={isLoading}
+                    autoFocus
+                  />
+                  <Button
+                    type="submit"
+                    disabled={isLoading || !url.trim()}
+                    className="h-11 shrink-0 gap-2 px-5 sm:min-w-[160px]"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Building…
+                      </>
+                    ) : (
+                      <>
+                        Generate
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Works with any company — analyze your own, a competitor, or a client. AI uses public sources only; you can edit and refine everything later.
-              </p>
-            </div>
-          </form>
 
-          {/* User Guidance Tip */}
-          <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 border border-primary/20 rounded-lg">
-            <span className="text-base">💡</span>
-            <p className="text-xs text-muted-foreground flex-1">
-              <strong>Tip:</strong> You can refine and reuse your Context File anytime. It's your AI-ready business foundation.
-            </p>
-          </div>
-          
-          <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-            <p className="text-center md:text-left">
-              Press <kbd className="px-2 py-0.5 text-xs font-semibold bg-white/[0.08] border border-white/[0.12] rounded">Enter</kbd> to analyze
-            </p>
-            {isLoading && (
-              <p className="animate-pulse">
-                Analysis typically completes in 30-60 seconds...
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Works with any company — your own, a competitor, or a client.
+                AI uses public sources only; you refine everything afterward.
               </p>
-            )}
-          </div>
+            </form>
+          )}
         </div>
       </div>
+
+      {!isLoading && (
+        <p className="mt-3 text-center text-xs text-muted-foreground/70">
+          Press{" "}
+          <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+            Enter
+          </kbd>{" "}
+          to start · Your first context takes about a minute
+        </p>
+      )}
     </div>
   );
-};
+}

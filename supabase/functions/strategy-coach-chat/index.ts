@@ -302,10 +302,7 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
         try {
           await streamGrokChat({
             messages,
-            search_parameters: {
-              mode: 'auto',
-              return_citations: false
-            },
+            webSearch: false,
             temperature: 0.7,
             maxTokens: 3000,
             onChunk: (text: string) => {

@@ -5,7 +5,7 @@ import { Copy, Download, Save, RefreshCw, X, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { copyHtmlToClipboard, exportReportToPdf } from "@/lib/report-export";
-import { REPORT_TEMPLATES } from "@/data/report-templates";
+import { BASE_REPORT_STYLES } from "@/data/report-templates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 
@@ -244,7 +244,7 @@ export function ReportViewerDrawer({
       description: "Your PDF is being generated"
     });
     try {
-      await exportReportToPdf(reportHtml, filename);
+      await exportReportToPdf(reportHtml, filename, `${BASE_REPORT_STYLES}\n${customCss}`);
     } catch (err) {
       toast({
         title: "Export failed",
@@ -351,6 +351,9 @@ export function ReportViewerDrawer({
             </div>
           ) : (
             <>
+              {/* Reports stay light/printable regardless of app theme, so every
+                  generated report shares one consistent "boardroom report" look. */}
+              <style>{BASE_REPORT_STYLES}</style>
               <style>{customCss}</style>
               <div
                 ref={contentRef}

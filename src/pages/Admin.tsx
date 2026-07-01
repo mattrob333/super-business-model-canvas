@@ -292,10 +292,10 @@ const Admin = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'draft': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'archived': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      case 'active': return 'bg-success/10 text-success border-success/20';
+      case 'draft': return 'bg-warning/10 text-warning border-warning/20';
+      case 'archived': return 'bg-muted text-muted-foreground border-border';
+      default: return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -313,7 +313,7 @@ const Admin = () => {
 
   if (authLoading || adminLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -327,20 +327,11 @@ const Admin = () => {
   const categories = Array.from(new Set(frameworks.map(f => f.category).filter(Boolean)));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <div className="container mx-auto px-6 py-8 max-w-7xl">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/analyze')}
-          className="mb-6"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Analysis
-        </Button>
-
+    <div>
+      <div className="max-w-7xl mx-auto">
         <div className="space-y-6">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">Admin Dashboard</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Admin Dashboard</h1>
             <p className="text-muted-foreground mt-2">Manage leads, frameworks, and monitor growth</p>
           </div>
 
@@ -490,7 +481,7 @@ const Admin = () => {
             <TabsContent value="frameworks" className="space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold tracking-tight">Framework Library</h2>
+                  <h2 className="text-xl font-semibold tracking-tight">Framework Library</h2>
                   <p className="text-muted-foreground mt-1">Manage strategic analysis frameworks</p>
                 </div>
                 <div className="flex gap-2">

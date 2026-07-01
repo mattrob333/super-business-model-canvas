@@ -17,6 +17,14 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { 
       userMessage, 
       conversationHistory = [], 
@@ -103,10 +111,7 @@ Always consider the full context including the additional notes field when provi
         try {
           await streamGrokChat({
             messages,
-            search_parameters: {
-              mode: 'auto',
-              return_citations: false
-            },
+            webSearch: false,
             maxTokens: 1500,
             temperature: 0.7,
             onChunk: (text: string) => {
@@ -123,12 +128,15 @@ Always consider the full context including the additional notes field when provi
             },
             onError: (error: Error) => {
               console.error('Grok streaming error:', error);
-              controller.error(error);
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error.message })}\n\n`));
+              controller.close();
             }
           });
         } catch (error) {
           console.error('Stream error:', error);
-          controller.error(error);
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`));
+          controller.close();
         }
       }
     });

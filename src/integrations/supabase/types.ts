@@ -865,6 +865,7 @@ export type Database = {
           tokens_in: number | null
           tokens_out: number | null
           estimated_cost: number | null
+          created_at: string
           started_at: string | null
           completed_at: string | null
           error: string | null
@@ -885,6 +886,7 @@ export type Database = {
           tokens_in?: number | null
           tokens_out?: number | null
           estimated_cost?: number | null
+          created_at?: string
           started_at?: string | null
           completed_at?: string | null
           error?: string | null
@@ -905,6 +907,7 @@ export type Database = {
           tokens_in?: number | null
           tokens_out?: number | null
           estimated_cost?: number | null
+          created_at?: string
           started_at?: string | null
           completed_at?: string | null
           error?: string | null
@@ -1157,15 +1160,139 @@ export type Database = {
           },
         ]
       }
+      model_routes: {
+        Row: {
+          id: string
+          account_id: string | null
+          route_key: string
+          label: string
+          provider: string
+          model_name: string
+          params: Json
+          fallback_route_key: string | null
+          is_default: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id?: string | null
+          route_key: string
+          label: string
+          provider: string
+          model_name: string
+          params?: Json
+          fallback_route_key?: string | null
+          is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string | null
+          route_key?: string
+          label?: string
+          provider?: string
+          model_name?: string
+          params?: Json
+          fallback_route_key?: string | null
+          is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_routes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_skills: {
+        Row: {
+          id: string
+          account_id: string
+          agent_profile_id: string
+          framework_id: string
+          enabled: boolean
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          agent_profile_id: string
+          framework_id: string
+          enabled?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          agent_profile_id?: string
+          framework_id?: string
+          enabled?: boolean
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_skills_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_skills_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_skills_framework_id_fkey"
+            columns: ["framework_id"]
+            isOneToOne: false
+            referencedRelation: "frameworks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      skills: {
+        Row: {
+          id: string | null
+          kind: string | null
+          skill_key: string | null
+          name: string | null
+          description: string | null
+          when_to_use: string | null
+          system_prompt: string | null
+          analysis_prompt: string | null
+          response_schema: Json | null
+          ai_model: string | null
+          max_tokens: number | null
+          temperature: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
+        }
+        Returns: boolean
+      }
+      is_account_member: {
+        Args: {
+          _account_id: string
         }
         Returns: boolean
       }

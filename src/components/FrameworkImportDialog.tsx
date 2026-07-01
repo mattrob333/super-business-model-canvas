@@ -192,7 +192,7 @@ export function FrameworkImportDialog({ open, onOpenChange, existingShortcuts, o
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex gap-4 text-sm">
-                  <span className="flex items-center gap-1 text-green-600">
+                  <span className="flex items-center gap-1 text-success">
                     <CheckCircle className="h-4 w-4" />
                     {validCount} valid
                   </span>
@@ -203,7 +203,7 @@ export function FrameworkImportDialog({ open, onOpenChange, existingShortcuts, o
                     </span>
                   )}
                   {totalWarnings > 0 && (
-                    <span className="flex items-center gap-1 text-yellow-600">
+                    <span className="flex items-center gap-1 text-warning">
                       <AlertCircle className="h-4 w-4" />
                       {totalWarnings} warnings
                     </span>

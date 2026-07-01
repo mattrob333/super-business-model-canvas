@@ -161,13 +161,13 @@ export const ChatDrawer = ({
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full md:max-w-[500px] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="fixed right-0 top-0 h-full w-full md:max-w-[500px] bg-card border-l border-border z-50 flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="border-b border-white/[0.12] p-6 flex items-center justify-between">
+        <div className="border-b border-border p-6 flex items-center justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              <span className="label-tech text-primary">AI Analysis</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">AI Analysis</span>
             </div>
             <h2 className="text-xl font-semibold">
               {mode === 'competitor' && competitor ? competitor.name : section?.title}
@@ -178,7 +178,7 @@ export const ChatDrawer = ({
               variant="ghost"
               size="icon"
               onClick={handleClearChat}
-              className="hover:bg-white/[0.1]"
+              className="hover:bg-muted"
               title="Clear chat"
               aria-label="Clear chat history"
             >
@@ -188,7 +188,7 @@ export const ChatDrawer = ({
               variant="ghost"
               size="icon"
               onClick={() => onOpenChange(false)}
-              className="hover:bg-white/[0.1]"
+              className="hover:bg-muted"
               aria-label="Close chat drawer"
             >
               <X className="h-5 w-5" />
@@ -208,7 +208,7 @@ export const ChatDrawer = ({
                   className={`max-w-[85%] rounded-2xl p-6 ${
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "bg-white/[0.06] border border-white/[0.12]"
+                      : "bg-muted border border-border"
                   }`}
                 >
                   <div className={
@@ -245,12 +245,8 @@ export const ChatDrawer = ({
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="relative p-6">
-          {/* Ambient neon underglow */}
-          <div className="absolute inset-x-6 -top-6 h-6 bg-gradient-to-t from-primary/10 to-transparent pointer-events-none" />
-          
-          {/* Main input container */}
-          <div className="relative rounded-2xl bg-[#111111] p-4 shadow-[0_8px_16px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.06)]">
+        <div className="p-6 border-t border-border">
+          <div className="rounded-2xl bg-muted/40 border border-border p-4">
             <div className="flex items-center gap-3">
               <Input
                 value={input}
@@ -262,7 +258,7 @@ export const ChatDrawer = ({
               <Button
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="shrink-0 h-9 w-9 rounded-xl bg-white/[0.08] hover:bg-primary/20 hover:shadow-[0_0_12px_rgba(196,248,42,0.3)] transition-all duration-200 group"
+                className="shrink-0 h-9 w-9 rounded-xl bg-background hover:bg-primary/20 transition-all duration-200 group"
               >
                 <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </Button>

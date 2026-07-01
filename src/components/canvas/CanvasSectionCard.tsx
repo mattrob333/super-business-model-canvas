@@ -6,7 +6,6 @@ import {
   FileCheck,
   AlertTriangle,
   Target,
-  Edit3,
   ChevronRight,
   Sparkles,
   Loader2,
@@ -45,7 +44,7 @@ export interface CanvasSectionCardProps {
   onClick?: () => void;
   /** Whether an agent analysis is running for this section */
   isAnalyzing?: boolean;
-  /** Callback when user clicks "Run Analysis" */
+  /** Callback when user clicks "Analyze" */
   onAnalyze?: () => void;
   /** Error message from the last analysis run */
   analysisError?: string;
@@ -105,7 +104,11 @@ export function CanvasSectionCard({
 
   const handleAnalyzeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onAnalyze?.();
+    if (onAnalyze) {
+      onAnalyze();
+    } else {
+      onClick?.();
+    }
   };
 
   return (
@@ -118,54 +121,29 @@ export function CanvasSectionCard({
       )}
       onClick={onClick}
     >
-      {/* Header row: title + actions */}
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <h3 className="text-xs sm:text-sm font-medium uppercase tracking-wide text-muted-foreground truncate">
-            {title}
-          </h3>
-          {meta?.hasNotes || notes ? (
-            <Target className="w-3.5 h-3.5 text-primary opacity-70 flex-shrink-0" />
-          ) : null}
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {onAnalyze && !isAnalyzing && (
-            <button
-              type="button"
-              onClick={handleAnalyzeClick}
-              className="flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors px-1.5 py-0.5 rounded hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring"
-              title={`Run agent analysis on ${title}`}
-              aria-label={`Run agent analysis on ${title}`}
-            >
-              <Sparkles className="w-3 h-3" />
-              Analyze
-            </button>
-          )}
-          {isAnalyzing && (
-            <span className="flex items-center gap-1 text-[10px] font-medium text-primary px-1.5 py-0.5">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Analyzing…
-            </span>
-          )}
-          {!isAnalyzing && !onAnalyze && (
-            <Edit3 className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
-          )}
-        </div>
+      {/* Title */}
+      <div className="mb-2 flex items-center gap-1.5 min-w-0 pr-1">
+        <h3 className="text-xs sm:text-sm font-medium uppercase tracking-wide text-muted-foreground truncate">
+          {title}
+        </h3>
+        {meta?.hasNotes || notes ? (
+          <Target className="h-3.5 w-3.5 shrink-0 text-primary opacity-70" />
+        ) : null}
       </div>
 
       {/* Analysis error banner */}
       {analysisError && !isAnalyzing && (
-        <div className="flex items-center gap-1 mb-2 text-[10px] text-destructive">
-          <AlertCircle className="w-3 h-3 flex-shrink-0" />
+        <div className="mb-2 flex items-center gap-1 text-[10px] text-destructive">
+          <AlertCircle className="h-3 w-3 shrink-0" />
           <span className="truncate">{analysisError}</span>
         </div>
       )}
 
       {/* Loading overlay when analyzing */}
       {isAnalyzing && (
-        <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center z-10">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[2px]">
           <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-5 h-5 text-primary animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
             <span className="text-[10px] text-muted-foreground">
               Agent analyzing…
             </span>
@@ -179,31 +157,31 @@ export function CanvasSectionCard({
         freshness !== "unverified" ||
         (meta?.evidenceCount ?? 0) > 0 ||
         (meta?.gapCount ?? 0) > 0) && (
-        <div className="flex flex-wrap items-center gap-1 mb-2">
+        <div className="mb-2 flex flex-wrap items-center gap-1">
           {meta?.agentName && (
             <Badge
               variant="outline"
-              className="text-[10px] py-0 px-1.5 font-normal gap-0.5"
+              className="gap-0.5 px-1.5 py-0 text-[10px] font-normal"
             >
-              <Bot className="w-2.5 h-2.5" />
+              <Bot className="h-2.5 w-2.5" />
               {meta.agentName}
             </Badge>
           )}
           {confidence !== null && (
             <span
               className={cn(
-                "text-[10px] font-medium inline-flex items-center gap-0.5",
+                "inline-flex items-center gap-0.5 text-[10px] font-medium",
                 confidenceColor(confidence),
               )}
               title={`Confidence: ${Math.round(confidence * 100)}%`}
             >
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-current" />
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" />
               {confidenceLabel(confidence)}
             </span>
           )}
           <span
             className={cn(
-              "text-[10px] font-medium inline-flex items-center gap-0.5 px-1.5 py-0 rounded-full border",
+              "inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0 text-[10px] font-medium",
               freshnessCfg.className,
             )}
           >
@@ -211,19 +189,19 @@ export function CanvasSectionCard({
           </span>
           {(meta?.evidenceCount ?? 0) > 0 && (
             <span
-              className="text-[10px] font-medium inline-flex items-center gap-0.5 text-muted-foreground"
+              className="inline-flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground"
               title={`${meta?.evidenceCount} evidence items`}
             >
-              <FileCheck className="w-2.5 h-2.5" />
+              <FileCheck className="h-2.5 w-2.5" />
               {meta?.evidenceCount}
             </span>
           )}
           {(meta?.gapCount ?? 0) > 0 && (
             <span
-              className="text-[10px] font-medium inline-flex items-center gap-0.5 text-destructive"
+              className="inline-flex items-center gap-0.5 text-[10px] font-medium text-destructive"
               title={`${meta?.gapCount} open gaps`}
             >
-              <AlertTriangle className="w-2.5 h-2.5" />
+              <AlertTriangle className="h-2.5 w-2.5" />
               {meta?.gapCount}
             </span>
           )}
@@ -231,30 +209,51 @@ export function CanvasSectionCard({
       )}
 
       {/* Content: items preview */}
-      <div className="flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {items.length > 0 ? (
           <>
             <ul className="space-y-1.5">
               {previewItems.map((item, index) => (
                 <li key={index} className="flex items-start gap-1.5">
-                  <div className="h-1.5 w-1.5 bg-primary rounded-full mt-1.5 flex-shrink-0" />
-                  <span className="text-foreground/80 text-sm leading-snug line-clamp-2">
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  <span className="line-clamp-2 text-sm leading-snug text-foreground/80">
                     {item}
                   </span>
                 </li>
               ))}
             </ul>
             {remainingCount > 0 && (
-              <p className="text-xs text-muted-foreground mt-1.5 inline-flex items-center gap-0.5">
+              <p className="mt-1.5 inline-flex items-center gap-0.5 text-xs text-muted-foreground">
                 +{remainingCount} more
-                <ChevronRight className="w-3 h-3" />
+                <ChevronRight className="h-3 w-3" />
               </p>
             )}
           </>
         ) : (
-          <p className="text-sm text-muted-foreground italic">
+          <p className="text-sm italic text-muted-foreground">
             No data yet. Click to add.
           </p>
+        )}
+      </div>
+
+      {/* Analyze — bottom right */}
+      <div className="mt-auto flex justify-end pt-2">
+        {isAnalyzing ? (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Analyzing…
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={handleAnalyzeClick}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/5 hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title={`Analyze ${title}`}
+            aria-label={`Analyze ${title}`}
+          >
+            <Sparkles className="h-3 w-3" />
+            Analyze
+          </button>
         )}
       </div>
     </Card>

@@ -1,3 +1,4 @@
+export { CanvasGridFrame } from "./CanvasGridFrame";
 export { CanvasSectionCard } from "./CanvasSectionCard";
 export type {
   CanvasSectionCardProps,

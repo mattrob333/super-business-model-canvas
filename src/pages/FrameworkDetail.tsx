@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -112,17 +111,14 @@ const FrameworkDetail = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <div className="container max-w-4xl mx-auto px-4 py-8">
-          <Skeleton className="h-8 w-64 mb-8" />
-          <Card className="p-8">
-            <Skeleton className="h-12 w-3/4 mb-4" />
-            <Skeleton className="h-6 w-full mb-2" />
-            <Skeleton className="h-6 w-full mb-2" />
-            <Skeleton className="h-6 w-2/3" />
-          </Card>
-        </div>
+      <div className="max-w-4xl mx-auto">
+        <Skeleton className="h-8 w-64 mb-8" />
+        <Card className="p-8">
+          <Skeleton className="h-12 w-3/4 mb-4" />
+          <Skeleton className="h-6 w-full mb-2" />
+          <Skeleton className="h-6 w-full mb-2" />
+          <Skeleton className="h-6 w-2/3" />
+        </Card>
       </div>
     );
   }
@@ -130,10 +126,9 @@ const FrameworkDetail = () => {
   if (!framework) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-      <div className="border-b bg-muted/30">
-        <div className="container max-w-4xl mx-auto px-4 py-3">
+    <div>
+      <div className="-mx-6 -mt-6 border-b border-border bg-muted/30 px-6 py-3 mb-6">
+        <div className="max-w-4xl mx-auto">
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -155,7 +150,7 @@ const FrameworkDetail = () => {
           </Breadcrumb>
         </div>
       </div>
-      <div className="container max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto">
 
         <Card className="p-8 space-y-8">
           {/* Header */}

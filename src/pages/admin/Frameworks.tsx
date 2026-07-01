@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Search, Edit, Eye, Copy, Archive, Upload } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { FrameworkImportDialog } from '@/components/FrameworkImportDialog';
-import { Navigation } from '@/components/Navigation';
 
 interface Framework {
   id: string;
@@ -163,7 +162,7 @@ const AdminFrameworks = () => {
 
   if (authLoading || adminLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -175,22 +174,21 @@ const AdminFrameworks = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'draft': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'archived': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      case 'active': return 'bg-success/10 text-success border-success/20';
+      case 'draft': return 'bg-warning/10 text-warning border-warning/20';
+      case 'archived': return 'bg-muted text-muted-foreground border-border';
+      default: return 'bg-muted text-muted-foreground border-border';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <Navigation />
-      <div className="container mx-auto px-6 py-8 max-w-7xl">
+    <div>
+      <div className="max-w-7xl mx-auto">
         <div className="space-y-6">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h1 className="text-4xl font-bold tracking-tight">Framework Library</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Framework Library</h1>
               <p className="text-muted-foreground mt-2">Manage strategic analysis frameworks</p>
             </div>
             <div className="flex gap-2">

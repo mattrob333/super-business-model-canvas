@@ -60,7 +60,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
 
       {/* Section Header with Edit Button */}
       <div className="flex items-center justify-between gap-2">
-        <div className="label-tech text-muted-foreground">Business Overview — AI Drafted (Editable)</div>
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Business Overview — AI Drafted (Editable)</div>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button 
@@ -81,11 +81,8 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
 
       {/* Card Content */}
       <div 
-        className="card-mono cursor-pointer md:cursor-default 
-                   border border-white/[0.08] 
-                   shadow-[0_8px_24px_rgba(0,0,0,0.4)]
-                   hover:border-primary/50 hover:shadow-[0_10px_20px_rgba(0,0,0,0.35),0_0_20px_rgba(196,248,42,0.15)]
-                   transition-all duration-300"
+        className="bg-card border border-border rounded-xl p-6 sm:p-8 cursor-pointer md:cursor-default 
+                   hover:border-primary/30 transition-colors duration-200"
         onClick={() => window.innerWidth < 768 && setIsExpanded(!isExpanded)}
       >
         <div className="space-y-4 sm:space-y-6">
@@ -104,7 +101,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
           }`}>
             {/* Left Column: Key Facts */}
             <div className="space-y-4">
-              <h3 className="label-tech text-muted-foreground">Key Facts</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Key Facts</h3>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <Briefcase className="h-5 w-5 text-primary mt-0.5" />
@@ -132,7 +129,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
               {/* Key Leadership - Only when expanded */}
               {isExpanded && (
                 <div className="pt-4 space-y-3">
-                  <h3 className="label-tech text-muted-foreground">Key Leadership</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Key Leadership</h3>
                   <div className="space-y-2">
                     {data.keyExecutives.map((exec, index) => (
                       <div key={index} className="flex items-start gap-3 p-2 rounded-lg hover:bg-primary/5 transition-colors">
@@ -153,7 +150,7 @@ export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
 
             {/* Right Column: Products & Services */}
             <div className="space-y-4">
-              <h3 className="label-tech text-muted-foreground">Products & Services</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Products & Services</h3>
               <ul className="space-y-2">
                 {/* First 2 products - Always visible */}
                 {data.productsServices.slice(0, 2).map((item, index) => (

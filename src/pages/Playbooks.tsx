@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -346,15 +345,15 @@ const Playbooks = () => {
     return (
       <div className="text-xs text-muted-foreground pt-2 border-t">
         <span className="font-medium">Inputs from context: </span>
-        <span className={availability.valueProps ? "text-green-600" : ""}>
+        <span className={availability.valueProps ? "text-success" : ""}>
           Value Props {availability.valueProps ? "✓" : "•"}
         </span>
         {" "}
-        <span className={availability.icp ? "text-green-600" : ""}>
+        <span className={availability.icp ? "text-success" : ""}>
           ICP {availability.icp ? "✓" : "•"}
         </span>
         {" "}
-        <span className={availability.channels ? "text-green-600" : ""}>
+        <span className={availability.channels ? "text-success" : ""}>
           Channels {availability.channels ? "✓" : "•"}
         </span>
       </div>
@@ -445,13 +444,12 @@ const Playbooks = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-      <main className="container mx-auto px-4 py-8 max-w-7xl">
+    <div>
+      <main className="max-w-7xl mx-auto">
         {/* Hero Section - Centered */}
         <div className="mb-12">
           <div className="text-center mb-8">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 pb-2 text-primary tracking-tight">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-4 pb-2 text-foreground tracking-tight">
           Strategy Playbooks
         </h1>
             <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto font-light">
@@ -500,7 +498,7 @@ const Playbooks = () => {
               </p>
             )}
             {selectedAnalysis ? (
-              <div className="flex items-center justify-center gap-1.5 text-xs text-green-600 mt-1.5">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-success mt-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>Context loaded</span>
                 <span className="text-muted-foreground">•</span>
@@ -522,7 +520,7 @@ const Playbooks = () => {
             <label className="block text-sm font-medium text-muted-foreground text-center mb-2">
               Tell the Strategy Coach your goal
             </label>
-            <div className="relative border border-primary/90 rounded-xl bg-card p-5 sm:p-7 shadow-[0_0_60px_rgba(196,248,42,0.2),0_0_30px_rgba(196,248,42,0.15),0_4px_20px_rgba(0,0,0,0.5),inset_0_2px_8px_rgba(0,0,0,0.3),inset_0_0_20px_rgba(196,248,42,0.08)] hover:shadow-[0_0_80px_rgba(196,248,42,0.3),0_0_40px_rgba(196,248,42,0.2),0_8px_28px_rgba(0,0,0,0.6),inset_0_2px_8px_rgba(0,0,0,0.3),inset_0_0_24px_rgba(196,248,42,0.1)] focus-within:shadow-[0_0_80px_rgba(196,248,42,0.28),0_0_40px_rgba(196,248,42,0.18),0_4px_20px_rgba(0,0,0,0.5),inset_0_2px_8px_rgba(0,0,0,0.3),inset_0_0_24px_rgba(196,248,42,0.1)] transition-all duration-300">
+            <div className="relative border border-border rounded-xl bg-card p-5 sm:p-7 transition-colors duration-200 focus-within:border-primary/50">
               <Textarea 
                 value={goalInput}
                 onChange={(e) => setGoalInput(e.target.value)}
@@ -530,7 +528,7 @@ const Playbooks = () => {
                 className="min-h-[120px] sm:min-h-[150px] border-none bg-transparent resize-none focus-visible:ring-0 text-sm sm:text-base"
               />
               
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-4 pt-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-4 pt-3 border-t border-border">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center sm:justify-start">
                   <Sparkles className="h-4 w-4" />
                   <span className="text-xs sm:text-sm">AI Strategy Assistant</span>
@@ -538,7 +536,7 @@ const Playbooks = () => {
                 <Button 
                   onClick={handleStartChat}
                   disabled={!selectedAnalysis || !goalInput.trim()}
-                  className="w-full sm:w-auto min-h-[44px] hover:shadow-[0_0_20px_rgba(196,248,42,0.3)] transition-all duration-300"
+                  className="w-full sm:w-auto min-h-[44px]"
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
                   Start Strategy Session
@@ -558,7 +556,7 @@ const Playbooks = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => setGoalInput(chipText)}
-                  className="text-xs px-4 py-2 text-white hover:text-white border-primary/20 hover:border-primary hover:bg-primary/10 hover:shadow-[0_0_12px_rgba(196,248,42,0.2)] active:scale-95 transition-all duration-200"
+                  className="text-xs px-4 py-2 active:scale-95 transition-all duration-200"
                 >
                   {chipText}
                 </Button>
@@ -584,7 +582,7 @@ const Playbooks = () => {
                       setSelectedFramework(framework.id);
                       setShowFrameworkModal(true);
                     }}
-                    className="group cursor-pointer bg-gradient-to-b from-[#151515] to-[#0C0C0C] border border-white/[0.08] rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.4)] hover:border-primary hover:shadow-[0_8px_24px_rgba(0,0,0,0.5),0_0_20px_rgba(196,248,42,0.15)] hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 relative"
+                    className="group cursor-pointer hover:border-primary/40 hover:shadow-sm transition-all duration-200 relative"
                   >
                     <Badge 
                       variant="secondary" 
@@ -654,7 +652,7 @@ const Playbooks = () => {
         <div>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-semibold mb-2 tracking-wide" style={{ marginTop: '70px' }}>All Playbooks</h2>
+              <h2 className="text-2xl font-semibold mb-2 tracking-tight">All Playbooks</h2>
               <p className="text-muted-foreground font-light">Browse and select frameworks to run on your business</p>
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -681,7 +679,7 @@ const Playbooks = () => {
                     setSelectedFramework(framework.id);
                     setShowFrameworkModal(true);
                   }}
-                  className="group cursor-pointer bg-gradient-to-b from-[#151515] to-[#0C0C0C] border border-white/[0.08] rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.4)] hover:border-primary hover:shadow-[0_8px_24px_rgba(0,0,0,0.5),0_0_20px_rgba(196,248,42,0.15)] hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300"
+                  className="group cursor-pointer hover:border-primary/40 hover:shadow-sm transition-all duration-200"
                 >
                   <CardHeader>
                     <div className="flex items-start mb-3">

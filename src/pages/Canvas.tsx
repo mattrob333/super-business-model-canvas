@@ -5,11 +5,13 @@ import {
   type CanvasSectionMeta,
   type FreshnessStatus,
 } from "@/components/canvas/CanvasSectionCard";
+import { CanvasGridFrame } from "@/components/canvas/CanvasGridFrame";
 import {
   CANVAS_SECTION_KEYS,
   CANVAS_SECTION_LABELS,
   LEGACY_SECTION_KEYS,
   CANVAS_SECTION_AGENT_KEYS,
+  CANVAS_SECTION_GRID_PLACEMENT,
 } from "@/components/canvas/section-types";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { Button } from "@/components/ui/button";
@@ -56,13 +58,6 @@ interface LegacyCanvasData {
   costStructure_notes?: string;
   revenueStreams_notes?: string;
 }
-
-// Grid layout: which sections span 2 rows (taller) in the 5-column grid
-const TALL_SECTIONS = new Set([
-  "key_partners",
-  "value_propositions",
-  "customer_segments",
-]);
 
 // ─── Types for canvas_section_versions data ─────────────────────────────────
 
@@ -301,7 +296,7 @@ export default function Canvas() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
       {/* Page heading */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -399,46 +394,45 @@ export default function Canvas() {
       {/* Canvas grid — always show sections so users can run per-section analysis */}
       {(hasCanvasData || !versionsLoading) && (
         <>
-          {/* Top rows: 5-column grid with tall side sections */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 auto-rows-[200px]">
-            {CANVAS_SECTION_KEYS.slice(0, 7).map((sectionKey) => {
-              const isTall = TALL_SECTIONS.has(sectionKey);
-              return (
+          {/* The full canvas is wrapped in one bordered frame so the nine
+              sections read as a single unit. */}
+          <CanvasGridFrame>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 md:auto-rows-[200px]">
+              {CANVAS_SECTION_KEYS.slice(0, 7).map((sectionKey) => (
                 <CanvasSectionCard
                   key={sectionKey}
                   title={CANVAS_SECTION_LABELS[sectionKey]}
                   items={getSectionItems(sectionKey)}
                   notes={getSectionNotes(sectionKey)}
                   meta={sectionMetas[sectionKey]}
-                  span={isTall ? "col-span-1 row-span-2" : "col-span-1 row-span-1"}
-                  height="h-full"
+                  span={CANVAS_SECTION_GRID_PLACEMENT[sectionKey]}
+                  height="h-[200px] md:h-full"
                   onClick={() => navigate("/analyze")}
                   isAnalyzing={isSectionRunning(sectionKey)}
                   onAnalyze={() => void runSectionAnalysis(sectionKey)}
                   analysisError={getSectionError(sectionKey)}
                 />
-              );
-            })}
-          </div>
+              ))}
+            </div>
 
-          {/* Bottom row: Cost Structure + Revenue Streams (50/50) */}
-          <div className="flex flex-col md:flex-row gap-3">
-            {CANVAS_SECTION_KEYS.slice(7).map((sectionKey) => (
-              <CanvasSectionCard
-                key={sectionKey}
-                title={CANVAS_SECTION_LABELS[sectionKey]}
-                items={getSectionItems(sectionKey)}
-                notes={getSectionNotes(sectionKey)}
-                meta={sectionMetas[sectionKey]}
-                span="flex-1"
-                height="h-[200px]"
-                onClick={() => navigate("/analyze")}
-                isAnalyzing={isSectionRunning(sectionKey)}
-                onAnalyze={() => void runSectionAnalysis(sectionKey)}
-                analysisError={getSectionError(sectionKey)}
-              />
-            ))}
-          </div>
+            <div className="flex flex-col md:flex-row gap-3">
+              {CANVAS_SECTION_KEYS.slice(7).map((sectionKey) => (
+                <CanvasSectionCard
+                  key={sectionKey}
+                  title={CANVAS_SECTION_LABELS[sectionKey]}
+                  items={getSectionItems(sectionKey)}
+                  notes={getSectionNotes(sectionKey)}
+                  meta={sectionMetas[sectionKey]}
+                  span="flex-1"
+                  height="h-[200px]"
+                  onClick={() => navigate("/analyze")}
+                  isAnalyzing={isSectionRunning(sectionKey)}
+                  onAnalyze={() => void runSectionAnalysis(sectionKey)}
+                  analysisError={getSectionError(sectionKey)}
+                />
+              ))}
+            </div>
+          </CanvasGridFrame>
 
           {/* Info panel */}
           <Card>

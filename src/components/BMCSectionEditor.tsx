@@ -10,7 +10,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { getAccessToken, readGrokSseStream } from "@/lib/supabase-auth";
 
 const SECTION_ORDER: Record<string, number> = {
   "Value Propositions": 1,
@@ -111,6 +112,7 @@ export const BMCSectionEditor = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { session } = useAuth();
 
   // Generate Goals prompt
   const generateGoalsPrompt = `Based on our current ${section.title} content and strategic context, generate 3-5 SMART strategic goals in clean bullet-point format. Use this exact structure:
@@ -184,17 +186,14 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
     setIsLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
+      const accessToken = await getAccessToken(session);
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bmc-chat`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -217,65 +216,48 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
         throw new Error(errorData.error || "Failed to get response");
       }
 
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
       let assistantMessage = "";
+      await readGrokSseStream(response, (content) => {
+        assistantMessage += content;
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: assistantMessage,
+          };
+          return updated;
+        });
+      });
 
-      // Add placeholder for assistant message
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "" },
-      ]);
-
-      while (reader) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6).trim();
-            if (data === "[DONE]") continue;
-
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content;
-              if (content) {
-                assistantMessage += content;
-                // Update the last message with accumulated content
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = {
-                    role: "assistant",
-                    content: assistantMessage,
-                  };
-                  return updated;
-                });
-              }
-            } catch (e) {
-              // Ignore JSON parse errors for incomplete chunks
-              console.debug("Parse error:", e);
-            }
-          }
-        }
+      if (!assistantMessage.trim()) {
+        throw new Error("The assistant returned an empty response. Please try again.");
       }
     } catch (error) {
       console.error("Error sending message:", error);
+      const description =
+        error instanceof Error ? error.message : "Failed to send message. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description,
         variant: "destructive",
       });
-      const errorMessage: Message = {
-        role: "assistant",
-        content: "Sorry, I encountered an error. Please try again.",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => {
+        const withoutEmptyPlaceholder =
+          prev.length > 0 &&
+          prev[prev.length - 1].role === "assistant" &&
+          !prev[prev.length - 1].content
+            ? prev.slice(0, -1)
+            : prev;
+        return [
+          ...withoutEmptyPlaceholder,
+          {
+            role: "assistant",
+            content: "Sorry, I encountered an error. Please try again.",
+          },
+        ];
+      });
     } finally {
       setIsLoading(false);
     }
@@ -341,7 +323,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
       {/* Drawer */}
       <div 
-        className="fixed right-0 top-0 h-full w-full md:max-w-[66vw] bg-[#0a0a0a] border-l border-white/[0.12] z-50 flex animate-in slide-in-from-right duration-300"
+        className="fixed right-0 top-0 h-full w-full md:max-w-[66vw] bg-card border-l border-border z-50 flex animate-in slide-in-from-right duration-300"
         onWheel={(e) => e.stopPropagation()}
         onTouchStart={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
@@ -349,8 +331,8 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
         {/* Mobile Tabs Layout */}
           <div className="h-full w-full md:hidden flex flex-col overflow-hidden min-h-0">
             <Tabs defaultValue="edit" className="h-full w-full flex flex-col min-h-0">
-            <div className="border-b border-white/[0.12] px-6 pt-6 pb-4 flex items-center justify-between">
-              <TabsList className="bg-white/[0.05]">
+            <div className="border-b border-border px-6 pt-6 pb-4 flex items-center justify-between">
+              <TabsList>
                 <TabsTrigger value="edit">Edit</TabsTrigger>
                 <TabsTrigger value="chat">AI Chat</TabsTrigger>
               </TabsList>
@@ -359,7 +341,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   variant="ghost"
                   size="icon"
                   onClick={handleClearChat}
-                  className="hover:bg-white/[0.1] h-8 w-8"
+                  className="hover:bg-muted h-8 w-8"
                   title="Clear chat"
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -368,7 +350,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   variant="ghost"
                   size="icon"
                   onClick={() => onOpenChange(false)}
-                  className="hover:bg-white/[0.1]"
+                  className="hover:bg-muted"
                 >
                   <X className="h-5 w-5" />
                 </Button>
@@ -408,11 +390,11 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                       </TooltipProvider>
                     </div>
                     {editedItems.map((item, index) => (
-                      <div key={index} className="flex gap-2 pb-3 border-b border-white/[0.06] last:border-0">
+                      <div key={index} className="flex gap-2 pb-3 border-b border-border last:border-0">
                         <Input
                           value={item}
                           onChange={(e) => updateItem(index, e.target.value)}
-                          className="flex-1 bg-white/[0.05] border-white/[0.12]"
+                          className="flex-1"
                           placeholder={`Item ${index + 1}`}
                         />
                         <Button
@@ -428,7 +410,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   </div>
 
                   {/* Strategic Goals - Enhanced */}
-                  <div className="space-y-3 pt-6 mt-2 bg-white/[0.02] border-l-[3px] border-primary pl-4 pr-3 py-4 rounded-r-lg">
+                  <div className="space-y-3 pt-6 mt-2 bg-primary/5 border-l-[3px] border-primary pl-4 pr-3 py-4 rounded-r-lg">
                     {/* Header with Icon and Badge */}
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center mt-0.5">
@@ -466,14 +448,14 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="Set specific, measurable goals with clear timelines..."
-                      className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-white/[0.05] [&::-webkit-scrollbar-thumb]:bg-white/[0.2] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-white/[0.3]"
+                      className="min-h-[150px] focus:border-primary/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-muted-foreground/30"
                     />
                   </div>
                 </div>
               </ScrollArea>
 
               {/* Save Button */}
-              <div className="border-t border-white/[0.12] p-6">
+              <div className="border-t border-border p-6">
                 <p className="text-xs text-muted-foreground mb-2">All changes save to your Context File.</p>
                 <Button onClick={handleSave} className="w-full h-12 text-base font-medium" disabled={isSaving}>
                   <Save className="h-4 w-4 mr-2" />
@@ -495,7 +477,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                         className={`max-w-[85%] rounded-2xl p-6 relative ${
                           message.role === "user"
                             ? "bg-primary text-primary-foreground"
-                            : "bg-white/[0.06] border border-white/[0.12]"
+                            : "bg-muted border border-border"
                         }`}
                       >
                         <div className={
@@ -543,7 +525,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                             variant="ghost"
                             size="icon"
                             onClick={() => handleCopyMessage(message.content, index)}
-                            className="absolute bottom-2 right-2 h-8 w-8 hover:bg-white/[0.08]"
+                            className="absolute bottom-2 right-2 h-8 w-8 hover:bg-muted"
                           >
                             {copiedMessageIndex === index ? (
                               <Check className="h-4 w-4 text-primary" />
@@ -602,14 +584,14 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               )}
 
               {/* Input Area */}
-              <div className="border-t border-white/[0.12] p-4 flex-shrink-0">
+              <div className="border-t border-border p-4 flex-shrink-0">
                 <div className="relative">
                   <Input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Ask anything about refining this section—e.g., 'Make this sound more outcome-focused.'"
-                    className="w-full pr-12 bg-white/[0.05] border-white/[0.12] focus:border-primary"
+                    className="w-full pr-12"
                   />
                   <Button
                     onClick={() => handleSend()}
@@ -629,9 +611,9 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
         {/* Desktop Side-by-Side Layout */}
         {/* Left Panel - Edit Form */}
-        <div className="hidden md:flex md:w-[55%] border-r border-white/[0.15] flex-col">
+        <div className="hidden md:flex md:w-[55%] border-r border-border flex-col">
           {/* Header */}
-          <div className="border-b border-white/[0.12] p-6 h-[88px] flex items-center justify-between">
+          <div className="border-b border-border p-6 h-[88px] flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-xs uppercase tracking-wide text-primary font-medium mb-1">
                 {section.title}
@@ -665,11 +647,11 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   </TooltipProvider>
                 </div>
                 {editedItems.map((item, index) => (
-                  <div key={index} className="flex gap-2 pb-3 border-b border-white/[0.06] last:border-0">
+                  <div key={index} className="flex gap-2 pb-3 border-b border-border last:border-0">
                     <Input
                       value={item}
                       onChange={(e) => updateItem(index, e.target.value)}
-                      className="flex-1 bg-white/[0.05] border-white/[0.12]"
+                      className="flex-1"
                       placeholder={`Item ${index + 1}`}
                     />
                     <Button
@@ -685,7 +667,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
               </div>
 
               {/* Strategic Goals - Enhanced */}
-              <div className="space-y-3 pt-6 mt-2 bg-white/[0.02] border-l-[3px] border-primary pl-4 pr-3 py-4 rounded-r-lg">
+              <div className="space-y-3 pt-6 mt-2 bg-primary/5 border-l-[3px] border-primary pl-4 pr-3 py-4 rounded-r-lg">
                 {/* Header with Icon and Badge */}
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center mt-0.5">
@@ -723,14 +705,14 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Set specific, measurable goals with clear timelines..."
-                  className="min-h-[150px] bg-white/[0.05] border-white/[0.12] focus:border-primary/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-white/[0.05] [&::-webkit-scrollbar-thumb]:bg-white/[0.2] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-white/[0.3]"
+                  className="min-h-[150px] focus:border-primary/50 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-muted-foreground/30"
                 />
               </div>
             </div>
           </ScrollArea>
 
           {/* Save Button */}
-          <div className="border-t border-white/[0.12] p-6 h-[88px] flex flex-col justify-center">
+          <div className="border-t border-border p-6 h-[88px] flex flex-col justify-center">
             <p className="text-xs text-muted-foreground mb-2">All changes save to your Context File.</p>
             <Button onClick={handleSave} className="w-full h-12 text-base font-medium" disabled={isSaving}>
               <Save className="h-4 w-4 mr-2" />
@@ -752,7 +734,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                 variant="ghost"
                 size="icon"
                 onClick={handleClearChat}
-                className="hover:bg-white/[0.1]"
+                className="hover:bg-muted"
                 title="Clear chat"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -761,7 +743,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                 variant="ghost"
                 size="icon"
                 onClick={() => onOpenChange(false)}
-                className="hover:bg-white/[0.1]"
+                className="hover:bg-muted"
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -780,7 +762,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                     className={`max-w-[85%] rounded-2xl p-6 relative ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
-                        : "bg-white/[0.06] border border-white/[0.12]"
+                        : "bg-muted border border-border"
                     }`}
                   >
                     <div className={
@@ -828,7 +810,7 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
                         variant="ghost"
                         size="icon"
                         onClick={() => handleCopyMessage(message.content, index)}
-                        className="absolute bottom-2 right-2 h-8 w-8 hover:bg-white/[0.08]"
+                        className="absolute bottom-2 right-2 h-8 w-8 hover:bg-muted"
                       >
                         {copiedMessageIndex === index ? (
                           <Check className="h-4 w-4 text-primary" />
@@ -887,14 +869,14 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
           )}
 
           {/* Input Area */}
-          <div className="border-t border-white/[0.12] p-6 h-[88px] flex flex-col justify-center">
+          <div className="border-t border-border p-6 h-[88px] flex flex-col justify-center">
             <div className="flex gap-3">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Ask anything about refining this section—e.g., 'Make this sound more outcome-focused.'"
-                className="flex-1 bg-white/[0.05] border-white/[0.12] focus:border-primary"
+                className="flex-1"
               />
               <Button
                 onClick={() => handleSend()}

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
-import { LoadingState } from "@/components/LoadingState";
 import { BusinessOverview } from "@/components/BusinessOverview";
 import { EnterpriseBusinessModelCanvas } from "@/components/canvas/EnterpriseBusinessModelCanvas";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
@@ -13,12 +12,30 @@ import { FloatingCTA } from "@/components/FloatingCTA";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { setActiveWorkspaceName } from "@/lib/active-workspace";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Save, Search, ChevronUp, ArrowRight, Loader2 } from "lucide-react";
-import { Navigation } from "@/components/Navigation";
+import { Copy, Check, Save, Search, ChevronUp, ArrowRight, Loader2, Sparkles } from "lucide-react";
 import { Card as UICard, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import logo from "@/assets/logo_2.png";
+
+function syncWorkspaceFromAnalysis(data: { company?: { name?: string } } | null) {
+  const name = data?.company?.name?.trim();
+  if (name) {
+    setActiveWorkspaceName(name);
+  }
+}
+
+function domainLabelFromUrl(url: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./i, "");
+    const base = hostname.split(".")[0] ?? hostname;
+    return base.charAt(0).toUpperCase() + base.slice(1);
+  } catch {
+    return url;
+  }
+}
 
 const Analysis = () => {
   const navigate = useNavigate();
@@ -37,6 +54,7 @@ const Analysis = () => {
   const [reviewedSections, setReviewedSections] = useState(0);
   const [showPlaybooksCTA, setShowPlaybooksCTA] = useState(false);
   const [bmcEditorOpen, setBmcEditorOpen] = useState(false);
+  const [analyzingLabel, setAnalyzingLabel] = useState<string | undefined>();
   const resultsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -75,10 +93,12 @@ const Analysis = () => {
     const loadedAnalysis = sessionStorage.getItem('loadedAnalysis');
     if (loadedAnalysis) {
       try {
-        setAnalysisData(JSON.parse(loadedAnalysis));
+        const parsed = JSON.parse(loadedAnalysis);
+        setAnalysisData(parsed);
         setHasAnalyzed(true);
         setIsNewAnalysis(false);
         setSearchCollapsed(true);
+        syncWorkspaceFromAnalysis(parsed);
         sessionStorage.removeItem('loadedAnalysis');
         // Ensure page starts at the top
         window.scrollTo({ top: 0, behavior: 'auto' });
@@ -103,6 +123,7 @@ const Analysis = () => {
 
   const handleAnalyze = async (url: string) => {
     setIsLoading(true);
+    setAnalyzingLabel(domainLabelFromUrl(url));
     setHasAnalyzed(false);
     setReviewedSections(0);
     setShowPlaybooksCTA(false);
@@ -116,6 +137,7 @@ const Analysis = () => {
 
       if (data) {
         setAnalysisData(data);
+        syncWorkspaceFromAnalysis(data);
         setHasAnalyzed(true);
         setIsNewAnalysis(true);
         setSearchCollapsed(true);
@@ -131,13 +153,33 @@ const Analysis = () => {
       }
     } catch (error: any) {
       console.error('Analysis error:', error);
+
+      // supabase.functions.invoke wraps any non-2xx response in a generic
+      // "Edge Function returned a non-2xx status code" message and stashes the
+      // real response on error.context. Dig it out so the user (and we) can see
+      // the actual reason the AI backend failed (e.g. missing API key, auth).
+      let description = "Failed to analyze company. Please try again.";
+      try {
+        const ctx = error?.context;
+        if (ctx && typeof ctx.json === "function") {
+          const body = await ctx.clone().json().catch(() => null);
+          description =
+            body?.error || body?.details || error?.message || description;
+        } else if (error?.message) {
+          description = error.message;
+        }
+      } catch {
+        if (error?.message) description = error.message;
+      }
+
       toast({
         title: "Analysis Failed",
-        description: error.message || "Failed to analyze company. Please try again.",
+        description,
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
+      setAnalyzingLabel(undefined);
     }
   };
 
@@ -148,6 +190,7 @@ const Analysis = () => {
     };
     
     setAnalysisData(newAnalysisData);
+    syncWorkspaceFromAnalysis(newAnalysisData);
     
     // Mark section as reviewed
     setReviewedSections(prev => prev + 1);
@@ -512,20 +555,9 @@ Website: ${comp.website || 'N/A'}
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-
-      {/* Tagline */}
-      <div className="bg-background">
-        <div className="container mx-auto px-4 md:px-6 pt-6 pb-3">
-          <p className="text-muted-foreground font-montserrat font-light text-xs sm:text-sm md:text-base tracking-wide">
-            AI-Powered Strategic Business Analysis
-          </p>
-        </div>
-      </div>
-
+    <div>
       {/* Main Content */}
-      <main className="container mx-auto px-3 sm:px-6 py-4 sm:py-8 md:py-12 space-y-4 sm:space-y-8 md:space-y-12">
+      <main className="space-y-4 sm:space-y-8 md:space-y-12">
         
         {/* Copy Button - Top Right Corner */}
         {hasAnalyzed && !isLoading && analysisData && (
@@ -543,47 +575,82 @@ Website: ${comp.website || 'N/A'}
           </div>
         )}
         
-        {/* Input Section */}
+        {/* Input Section — on the initial (pre-analysis) view this hero is
+            vertically centered on the screen for a more premium feel. Once
+            results exist it sits at the top of the page as a normal block. */}
         {!searchCollapsed && (
-          <section className="pt-0 md:pt-4 animate-in fade-in slide-in-from-top duration-300">
-          <div className="w-full max-w-7xl mx-auto">
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-1 text-center">
-                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight">Build Your Business Source of Truth</h2>
-                  <p className="text-muted-foreground text-sm sm:text-base max-w-3xl mx-auto px-4 sm:px-0">
-                    Turn any company website into a complete <strong>AI-ready business profile.</strong> The AI gathers data, you verify it, and your business model becomes interactive across strategy frameworks.
+          <section
+            className={cn(
+              "animate-in fade-in slide-in-from-top duration-300",
+              !hasAnalyzed && !isLoading
+                ? "flex min-h-[calc(100vh-11rem)] flex-col justify-center"
+                : "pt-0 md:pt-4",
+            )}
+          >
+            <div className="mx-auto w-full max-w-xl">
+              <div className="space-y-8 md:space-y-10">
+                <div className="space-y-5 text-center">
+                  {!isLoading && (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+                      <Sparkles className="h-3 w-3" />
+                      AI-powered strategic analysis
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                      {isLoading
+                        ? "Researching your company"
+                        : "Build your business source of truth"}
+                    </h1>
+                    <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
+                      {isLoading
+                        ? `Gathering public data about ${analyzingLabel ?? "this company"}. Hang tight — this usually takes under a minute.`
+                        : "Turn any company website into an AI-ready business profile. You verify the facts; we power the frameworks."}
+                    </p>
+                  </div>
+                </div>
+
+                {!isLoading && <ProcessSteps />}
+
+                <UrlInput
+                  onAnalyze={handleAnalyze}
+                  isLoading={isLoading}
+                  companyName={analyzingLabel ?? analysisData?.company?.name}
+                />
+
+                {!hasAnalyzed && !isLoading && recentAnalyses.length === 0 && (
+                  <p className="text-center text-xs text-muted-foreground/60">
+                    No contexts yet — enter a URL above to create your first
+                    business model.
                   </p>
-                </div>
-                <ProcessSteps />
+                )}
+
+                {/* Collapse button when results exist */}
+                {hasAnalyzed && analysisData && !isLoading && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      onClick={handleSearchToggle}
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                      <span>Collapse and view results</span>
+                    </Button>
+                  </div>
+                )}
               </div>
-              <UrlInput onAnalyze={handleAnalyze} isLoading={isLoading} />
-              
-              {/* Collapse button when results exist */}
-              {hasAnalyzed && analysisData && !isLoading && (
-                <div className="flex justify-center pt-2">
-                  <Button
-                    onClick={handleSearchToggle}
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                    <span>Collapse and view results</span>
-                  </Button>
-                </div>
-              )}
             </div>
-          </div>
-        </section>
+          </section>
         )}
 
-        {/* Recent Analyses / Empty State Section */}
-        {!searchCollapsed && !hasAnalyzed && !isLoading && (
-          recentAnalyses.length > 0 ? (
+        {/* Saved Contexts — only shown when the user has previous analyses.
+            The no-contexts empty state now lives inline in the hero above. */}
+        {!searchCollapsed && !hasAnalyzed && !isLoading && recentAnalyses.length > 0 && (
           <section className="w-full max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h2 className="text-2xl font-semibold text-white mb-2">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-foreground mb-1">
                 Your Saved Contexts
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -591,26 +658,25 @@ Website: ${comp.website || 'N/A'}
               </p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {recentAnalyses.map((analysis) => (
             <button
               key={analysis.id}
               onClick={() => {
                 setAnalysisData(analysis.analysis_data);
+                syncWorkspaceFromAnalysis(analysis.analysis_data);
                 setHasAnalyzed(true);
                 setIsNewAnalysis(false);
                 setSearchCollapsed(true);
               }}
-              className="group cursor-pointer bg-gradient-to-b from-[#151515] to-[#0C0C0C] border border-white/[0.08] rounded-xl 
-                         shadow-[0_4px_12px_rgba(0,0,0,0.4)]
-                         hover:border-primary hover:shadow-[0_8px_24px_rgba(0,0,0,0.5),0_0_20px_rgba(196,248,42,0.15)] 
-                         hover:-translate-y-1 hover:scale-[1.02]
-                         transition-all duration-300
+              className="group cursor-pointer bg-card border border-border rounded-xl
+                         hover:border-primary/40 hover:shadow-sm
+                         transition-colors duration-200
                          text-left h-36 flex flex-col p-6 focus-visible:ring-2 focus-visible:ring-ring"
             >
                   <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <Search className="h-6 w-6 text-primary" />
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Search className="h-5 w-5 text-primary" />
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {new Date(analysis.created_at).toLocaleDateString('en-US', { 
@@ -620,7 +686,7 @@ Website: ${comp.website || 'N/A'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white group-hover:text-primary transition-colors">
+                    <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">
                       {analysis.company_name}
                     </h3>
                     <span className="text-sm text-primary font-medium whitespace-nowrap ml-4">View Context</span>
@@ -629,37 +695,9 @@ Website: ${comp.website || 'N/A'}
               ))}
             </div>
           </section>
-          ) : (
-            <section className="w-full max-w-2xl mx-auto text-center py-12">
-              <div className="card-mono p-12">
-                <Search className="w-16 h-16 text-primary mx-auto mb-6 opacity-50" />
-                <h3 className="text-xl font-semibold text-white mb-3">
-                  No contexts yet.
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  Paste a company URL to create your first AI-powered business model.
-                </p>
-                <Button
-                  onClick={() => {
-                    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-                    input?.focus();
-                  }}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full font-semibold uppercase tracking-tech px-8"
-                >
-                  GENERATE CONTEXT
-                </Button>
-              </div>
-            </section>
-          )
         )}
 
         {/* Results Section */}
-        {isLoading && (
-          <section className="animate-in fade-in duration-500">
-            <LoadingState companyName={analysisData?.company?.name} />
-          </section>
-        )}
-
         {hasAnalyzed && !isLoading && analysisData && (
           <div ref={resultsRef} className="space-y-4 sm:space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
             {/* Success Banner - Only show for new analyses */}
@@ -671,12 +709,6 @@ Website: ${comp.website || 'N/A'}
 
             
             <section className="relative">
-              {/* Ambient glow layer - beneath Business Overview */}
-              <div className="absolute inset-0 rounded-2xl
-                              shadow-[0_0_45px_rgba(196,248,42,0.20),0_0_25px_rgba(196,248,42,0.14),0_8px_24px_rgba(0,0,0,0.3)] 
-                              pointer-events-none -z-10" 
-                   style={{ transform: 'scale(1.02)' }} 
-              />
               <BusinessOverview
                 data={{
                   name: analysisData.company?.name || "Unknown Company",
@@ -696,12 +728,6 @@ Website: ${comp.website || 'N/A'}
             </section>
 
             <section className="w-full max-w-7xl mx-auto relative">
-              {/* Unified soft light beneath Canvas grid */}
-              <div className="absolute inset-0 rounded-2xl opacity-80
-                              shadow-[0_0_35px_rgba(196,248,42,0.14),0_0_18px_rgba(196,248,42,0.10)]
-                              pointer-events-none -z-10"
-                   style={{ transform: 'scale(1.015)' }}
-              />
               <EnterpriseBusinessModelCanvas
                 data={{
                   keyPartners: Array.isArray(analysisData.canvas?.keyPartners) ? analysisData.canvas.keyPartners : [],
@@ -737,12 +763,6 @@ Website: ${comp.website || 'N/A'}
             </section>
 
             <section className="w-full max-w-7xl mx-auto relative">
-              {/* Faint ambient glow beneath competitor cards */}
-              <div className="absolute inset-0 rounded-2xl opacity-70
-                              shadow-[0_0_30px_rgba(196,248,42,0.12),0_0_15px_rgba(196,248,42,0.08)]
-                              pointer-events-none -z-10"
-                   style={{ transform: 'scale(1.01)' }}
-              />
               <CompetitiveLandscape
                 competitors={Array.isArray(analysisData.similarCompanies) ? analysisData.similarCompanies : []} 
                 onSimilarCompanyChat={handleSimilarCompanyChat}
@@ -760,7 +780,7 @@ Website: ${comp.website || 'N/A'}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/[0.12] mt-24">
+      <footer className="border-t border-border mt-24">
         <div className="container mx-auto px-6 py-8">
           <div className="flex flex-col items-center gap-4">
             <a 

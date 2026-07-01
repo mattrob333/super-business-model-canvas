@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Handlebars from 'https://esm.sh/handlebars@4.7.8';
+import { callChatCompletion, resolveFrameworkModel } from '../_shared/llm-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -150,36 +151,16 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
 
     console.log('Generating report with AI...');
     console.log('Needs JSON output:', needsJsonOutput);
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    const aiModel = framework.ai_model || 'google/gemini-2.5-flash';
-    
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: aiModel,
-        messages: [
-          { role: 'user', content: fullPrompt }
-        ],
-        temperature: framework.temperature || 0.7,
-        max_tokens: framework.max_tokens || 4000,
-      }),
-    });
+    const { provider, model } = resolveFrameworkModel(framework.ai_model);
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      return new Response(
-        JSON.stringify({ error: 'AI service unavailable' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const aiData = await aiResponse.json();
-    let reportContent = aiData.choices[0].message.content;
+    let reportContent: string;
+    ({ text: reportContent } = await callChatCompletion({
+      modelProvider: provider,
+      model,
+      messages: [{ role: 'user', content: fullPrompt }],
+      temperature: framework.temperature || 0.7,
+      maxTokens: framework.max_tokens || 4000,
+    }));
     
     console.log('AI Response received, length:', reportContent.length);
     console.log('First 200 chars:', reportContent.substring(0, 200));

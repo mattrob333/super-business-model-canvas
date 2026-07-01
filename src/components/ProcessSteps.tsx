@@ -1,80 +1,63 @@
-import { Search, Edit, Repeat } from "lucide-react";
-import { ArrowRight } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-export const ProcessSteps = () => {
+const STEPS = [
+  {
+    label: "AI Research",
+    detail: "~60 sec",
+    tip: "We gather and summarize public data about the company.",
+  },
+  {
+    label: "You Refine",
+    detail: "5–10 min",
+    tip: "Review and edit for accuracy — these become your verified facts.",
+  },
+  {
+    label: "Reuse Forever",
+    detail: "Playbooks",
+    tip: "Your Context File powers strategy frameworks and reports.",
+  },
+] as const;
+
+export function ProcessSteps() {
   return (
-    <TooltipProvider>
-      <div className="flex flex-row items-center justify-center gap-3 sm:gap-6 md:gap-8 mb-6 md:mb-8 px-4 overflow-x-auto">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <ProcessStep 
-                icon={<Search className="w-8 h-8 sm:w-10 md:w-12" />}
-                label="AI Research"
-                sublabel="60 seconds"
-              />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>We'll fetch and summarize public data about the company.</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0 mb-8 sm:mb-10 md:mb-12" />
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <ProcessStep 
-                icon={<Edit className="w-8 h-8 sm:w-10 md:w-12" />}
-                label="You Refine"
-                sublabel="5-10 minutes"
-              />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Review and edit for accuracy — these become your verified facts.</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <ArrowRight className="w-4 h-4 sm:w-5 md:w-6 text-muted-foreground flex-shrink-0 mb-8 sm:mb-10 md:mb-12" />
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <ProcessStep 
-                icon={<Repeat className="w-8 h-8 sm:w-10 md:w-12" />}
-                label="Reuse Forever"
-                sublabel="Apply frameworks"
-              />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Your Context File powers strategy playbooks and reports.</p>
-          </TooltipContent>
-        </Tooltip>
+    <TooltipProvider delayDuration={200}>
+      <div className="mx-auto w-full max-w-md">
+        <div className="relative flex items-start justify-between">
+          {/* Connector line behind step circles */}
+          <div
+            className="absolute left-[16%] right-[16%] top-4 h-px bg-border"
+            aria-hidden="true"
+          />
+
+          {STEPS.map((step, index) => (
+            <Tooltip key={step.label}>
+              <TooltipTrigger asChild>
+                <div className="relative z-10 flex w-[30%] cursor-default flex-col items-center gap-2 text-center">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold text-muted-foreground shadow-sm transition-colors hover:border-primary/40 hover:text-primary">
+                    {index + 1}
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-medium text-foreground sm:text-sm">
+                      {step.label}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground sm:text-xs">
+                      {step.detail}
+                    </p>
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="max-w-[200px] text-xs">{step.tip}</p>
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
       </div>
     </TooltipProvider>
   );
-};
-
-interface ProcessStepProps {
-  icon: React.ReactNode;
-  label: string;
-  sublabel: string;
 }
-
-const ProcessStep = ({ icon, label, sublabel }: ProcessStepProps) => {
-  return (
-    <div className="flex flex-col items-center gap-1 sm:gap-2 text-center flex-shrink-0">
-      <div className="w-10 h-10 sm:w-12 md:w-14 sm:h-12 md:h-14 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-        {icon}
-      </div>
-      <div>
-        <div className="font-semibold text-foreground text-xs sm:text-sm md:text-base">{label}</div>
-        <div className="text-[10px] sm:text-xs text-muted-foreground">{sublabel}</div>
-      </div>
-    </div>
-  );
-};

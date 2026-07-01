@@ -1,4 +1,24 @@
-{
+-- =============================================================================
+-- SEED: default strategy frameworks ("skills")
+-- =============================================================================
+-- Run this AFTER supabase/schema.sql. It loads the 10 default frameworks
+-- (SWOT, Porter's Five Forces, BMC, PESTLE, Ansoff, McKinsey 7S, Value Chain,
+-- BCG, Balanced Scorecard, Blue Ocean) as active, playbook-visible skills.
+--
+-- The framework definitions live in src/data/initial-frameworks.json and are
+-- embedded below verbatim inside a Postgres dollar-quoted block ($seed_json$).
+-- Dollar-quoting lets us paste raw HTML/CSS/JSON without any escaping, and the
+-- INSERT expands the JSON array into rows with jsonb_array_elements.
+--
+-- To regenerate this file from the JSON source, run:
+--   node scripts/generate-framework-seed.mjs
+--
+-- Idempotent: re-running does nothing for frameworks that already exist
+-- (matched on the unique "shortcut").
+-- =============================================================================
+
+with seed(doc) as (
+  values ($seed_json${
   "frameworks": [
     {
       "title": "SWOT Analysis",
@@ -249,4 +269,37 @@
       "temperature": 0.7
     }
   ]
-}
+}$seed_json$::jsonb)
+)
+insert into public.frameworks (
+  title, shortcut, description, category, tags, when_to_use, icon,
+  stages, departments, goal_alignment, ai_model, system_prompt,
+  analysis_prompt, output_template, custom_css, response_schema,
+  estimated_time, max_tokens, temperature, validate_json,
+  status, show_in_playbooks
+)
+select
+  f->>'title',
+  f->>'shortcut',
+  f->>'description',
+  f->>'category',
+  array(select jsonb_array_elements_text(coalesce(f->'tags', '[]'::jsonb))),
+  f->>'when_to_use',
+  f->>'icon',
+  array(select jsonb_array_elements_text(coalesce(f->'stages', '[]'::jsonb))),
+  array(select jsonb_array_elements_text(coalesce(f->'departments', '[]'::jsonb))),
+  array(select jsonb_array_elements_text(coalesce(f->'goal_alignment', '[]'::jsonb))),
+  coalesce(f->>'ai_model', 'google/gemini-2.5-flash'),
+  f->>'system_prompt',
+  f->>'analysis_prompt',
+  f->>'output_template',
+  f->>'custom_css',
+  case when f ? 'response_schema' then f->'response_schema' else null end,
+  coalesce((f->>'estimated_time')::int, 15),
+  coalesce((f->>'max_tokens')::int, 4000),
+  coalesce((f->>'temperature')::numeric, 0.7),
+  coalesce((f->>'validate_json')::boolean, true),
+  'active',
+  true
+from seed, jsonb_array_elements(seed.doc->'frameworks') as f
+on conflict (shortcut) do nothing;

@@ -1,4 +1,8 @@
 import { callGrokChat } from "../_shared/grok-client.ts";
+import {
+  XAI_RESEARCH_MODEL,
+  XAI_RESEARCH_REASONING,
+} from "../_shared/xai-models.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,6 +43,9 @@ Deno.serve(async (req) => {
     console.log('Calling Grok API for competitive research...');
 
     const researchData = await callGrokChat({
+      model: XAI_RESEARCH_MODEL,
+      reasoning_effort: XAI_RESEARCH_REASONING,
+      webSearch: true,
       messages: [
         {
           role: 'system',
@@ -49,10 +56,6 @@ Deno.serve(async (req) => {
           content: prompt
         }
       ],
-      search_parameters: {
-        mode: 'on',
-        return_citations: false
-      },
       temperature: 0.2,
       maxTokens: 1000,
     });

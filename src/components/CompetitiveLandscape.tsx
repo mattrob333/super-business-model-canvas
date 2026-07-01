@@ -25,17 +25,14 @@ export const CompetitiveLandscape = ({ competitors, onSimilarCompanyChat }: Comp
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {competitors.map((competitor, index) => (
-            <div key={index} className="relative p-6 border border-white/[0.08] rounded-lg 
-                                            bg-gradient-to-b from-[#161616] to-[#0B0B0B]
-                                            shadow-[0_8px_16px_rgba(0,0,0,0.25)]
-                                            hover:border-primary/50 hover:shadow-[0_10px_20px_rgba(0,0,0,0.35),0_0_20px_rgba(196,248,42,0.15)]
-                                            transition-all duration-300">
+            <div key={index} className="relative p-6 border border-border rounded-lg bg-card
+                                            hover:border-primary/40 transition-colors duration-200">
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 bg-primary rounded-full" />
-                      <span className="label-tech text-primary">Company {index + 1}</span>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-primary">Company {index + 1}</span>
                     </div>
                     <h3 className="text-xl font-semibold">{competitor.name}</h3>
                   </div>

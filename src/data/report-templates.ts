@@ -5,9 +5,45 @@ export interface FrameworkTemplate {
   cssStyles: string;
 }
 
+// Shared "boardroom report" foundation: consistent light/print-safe typography,
+// spacing, and brand navy accent applied to every generated report (all
+// frameworks whose output wraps content in `.framework-report`, plus the
+// standalone report-template containers below). Framework-specific stylesheets
+// only need to define their own grid/quadrant/badge rules on top of this.
+export const BASE_REPORT_STYLES = `
+  .framework-report, .swot-container, .porters-container, .ai-audit-container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px;
+    background: #ffffff;
+    color: #334155;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.6;
+    border-radius: 8px;
+  }
+  .framework-report h1, .swot-container h1, .porters-container h1, .ai-audit-container h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+  }
+  .framework-report h2, .swot-container h2, .porters-container h2, .ai-audit-container h2 {
+    font-size: 18px;
+    font-weight: 500;
+    color: #64748b;
+    margin-bottom: 24px;
+  }
+  .framework-report h3 { font-size: 17px; font-weight: 600; color: #1a5490; margin-bottom: 12px; }
+  .framework-report h4 { font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 8px; }
+  .framework-report p { color: #334155; }
+  @media print {
+    .framework-report, .swot-container, .porters-container, .ai-audit-container { padding: 20px; }
+  }
+`;
+
 export const SWOT_STYLES = `
-  .swot-container { max-width: 900px; margin: 0 auto; padding: 32px; background: #ffffff; border-radius: 8px; }
-  .swot-container h1 { font-size: 28px; font-weight: bold; margin-bottom: 24px; color: #1e293b; }
+  ${BASE_REPORT_STYLES}
   .swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
   .quadrant { padding: 24px; border-radius: 8px; border: 2px solid; }
   .quadrant h3 { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
@@ -32,11 +68,10 @@ export const SWOT_STYLES = `
 `;
 
 export const PORTERS_STYLES = `
-  .porters-container { max-width: 1000px; margin: 0 auto; padding: 32px; background: #ffffff; border-radius: 8px; }
-  .porters-container h1 { font-size: 28px; font-weight: bold; margin-bottom: 24px; color: #1e293b; }
+  ${BASE_REPORT_STYLES}
   .porters-diagram { display: grid; grid-template-columns: 1fr 2fr 1fr; grid-template-rows: 1fr 2fr 1fr; gap: 16px; margin-top: 24px; }
   .force-card { padding: 20px; border-radius: 8px; border: 2px solid #e2e8f0; background: #ffffff; }
-  .force-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #3b82f6; }
+  .force-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #1a5490; }
   .force-card p { margin-bottom: 12px; line-height: 1.6; color: #334155; }
   .force-card .rating { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 14px; font-weight: 600; }
   .rating-high { background: #fee2e2; color: #b91c1c; }
@@ -46,7 +81,7 @@ export const PORTERS_STYLES = `
   .buyer-power { grid-column: 2; grid-row: 3; }
   .new-entrants { grid-column: 1; grid-row: 2; }
   .substitutes { grid-column: 3; grid-row: 2; }
-  .rivalry { grid-column: 2; grid-row: 2; background: #dbeafe; border-color: #3b82f6; }
+  .rivalry { grid-column: 2; grid-row: 2; background: #eef4fa; border-color: #1a5490; }
   @media (max-width: 768px) {
     .porters-diagram { grid-template-columns: 1fr; grid-template-rows: auto; }
     .supplier-power, .buyer-power, .new-entrants, .substitutes, .rivalry { grid-column: 1; grid-row: auto; }
@@ -54,13 +89,12 @@ export const PORTERS_STYLES = `
 `;
 
 export const AI_AUDIT_STYLES = `
-  .ai-audit-container { max-width: 950px; margin: 0 auto; padding: 32px; font-family: system-ui, -apple-system, sans-serif; background: #ffffff; border-radius: 8px; }
-  .ai-audit-container h1 { font-size: 28px; font-weight: bold; margin-bottom: 24px; color: #1e293b; }
+  ${BASE_REPORT_STYLES}
   .ai-audit-container h2 { font-size: 22px; font-weight: 600; margin: 32px 0 16px 0; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
-  .executive-summary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 12px; margin-bottom: 32px; }
+  .executive-summary { background: #1a5490; color: white; padding: 24px; border-radius: 12px; margin-bottom: 32px; }
   .executive-summary h2 { color: white; border-bottom: 2px solid rgba(255,255,255,0.3); margin-top: 0; }
   .summary-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin: 20px 0; }
-  .stat-card { background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); padding: 20px; border-radius: 8px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.2); }
+  .stat-card { background: rgba(255, 255, 255, 0.15); padding: 20px; border-radius: 8px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.2); }
   .stat-value { display: block; font-size: 32px; font-weight: bold; margin-bottom: 8px; }
   .stat-label { display: block; font-size: 14px; opacity: 0.9; }
   .summary-text { line-height: 1.6; margin-top: 16px; font-size: 15px; }

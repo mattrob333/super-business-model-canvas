@@ -5,12 +5,40 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+function createSafeAuthStorage() {
+  const memory = new Map<string, string>();
+
+  const memoryStorage = {
+    getItem: (key: string) => memory.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      memory.set(key, value);
+    },
+    removeItem: (key: string) => {
+      memory.delete(key);
+    },
+  };
+
+  if (typeof window === "undefined") {
+    return memoryStorage;
+  }
+
+  try {
+    const probeKey = "__supabase_storage_probe__";
+    window.localStorage.setItem(probeKey, "1");
+    window.localStorage.removeItem(probeKey);
+    return window.localStorage;
+  } catch {
+    console.warn("localStorage unavailable — using in-memory auth storage for this tab");
+    return memoryStorage;
+  }
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    storage: createSafeAuthStorage(),
     persistSession: true,
     autoRefreshToken: true,
   }

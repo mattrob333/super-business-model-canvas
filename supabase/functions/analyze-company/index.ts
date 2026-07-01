@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { streamGrokChat } from "../_shared/grok-client.ts";
+import { callGrokChat } from "../_shared/grok-client.ts";
+import {
+  XAI_RESEARCH_MODEL,
+  XAI_RESEARCH_REASONING,
+} from "../_shared/xai-models.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -124,7 +128,11 @@ Return in this exact JSON format:
   ]
 }`;
 
-        const analysisText = await streamGrokChat({
+        const analysisText = await callGrokChat({
+          model: XAI_RESEARCH_MODEL,
+          reasoning_effort: XAI_RESEARCH_REASONING,
+          webSearch: true,
+          maxTurns: 15,
           messages: [
             {
               role: 'system',
@@ -135,10 +143,6 @@ Return in this exact JSON format:
               content: analysisPrompt
             }
           ],
-        search_parameters: {
-          mode: 'on',
-          return_citations: false
-        },
           temperature: 0.3,
           maxTokens: 4000,
         });

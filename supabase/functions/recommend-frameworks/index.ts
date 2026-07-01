@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { callChatCompletion } from '../_shared/llm-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,7 +36,6 @@ Deno.serve(async (req) => {
 
     const { company_id, company_name, goal_input } = await req.json();
 
-    // Fetch business context
     const { data: analysis } = await supabase
       .from('saved_analyses')
       .select('*')
@@ -49,16 +49,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch all frameworks
     const { data: frameworks } = await supabase
-      .from('strategic_frameworks')
+      .from('frameworks')
       .select('*')
       .eq('status', 'active');
 
     const businessContext = analysis.analysis_data;
 
-    // Call Lovable AI for recommendations
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     const systemPrompt = `You are a McKinsey-level strategy consultant specializing in framework selection.
 
 BUSINESS CONTEXT:
@@ -87,50 +84,20 @@ Analyze the goal and recommend 3-6 most relevant frameworks. Return JSON:
   ]
 }`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: goal_input }
-        ],
-        temperature: 0.7,
-      }),
+    const { text } = await callChatCompletion({
+      model: 'google/gemini-2.5-flash',
+      modelProvider: 'openrouter',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: goal_input },
+      ],
+      temperature: 0.7,
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      return new Response(
-        JSON.stringify({ error: 'AI service unavailable' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const aiData = await aiResponse.json();
-    const recommendations = JSON.parse(aiData.choices[0].message.content);
-
-    // Save session
-    const { data: session } = await supabase
-      .from('strategy_sessions')
-      .insert({
-        user_id: user.id,
-        company_id,
-        company_name,
-        goal_input,
-        recommended_frameworks: recommendations.frameworks,
-        insights: recommendations.insights,
-      })
-      .select()
-      .single();
+    const recommendations = JSON.parse(text);
 
     return new Response(
-      JSON.stringify({ session_id: session.id, ...recommendations }),
+      JSON.stringify({ ...recommendations }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

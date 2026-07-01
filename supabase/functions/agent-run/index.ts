@@ -216,7 +216,7 @@ async function callLLM(
   }
 
   if (provider === 'xai' && xaiKey) {
-    const model = modelName || 'grok-4-1-fast-non-reasoning';
+    const model = modelName || 'grok-4.3';
     const response = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -225,6 +225,7 @@ async function callLLM(
       },
       body: JSON.stringify({
         model,
+        reasoning_effort: 'low',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

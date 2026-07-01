@@ -42,10 +42,10 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Middle row — 2 panels + activity rail */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      {/* Middle row — 3 equal-height panels */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-stretch">
         {/* Recent Agent Activity */}
-        <Card className="xl:col-span-1">
+        <Card className="xl:col-span-1 h-full flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Bot className="h-4 w-4 text-muted-foreground" />
@@ -72,7 +72,7 @@ const Dashboard = () => {
         </Card>
 
         {/* Scheduled Loops Status */}
-        <Card className="xl:col-span-1">
+        <Card className="xl:col-span-1 h-full flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <RefreshCw className="h-4 w-4 text-muted-foreground" />
@@ -90,10 +90,8 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Strategic Health Panel (right rail) */}
-        <div className="xl:col-span-1">
-          <StrategicHealthPanel />
-        </div>
+        {/* Strategic Health Panel */}
+        <StrategicHealthPanel className="xl:col-span-1" />
       </div>
 
       {/* Bottom row — Recent Reports */}

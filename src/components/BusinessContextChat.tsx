@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { getAccessToken, readGrokSseStream } from "@/lib/supabase-auth";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ReportSelector } from "@/components/ReportSelector";
@@ -43,6 +44,7 @@ export const BusinessContextChat = ({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const { session } = useAuth();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -77,17 +79,14 @@ export const BusinessContextChat = ({
 
     try {
       // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("No active session. Please log in again.");
-      }
+      const accessToken = await getAccessToken(session);
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strategy-coach-chat`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -358,17 +357,13 @@ export const BusinessContextChat = ({
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="relative p-6">
-          {/* Ambient neon underglow */}
-          <div className="absolute inset-x-6 -top-6 h-6 bg-gradient-to-t from-primary/10 to-transparent pointer-events-none" />
-          
-          {/* Main input container */}
-          <div className="relative rounded-2xl bg-[#111111] p-4 shadow-[0_8px_16px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.06)]">
+        <div className="p-6 border-t border-border">
+          <div className="rounded-2xl bg-muted/40 border border-border p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Badge variant="outline" className="text-xs border-white/[0.08] bg-white/[0.02]">
+              <Badge variant="outline" className="text-xs">
                 {selectedAnalysis.company_name}
               </Badge>
-              <Badge variant="outline" className="text-xs border-white/[0.08] bg-white/[0.02]">
+              <Badge variant="outline" className="text-xs">
                 <Sparkles className="h-3 w-3 mr-1" />
                 Grok 4.1 Fast
               </Badge>
@@ -386,7 +381,7 @@ export const BusinessContextChat = ({
                 onClick={() => handleSendMessage()}
                 disabled={!inputValue.trim() || isLoading}
                 size="icon"
-                className="shrink-0 h-9 w-9 rounded-xl bg-white/[0.08] hover:bg-primary/20 hover:shadow-[0_0_12px_rgba(196,248,42,0.3)] transition-all duration-200 group"
+                className="shrink-0 h-9 w-9 rounded-xl bg-background hover:bg-primary/20 transition-all duration-200 group"
                 aria-label="Send message"
               >
                 <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />

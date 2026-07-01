@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Sparkles, BarChart3, Lightbulb, Zap, MessageSquare, RefreshCw } from "lucide-react";
+import { ArrowRight, Sparkles, BarChart3, Lightbulb } from "lucide-react";
 
 const Landing = () => {
   const [email, setEmail] = useState("");
@@ -63,27 +63,27 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Background gradient effect */}
-      <div className="fixed inset-0 pointer-events-none opacity-30">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px]" />
-      </div>
-
       {/* Header */}
-      <header className="border-b border-white/[0.12] backdrop-blur-sm sticky top-0 z-30 bg-background/80">
-        <div className="container mx-auto px-6 py-6">
+      <header className="border-b border-border sticky top-0 z-30 bg-background/95 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex flex-row items-center gap-1.5">
-              <div className="inline-flex items-center bg-[#C4F82A] text-black px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full font-montserrat font-normal tracking-wide">
-                <span className="text-base sm:text-lg md:text-xl whitespace-nowrap">SUPER</span>
+            <div className="flex flex-row items-center gap-2">
+              <div className="inline-flex items-center bg-primary text-primary-foreground px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-md font-semibold tracking-wide">
+                <span className="text-base sm:text-lg whitespace-nowrap">SUPER</span>
               </div>
-              <h1 className="text-base sm:text-lg md:text-xl font-montserrat font-light tracking-wide text-white whitespace-nowrap">
+              <h1 className="text-base sm:text-lg font-medium tracking-wide text-foreground whitespace-nowrap">
                 <span className="md:hidden">BMC</span>
-                <span className="hidden md:inline">BUSINESS MODEL CANVAS</span>
+                <span className="hidden md:inline">Business Model Canvas</span>
               </h1>
             </div>
-            <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 bg-primary/10 border border-primary/20 rounded-full">
-              <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-primary rounded-full animate-pulse" />
-              <span className="label-tech text-primary text-[9px] sm:text-[10px]">Powered by AI</span>
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full">
+                <div className="h-1.5 w-1.5 bg-primary rounded-full animate-pulse" />
+                <span className="text-primary text-xs font-medium tracking-wide">Powered by AI</span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
+                Sign in
+              </Button>
             </div>
           </div>
         </div>
@@ -91,15 +91,15 @@ const Landing = () => {
 
       {/* Hero Section */}
       <main className="relative">
-        <div className="container mx-auto px-6 py-24 max-w-5xl">
+        <div className="container mx-auto px-6 py-16 sm:py-24 max-w-5xl">
           {/* Main Hero Content */}
           <div className="text-center space-y-8 mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/[0.06] border border-white/[0.12] rounded-full mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted border border-border rounded-full mb-6">
               <Sparkles className="w-4 h-4 text-primary" />
-              <span className="label-tech text-primary text-[10px]">AI Strategic Analysis</span>
+              <span className="text-primary text-xs font-medium tracking-wide">AI Strategic Analysis</span>
             </div>
             
-            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">
               Build Your Business<br />
               <span className="text-primary">Source of Truth</span>
             </h2>
@@ -114,10 +114,10 @@ const Landing = () => {
               <div className="flex items-start justify-center gap-3 sm:gap-6 md:gap-8">
                 {/* Step 1 */}
                 <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0">
                     1
                   </div>
-                  <h3 className="text-sm sm:text-base font-semibold text-white text-center">AI Builds</h3>
+                  <h3 className="text-sm sm:text-base font-semibold text-foreground text-center">AI Builds</h3>
                   <p className="text-xs sm:text-sm text-muted-foreground text-center">60 seconds</p>
                 </div>
 
@@ -126,10 +126,10 @@ const Landing = () => {
 
                 {/* Step 2 */}
                 <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0">
                     2
                   </div>
-                  <h3 className="text-sm sm:text-base font-semibold text-white text-center">You Refine</h3>
+                  <h3 className="text-sm sm:text-base font-semibold text-foreground text-center">You Refine</h3>
                   <p className="text-xs sm:text-sm text-muted-foreground text-center">With AI assistance</p>
                 </div>
 
@@ -138,10 +138,10 @@ const Landing = () => {
 
                 {/* Step 3 */}
                 <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-black flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-base sm:text-lg flex-shrink-0">
                     3
                   </div>
-                  <h3 className="text-sm sm:text-base font-semibold text-white text-center">Reuse Forever</h3>
+                  <h3 className="text-sm sm:text-base font-semibold text-foreground text-center">Reuse Forever</h3>
                   <p className="text-xs sm:text-sm text-muted-foreground text-center">As foundation</p>
                 </div>
               </div>
@@ -149,7 +149,7 @@ const Landing = () => {
 
             {/* Email Signup Form */}
             <form onSubmit={handleSubmit} className="max-w-5xl mx-auto mt-8 sm:mt-12 px-4 sm:px-0">
-              <div className="card-mono p-6 sm:p-8 space-y-4 max-w-md mx-auto">
+              <div className="bg-card border border-border rounded-xl p-6 sm:p-8 space-y-4 max-w-md mx-auto">
                 <Input
                   type="email"
                   placeholder="Enter your email"
@@ -184,8 +184,8 @@ const Landing = () => {
 
           {/* Features Grid */}
           <div className="grid md:grid-cols-3 gap-6 mt-24">
-            <div className="card-mono card-mono-hover space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4 hover:border-primary/30 transition-colors">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                 <BarChart3 className="w-6 h-6 text-primary" />
               </div>
               <h3 className="text-xl font-semibold">Complete BMC</h3>
@@ -194,8 +194,8 @@ const Landing = () => {
               </p>
             </div>
 
-            <div className="card-mono card-mono-hover space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4 hover:border-primary/30 transition-colors">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Sparkles className="w-6 h-6 text-primary" />
               </div>
               <h3 className="text-xl font-semibold">AI-Powered</h3>
@@ -204,8 +204,8 @@ const Landing = () => {
               </p>
             </div>
 
-            <div className="card-mono card-mono-hover space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4 hover:border-primary/30 transition-colors">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Lightbulb className="w-6 h-6 text-primary" />
               </div>
               <h3 className="text-xl font-semibold">Reusable Foundation</h3>
@@ -218,11 +218,11 @@ const Landing = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/[0.12] mt-24">
+      <footer className="border-t border-border mt-24">
         <div className="container mx-auto px-6 py-8">
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <p>© 2025 Super Business Model Canvas</p>
-            <p className="label-tech text-[10px]">Strategic Analysis Tool</p>
+            <p className="text-xs tracking-wide">Strategic Analysis Tool</p>
           </div>
         </div>
       </footer>

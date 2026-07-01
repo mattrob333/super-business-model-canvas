@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +9,7 @@ import { Loader2, Trash2, ExternalLink, FileText, Target, Download } from 'lucid
 import { toast } from '@/hooks/use-toast';
 import { getIconComponent } from '@/lib/icon-utils';
 import { exportAnalysisPackage } from '@/lib/analysis-export';
+import { setActiveWorkspaceName } from '@/lib/active-workspace';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -140,6 +140,11 @@ const MyAnalyses = () => {
   };
 
   const loadAnalysis = (analysis: SavedAnalysis) => {
+    const companyName =
+      analysis.company_name || analysis.analysis_data?.company?.name;
+    if (companyName) {
+      setActiveWorkspaceName(companyName);
+    }
     sessionStorage.setItem('loadedAnalysis', JSON.stringify(analysis.analysis_data));
     navigate('/analyze');
   };
@@ -211,7 +216,7 @@ const MyAnalyses = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -222,12 +227,11 @@ const MyAnalyses = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <Navigation />
-      <div className="container mx-auto px-6 py-8 max-w-6xl">
+    <div>
+      <div className="max-w-6xl mx-auto">
         <div className="space-y-6">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">My Analyses</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">My Analyses</h1>
             <p className="text-muted-foreground mt-2">View and manage your saved analyses</p>
           </div>
 

@@ -14,6 +14,8 @@
  * will auto-detect from its env vars (priority: OpenAI > Anthropic > OpenRouter > xAI).
  */
 
+import { supabase } from "@/integrations/supabase/client";
+
 export interface ResolvedModelRoute {
   provider: string;
   modelName: string;
@@ -28,16 +30,16 @@ export interface ResolvedModelRoute {
  */
 const MODEL_ROUTE_MAPPING: Record<string, ResolvedModelRoute> = {
   premium: {
-    provider: "anthropic",
-    modelName: "claude-3-5-sonnet-20241022",
+    provider: "xai",
+    modelName: "grok-4.3",
   },
   standard: {
-    provider: "openai",
-    modelName: "gpt-4o-mini",
+    provider: "xai",
+    modelName: "grok-4.3",
   },
   economy: {
-    provider: "openai",
-    modelName: "gpt-4o-mini",
+    provider: "openrouter",
+    modelName: "openai/gpt-4o-mini",
   },
   local: {
     // Local models are served via OpenAI-compatible endpoints (Ollama, vLLM).
@@ -71,5 +73,70 @@ export function getAvailableRouteTiers(): { value: string; label: string; provid
     label: key.charAt(0).toUpperCase() + key.slice(1),
     provider: route.provider,
     model: route.modelName,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Database-backed routes (model_routes table)
+// ---------------------------------------------------------------------------
+//
+// The static map above is the fallback. The source of truth is the
+// `model_routes` table, which is seeded globally and copied into each account
+// on provisioning, so users can re-point a tier (e.g. "premium") at any
+// provider/model (including OpenRouter) from the Settings UI.
+
+export interface ModelRoute {
+  routeKey: string;
+  label: string;
+  provider: string;
+  modelName: string;
+  params: Record<string, unknown>;
+  fallbackRouteKey: string | null;
+  isDefault: boolean;
+}
+
+/**
+ * Load the model routes for an account from the database. Falls back to the
+ * static tier map if the table is empty or the query fails, so the UI always
+ * has something to show.
+ */
+export async function fetchModelRoutes(
+  accountId: string | null | undefined,
+): Promise<ModelRoute[]> {
+  if (accountId) {
+    try {
+      const { data, error } = await supabase
+        .from("model_routes")
+        .select(
+          "route_key, label, provider, model_name, params, fallback_route_key, is_default",
+        )
+        .eq("account_id", accountId)
+        .order("route_key", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data.map((r) => ({
+          routeKey: r.route_key,
+          label: r.label,
+          provider: r.provider,
+          modelName: r.model_name,
+          params: (r.params as Record<string, unknown>) ?? {},
+          fallbackRouteKey: r.fallback_route_key,
+          isDefault: r.is_default,
+        }));
+      }
+    } catch (err) {
+      console.warn("fetchModelRoutes: falling back to static map", err);
+    }
+  }
+
+  // Fallback: derive routes from the static tier map.
+  return Object.entries(MODEL_ROUTE_MAPPING).map(([key, route]) => ({
+    routeKey: key,
+    label: key.charAt(0).toUpperCase() + key.slice(1),
+    provider: route.provider,
+    modelName: route.modelName,
+    params: {},
+    fallbackRouteKey: null,
+    isDefault: key === "standard",
   }));
 }

@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, ArrowLeft, Save, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { downloadFrameworkTemplate, generateBlankTemplate } from '@/lib/framework-import-export';
-import { Navigation } from '@/components/Navigation';
 
 const FrameworkEditor = () => {
   const navigate = useNavigate();
@@ -145,16 +144,15 @@ const FrameworkEditor = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <Navigation />
-      <div className="container mx-auto px-6 py-8 max-w-6xl">
+    <div>
+      <div className="max-w-6xl mx-auto">
         <Button
           variant="ghost"
           onClick={() => navigate('/admin/frameworks')}
@@ -167,7 +165,7 @@ const FrameworkEditor = () => {
         <div className="space-y-6">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-4xl font-bold tracking-tight">
+              <h1 className="text-2xl font-semibold tracking-tight">
                 {id === 'new' ? 'Create Framework' : 'Edit Framework'}
               </h1>
               <p className="text-muted-foreground mt-2">

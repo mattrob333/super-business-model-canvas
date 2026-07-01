@@ -1,14 +1,15 @@
 import { useState, useCallback } from "react";
 import { CanvasSectionCard } from "./CanvasSectionCard";
+import { CanvasGridFrame } from "./CanvasGridFrame";
 import type { CanvasSectionMeta } from "./CanvasSectionCard";
 import {
   CANVAS_SECTION_KEYS,
   CANVAS_SECTION_LABELS,
   LEGACY_SECTION_KEYS,
+  CANVAS_SECTION_GRID_PLACEMENT,
 } from "./section-types";
 import type { CanvasSectionKey } from "./section-types";
 import { BMCSectionEditor } from "@/components/BMCSectionEditor";
-import { Info } from "lucide-react";
 
 /**
  * Legacy data shape from saved_analyses.analysis_data JSON.
@@ -121,7 +122,7 @@ export function EnterpriseBusinessModelCanvas({
     [selectedSection, onSectionUpdate],
   );
 
-  const renderSection = (key: CanvasSectionKey) => {
+  const renderSection = (key: CanvasSectionKey, height: string) => {
     const { items, notes } = getSectionData(key);
     const meta = sectionMeta?.[key];
     return (
@@ -131,6 +132,8 @@ export function EnterpriseBusinessModelCanvas({
         items={items}
         notes={notes}
         meta={meta}
+        span={CANVAS_SECTION_GRID_PLACEMENT[key]}
+        height={height}
         onClick={() => handleSectionClick(key)}
       />
     );
@@ -140,63 +143,33 @@ export function EnterpriseBusinessModelCanvas({
     <>
       <div className="w-full max-w-7xl mx-auto">
         {/* Header */}
-        <div className="hidden md:flex items-start justify-between mb-6 gap-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              Business Model Canvas
-            </h2>
-            <p className="text-muted-foreground text-sm mt-1">
-              Explore how this organization creates, delivers, and captures
-              value. Click any section to refine or expand with AI.
-            </p>
-          </div>
-          <div className="bg-muted/50 border border-border rounded-lg px-4 py-3 flex items-start gap-3 max-w-xs flex-shrink-0">
-            <Info className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground">
-              Click any section to expand. Agent badges and confidence
-              indicators show AI-assisted coverage.
-            </p>
-          </div>
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
+            Business Model Canvas
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Click a section or use{" "}
+            <span className="font-medium text-primary">Analyze</span> to refine
+            with AI.
+          </p>
         </div>
 
-        {/* Mobile header */}
-        <div className="md:hidden mb-4">
-          <h2 className="text-xl font-bold">Business Model Canvas</h2>
-        </div>
-
-        {/* Canvas Grid — standard BMC layout */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2 auto-rows-[180px] sm:auto-rows-[200px]">
-          {/* Row 1-2: Key Partners (left, 2 rows), Key Activities, Value Props (center, 2 rows), Customer Relationships, Customer Segments (right, 2 rows) */}
-          <div className="md:col-span-1 md:row-span-2 h-full">
-            {renderSection("key_partners")}
-          </div>
-          <div className="md:col-span-1 md:row-span-1 h-full">
-            {renderSection("key_activities")}
-          </div>
-          <div className="md:col-span-1 md:row-span-2 h-full">
-            {renderSection("value_propositions")}
-          </div>
-          <div className="md:col-span-1 md:row-span-1 h-full">
-            {renderSection("customer_relationships")}
-          </div>
-          <div className="md:col-span-1 md:row-span-2 h-full">
-            {renderSection("customer_segments")}
+        {/* Canvas Grid — wrapped in a single bordered frame */}
+        <CanvasGridFrame>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-3 md:auto-rows-[200px]">
+            {CANVAS_SECTION_KEYS.slice(0, 7).map((key) =>
+              renderSection(key, "h-[180px] md:h-full"),
+            )}
           </div>
 
-          {/* Row 2: Key Resources, Channels */}
-          <div className="md:col-span-1 md:row-span-1 h-full">
-            {renderSection("key_resources")}
+          <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+            {CANVAS_SECTION_KEYS.slice(7).map((key) => (
+              <div key={key} className="flex-1">
+                {renderSection(key, "h-[200px]")}
+              </div>
+            ))}
           </div>
-          <div className="md:col-span-1 md:row-span-1 h-full">
-            {renderSection("channels")}
-          </div>
-        </div>
-
-        {/* Bottom Row — Cost Structure + Revenue Streams */}
-        <div className="flex flex-col md:flex-row gap-2 mt-2">
-          <div className="flex-1 h-[200px]">{renderSection("cost_structure")}</div>
-          <div className="flex-1 h-[200px]">{renderSection("revenue_streams")}</div>
-        </div>
+        </CanvasGridFrame>
       </div>
 
       {selectedSection && (

@@ -27,11 +27,13 @@ export const copyHtmlToClipboard = async (html: string): Promise<void> => {
   }
 };
 
-export const exportReportToPdf = async (html: string, filename: string): Promise<void> => {
+export const exportReportToPdf = async (html: string, filename: string, css?: string): Promise<void> => {
   const { default: html2pdf } = await getHtml2pdf();
   const element = document.createElement('div');
-  element.innerHTML = html;
-  
+  // Include the report's stylesheet(s) so the exported PDF matches what's
+  // shown on screen, instead of falling back to unstyled browser defaults.
+  element.innerHTML = css ? `<style>${css}</style>${html}` : html;
+
   html2pdf()
     .set({
       margin: 1,

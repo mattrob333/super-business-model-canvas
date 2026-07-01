@@ -24,9 +24,9 @@ export const StrategyDrawer = ({
 
   const getRelevanceBadgeColor = (relevance: string) => {
     switch(relevance.toLowerCase()) {
-      case 'high': return 'bg-green-500/10 text-green-600 border-green-500/20';
-      case 'critical': return 'bg-red-500/10 text-red-600 border-red-500/20';
-      case 'medium': return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20';
+      case 'high': return 'bg-success/10 text-success border-success/20';
+      case 'critical': return 'bg-critical/10 text-critical border-critical/20';
+      case 'medium': return 'bg-warning/10 text-warning border-warning/20';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -53,7 +53,7 @@ export const StrategyDrawer = ({
           <div className="space-y-3">
             {recommendations.insights.map((insight: string, idx: number) => (
               <div key={idx} className="flex gap-3 items-start">
-                <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">{insight}</p>
               </div>
             ))}

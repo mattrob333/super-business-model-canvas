@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -19,7 +19,7 @@ import { Cpu, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { resolveModelRoute } from "@/lib/agent-runtime/model-routing";
+import { fetchModelRoutes, type ModelRoute } from "@/lib/agent-runtime/model-routing";
 
 type AgentProfile = Database["public"]["Tables"]["agent_profiles"]["Row"];
 
@@ -64,8 +64,17 @@ const MODEL_ROUTES = [
 export function ModelRoutingPanel({ accountId }: { accountId: string }) {
   const { toast } = useToast();
   const [agents, setAgents] = useState<AgentProfile[]>([]);
+  const [routes, setRoutes] = useState<ModelRoute[]>([]);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
+
+  // Static descriptions/colors keyed by route tier. Used to decorate whatever
+  // routes come back from the database (which is the source of truth).
+  const meta = (key: string) =>
+    MODEL_ROUTES.find((r) => r.value === key) ?? {
+      description: "Custom route",
+      color: "bg-muted text-muted-foreground border-border",
+    };
 
   const fetchAgents = useCallback(async () => {
     setLoading(true);
@@ -92,6 +101,12 @@ export function ModelRoutingPanel({ accountId }: { accountId: string }) {
       setLoading(false);
     }
   }, [accountId, toast]);
+
+  // Load agents + model routes when the account changes.
+  useEffect(() => {
+    void fetchAgents();
+    void fetchModelRoutes(accountId).then(setRoutes);
+  }, [fetchAgents, accountId]);
 
   const handleRouteChange = async (agentId: string, newRoute: string) => {
     setUpdating(agentId);
@@ -137,25 +152,20 @@ export function ModelRoutingPanel({ accountId }: { accountId: string }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Route legend */}
+        {/* Route legend (driven by the model_routes table) */}
         <div className="flex flex-wrap gap-2">
-          {MODEL_ROUTES.map((route) => {
-            const resolved = resolveModelRoute(route.value);
-            return (
-              <Badge
-                key={route.value}
-                variant="outline"
-                className={`text-xs ${route.color}`}
-              >
-                {route.label}: {route.description}
-                {resolved && (
-                  <span className="ml-1 opacity-60 font-mono">
-                    ({resolved.provider}/{resolved.modelName})
-                  </span>
-                )}
-              </Badge>
-            );
-          })}
+          {routes.map((route) => (
+            <Badge
+              key={route.routeKey}
+              variant="outline"
+              className={`text-xs ${meta(route.routeKey).color}`}
+            >
+              {route.label}: {meta(route.routeKey).description}
+              <span className="ml-1 opacity-60 font-mono">
+                ({route.provider}/{route.modelName})
+              </span>
+            </Badge>
+          ))}
         </div>
 
         {loading ? (
@@ -181,9 +191,6 @@ export function ModelRoutingPanel({ accountId }: { accountId: string }) {
         ) : (
           <div className="space-y-2">
             {agents.map((agent) => {
-              const route = MODEL_ROUTES.find(
-                (r) => r.value === agent.model_route_key
-              );
               return (
                 <div
                   key={agent.id}
@@ -220,8 +227,8 @@ export function ModelRoutingPanel({ accountId }: { accountId: string }) {
                         <SelectValue placeholder="Unassigned" />
                       </SelectTrigger>
                       <SelectContent>
-                        {MODEL_ROUTES.map((r) => (
-                          <SelectItem key={r.value} value={r.value} className="text-xs">
+                        {routes.map((r) => (
+                          <SelectItem key={r.routeKey} value={r.routeKey} className="text-xs">
                             {r.label}
                           </SelectItem>
                         ))}
