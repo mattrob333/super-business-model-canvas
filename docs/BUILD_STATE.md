@@ -559,6 +559,11 @@ npm run lint                    -> 69 problems (50 errors, 19 warnings), within 
   merged PR #7 at merge commit `3c10b26`. Gate results before merge: `npx tsc -p
   tsconfig.app.json --noEmit` exit 0; `npm run build` green; `npm run lint` 68 problems, within
   frozen <=69 baseline; worker typecheck/tests/lint still green.
+- **App light-mode polish:** merged PR #9 (`feat/app-light-polish` -> `main`) at merge commit
+  `761c8de`. Added the shared subtle grid page-canvas treatment, card discipline, spec notes,
+  and 1440px before/after screenshots for Dashboard, Canvas, and Settings. Gates before merge:
+  `npx tsc -p tsconfig.app.json --noEmit` exit 0; `npm run build` green; `npm run lint`
+  68 problems, within frozen <=69 baseline.
 
 ### Phase 3 — Research engine & evidence
 Tasks: 3.1 ☐ · 3.2 ☐ · 3.3 ☐ · 3.4 ☐ · 3.5 ☐ · 3.6 ☐ · 3.7 ☐
