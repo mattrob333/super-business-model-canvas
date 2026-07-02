@@ -4,6 +4,27 @@ Newest entries first. Companion docs: `VISION.md` (product), `AGENT_RUNTIME_DECI
 
 ---
 
+## 2026-07-02 (handoff) — Repo cleanup, hardening pass, incoming-agent handoff
+
+Phases 0–1 are APPROVED and merged; Matt is rotating build execution to a new agent for
+Phases 2+. This pass prepared the repo for that handoff:
+
+- **Cleanup:** retired-headers added to `.hermes/build-state.md` and `docs/NEXT_STEPS_PLAN.md`
+  (historical records, active program is BUILD_PLAN/BUILD_STATE). Merged remote branches
+  queued for owner deletion (agent push scope can't delete): phase-0/phase-1/rf-fix/
+  enterprise-strategy-workspace; unmerged Lovable `edit/…` branch flagged for owner review.
+- **Hardening verification on main:** tsc clean · build green · lint at frozen 69 ·
+  `.env.example` complete · Phase-1 schema previously proven on scratch Postgres (fresh,
+  incremental, idempotent, mirror-identical). No code changes required.
+- **`HANDOFF.md` rewritten** as the incoming-agent front door: verified project state,
+  binding reading order, compressed ground rules, review-protocol expectations (with the
+  RF-1-3 precedent), hard-won gotchas (model-ID dash/dot conventions per provider,
+  service-role RLS bypass, section-key mappings, frozen lint baseline), repo map, Phase-2
+  first assignment with a dispatch-splitting recommendation from the Phase-1 rate-limit
+  post-mortem, and the owner housekeeping list. README references updated.
+
+---
+
 ## 2026-07-02 (addendum) — Claude Agent SDK integration spec
 
 Gap spotted by Matt: the SDK was named everywhere but no doc told the build team *how* to

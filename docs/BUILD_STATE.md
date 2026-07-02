@@ -42,6 +42,11 @@ Status: OPEN | RESOLVED (<how>)
   since Phase 0 made no code changes, only verified/documented. When you do run the July-2
   deploy, use `scripts/smoke-test.md` (new, this phase) to confirm all 6 flows work afterward.
 
+- **Housekeeping (July 2, post-Phase-1):** delete four merged remote branches via the GitHub
+  UI — `build/phase-0-baseline`, `build/phase-1-migrations`, `fix/rf-1-3-opus-model-id`,
+  `enterprise-strategy-workspace` (all fully merged into main; agent push access cannot
+  delete branches). The unmerged `edit/edt-6cd24209-…` Lovable leftover (tip `958b1dd`) is
+  yours to review or discard.
 - **From Phase 1:** apply the four Phase-1 migrations (`20260702100000` → `20260702100300`)
   to the live Supabase project (SQL Editor, in order), then run `scripts/verify-schema.sql`
   there and confirm 62 PASS / 0 FAIL. Verified clean on scratch Postgres 16 (fresh + incremental
