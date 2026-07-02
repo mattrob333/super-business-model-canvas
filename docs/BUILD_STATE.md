@@ -9,7 +9,7 @@
 | Phase | Title | Status | Branch | Last update |
 |---|---|---|---|---|
 | 0 | Baseline verification & deploy prep | **APPROVED** | `build/phase-0-baseline` (merged, PR #2, `db7cd1f`) | 2026-07-02 |
-| 1 | Data model wave 1 | **IN PROGRESS** | `build/phase-1-migrations` | 2026-07-02 |
+| 1 | Data model wave 1 | **AWAITING REVIEW** | `build/phase-1-migrations` | 2026-07-02 |
 | 2 | Agent worker service | NOT STARTED | — | — |
 | 3 | Research engine & evidence | NOT STARTED | — | — |
 | 4 | Competitor canvases & gap engine | NOT STARTED | — | — |
@@ -116,7 +116,104 @@ Tasks: 0.1 ☑ · 0.2 ☑ · 0.3 ☑ · 0.4 ☑ · **APPROVED, merged to main (P
 documentation — so there is nothing to regress. Ready for review.
 
 ### Phase 1 — Data model wave 1
-Tasks: 1.1 ☐ · 1.2 ☐ · 1.3 ☐ · 1.4 ☐ · 1.5 ☐ · 1.6 ☐
+Tasks: 1.1 ☑ · 1.2 ☑ · 1.3 ☑ · 1.4 ☑ · 1.5 ☑ · 1.6 ☑ · **AWAITING REVIEW**
+
+**2026-07-02 — Phase 1 complete on branch `build/phase-1-migrations` (cut from `main` @ `00e026b`).**
+
+Work was split: a subagent produced the four migration files + the `schema.sql` mirror (fully
+committed-quality SQL, but ran out of budget before finishing `types.ts` and committing); I
+(the primary session) completed the remaining `types.ts` patches, wrote `verify-schema.sql`,
+re-ran all gates, and made the actual commits. Full honesty per BUILD_PLAN rule 6: nothing here
+was applied to a live Postgres instance — no Supabase CLI/Docker available in this environment.
+Verification is structural (careful read-through + `tsc`/`build`/`lint` against the hand-authored
+`types.ts`), not a real migration run. See the ordering-proof comment block at the top of
+`20260702100000_workspace_orchestration_tables.sql` for the dependency-order reasoning.
+
+**1.1 — New tables** (`supabase/migrations/20260702100000_workspace_orchestration_tables.sql`):
+all 12 tables from spec 04 §5 — `workspace_threads`, `workspace_messages`, `context_sources`,
+`insights`, `agenda_items`, `approvals`, `agent_jobs`, `cascades`, `cascade_steps`,
+`cascade_runs`, `metric_snapshots`, `agent_profile_revisions` — created in true dependency order
+(differs from the work order's literal listing order, which contains a forward reference:
+`agent_jobs.cascade_run_id` → `cascade_runs`, listed after `agent_jobs` in the prose; the
+migration file creates `cascade_runs` before `agent_jobs` instead, documented in the file's
+header comment). 7 new enums (`workspace_message_kind`, `context_source_type`,
+`insight_severity`, `agenda_item_status`, `approval_kind`, `approval_status`,
+`cascade_run_status`), indexes on every FK + common query path, `updated_at` triggers on
+`agenda_items`/`cascades`.
+
+**1.2 — Column additions** (`20260702100100_column_additions.sql`): `agent_profiles`
+(+`behavior` jsonb, +`avatar` jsonb) · `agent_skills` (+`orchestrator_can_trigger`,
++`action_kind`) · `scheduled_loops` (+`action_key`, +`created_by_agent`) · `model_routes`
+(+`task_class`, +`max_tokens_in/out`, +`cost_per_1k_in/out`, +`eval_score`, +`updated_by`) ·
+`generated_reports` (+`account_id`, +`source_cascade_run_id`, both nullable) with a documented
+backfill: `account_id` populated via each row's `user_id` → earliest-created
+`account_members.account_id` for that user, raising a NOTICE (not failing) for any
+unbackfillable row. Real limitation of this heuristic documented inline (a user's first account
+isn't necessarily the account the report was generated for — no better signal exists on
+`generated_reports` today).
+
+**1.3 — RLS** (`20260702100200_rls_new_tables.sql`): standard account-scoped CRUD loop extended
+to `workspace_threads`, `context_sources`, `agent_jobs`, `metric_snapshots`, `cascade_runs`.
+Exceptions per BUILD_PLAN 1.3: `insights`/`agenda_items` are SELECT-only for `authenticated`
+(worker writes via service role, bypassing RLS); `approvals` is SELECT+UPDATE only (no
+INSERT/DELETE for `authenticated`). Child-table policies with parent-join subqueries for
+`cascade_steps` (via `cascades.account_id`, nullable for templates), `workspace_messages` (via
+`workspace_threads.account_id`), `agent_profile_revisions` (via `agent_profiles.account_id`,
+nullable for templates). `cascades` template rows (`account_id IS NULL`) SELECT-able by any
+authenticated user, matching the existing `agent_profiles` template pattern.
+
+**1.4 — Seed** (`20260702100300_seed_phase1.sql`): all 10 template `agent_profiles` renamed to
+`"<Callsign> — <Role title>"` with `avatar: {icon, accent}` set per spec 01's naming table. All
+7 template cascades (Full Recon, Competitor Delta Sweep, Board Pack, Pricing War Response, Unit
+Economics Duet, Launch Readiness, Cost-Down Sprint) seeded with `cascade_steps` — DAG structure
+inferred from spec 04 §3 prose, documented assumptions inline (system/data-layer steps like
+"research refresh" and "gap engine" assigned `agent_key: 'orchestrator'` since they aren't one
+of the ten named agents; step_keys invented from the prose since the spec doesn't give literal
+keys; the "3 at a time" concurrency note is a runtime parameter, not stored on `cascade_steps`).
+9 `model_routes` rows (one per task_class from spec 06 §1), placeholder-but-plausible model
+slugs explicitly flagged as needing Phase 7's model-scout sweep to keep current. All inserts
+idempotent (`on conflict do nothing`, matching the existing seed migration's style; the
+`model_routes` conflict target `(route_key) where account_id is null` uses the pre-existing
+partial unique index — verified it exists in `schema.sql` line 507).
+
+**1.5 — Mirror**: `supabase/schema.sql` updated with a new section (renumbered so the old
+"DROP DEAD / LEGACY TABLES" section is now last) containing all of the above, matching the
+file's existing section-banner style. `src/integrations/supabase/types.ts` hand-authored: all 12
+new table `Row`/`Insert`/`Update` blocks, all 7 new enums added to both the `Enums` type block
+and the `Constants.public.Enums` runtime object, and the 5 existing-table patches from 1.2
+applied to their respective `Row`/`Insert`/`Update` blocks (`agent_profiles`, `agent_skills`,
+`scheduled_loops`, `generated_reports`, `model_routes`).
+
+**1.6 — `scripts/verify-schema.sql`**: SQL-editor-runnable script with ~40 PASS/FAIL assertions
+covering table existence, new column existence, RLS-enabled + at-least-one-policy per new table,
+enum type existence, and seed-data sanity checks (10 profiles with avatars, 7 template cascades,
+cascade_steps rows present, 9 distinct task_class rows in model_routes). Not run against a live
+DB in this phase (no Supabase project available) — ready for the operator/reviewer to run
+post-deploy.
+
+**Gate results (re-run clean, final):**
+```
+npx tsc -p tsconfig.app.json --noEmit   → exit 0, no output (clean)
+npm run build                            → ✓ built in 6.45s (green)
+npm run lint                             → 69 problems (50 errors, 19 warnings) — exact frozen baseline
+```
+
+**BLOCKERS / judgment calls (documented inline in the migrations, logged here per BUILD_PLAN
+rule 5):**
+- `agent_jobs.status` and `model_routes.updated_by` / `agent_skills.action_kind`: the work order
+  brackets explicit value-sets for most new enum-like columns (e.g. `insights.severity`,
+  `approvals.status`) but leaves these three as bare column names with no bracketed values.
+  Conservative resolution: kept as free `text` with a documented expected-value-set in a column
+  comment, rather than inventing an enum that Phase 2 (the worker, which owns these state
+  machines) might immediately need to alter. Not treated as a hard BLOCKER since a conservative
+  default was available and applied.
+- `generated_reports` backfill ambiguity (a user could belong to multiple accounts): resolved by
+  taking the earliest-created `account_members` row per user, documented as a best-effort
+  heuristic with its real limitation stated inline (no stronger signal exists on the row).
+
+**No other BLOCKERS.** Ready for review — reviewer should expect the "meatier" schema audit
+flagged after Phase 0 (migrations read against a scratch DB if available, RLS coverage check,
+seed-vs-spec diff).
 
 ### Phase 2 — Agent worker service
 Tasks: 2.1 ☐ · 2.2 ☐ · 2.3 ☐ · 2.4 ☐ · 2.5 ☐ · 2.6 ☐ · 2.7 ☐ · 2.8 ☐ · 2.9 ☐ · 2.10 ☐
