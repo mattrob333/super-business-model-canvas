@@ -48,7 +48,7 @@ const Landing = () => {
       }
 
       // Redirect to analysis tool
-      setTimeout(() => navigate("/analyze"), 1500);
+      setTimeout(() => navigate("/canvas"), 1500);
     } catch (error: any) {
       console.error("Error submitting email:", error);
       toast({

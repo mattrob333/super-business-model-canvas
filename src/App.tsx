@@ -3,14 +3,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 
 // Lazy-load all other route components for code splitting
-const Analysis = lazy(() => import("./pages/Analysis"));
+const Canvas = lazy(() => import("./pages/Canvas"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminFrameworks = lazy(() => import("./pages/admin/Frameworks"));
 const FrameworkEditor = lazy(() => import("./pages/admin/FrameworkEditor"));
@@ -19,7 +19,6 @@ const Playbooks = lazy(() => import("./pages/Playbooks"));
 const FrameworkDetail = lazy(() => import("./pages/FrameworkDetail"));
 const ReportViewer = lazy(() => import("./pages/ReportViewer"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Canvas = lazy(() => import("./pages/Canvas"));
 const Gaps = lazy(() => import("./pages/Gaps"));
 const Knowledge = lazy(() => import("./pages/Knowledge"));
 const Agents = lazy(() => import("./pages/Agents"));
@@ -63,7 +62,7 @@ const App = () => (
             <Route path="/agents" element={withSuspense(Agents)} />
             <Route path="/agents/:agentId" element={withSuspense(AgentDetail)} />
             <Route path="/activity" element={withSuspense(Activity)} />
-            <Route path="/analyze" element={withSuspense(Analysis)} />
+            <Route path="/analyze" element={<Navigate to="/canvas" replace />} />
             <Route path="/my-analyses" element={withSuspense(MyAnalyses)} />
             <Route path="/playbooks" element={withSuspense(Playbooks)} />
             <Route path="/playbooks/framework/:frameworkId" element={withSuspense(FrameworkDetail)} />

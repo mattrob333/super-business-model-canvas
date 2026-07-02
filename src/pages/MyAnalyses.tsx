@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast';
 import { getIconComponent } from '@/lib/icon-utils';
 import { exportAnalysisPackage } from '@/lib/analysis-export';
 import { setActiveWorkspaceName } from '@/lib/active-workspace';
+import { setActiveAnalysis } from '@/lib/active-analysis';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -146,7 +147,8 @@ const MyAnalyses = () => {
       setActiveWorkspaceName(companyName);
     }
     sessionStorage.setItem('loadedAnalysis', JSON.stringify(analysis.analysis_data));
-    navigate('/analyze');
+    setActiveAnalysis({ id: analysis.id, data: analysis.analysis_data });
+    navigate('/canvas');
   };
 
   const handleDeleteReport = async (reportId: string) => {
@@ -241,7 +243,7 @@ const MyAnalyses = () => {
                 <p className="text-muted-foreground text-center mb-4">
                   No saved analyses yet. Analyze a company to get started!
                 </p>
-                <Button onClick={() => navigate('/analyze')}>
+                <Button onClick={() => navigate('/canvas')}>
                   Start Analysis
                 </Button>
               </CardContent>

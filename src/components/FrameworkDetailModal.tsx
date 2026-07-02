@@ -23,6 +23,7 @@ interface FrameworkDetailModalProps {
   framework: Framework | null;
   onRunFramework?: (frameworkId: string) => void;
   selectedAnalysis?: any;
+  strategicGoal?: string;
 }
 
 export const FrameworkDetailModal = ({
@@ -30,7 +31,8 @@ export const FrameworkDetailModal = ({
   onClose,
   framework,
   onRunFramework,
-  selectedAnalysis
+  selectedAnalysis,
+  strategicGoal,
 }: FrameworkDetailModalProps) => {
   if (!framework) return null;
 
@@ -135,18 +137,29 @@ export const FrameworkDetailModal = ({
 
               <TabsContent value="inputs" className="space-y-3 pt-5">
                 {selectedAnalysis ? (
-                  <div>
-                    <h4 className="font-semibold mb-3">Inputs it will use</h4>
-                    <div className="text-sm space-x-3">
-                      <span className={availability.valueProps ? "text-success" : "text-muted-foreground"}>
-                        Value Props {availability.valueProps ? "✓" : "•"}
-                      </span>
-                      <span className={availability.icp ? "text-success" : "text-muted-foreground"}>
-                        ICP {availability.icp ? "✓" : "•"}
-                      </span>
-                      <span className={availability.channels ? "text-success" : "text-muted-foreground"}>
-                        Channels {availability.channels ? "✓" : "•"}
-                      </span>
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="font-semibold mb-3">AI will use from your context</h4>
+                      <div className="text-sm space-x-3">
+                        <span className={availability.valueProps ? "text-success" : "text-muted-foreground"}>
+                          Value Props {availability.valueProps ? "✓" : "•"}
+                        </span>
+                        <span className={availability.icp ? "text-success" : "text-muted-foreground"}>
+                          ICP {availability.icp ? "✓" : "•"}
+                        </span>
+                        <span className={availability.channels ? "text-success" : "text-muted-foreground"}>
+                          Channels {availability.channels ? "✓" : "•"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Company: <span className="font-medium text-foreground">{selectedAnalysis.company_name}</span>
+                        {" — "}full business model canvas, profile, and competitors are sent to the AI.
+                      </p>
+                      {strategicGoal && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Goal: <span className="text-foreground">{strategicGoal}</span>
+                        </p>
+                      )}
                     </div>
 
                     {hasMissingInputs && (
@@ -173,10 +186,10 @@ export const FrameworkDetailModal = ({
               <Button 
                 onClick={() => onRunFramework?.(framework.id)}
                 className="gap-2"
-                disabled={!onRunFramework}
+                disabled={!onRunFramework || !selectedAnalysis}
               >
                 <Play className="h-4 w-4" />
-                Run Framework
+                Run with AI
               </Button>
             </DialogFooter>
           </div>

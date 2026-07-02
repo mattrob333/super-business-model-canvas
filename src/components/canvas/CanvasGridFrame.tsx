@@ -17,7 +17,7 @@ export function CanvasGridFrame({ children, className }: CanvasGridFrameProps) {
         className,
       )}
     >
-      <div className="flex flex-col gap-2 md:gap-3">{children}</div>
+      <div className="flex flex-col gap-1.5 md:gap-2">{children}</div>
     </div>
   );
 }

@@ -27,7 +27,7 @@ const Auth = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      navigate('/analyze');
+      navigate('/canvas');
     }
   }, [user, loading, navigate]);
 
@@ -62,7 +62,7 @@ const Auth = () => {
           title: "Welcome!",
           description: "Your account has been created successfully."
         });
-        navigate('/analyze');
+        navigate('/canvas');
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -100,7 +100,7 @@ const Auth = () => {
           title: "Welcome back!",
           description: "You've been signed in successfully."
         });
-        navigate('/analyze');
+        navigate('/canvas');
       }
     } catch (error) {
       if (error instanceof z.ZodError) {

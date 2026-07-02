@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,15 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Sparkles, Clock, Users, Globe, Target, TrendingUp, Bot } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { CheckCircle2, Sparkles, Clock, Users, Globe, Target, TrendingUp } from "lucide-react";
 import { getCategoryColor } from "@/data/dummy-frameworks";
 import { BusinessContextChat } from "@/components/BusinessContextChat";
 import { FrameworkDetailModal } from "@/components/FrameworkDetailModal";
 import { ReportViewerDrawer } from "@/components/ReportViewerDrawer";
 import { FloatingChatButton } from "@/components/FloatingChatButton";
-
+import { getActiveAnalysis } from "@/lib/active-analysis";
+import { getActiveWorkspaceName } from "@/lib/active-workspace";
 interface SavedAnalysis {
   id: string;
   company_name: string;
@@ -44,6 +43,9 @@ interface Recommendation {
   description: string;
   estimated_time: number;
 }
+
+/** Shared content width — goal input and card grids align */
+const CONTENT_CLASS = "w-full max-w-6xl mx-auto";
 
 const Playbooks = () => {
   const { user, loading } = useAuth();
@@ -107,10 +109,37 @@ const Playbooks = () => {
     }
   }, [savedAnalyses]);
 
+  // Auto-select active company from session / workspace when analyses load
+  useEffect(() => {
+    if (savedAnalyses.length === 0 || selectedAnalysis) return;
+
+    const active = getActiveAnalysis();
+    if (active?.id) {
+      const byId = savedAnalyses.find((a) => a.id === active.id);
+      if (byId) {
+        setSelectedAnalysis(byId);
+        return;
+      }
+    }
+
+    const workspaceName = getActiveWorkspaceName();
+    if (workspaceName) {
+      const byName = savedAnalyses.find(
+        (a) =>
+          a.company_name === workspaceName ||
+          a.analysis_data?.company?.name === workspaceName,
+      );
+      if (byName) setSelectedAnalysis(byName);
+    }
+  }, [savedAnalyses, selectedAnalysis]);
+
   const fetchSavedAnalyses = async () => {
+    if (!user) return;
+
     const { data, error } = await supabase
       .from("saved_analyses")
       .select("*")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -260,7 +289,9 @@ const Playbooks = () => {
     const hasICP = canvas.customerSegments?.length > 0;
     const hasChannels = canvas.channels?.length > 0;
     const hasValueProps = canvas.valuePropositions?.length > 0;
-    const hasCompetitors = analysisData.competitors?.length > 0;
+    const hasCompetitors =
+      (analysisData.similarCompanies?.length ?? 0) > 0 ||
+      (analysisData.competitors?.length ?? 0) > 0;
     
     if (!hasICP) {
       addFramework(recommended, ['JTBD', 'BMC']);
@@ -332,9 +363,24 @@ const Playbooks = () => {
       icp: canvas.customerSegments && canvas.customerSegments.length > 0,
       channels: canvas.channels && canvas.channels.length > 0,
       products: analysisData.company?.productsServices && analysisData.company.productsServices.length > 0,
-      competitors: analysisData.competitors && analysisData.competitors.length > 0,
+      competitors:
+        (analysisData.similarCompanies?.length ?? 0) > 0 ||
+        (analysisData.competitors?.length ?? 0) > 0,
     };
   };
+
+  const recommendedFrameworks = useMemo(
+    () => getRecommendedFrameworks(),
+    [
+      selectedAnalysis,
+      frameworks,
+      goalInput,
+      availableReports,
+    ],
+  );
+
+  const playbookGridClass =
+    "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4";
 
   // Generate input status text
   const getInputStatusText = (framework: Framework) => {
@@ -356,8 +402,25 @@ const Playbooks = () => {
         <span className={availability.channels ? "text-success" : ""}>
           Channels {availability.channels ? "✓" : "•"}
         </span>
+        {" "}
+        <span className={availability.competitors ? "text-success" : ""}>
+          Competitors {availability.competitors ? "✓" : "•"}
+        </span>
       </div>
     );
+  };
+
+  const openFramework = (frameworkId: string) => {
+    if (!selectedAnalysis) {
+      toast({
+        title: "Select a company first",
+        description: "Choose a company context so the AI can use your business model.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedFramework(frameworkId);
+    setShowFrameworkModal(true);
   };
 
   const handleStartChat = () => {
@@ -397,12 +460,19 @@ const Playbooks = () => {
     setIsReportDrawerOpen(true);
     setCurrentReportId(null);
 
+    const framework = frameworks.find((f) => f.id === frameworkId);
+
     try {
+      toast({
+        title: "Generating playbook",
+        description: `AI is analyzing ${selectedAnalysis.company_name} using ${framework?.title ?? "this framework"}…`,
+      });
+
       const { data, error } = await supabase.functions.invoke('generate-framework-report', {
         body: {
           company_id: selectedAnalysis.id,
           framework_id: frameworkId,
-          strategic_goal: goalInput || null
+          strategic_goal: goalInput.trim() || null,
         }
       });
 
@@ -444,144 +514,138 @@ const Playbooks = () => {
   };
 
   return (
-    <div>
-      <main className="max-w-7xl mx-auto">
-        {/* Hero Section - Centered */}
-        <div className="mb-12">
-          <div className="text-center mb-8">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-4 pb-2 text-foreground tracking-tight">
-          Strategy Playbooks
-        </h1>
-            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto font-light">
-              Use your Context File to get tailored strategy moves. Describe a goal or pick a playbook—then save the report to this company.
-            </p>
-          </div>
+    <div className={CONTENT_CLASS}>
+      <main className="space-y-8 pb-8">
+        {/* Page header */}
+        <header className="space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+            Strategy
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            Strategy Playbooks
+          </h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Run AI-powered frameworks on your company context. Set a goal, pick a
+            playbook, and save the report to this company.
+          </p>
+        </header>
 
-          {/* Centered Company Selector - Inline Above Chat */}
-          <div className="max-w-5xl mx-auto mb-6">
-            <label className="text-xs text-muted-foreground mb-1.5 block text-center">
-              Company Context
-            </label>
-            <Select
-              value={selectedAnalysis?.id || ""}
-              onValueChange={(value) => {
-                const analysis = savedAnalyses.find((a) => a.id === value);
-                setSelectedAnalysis(analysis || null);
-              }}
-            >
-              <SelectTrigger className="w-full border-primary/30 hover:border-primary/50 transition-colors">
-                <SelectValue placeholder="Select company..." />
-              </SelectTrigger>
-              <SelectContent>
-                {savedAnalyses.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    No analyses yet
-                  </SelectItem>
-                ) : (
-                  savedAnalyses.map((analysis) => (
-                    <SelectItem key={analysis.id} value={analysis.id}>
-                      {analysis.company_name}
+        {/* Context + goal — same width as card grids below */}
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Company context
+              </label>
+              <Select
+                value={selectedAnalysis?.id || ""}
+                onValueChange={(value) => {
+                  const analysis = savedAnalyses.find((a) => a.id === value);
+                  setSelectedAnalysis(analysis || null);
+                }}
+              >
+                <SelectTrigger className="w-full border-primary/25">
+                  <SelectValue placeholder="Select company…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedAnalyses.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No analyses yet
                     </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {savedAnalyses.length === 0 && (
-              <p className="text-xs text-muted-foreground mt-1.5 text-center">
-                <Button 
-                  variant="link" 
-                  className="p-0 h-auto text-xs font-semibold" 
-                  onClick={() => navigate('/analyze')}
-                >
-                  Create one first
-                </Button>
-              </p>
-            )}
-            {selectedAnalysis ? (
-              <div className="flex items-center justify-center gap-1.5 text-xs text-success mt-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                <span>Context loaded</span>
-                <span className="text-muted-foreground">•</span>
-                <span className="text-muted-foreground">
-                  Last verified: {new Date(selectedAnalysis.created_at || Date.now()).toLocaleDateString()}
-                </span>
-                <span className="text-muted-foreground">•</span>
-                <span className="text-muted-foreground">Version v1</span>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground mt-1.5 text-center">
-                Select a company to tailor recommendations
-              </p>
-            )}
-          </div>
-
-          {/* Large Prominent Chat Input - Centered */}
-          <div className="max-w-5xl mx-auto space-y-2">
-            <label className="block text-sm font-medium text-muted-foreground text-center mb-2">
-              Tell the Strategy Coach your goal
-            </label>
-            <div className="relative border border-border rounded-xl bg-card p-5 sm:p-7 transition-colors duration-200 focus-within:border-primary/50">
-              <Textarea 
-                value={goalInput}
-                onChange={(e) => setGoalInput(e.target.value)}
-                placeholder="E.g., 'We want to break into a new market and drive customer acquisition' or 'Need to improve operational efficiency and reduce costs'"
-                className="min-h-[120px] sm:min-h-[150px] border-none bg-transparent resize-none focus-visible:ring-0 text-sm sm:text-base"
-              />
-              
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-4 pt-3 border-t border-border">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center sm:justify-start">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-xs sm:text-sm">AI Strategy Assistant</span>
-                </div>
-                <Button 
-                  onClick={handleStartChat}
-                  disabled={!selectedAnalysis || !goalInput.trim()}
-                  className="w-full sm:w-auto min-h-[44px]"
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Start Strategy Session
-                </Button>
-              </div>
+                  ) : (
+                    savedAnalyses.map((analysis) => (
+                      <SelectItem key={analysis.id} value={analysis.id}>
+                        {analysis.company_name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {savedAnalyses.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs font-semibold"
+                    onClick={() => navigate("/canvas")}
+                  >
+                    Analyze a company first
+                  </Button>
+                </p>
+              )}
             </div>
 
-            {/* Quick-start chips */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+            {selectedAnalysis && (
+              <div className="flex items-center gap-1.5 text-xs text-success sm:pb-2">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                <span>Context loaded for AI</span>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Your strategic goal
+            </label>
+            <Textarea
+              value={goalInput}
+              onChange={(e) => setGoalInput(e.target.value)}
+              placeholder="E.g., break into a new market, reduce CAC, or improve operational margins…"
+              className="min-h-[100px] resize-none text-sm sm:text-base"
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2">
               {[
                 "Increase revenue / reduce CAC",
                 "Enter a new market / launch a product",
-                "Improve margins / cut ops waste"
+                "Improve margins / cut ops waste",
               ].map((chipText) => (
                 <Button
                   key={chipText}
                   variant="outline"
                   size="sm"
                   onClick={() => setGoalInput(chipText)}
-                  className="text-xs px-4 py-2 active:scale-95 transition-all duration-200"
+                  className="h-8 text-xs"
                 >
                   {chipText}
                 </Button>
               ))}
             </div>
+            <Button
+              onClick={handleStartChat}
+              disabled={!selectedAnalysis || !goalInput.trim()}
+              className="shrink-0 gap-2 sm:min-w-[180px]"
+            >
+              <Sparkles className="h-4 w-4" />
+              Start Strategy Session
+            </Button>
           </div>
-        </div>
+
+          <p className="text-[11px] text-muted-foreground">
+            Strategy Coach and playbooks use your saved business model, company
+            profile, and competitors from the Canvas.
+          </p>
+        </section>
 
         {/* Recommended Section */}
-        {selectedAnalysis && getRecommendedFrameworks().length > 0 && (
-          <div className="mt-16 mb-12">
-            <div className="mb-6">
-              <h2 className="text-2xl font-medium mb-2 text-foreground tracking-wide">Recommended for {selectedAnalysis.company_name}</h2>
-              <p className="text-muted-foreground font-light">Based on your goals, stage, ICP, and channels.</p>
+        {selectedAnalysis && recommendedFrameworks.length > 0 && (
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                Recommended for {selectedAnalysis.company_name}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Based on your goal, industry, and canvas data.
+              </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-fade-in">
-              {getRecommendedFrameworks().slice(0, 6).map((framework) => {
+            <div className={`${playbookGridClass} animate-fade-in`}>
+              {recommendedFrameworks.slice(0, 6).map((framework) => {
                 const IconComponent = framework.icon || Target;
                 return (
                   <Card 
                     key={framework.id}
-                    onClick={() => {
-                      setSelectedFramework(framework.id);
-                      setShowFrameworkModal(true);
-                    }}
+                    onClick={() => openFramework(framework.id)}
                     className="group cursor-pointer hover:border-primary/40 hover:shadow-sm transition-all duration-200 relative"
                   >
                     <Badge 
@@ -638,25 +702,20 @@ const Playbooks = () => {
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {/* Premium section separator */}
-        {selectedAnalysis && getRecommendedFrameworks().length > 0 && (
-          <div className="my-16">
-            <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-          </div>
+          </section>
         )}
 
         {/* Framework Library */}
-        <div>
-          <div className="flex items-center justify-between mb-6">
+        <section className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-2xl font-semibold mb-2 tracking-tight">All Playbooks</h2>
-              <p className="text-muted-foreground font-light">Browse and select frameworks to run on your business</p>
+              <h2 className="text-lg font-semibold tracking-tight">All playbooks</h2>
+              <p className="text-sm text-muted-foreground">
+                Browse frameworks — each run uses your company context and goal.
+              </p>
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
@@ -669,16 +728,13 @@ const Playbooks = () => {
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-fade-in">
+          <div className={`${playbookGridClass} animate-fade-in`}>
             {filteredFrameworks.map((framework) => {
               const IconComponent = framework.icon || Target;
               return (
                 <Card 
                   key={framework.id}
-                  onClick={() => {
-                    setSelectedFramework(framework.id);
-                    setShowFrameworkModal(true);
-                  }}
+                  onClick={() => openFramework(framework.id)}
                   className="group cursor-pointer hover:border-primary/40 hover:shadow-sm transition-all duration-200"
                 >
                   <CardHeader>
@@ -731,12 +787,12 @@ const Playbooks = () => {
           </div>
 
           {filteredFrameworks.length === 0 && (
-            <div className="text-center py-12 bg-muted/30 rounded-lg border-2 border-dashed">
-              <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div className="rounded-lg border border-dashed bg-muted/30 py-12 text-center">
+              <Sparkles className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
               <p className="text-muted-foreground">No frameworks found in this category.</p>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Persistent Chat Button - Always visible when company selected */}
         {selectedAnalysis && user && chatState === 'closed' && (
@@ -771,6 +827,7 @@ const Playbooks = () => {
           framework={frameworks.find(f => f.id === selectedFramework) || null}
           onRunFramework={handleRunFramework}
           selectedAnalysis={selectedAnalysis}
+          strategicGoal={goalInput.trim() || undefined}
         />
 
         {/* Report Viewer Drawer */}

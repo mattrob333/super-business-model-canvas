@@ -11,6 +11,13 @@ import {
 import type { CanvasSectionKey } from "./section-types";
 import { BMCSectionEditor } from "@/components/BMCSectionEditor";
 
+/** Two-row pillar sections — extra vertical room for all bullets */
+const TALL_PILLAR_SECTIONS = new Set<CanvasSectionKey>([
+  "key_partners",
+  "value_propositions",
+  "customer_segments",
+]);
+
 /**
  * Legacy data shape from saved_analyses.analysis_data JSON.
  * Keys are camelCase.
@@ -53,6 +60,8 @@ export interface EnterpriseBusinessModelCanvasProps {
     updatedData: { items: string[]; notes: string },
   ) => void;
   onEditorOpenChange?: (open: boolean) => void;
+  /** Tighter grid for analysis results — fits more on one screen */
+  compact?: boolean;
 }
 
 interface SelectedSection {
@@ -69,6 +78,7 @@ export function EnterpriseBusinessModelCanvas({
   sectionMeta,
   onSectionUpdate,
   onEditorOpenChange,
+  compact = false,
 }: EnterpriseBusinessModelCanvasProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [selectedSection, setSelectedSection] =
@@ -122,9 +132,20 @@ export function EnterpriseBusinessModelCanvas({
     [selectedSection, onSectionUpdate],
   );
 
-  const renderSection = (key: CanvasSectionKey, height: string) => {
+  const renderSection = (
+    key: CanvasSectionKey,
+    height: string,
+    maxPreviewItems?: number,
+  ) => {
     const { items, notes } = getSectionData(key);
     const meta = sectionMeta?.[key];
+    const isTallPillar = TALL_PILLAR_SECTIONS.has(key);
+    const previewCount = compact
+      ? isTallPillar
+        ? items.length
+        : (maxPreviewItems ?? 3)
+      : (maxPreviewItems ?? 3);
+
     return (
       <CanvasSectionCard
         key={key}
@@ -134,38 +155,60 @@ export function EnterpriseBusinessModelCanvas({
         meta={meta}
         span={CANVAS_SECTION_GRID_PLACEMENT[key]}
         height={height}
+        maxPreviewItems={previewCount}
+        compactPreview={compact}
+        tallPreview={compact && isTallPillar}
         onClick={() => handleSectionClick(key)}
       />
     );
   };
 
+  const topRowHeight = compact ? "h-[136px] md:h-full" : "h-[180px] md:h-full";
+  const bottomRowHeight = compact ? "h-[168px] md:h-[176px]" : "h-[200px]";
+  const gridRowClass = compact
+    ? "md:auto-rows-[minmax(136px,1fr)]"
+    : "md:auto-rows-[200px]";
+
   return (
     <>
-      <div className="w-full max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
-            Business Model Canvas
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Click a section or use{" "}
-            <span className="font-medium text-primary">Analyze</span> to refine
-            with AI.
-          </p>
-        </div>
+      <div className="w-full">
+        {!compact && (
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
+              Business Model Canvas
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Click a section or the{" "}
+              <span className="font-medium text-primary">✦</span> icon to refine
+              with AI.
+            </p>
+          </div>
+        )}
 
-        {/* Canvas Grid — wrapped in a single bordered frame */}
-        <CanvasGridFrame>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-3 md:auto-rows-[200px]">
+        {compact && (
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">
+              Business Model Canvas
+            </h2>
+            <p className="text-[10px] text-muted-foreground">
+              Click a section or <span className="text-primary">✦</span> to refine
+            </p>
+          </div>
+        )}
+
+        <CanvasGridFrame className={compact ? "p-2 sm:p-2.5" : undefined}>
+          <div
+            className={`grid grid-cols-1 md:grid-cols-5 gap-1.5 md:gap-2 ${gridRowClass}`}
+          >
             {CANVAS_SECTION_KEYS.slice(0, 7).map((key) =>
-              renderSection(key, "h-[180px] md:h-full"),
+              renderSection(key, topRowHeight),
             )}
           </div>
 
-          <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+          <div className="flex flex-col md:flex-row gap-1.5 md:gap-2">
             {CANVAS_SECTION_KEYS.slice(7).map((key) => (
               <div key={key} className="flex-1">
-                {renderSection(key, "h-[200px]")}
+                {renderSection(key, bottomRowHeight, 3)}
               </div>
             ))}
           </div>

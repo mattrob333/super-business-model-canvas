@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
-import { BusinessOverview } from "@/components/BusinessOverview";
+import { BusinessOverviewSheet } from "@/components/BusinessOverviewSheet";
 import { EnterpriseBusinessModelCanvas } from "@/components/canvas/EnterpriseBusinessModelCanvas";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
@@ -13,6 +13,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { setActiveWorkspaceName } from "@/lib/active-workspace";
+import {
+  getActiveAnalysis,
+  setActiveAnalysis,
+} from "@/lib/active-analysis";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Save, Search, ChevronUp, ArrowRight, Loader2, Sparkles } from "lucide-react";
@@ -25,6 +29,18 @@ function syncWorkspaceFromAnalysis(data: { company?: { name?: string } } | null)
   if (name) {
     setActiveWorkspaceName(name);
   }
+}
+
+function persistActiveAnalysis(
+  data: Record<string, unknown> | null,
+  id?: string | null,
+) {
+  if (!data) return;
+  syncWorkspaceFromAnalysis(data);
+  setActiveAnalysis({
+    id: id ?? getActiveAnalysis()?.id ?? null,
+    data,
+  });
 }
 
 function domainLabelFromUrl(url: string): string {
@@ -88,9 +104,16 @@ const Analysis = () => {
     };
   }, [hasAnalyzed, analysisData]);
 
+  // Keep session in sync whenever results are on screen (survives sidebar navigation)
+  useEffect(() => {
+    if (hasAnalyzed && analysisData) {
+      persistActiveAnalysis(analysisData);
+    }
+  }, [hasAnalyzed, analysisData]);
+
   // Load saved analysis from sessionStorage if available
   useEffect(() => {
-    const loadedAnalysis = sessionStorage.getItem('loadedAnalysis');
+    const loadedAnalysis = sessionStorage.getItem("loadedAnalysis");
     if (loadedAnalysis) {
       try {
         const parsed = JSON.parse(loadedAnalysis);
@@ -98,15 +121,23 @@ const Analysis = () => {
         setHasAnalyzed(true);
         setIsNewAnalysis(false);
         setSearchCollapsed(true);
-        syncWorkspaceFromAnalysis(parsed);
-        sessionStorage.removeItem('loadedAnalysis');
-        // Ensure page starts at the top
-        window.scrollTo({ top: 0, behavior: 'auto' });
+        persistActiveAnalysis(parsed);
+        sessionStorage.removeItem("loadedAnalysis");
+        window.scrollTo({ top: 0, behavior: "auto" });
       } catch (error) {
-        console.error('Failed to load analysis:', error);
+        console.error("Failed to load analysis:", error);
+      }
+    } else {
+      const active = getActiveAnalysis();
+      if (active?.data) {
+        setAnalysisData(active.data);
+        setHasAnalyzed(true);
+        setIsNewAnalysis(false);
+        setSearchCollapsed(true);
+        syncWorkspaceFromAnalysis(active.data);
       }
     }
-    
+
     // Fetch recent analyses if user is logged in
     if (user) {
       supabase
@@ -137,7 +168,7 @@ const Analysis = () => {
 
       if (data) {
         setAnalysisData(data);
-        syncWorkspaceFromAnalysis(data);
+        persistActiveAnalysis(data);
         setHasAnalyzed(true);
         setIsNewAnalysis(true);
         setSearchCollapsed(true);
@@ -190,7 +221,7 @@ const Analysis = () => {
     };
     
     setAnalysisData(newAnalysisData);
-    syncWorkspaceFromAnalysis(newAnalysisData);
+    persistActiveAnalysis(newAnalysisData);
     
     // Mark section as reviewed
     setReviewedSections(prev => prev + 1);
@@ -245,13 +276,21 @@ const Analysis = () => {
             .maybeSingle();
 
           if (!existing) {
-            await supabase
-              .from('saved_analyses')
+            const { data: inserted } = await supabase
+              .from("saved_analyses")
               .insert({
                 user_id: user.id,
                 company_name: companyName,
                 analysis_data: analysisData,
-              });
+              })
+              .select("id")
+              .single();
+
+            if (inserted?.id) {
+              persistActiveAnalysis(analysisData, inserted.id);
+            }
+          } else {
+            persistActiveAnalysis(analysisData, existing.id);
           }
         } catch (error) {
           console.error('Initial auto-save error:', error);
@@ -299,20 +338,20 @@ const Analysis = () => {
       [`${legacyKey}_notes`]: updatedData.notes
     };
 
-    setAnalysisData({
+    const nextAnalysisData = {
       ...analysisData,
-      canvas: updatedCanvas
-    });
+      canvas: updatedCanvas,
+    };
+
+    setAnalysisData(nextAnalysisData);
+    persistActiveAnalysis(nextAnalysisData);
 
     // Auto-save if user is logged in
     if (user && analysisData) {
       supabase
         .from('saved_analyses')
         .update({
-          analysis_data: {
-            ...analysisData,
-            canvas: updatedCanvas
-          }
+          analysis_data: nextAnalysisData,
         })
         .eq('user_id', user.id)
         .eq('company_name', analysisData.company?.name || 'Unknown Company')
@@ -664,7 +703,7 @@ Website: ${comp.website || 'N/A'}
               key={analysis.id}
               onClick={() => {
                 setAnalysisData(analysis.analysis_data);
-                syncWorkspaceFromAnalysis(analysis.analysis_data);
+                persistActiveAnalysis(analysis.analysis_data, analysis.id);
                 setHasAnalyzed(true);
                 setIsNewAnalysis(false);
                 setSearchCollapsed(true);
@@ -699,36 +738,69 @@ Website: ${comp.website || 'N/A'}
 
         {/* Results Section */}
         {hasAnalyzed && !isLoading && analysisData && (
-          <div ref={resultsRef} className="space-y-4 sm:space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom duration-500">
-            {/* Success Banner - Only show for new analyses */}
+          <div
+            ref={resultsRef}
+            className="mx-auto w-full max-w-7xl space-y-3 animate-in fade-in slide-in-from-bottom duration-500"
+          >
             {isNewAnalysis && (
-              <SuccessBanner 
+              <SuccessBanner
                 companyName={analysisData.company?.name || "Unknown Company"}
               />
             )}
 
-            
-            <section className="relative">
-              <BusinessOverview
+            {/* Company header */}
+            <header className="space-y-1.5 pt-1">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1.5">
+                  <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+                    {analysisData.company?.name || "Unknown Company"}
+                  </h1>
+                  <p className="text-base font-medium text-primary md:text-lg">
+                    {analysisData.company?.industry || "Unknown industry"}
+                  </p>
+                  <BusinessOverviewSheet
                 data={{
                   name: analysisData.company?.name || "Unknown Company",
                   industry: analysisData.company?.industry || "Unknown",
-                  description: analysisData.company?.description || "No description available",
-                  productsServices: Array.isArray(analysisData.company?.productsServices) 
-                    ? analysisData.company.productsServices 
+                  description:
+                    analysisData.company?.description ||
+                    "No description available",
+                  productsServices: Array.isArray(
+                    analysisData.company?.productsServices,
+                  )
+                    ? analysisData.company.productsServices
                     : [],
-                  keyExecutives: Array.isArray(analysisData.company?.keyExecutives)
+                  keyExecutives: Array.isArray(
+                    analysisData.company?.keyExecutives,
+                  )
                     ? analysisData.company.keyExecutives
                     : [],
                   website: analysisData.company?.website || "",
-                  notes: analysisData.company?.notes
+                  notes: analysisData.company?.notes,
                 }}
                 onUpdate={handleBusinessOverviewUpdate}
               />
-            </section>
+                </div>
+                {searchCollapsed && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSearchCollapsed(false);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="shrink-0 gap-1.5"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    New analysis
+                  </Button>
+                )}
+              </div>
+            </header>
 
-            <section className="w-full max-w-7xl mx-auto relative">
+            <section className="relative w-full">
               <EnterpriseBusinessModelCanvas
+                compact
                 data={{
                   keyPartners: Array.isArray(analysisData.canvas?.keyPartners) ? analysisData.canvas.keyPartners : [],
                   keyActivities: Array.isArray(analysisData.canvas?.keyActivities) ? analysisData.canvas.keyActivities : [],
@@ -762,7 +834,7 @@ Website: ${comp.website || 'N/A'}
               />
             </section>
 
-            <section className="w-full max-w-7xl mx-auto relative">
+            <section className="relative w-full pt-4">
               <CompetitiveLandscape
                 competitors={Array.isArray(analysisData.similarCompanies) ? analysisData.similarCompanies : []} 
                 onSimilarCompanyChat={handleSimilarCompanyChat}

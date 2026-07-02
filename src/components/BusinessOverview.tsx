@@ -1,4 +1,11 @@
-import { Globe, Briefcase, MessageSquare, User, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Globe,
+  Briefcase,
+  MessageSquare,
+  User,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,187 +26,157 @@ interface BusinessOverviewProps {
     website: string;
     notes?: string;
   };
-  onUpdate?: (data: BusinessOverviewProps['data']) => void;
+  onUpdate?: (data: BusinessOverviewProps["data"]) => void;
+  /** When true, hides the company title block (shown by parent instead) */
+  hideHeader?: boolean;
 }
 
-export const BusinessOverview = ({ data, onUpdate }: BusinessOverviewProps) => {
+export const BusinessOverview = ({
+  data,
+  onUpdate,
+  hideHeader = false,
+}: BusinessOverviewProps) => {
   const [editorOpen, setEditorOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(() => {
-    // Collapsed on mobile (< 768px), expanded on desktop
-    if (typeof window !== 'undefined') {
-      return window.innerWidth >= 768;
-    }
-    return true; // Default to expanded for SSR
-  });
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleSave = (updatedData: BusinessOverviewProps['data']) => {
-    if (onUpdate) {
-      onUpdate(updatedData);
-    }
+  const handleSave = (updatedData: BusinessOverviewProps["data"]) => {
+    onUpdate?.(updatedData);
     setEditorOpen(false);
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 sm:space-y-8">
-      {/* Hero Header - Company Name + Tagline */}
-      <div className="space-y-2 sm:space-y-3">
-        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-none">
-          {data.name}
-        </h1>
-        
-        {/* Industry Tagline */}
-        <p className="text-base sm:text-lg md:text-xl text-primary font-medium">
-          {data.industry}
-        </p>
-        
-        {/* AI-generated microcopy */}
-        <p className="text-sm text-muted-foreground mt-1">
-          AI-generated profile — review and edit for accuracy.
-        </p>
-      </div>
+    <div className="w-full">
+      {!hideHeader && (
+        <div className="mb-3 space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
+            {data.name}
+          </h1>
+          <p className="text-sm font-medium text-primary">{data.industry}</p>
+        </div>
+      )}
 
-      {/* Section Header with Edit Button */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Business Overview — AI Drafted (Editable)</div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              onClick={() => setEditorOpen(true)} 
-              size="sm" 
-              variant="outline"
-              className="h-9 px-3 gap-2"
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Refine with AI</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Edit this section or chat with AI to refine descriptions and add missing details.</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
+      <div className="rounded-lg border border-border bg-card/50">
+        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setIsExpanded((v) => !v)}
+            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Business overview
+            </span>
+            {isExpanded ? (
+              <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            )}
+          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={() => setEditorOpen(true)}
+                size="sm"
+                variant="ghost"
+                className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Refine</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Edit or chat with AI to refine this overview.</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
-      {/* Card Content */}
-      <div 
-        className="bg-card border border-border rounded-xl p-6 sm:p-8 cursor-pointer md:cursor-default 
-                   hover:border-primary/30 transition-colors duration-200"
-        onClick={() => window.innerWidth < 768 && setIsExpanded(!isExpanded)}
-      >
-        <div className="space-y-4 sm:space-y-6">
-          {/* Description */}
-          <div>
-            <p className={`text-foreground/80 text-sm sm:text-base md:text-lg leading-loose ${
-              !isExpanded ? 'line-clamp-5 sm:line-clamp-3' : ''
-            }`}>
+        {!isExpanded ? (
+          <p className="px-3 py-2.5 text-sm leading-relaxed text-muted-foreground line-clamp-2">
+            {data.description}
+          </p>
+        ) : (
+          <div className="space-y-4 p-3 sm:p-4">
+            <p className="text-sm leading-relaxed text-foreground/85">
               {data.description}
             </p>
-          </div>
 
-          {/* Two-column grid - Collapsible on mobile */}
-          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 ${
-            !isExpanded ? 'hidden md:grid' : ''
-          }`}>
-            {/* Left Column: Key Facts */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Key Facts</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Briefcase className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="flex-1">
-                    <div className="text-xs text-muted-foreground uppercase tracking-wide">Industry</div>
-                    <div className="text-foreground font-medium">{data.industry}</div>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Key facts
+                </h3>
+                <div className="space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Industry
+                      </div>
+                      <div className="text-sm font-medium">{data.industry}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Globe className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Website
+                      </div>
+                      <a
+                        href={data.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-primary hover:underline"
+                      >
+                        {data.website}
+                      </a>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <Globe className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="flex-1">
-                    <div className="text-xs text-muted-foreground uppercase tracking-wide">Website</div>
-                    <a 
-                      href={data.website} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-0.5"
-                    >
-                      {data.website}
-                    </a>
-                  </div>
+
+                <div className="space-y-2 pt-1">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Key leadership
+                  </h3>
+                  {data.keyExecutives.length > 0 ? (
+                    data.keyExecutives.map((exec, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <User className="mt-0.5 h-3.5 w-3.5 text-primary" />
+                        <div>
+                          <div className="text-sm font-medium">{exec.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {exec.role}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No executives listed
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Key Leadership - Only when expanded */}
-              {isExpanded && (
-                <div className="pt-4 space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Key Leadership</h3>
-                  <div className="space-y-2">
-                    {data.keyExecutives.map((exec, index) => (
-                      <div key={index} className="flex items-start gap-3 p-2 rounded-lg hover:bg-primary/5 transition-colors">
-                        <User className="h-4 w-4 text-primary mt-1" />
-                        <div className="flex-1">
-                          <div className="text-foreground font-medium text-sm">{exec.name}</div>
-                          <div className="text-xs text-muted-foreground">{exec.role}</div>
-                        </div>
-                      </div>
-                    ))}
-                    {data.keyExecutives.length === 0 && (
-                      <p className="text-sm text-muted-foreground">No executives listed</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right Column: Products & Services */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Products & Services</h3>
-              <ul className="space-y-2">
-                {/* First 2 products - Always visible */}
-                {data.productsServices.slice(0, 2).map((item, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <div className="h-1.5 w-1.5 bg-primary rounded-full mt-2" />
-                    <span className="text-foreground/80">{item}</span>
-                  </li>
-                ))}
-                
-                {/* Remaining products - Only when expanded */}
-                {isExpanded && data.productsServices.slice(2).map((item, index) => (
-                  <li key={index + 2} className="flex items-start gap-3">
-                    <div className="h-1.5 w-1.5 bg-primary rounded-full mt-2" />
-                    <span className="text-foreground/80">{item}</span>
-                  </li>
-                ))}
-                
-                {data.productsServices.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No products or services listed</p>
-                )}
-              </ul>
+              <div className="space-y-2">
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Products &amp; services
+                </h3>
+                <ul className="space-y-1.5">
+                  {data.productsServices.map((item, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <div className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" />
+                      <span className="text-sm text-foreground/85">{item}</span>
+                    </li>
+                  ))}
+                  {data.productsServices.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No products or services listed
+                    </p>
+                  )}
+                </ul>
+              </div>
             </div>
           </div>
-
-          {/* Toggle indicator - Mobile only */}
-          {!isExpanded && (
-            <div className="flex justify-center md:hidden pt-1">
-              <ChevronDown className="h-4 w-4 text-muted-foreground animate-pulse" />
-            </div>
-          )}
-          
-          {/* Close button when expanded - Mobile only */}
-          {isExpanded && (
-            <div className="flex justify-center md:hidden pt-2">
-              <Button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsExpanded(false);
-                }} 
-                variant="ghost" 
-                size="sm"
-                className="gap-2 text-muted-foreground hover:text-foreground"
-              >
-                <ChevronUp className="h-4 w-4" />
-                <span>Close</span>
-              </Button>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       <BusinessOverviewEditor

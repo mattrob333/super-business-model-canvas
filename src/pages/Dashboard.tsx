@@ -3,16 +3,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MetricTile } from "@/components/dashboard/MetricTile";
 import { StrategicHealthPanel } from "@/components/dashboard/StrategicHealthPanel";
+import { useActiveAnalysis } from "@/hooks/useActiveAnalysis";
 
 const Dashboard = () => {
+  const { activeAnalysis } = useActiveAnalysis();
+  const company = activeAnalysis?.data?.company as
+    | { name?: string; industry?: string }
+    | undefined;
+
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Page heading */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Enterprise strategy operating overview
+          {company?.name
+            ? `Strategy overview for ${company.name}`
+            : "Enterprise strategy operating overview"}
         </p>
+        {company?.industry && (
+          <Badge variant="outline" className="mt-2 text-primary border-primary/30">
+            {company.industry}
+          </Badge>
+        )}
       </div>
 
       {/* Top row — 4 metric tiles */}

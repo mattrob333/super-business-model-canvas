@@ -1,6 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Handlebars from 'https://esm.sh/handlebars@4.7.8';
 import { callChatCompletion, resolveFrameworkModel } from '../_shared/llm-client.ts';
+import {
+  normalizeFrameworkAnalysis,
+  isLikelyHtml,
+  proseFallbackReport,
+  isThinReport,
+} from '../_shared/framework-report-normalize.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -162,6 +168,8 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
       maxTokens: framework.max_tokens || 4000,
     }));
     
+    const rawAiResponse = reportContent;
+    
     console.log('AI Response received, length:', reportContent.length);
     console.log('First 200 chars:', reportContent.substring(0, 200));
 
@@ -205,6 +213,7 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
           let analysisData: any;
           let parseAttempts = 0;
           const maxAttempts = 3;
+          let usedDirectHtml = false;
           
           // Try to parse JSON with retries
           while (parseAttempts < maxAttempts) {
@@ -243,6 +252,19 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
                 }
                 
                 const errorMsg = jsonError instanceof Error ? jsonError.message : 'Unknown error';
+
+                if (isLikelyHtml(reportContent)) {
+                  console.log('Using AI HTML response directly');
+                  reportContent = proseFallbackReport(
+                    framework.title,
+                    companyName,
+                    strategic_goal,
+                    reportContent,
+                  );
+                  usedDirectHtml = true;
+                  break;
+                }
+
                 throw new Error(`Failed to parse AI response as valid JSON after ${maxAttempts} attempts: ${errorMsg}`);
               }
               
@@ -251,18 +273,34 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
             }
           }
           
+          if (!usedDirectHtml) {
           // Compile and render template with data
           const template = Handlebars.compile(framework.output_template);
+          const normalizedData = normalizeFrameworkAnalysis(
+            framework.shortcut,
+            analysisData as Record<string, unknown>,
+          );
           const templateData = {
             companyName,
             strategicGoal: strategic_goal,
-            ...analysisData
+            ...normalizedData,
           };
-          
+
           console.log('Rendering template with data keys:', Object.keys(templateData));
           reportContent = template(templateData);
-          
+
+          if (isThinReport(reportContent)) {
+            console.warn('Thin report after template render — using prose fallback');
+            reportContent = proseFallbackReport(
+              framework.title,
+              companyName,
+              strategic_goal,
+              rawAiResponse,
+            );
+          }
+
           console.log('✅ Template rendered successfully, length:', reportContent.length);
+          }
         } else {
           console.log('Using simple variable substitution...');
           // Simple variable substitution

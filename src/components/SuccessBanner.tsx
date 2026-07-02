@@ -1,26 +1,57 @@
-import { CheckCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface SuccessBannerProps {
   companyName: string;
+  /** Auto-hide after this many ms (default 5s) */
+  durationMs?: number;
 }
 
-export const SuccessBanner = ({ companyName }: SuccessBannerProps) => {
+export const SuccessBanner = ({
+  companyName,
+  durationMs = 5000,
+}: SuccessBannerProps) => {
+  const [visible, setVisible] = useState(true);
+  const [exiting, setExiting] = useState(false);
+
+  const dismiss = () => {
+    setExiting(true);
+    window.setTimeout(() => setVisible(false), 300);
+  };
+
+  useEffect(() => {
+    const timer = window.setTimeout(dismiss, durationMs);
+    return () => window.clearTimeout(timer);
+  }, [durationMs]);
+
+  if (!visible) return null;
+
   return (
-    <div className="w-full max-w-7xl mx-auto mb-8">
-      <div className="bg-primary/5 border-l-4 border-primary rounded-lg p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-            <CheckCircle className="text-primary w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-xl font-semibold text-primary mb-2">
-              ✓ Source of Truth Created for {companyName}
-            </h3>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Your AI-researched business context is ready. Click on any section below to review, edit, or refine details before generating strategic insights.
-            </p>
-          </div>
+    <div
+      className={cn(
+        "fixed top-16 right-4 z-50 max-w-sm animate-in fade-in slide-in-from-top-2 duration-300",
+        exiting && "animate-out fade-out slide-out-to-top-2 duration-300",
+      )}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-start gap-2.5 rounded-lg border border-primary/30 bg-card px-3 py-2.5 shadow-lg">
+        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">
+            Source of truth created
+          </p>
+          <p className="truncate text-xs text-muted-foreground">{companyName}</p>
         </div>
+        <button
+          type="button"
+          onClick={dismiss}
+          className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+          aria-label="Dismiss"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );

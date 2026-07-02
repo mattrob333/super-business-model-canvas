@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getUserDisplayName, getUserInitials } from "@/lib/user-display";
 import { clearActiveWorkspaceName } from "@/lib/active-workspace";
+import { clearActiveAnalysis } from "@/lib/active-analysis";
 import { toast } from "@/hooks/use-toast";
 
 interface NavItem {
@@ -97,6 +98,7 @@ function SidebarUserFooter() {
     }
 
     clearActiveWorkspaceName();
+    clearActiveAnalysis();
     navigate("/auth");
   };
 

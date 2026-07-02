@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { summarizePreviewItem } from "@/lib/canvas-preview";
 import {
   Bot,
   FileCheck,
@@ -48,6 +49,12 @@ export interface CanvasSectionCardProps {
   onAnalyze?: () => void;
   /** Error message from the last analysis run */
   analysisError?: string;
+  /** Max bullet items shown in preview (bottom row cards use fewer) */
+  maxPreviewItems?: number;
+  /** Tighter cards on the analysis results page — larger type, shorter bullets */
+  compactPreview?: boolean;
+  /** Tall pillar sections (2-row span) — show more text per bullet */
+  tallPreview?: boolean;
 }
 
 const freshnessConfig: Record<
@@ -95,9 +102,13 @@ export function CanvasSectionCard({
   isAnalyzing = false,
   onAnalyze,
   analysisError,
+  maxPreviewItems = 3,
+  compactPreview = false,
+  tallPreview = false,
 }: CanvasSectionCardProps) {
-  const previewItems = items.slice(0, 3);
-  const remainingCount = items.length - 3;
+  const previewLimit = maxPreviewItems;
+  const previewItems = items.slice(0, previewLimit);
+  const remainingCount = Math.max(0, items.length - previewLimit);
   const freshness = meta?.freshness ?? "unverified";
   const freshnessCfg = freshnessConfig[freshness];
   const confidence = meta?.confidence ?? null;
@@ -114,16 +125,16 @@ export function CanvasSectionCard({
   return (
     <Card
       className={cn(
-        "relative flex flex-col p-3 sm:p-4 cursor-pointer transition-all duration-200 group overflow-hidden",
+        "relative flex flex-col p-2.5 sm:p-3 cursor-pointer transition-all duration-200 group overflow-hidden",
         "hover:border-primary/40 hover:shadow-md",
         span,
         height,
       )}
       onClick={onClick}
     >
-      {/* Title */}
-      <div className="mb-2 flex items-center gap-1.5 min-w-0 pr-1">
-        <h3 className="text-xs sm:text-sm font-medium uppercase tracking-wide text-muted-foreground truncate">
+      {/* Title — orange section label */}
+      <div className="mb-1.5 flex items-center gap-1.5 min-w-0 pr-6">
+        <h3 className="truncate text-[10px] font-semibold uppercase tracking-wide text-primary sm:text-xs">
           {title}
         </h3>
         {meta?.hasNotes || notes ? (
@@ -209,50 +220,63 @@ export function CanvasSectionCard({
       )}
 
       {/* Content: items preview */}
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden pb-5">
         {items.length > 0 ? (
           <>
-            <ul className="space-y-1.5">
+            <ul className={cn("space-y-1", compactPreview && "space-y-1.5")}>
               {previewItems.map((item, index) => (
                 <li key={index} className="flex items-start gap-1.5">
-                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                  <span className="line-clamp-2 text-sm leading-snug text-foreground/80">
-                    {item}
+                  <div
+                    className={cn(
+                      "h-1 w-1 shrink-0 rounded-full bg-primary",
+                      compactPreview ? "mt-2" : "mt-1.5",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-foreground/85",
+                      compactPreview
+                        ? cn(
+                            "text-sm leading-relaxed",
+                            tallPreview ? "line-clamp-2" : "line-clamp-1",
+                          )
+                        : "line-clamp-2 text-xs leading-snug text-foreground/80",
+                    )}
+                  >
+                    {compactPreview
+                      ? summarizePreviewItem(item, tallPreview ? 96 : 80)
+                      : item}
                   </span>
                 </li>
               ))}
             </ul>
             {remainingCount > 0 && (
-              <p className="mt-1.5 inline-flex items-center gap-0.5 text-xs text-muted-foreground">
+              <p className="mt-1 inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
                 +{remainingCount} more
                 <ChevronRight className="h-3 w-3" />
               </p>
             )}
           </>
         ) : (
-          <p className="text-sm italic text-muted-foreground">
+          <p className="text-xs italic text-muted-foreground">
             No data yet. Click to add.
           </p>
         )}
       </div>
 
-      {/* Analyze — bottom right */}
-      <div className="mt-auto flex justify-end pt-2">
+      {/* Sparkle — bottom-right refine affordance */}
+      <div className="pointer-events-none absolute bottom-2 right-2">
         {isAnalyzing ? (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium text-primary">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Analyzing…
-          </span>
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
         ) : (
           <button
             type="button"
             onClick={handleAnalyzeClick}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/5 hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            title={`Analyze ${title}`}
-            aria-label={`Analyze ${title}`}
+            className="pointer-events-auto rounded p-1 text-primary/70 transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title={`Refine ${title} with AI`}
+            aria-label={`Refine ${title} with AI`}
           >
-            <Sparkles className="h-3 w-3" />
-            Analyze
+            <Sparkles className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
