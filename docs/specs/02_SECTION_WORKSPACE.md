@@ -11,6 +11,8 @@ their name on the door, their working files on the desk, the section's live canv
 and a bench of instruments (skills/templates/frameworks) they actually use. The tone is
 enterprise-calm: 8px radii, generous whitespace, the agent's accent color used sparingly
 (avatar ring, active states, primary buttons) — never neon, never gimmicky.
+Light-mode page canvases use the established subtle grid background; cards remain white,
+bordered, and lightly shadowed above that texture.
 
 ## Route & entry
 

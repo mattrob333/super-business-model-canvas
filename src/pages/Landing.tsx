@@ -417,17 +417,7 @@ const Landing = () => {
       </header>
 
       <main>
-        <section className="relative overflow-hidden border-b border-border/60 bg-background">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-60"
-            style={{
-              backgroundImage:
-                "linear-gradient(hsl(var(--border)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px)",
-              backgroundSize: "48px 48px",
-              maskImage: "linear-gradient(to bottom, black, transparent 78%)",
-            }}
-            aria-hidden="true"
-          />
+        <section className="bg-grid-subtle border-b border-border/60">
           <div className="relative mx-auto max-w-6xl px-4 py-24 text-center sm:px-6 lg:py-28">
             <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-border/70 bg-white px-3 py-1 text-sm font-medium text-primary shadow-sm">
               <Sparkles className="h-4 w-4" />
