@@ -8,8 +8,8 @@
 
 | Phase | Title | Status | Branch | Last update |
 |---|---|---|---|---|
-| 0 | Baseline verification & deploy prep | **AWAITING REVIEW** | `build/phase-0-baseline` | 2026-07-02 |
-| 1 | Data model wave 1 | NOT STARTED | — | — |
+| 0 | Baseline verification & deploy prep | **APPROVED** | `build/phase-0-baseline` (merged, PR #2, `db7cd1f`) | 2026-07-02 |
+| 1 | Data model wave 1 | **IN PROGRESS** | `build/phase-1-migrations` | 2026-07-02 |
 | 2 | Agent worker service | NOT STARTED | — | — |
 | 3 | Research engine & evidence | NOT STARTED | — | — |
 | 4 | Competitor canvases & gap engine | NOT STARTED | — | — |
@@ -46,7 +46,16 @@ Status: OPEN | RESOLVED (<how>)
 
 ## REVIEW FINDINGS
 
-_(none yet)_
+### Phase 0 — APPROVED (2026-07-02)
+Reviewer independently re-ran all gates on `build/phase-0-baseline` (tsc clean, build green,
+lint 69 — matches logged claims), confirmed the diff is docs-only (127 lines, zero code
+changes), and adversarially spot-checked 3 of the 12 audited functions (`bmc-chat`,
+`generate-framework-report`, `agent-run`) against their callers — audit holds, no drift.
+Smoke-test doc quality noted as good (6 flows, fail signals cross-referenced to DEVLOG fixes,
+honest about not running against a live deployment — no fake completeness). One LOW note:
+acceptance criterion 0.4 was satisfied via cross-reference to DEVLOG's existing deploy
+checklist rather than duplicating it — reviewer accepted this as defensible, no action needed.
+Merged to `main` via PR #2 (`db7cd1f`).
 
 <!-- Reviewer appends RF-<phase>-<n> items; team marks them fixed with commit SHA. -->
 
@@ -55,9 +64,7 @@ _(none yet)_
 ## Phase logs
 
 ### Phase 0 — Baseline verification & deploy prep
-Tasks: 0.1 ☑ · 0.2 ☑ · 0.3 ☑ · 0.4 ☑ (0.4 is documentation only — already captured in
-DEVLOG.md's deployment checklist, cross-referenced above; no new operator action required
-beyond what was already queued)
+Tasks: 0.1 ☑ · 0.2 ☑ · 0.3 ☑ · 0.4 ☑ · **APPROVED, merged to main (PR #2, `db7cd1f`)**
 
 **2026-07-02 — Phase 0 complete, awaiting review.**
 
