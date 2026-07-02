@@ -301,7 +301,7 @@ let runtimeInstanceAccountId: string | undefined;
  */
 export function getAgentRuntime(accountId?: string): AgentRuntime {
   if (!runtimeInstance || (accountId && accountId !== runtimeInstanceAccountId)) {
-    if (getRuntimeMode() === "live") {
+    if (getRuntimeMode() !== "mock") {
       runtimeInstance = new HermesAgentRuntime(accountId);
     } else {
       runtimeInstance = new MockAgentRuntime(accountId);

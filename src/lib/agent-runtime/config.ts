@@ -13,7 +13,7 @@
  */
 
 /** The runtime mode selected by environment configuration. */
-export type RuntimeMode = "live" | "mock";
+export type RuntimeMode = "enqueue" | "inline" | "mock";
 
 /**
  * Read the runtime endpoint from env. Returns null if not configured,
@@ -29,11 +29,17 @@ export function getRuntimeEndpoint(): string | null {
 
 /**
  * Determine the current runtime mode based on environment configuration.
- * - "live" when VITE_HERMES_RUNTIME_ENDPOINT is set
- * - "mock" otherwise (development default)
+ * - VITE_RUNTIME_MODE=enqueue queues jobs for the worker
+ * - VITE_RUNTIME_MODE=inline keeps the legacy edge-function execution path
+ * - VITE_RUNTIME_MODE=mock uses the local mock runtime
+ * - Backcompat: with only VITE_HERMES_RUNTIME_ENDPOINT set, use inline
  */
 export function getRuntimeMode(): RuntimeMode {
-  return getRuntimeEndpoint() ? "live" : "mock";
+  const explicit = import.meta.env.VITE_RUNTIME_MODE;
+  if (explicit === "enqueue" || explicit === "inline" || explicit === "mock") {
+    return explicit;
+  }
+  return getRuntimeEndpoint() ? "inline" : "mock";
 }
 
 /**
@@ -52,5 +58,8 @@ export function getRuntimeApiKey(): string | null {
  * Human-readable label for the current runtime mode, for UI display.
  */
 export function getRuntimeModeLabel(): string {
-  return getRuntimeMode() === "live" ? "Live Runtime" : "Mock Runtime";
+  const mode = getRuntimeMode();
+  if (mode === "enqueue") return "Queued Runtime";
+  if (mode === "inline") return "Inline Runtime";
+  return "Mock Runtime";
 }

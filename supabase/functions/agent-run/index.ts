@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 interface AgentRunRequest {
+  mode?: 'inline' | 'enqueue';
   agentProfileId: string;
   accountId: string;
   runType: string;
@@ -396,6 +397,62 @@ serve(async (req) => {
       }
     } catch (e) {
       console.warn('Failed to load agent instructions from DB, using fallback:', e);
+    }
+
+    if (body.mode === 'enqueue') {
+      const nowIso = new Date().toISOString();
+      const runType = body.runType || 'canvas_section_analysis';
+      const { data: run, error: runError } = await adminClient
+        .from('agent_runs')
+        .insert({
+          account_id: accountId,
+          agent_profile_id: agentProfileId,
+          run_type: runType,
+          trigger_type: body.triggerType || 'manual',
+          triggered_by: body.triggeredBy || callerUserId,
+          status: 'pending',
+          input,
+          model_provider: modelProvider ?? null,
+          model_name: modelName ?? null,
+          started_at: nowIso,
+        })
+        .select('id, status')
+        .single();
+
+      if (runError) throw new Error(`Failed to create queued agent run: ${runError.message}`);
+
+      const jobKind = runType === 'workspace_chat' ? 'workspace_chat' : 'canvas_section_analysis';
+      const { error: jobError } = await adminClient.from('agent_jobs').insert({
+        account_id: accountId,
+        kind: jobKind,
+        payload: {
+          ...input,
+          agentProfileId,
+          modelProvider,
+          modelName,
+        },
+        status: 'queued',
+        agent_run_id: run.id,
+        run_after: nowIso,
+      });
+
+      if (jobError) {
+        await adminClient
+          .from('agent_runs')
+          .update({
+            status: 'failed',
+            error: `Failed to enqueue worker job: ${jobError.message}`,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', run.id)
+          .eq('account_id', accountId);
+        throw new Error(`Failed to enqueue worker job: ${jobError.message}`);
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, mode: 'enqueue', runId: run.id, status: run.status }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Build prompts (uses agent-specific instructions if available)

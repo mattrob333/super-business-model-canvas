@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CanvasSectionAnalysisHandler } from "../jobs/canvas-section-analysis.js";
+import { CanvasSectionAnalysisHandler, chooseModelRoute } from "../jobs/canvas-section-analysis.js";
+import { createJobDispatcher } from "../jobs/dispatch.js";
 import type { AgentRunner } from "../agent/runner.js";
 import type { AgentJob } from "../queue/types.js";
 
@@ -64,6 +65,77 @@ describe("CanvasSectionAnalysisHandler", () => {
       },
     });
   });
+
+  it("marks the linked agent run failed when the handler throws", async () => {
+    const client = new FakeSupabaseClient();
+    const dispatcher = createJobDispatcher({
+      client: client.asSupabase(),
+      runner: {
+        async run() {
+          throw new Error("Claude Agent SDK run failed with subtype: error_max_budget_usd");
+        },
+      },
+    });
+
+    await expect(dispatcher(makeJob())).rejects.toThrow("error_max_budget_usd");
+
+    expect(client.updates.at(-1)).toMatchObject({
+      table: "agent_runs",
+      filters: [
+        ["id", "run-1"],
+        ["account_id", "account-1"],
+      ],
+      values: {
+        status: "failed",
+        error: "Claude Agent SDK run failed with subtype: error_max_budget_usd",
+      },
+    });
+  });
+
+  it("prefers deterministic model routes over legacy tier ties", () => {
+    const routes = [
+      {
+        account_id: null,
+        route_key: "standard",
+        task_class: null,
+        provider: "xai",
+        model_name: "grok-legacy-standard",
+        cost_per_1k_in: null,
+        cost_per_1k_out: null,
+      },
+      {
+        account_id: null,
+        route_key: "section_analysis",
+        task_class: "section_analysis",
+        provider: "anthropic",
+        model_name: "global-sonnet",
+        cost_per_1k_in: null,
+        cost_per_1k_out: null,
+      },
+      {
+        account_id: "account-1",
+        route_key: "standard",
+        task_class: null,
+        provider: "openrouter",
+        model_name: "account-standard",
+        cost_per_1k_in: null,
+        cost_per_1k_out: null,
+      },
+      {
+        account_id: "account-1",
+        route_key: "section_analysis",
+        task_class: "section_analysis",
+        provider: "anthropic",
+        model_name: "account-section-analysis",
+        cost_per_1k_in: null,
+        cost_per_1k_out: null,
+      },
+    ];
+
+    expect(chooseModelRoute(routes, "account-1", "standard")?.model_name).toBe("account-standard");
+    expect(chooseModelRoute(routes.slice(0, 2), "account-1", "standard")?.model_name).toBe("grok-legacy-standard");
+    expect(chooseModelRoute([routes[1]], "account-1", "missing")?.model_name).toBe("global-sonnet");
+  });
 });
 
 class RecordingRunner implements AgentRunner {
@@ -122,6 +194,32 @@ class FakeSupabaseClient {
     }
     return null;
   }
+
+  selectMany(table: string): Array<Record<string, unknown>> {
+    if (table === "model_routes") {
+      return [
+        {
+          account_id: null,
+          route_key: "standard",
+          task_class: null,
+          provider: "xai",
+          model_name: "grok-legacy-standard",
+          cost_per_1k_in: 0.002,
+          cost_per_1k_out: 0.01,
+        },
+        {
+          account_id: null,
+          route_key: "section_analysis",
+          task_class: "section_analysis",
+          provider: "anthropic",
+          model_name: "claude-sonnet-4-5",
+          cost_per_1k_in: 0.003,
+          cost_per_1k_out: 0.015,
+        },
+      ];
+    }
+    return [];
+  }
 }
 
 class FakeQuery {
@@ -163,14 +261,17 @@ class FakeQuery {
     return { data: this.client.selectOne(this.table), error: null };
   }
 
-  then(resolve: (value: { error: null }) => void) {
+  then(resolve: (value: { data?: Array<Record<string, unknown>>; error: null }) => void) {
     if (this.updateValues) {
       this.client.updates.push({
         table: this.table,
         values: this.updateValues,
         filters: [...this.filters],
       });
+      resolve({ error: null });
+      return;
     }
-    resolve({ error: null });
+
+    resolve({ data: this.client.selectMany(this.table), error: null });
   }
 }

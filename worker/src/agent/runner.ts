@@ -44,6 +44,10 @@ export class ClaudeAgentRunner implements AgentRunner {
     try {
       for await (const message of q) {
         if (isResultMessage(message)) {
+          if (message.subtype !== "success") {
+            throw new Error(`Claude Agent SDK run failed with subtype: ${message.subtype}`);
+          }
+
           return {
             resultText: typeof message.result === "string" ? message.result : "",
             sessionId: typeof message.session_id === "string" ? message.session_id : null,

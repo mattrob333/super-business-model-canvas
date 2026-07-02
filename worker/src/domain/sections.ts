@@ -29,3 +29,10 @@ export const SECTION_KEYS = Object.keys(SECTION_LABELS) as SectionKey[];
 export function isSectionKey(value: unknown): value is SectionKey {
   return typeof value === "string" && value in SECTION_LABELS;
 }
+
+export function sectionKeyForAgentKey(agentKey: string): SectionKey | null {
+  for (const [sectionKey, mappedAgentKey] of Object.entries(SECTION_AGENT_KEYS)) {
+    if (mappedAgentKey === agentKey) return sectionKey as SectionKey;
+  }
+  return null;
+}

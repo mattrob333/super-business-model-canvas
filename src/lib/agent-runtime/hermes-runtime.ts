@@ -31,7 +31,7 @@ import type {
   StartRunInput,
 } from "./index";
 import { DEFAULT_RUNTIME_CONFIG } from "./index";
-import { getRuntimeEndpoint, getRuntimeApiKey } from "./config";
+import { getRuntimeEndpoint, getRuntimeApiKey, getRuntimeMode } from "./config";
 import { resolveModelRoute } from "./model-routing";
 
 export class HermesAgentRuntime implements AgentRuntime {
@@ -53,6 +53,10 @@ export class HermesAgentRuntime implements AgentRuntime {
   async startRun(
     input: StartRunInput
   ): Promise<{ runId: string; status: AgentRunStatus }> {
+    if (getRuntimeMode() === "enqueue") {
+      return this.enqueueRun(input);
+    }
+
     // Resolve model routing early so the agent_runs record has the correct provider
     let resolvedProvider = input.modelProvider;
     let resolvedModelName = input.modelName;
@@ -111,6 +115,38 @@ export class HermesAgentRuntime implements AgentRuntime {
     });
 
     return { runId, status: runStatus };
+  }
+
+  private async enqueueRun(
+    input: StartRunInput
+  ): Promise<{ runId: string; status: AgentRunStatus }> {
+    const response = await fetch(this.endpoint, {
+      method: "POST",
+      headers: await this.authHeaders(),
+      body: JSON.stringify({
+        mode: "enqueue",
+        agentProfileId: input.agentProfileId,
+        accountId: input.accountId,
+        runType: input.runType,
+        triggerType: input.triggerType,
+        triggeredBy: input.triggeredBy,
+        input: input.input,
+        modelProvider: input.modelProvider,
+        modelName: input.modelName,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Edge function enqueue error ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    if (!data.success || typeof data.runId !== "string") {
+      throw new Error(data.error || "Agent enqueue failed");
+    }
+
+    return { runId: data.runId, status: (data.status || "pending") as AgentRunStatus };
   }
 
   /**
@@ -323,5 +359,20 @@ export class HermesAgentRuntime implements AgentRuntime {
         latencyMs,
       };
     }
+  }
+
+  private async authHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session?.access_token) {
+      headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+    } else if (this.apiKey) {
+      headers["Authorization"] = `Bearer ${this.apiKey}`;
+    }
+
+    return headers;
   }
 }

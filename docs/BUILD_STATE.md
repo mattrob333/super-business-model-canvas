@@ -54,10 +54,38 @@ Status: OPEN | RESOLVED (<how>)
   `restrict_agent_job_rpc_execute` was added after Supabase security advisors flagged the worker
   queue RPCs as publicly executable by default; `anon`/`authenticated` execution is now revoked
   and `service_role` execution granted.
+- **From Phase 2.5-2.6:** deploy updated edge functions after review approval:
+  `supabase functions deploy agent-run` and `supabase functions deploy workspace-chat`. Set
+  staging/frontend env `VITE_RUNTIME_MODE=enqueue` only when the worker service is deployed and
+  has `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, and any optional research keys. Keep
+  `VITE_RUNTIME_MODE=inline` (or omit it with the legacy endpoint configured) for rollback.
 
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
 
 ## REVIEW FINDINGS
+
+### Phase 2 - RF-2-4 (MEDIUM) - FIXED pending re-review (2026-07-02)
+**Problem:** Reviewer found model-route resolution for section analysis was nondeterministic:
+the profile's legacy `standard` route_key and the `section_analysis` task_class row could tie
+under the old query ordering.
+**Fix:** Worker route selection now ranks candidates explicitly:
+account route_key -> account task_class -> global route_key -> global task_class. Unit tests pin
+the precedence and preserve the legacy route_key fallback.
+
+### Phase 2 - RF-2-3 (HIGH) - FIXED pending re-review (2026-07-02)
+**Problem:** If a job handler threw after marking the linked `agent_runs` row `running`, the job
+retry/dead-letter path updated `agent_jobs` but left `agent_runs` stuck `running`, causing the UI
+to poll forever.
+**Fix:** The worker dispatcher now catches job-handler errors, marks the linked run `failed` with
+`error`, `summary`, and `completed_at` under `.eq("account_id", job.account_id)`, then rethrows so
+the queue retry/dead-letter path still runs. Unit coverage pins the failed-run update.
+
+### Phase 2 - RF-2-2 (HIGH) - FIXED pending re-review (2026-07-02)
+**Problem:** Reviewer found `ClaudeAgentRunner` treated every SDK result message as success,
+masking `error_max_budget_usd`, `error_max_turns`, and `error_during_execution` as later JSON
+parse failures.
+**Fix:** `runner.ts` now throws immediately when the result subtype is not `success`, preserving
+the SDK subtype in the error message for retry/dead-letter diagnosis.
 
 ### Phase 2 — RF-2-1 (HIGH) — FIXED pending re-review (2026-07-02)
 **Problem:** Reviewer exercised the queue SQL on scratch Postgres and found that a stale
@@ -280,7 +308,7 @@ updated to match each model's current catalog price. Gates re-run clean: tsc cle
 green, lint 69 (unchanged). RF-1-2 marked RESOLVED.
 
 ### Phase 2 — Agent worker service
-Tasks: 2.1 ☑ · 2.2 ☑ · 2.3 ☑ · 2.4 ☑ · 2.5 ☐ · 2.6 ☐ · 2.7 ☐ · 2.8 ☐ · 2.9 ☐ · 2.10 ☐
+Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [ ] · 2.8 [ ] · 2.9 [ ] · 2.10 [ ]
 
 **2026-07-02 — Phase 2 started on branch `build/phase-2-worker`; work orders 2.1–2.2 complete.**
 
@@ -358,6 +386,38 @@ cd worker && npm run typecheck  → exit 0
 cd worker && npm test           → 5 tests passed
 cd worker && npm run build      → exit 0
 cd worker && npm run lint       → exit 0
+```
+
+**2026-07-02 - Reviewer findings RF-2-2/RF-2-3/RF-2-4 fixed; work orders 2.5-2.6 complete.**
+
+- **RF-2-2:** `ClaudeAgentRunner` now treats non-`success` SDK result subtypes as failures and
+  throws with the subtype in the message, preserving causes such as `error_max_budget_usd`.
+- **RF-2-3:** worker dispatch now marks linked `agent_runs` rows `failed` with `error`,
+  `summary`, and `completed_at` when a job handler throws, while still rethrowing for queue retry
+  and dead-letter behavior.
+- **RF-2-4:** model-route selection is deterministic via explicit precedence:
+  account route_key -> account task_class -> global route_key -> global task_class. Tests pin the
+  legacy `standard` route tie.
+- **2.5 `workspace_chat`:** added worker support for `workspace_chat` jobs. The handler loads the
+  account-scoped thread/profile/messages, runs the Claude Agent SDK with BMC tools and proposal
+  mode, writes the assistant reply to `workspace_messages`, and completes the linked run with
+  output/tokens/cost under `.eq("account_id", job.account_id)`.
+- **2.6 enqueue mode:** `agent-run` now accepts `mode: "enqueue"` to create a pending
+  `agent_runs` row and queued `agent_jobs` row, while the existing inline path remains the default
+  rollback path. Added `workspace-chat` edge function for auth -> user message insert -> queued
+  chat job. Frontend runtime mode now supports `VITE_RUNTIME_MODE=enqueue|inline|mock`.
+- **Honest scope note:** 2.7 frontend polling/runtime polish, 2.8 guardrail hooks, 2.9 SQL-level
+  crash-recovery tests, and 2.10 Docker/docs/final review prep remain open.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  -> exit 0
+cd worker && npm test           -> 7 tests passed
+cd worker && npm run build      -> exit 0
+cd worker && npm run lint       -> exit 0
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), frozen baseline unchanged
 ```
 
 ### Phase 3 — Research engine & evidence

@@ -207,7 +207,7 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground mb-1">Mode</p>
-              <Badge variant={getRuntimeMode() === "live" ? "default" : "outline"} className="text-xs">
+              <Badge variant={getRuntimeMode() !== "mock" ? "default" : "outline"} className="text-xs">
                 {getRuntimeModeLabel()}
               </Badge>
             </div>

@@ -18,6 +18,9 @@ interface ModelRoute {
   model_name: string;
   cost_per_1k_in: number | null;
   cost_per_1k_out: number | null;
+  account_id?: string | null;
+  route_key?: string | null;
+  task_class?: string | null;
 }
 
 interface BusinessContext {
@@ -122,15 +125,14 @@ export class CanvasSectionAnalysisHandler {
     const routeKey = profile.model_route_key ?? "section_analysis";
     const { data, error } = await this.deps.client
       .from("model_routes")
-      .select("provider, model_name, cost_per_1k_in, cost_per_1k_out")
+      .select("account_id, route_key, task_class, provider, model_name, cost_per_1k_in, cost_per_1k_out")
       .or(`account_id.eq.${accountId},account_id.is.null`)
       .or(`task_class.eq.section_analysis,route_key.eq.${routeKey}`)
-      .order("account_id", { ascending: true, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
+      .order("account_id", { ascending: false, nullsFirst: false });
     if (error) throw new Error(`Failed to load model route: ${error.message}`);
-    if (!data) throw new Error("No model route configured for section_analysis");
-    return data as ModelRoute;
+    const route = chooseModelRoute((data ?? []) as ModelRoute[], accountId, routeKey);
+    if (!route) throw new Error("No model route configured for section_analysis");
+    return route;
   }
 
   private async loadBusinessContext(accountId: string, payload: Record<string, unknown>): Promise<BusinessContext> {
@@ -214,4 +216,31 @@ function estimateCost(tokensIn: number | null, tokensOut: number | null, route: 
   const inputCost = ((tokensIn ?? 0) / 1000) * (route.cost_per_1k_in ?? 0);
   const outputCost = ((tokensOut ?? 0) / 1000) * (route.cost_per_1k_out ?? 0);
   return Math.round((inputCost + outputCost) * 10000) / 10000;
+}
+
+export function chooseModelRoute(
+  routes: ModelRoute[],
+  accountId: string,
+  routeKey: string,
+  taskClass = "section_analysis",
+): ModelRoute | null {
+  const ranked = routes
+    .map((route) => ({ route, rank: modelRouteRank(route, accountId, routeKey, taskClass) }))
+    .filter((entry): entry is { route: ModelRoute; rank: number } => entry.rank !== null)
+    .sort((a, b) => a.rank - b.rank);
+
+  return ranked[0]?.route ?? null;
+}
+
+function modelRouteRank(route: ModelRoute, accountId: string, routeKey: string, taskClass: string): number | null {
+  const accountMatches = route.account_id === accountId;
+  const globalMatches = route.account_id === null || route.account_id === undefined;
+  const routeKeyMatches = route.route_key === routeKey;
+  const taskClassMatches = route.task_class === taskClass;
+
+  if (accountMatches && routeKeyMatches) return 0;
+  if (accountMatches && taskClassMatches) return 1;
+  if (globalMatches && routeKeyMatches) return 2;
+  if (globalMatches && taskClassMatches) return 3;
+  return null;
 }
