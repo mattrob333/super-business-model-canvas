@@ -308,7 +308,7 @@ updated to match each model's current catalog price. Gates re-run clean: tsc cle
 green, lint 69 (unchanged). RF-1-2 marked RESOLVED.
 
 ### Phase 2 — Agent worker service
-Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [x] · 2.8 [x] · 2.9 [ ] · 2.10 [ ]
+Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [x] · 2.8 [x] · 2.9 [x] · 2.10 [ ]
 
 **2026-07-02 — Phase 2 started on branch `build/phase-2-worker`; work orders 2.1–2.2 complete.**
 
@@ -456,6 +456,32 @@ npm run lint                    -> 69 problems (50 errors, 19 warnings), within 
 ```
 cd worker && npm run typecheck  -> exit 0
 cd worker && npm test           -> 10 tests passed
+cd worker && npm run build      -> exit 0
+cd worker && npm run lint       -> exit 0
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
+```
+
+**2026-07-02 - Work order 2.9 test hardening complete.**
+
+- Added BMC MCP tool tests that exercise every registered tool handler through the SDK server's
+  in-process registry against a fake account-scoped schema. The tests assert account filters and
+  account-scoped inserts for Supabase-backed tools, plus graceful degraded responses for Phase-3
+  research stubs.
+- Added an explicit in-tool guardrail test for own-section writes and high-confidence writes
+  without evidence, complementing the 2.8 hook-level guardrail test.
+- Added a legacy-output fixture test for the exact `items`/`notes`/`confidence`/`summary` shape
+  expected by today's inline `agent-run` behavior.
+- Added an optional SQL-level crash-recovery integration test. When `WORKER_TEST_DATABASE_URL`
+  points at a scratch Postgres with the project schema applied, it inserts a stale final-attempt
+  `running` job, calls `claim_next_agent_job`, and asserts the job is reaped to
+  `failed_permanent` rather than orphaned. The test is skipped in local runs without that env var.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  -> exit 0
+cd worker && npm test           -> 13 passed, 1 skipped (SQL integration needs WORKER_TEST_DATABASE_URL)
 cd worker && npm run build      -> exit 0
 cd worker && npm run lint       -> exit 0
 npx tsc -p tsconfig.app.json --noEmit -> exit 0
