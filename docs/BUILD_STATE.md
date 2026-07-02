@@ -47,16 +47,13 @@ Status: OPEN | RESOLVED (<how>)
   `enterprise-strategy-workspace` (all fully merged into main; agent push access cannot
   delete branches). The unmerged `edit/edt-6cd24209-…` Lovable leftover (tip `958b1dd`) is
   yours to review or discard.
-- **From Phase 1:** apply the four Phase-1 migrations (`20260702100000` → `20260702100300`)
-  to the live Supabase project (SQL Editor, in order), then run `scripts/verify-schema.sql`
-  there and confirm 62 PASS / 0 FAIL. Verified clean on scratch Postgres 16 (fresh + incremental
-  + idempotent re-run) during review, but never against the live instance.
-- **From Phase 2.2:** apply `20260702110000_agent_job_queue_locking.sql` to the live Supabase
-  project after the Phase-1 migrations, then run the updated `scripts/verify-schema.sql` and
-  confirm all checks PASS. Verified via Supabase MCP on 2026-07-02 that project
-  `mehhuxzamnpxnkbrslls` is accessible but has no recorded migrations, and catalog checks show
-  the Phase-1 tables/columns/enums plus Phase-2 queue-locking columns/functions are missing.
-  Local Supabase CLI is not installed in this workspace.
+- **Completed 2026-07-02 via Supabase MCP:** Phase-1 schema/seed migrations and Phase-2.2
+  queue-locking migration were applied to live project `mehhuxzamnpxnkbrslls`; verification
+  checks passed for tables, columns, enums, RLS/policies, seed sanity, queue RPC functions, and
+  queue RPC browser-role restrictions. A follow-up live migration
+  `restrict_agent_job_rpc_execute` was added after Supabase security advisors flagged the worker
+  queue RPCs as publicly executable by default; `anon`/`authenticated` execution is now revoked
+  and `service_role` execution granted.
 
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
 
@@ -303,9 +300,16 @@ npm run lint                    → 69 problems (50 errors, 19 warnings), frozen
 ```
 
 **Notes / constraints carried forward:**
-- `claim_next_agent_job` and `fail_agent_job` are migration/schema definitions only in this
-  environment; no live or local Supabase database was available to execute them. `verify-schema.sql`
-  now includes assertions the operator/reviewer can run after applying the migration.
+- Live Supabase project `mehhuxzamnpxnkbrslls` now has recorded MCP-applied migrations:
+  `workspace_orchestration_tables`, `column_additions`, `rls_new_tables`, `seed_phase1`,
+  `agent_job_queue_locking`, and `restrict_agent_job_rpc_execute`. The scheduled-loop cron/Vault
+  migration remains an operator/deploy task because it requires the live service-role key secret.
+- Supabase advisors still report pre-existing/broader warnings not introduced by Phase 2.2:
+  mutable `set_updated_at` search path; public/authenticated execution on older SECURITY DEFINER
+  functions (`handle_new_user`, `has_role`, `is_account_member`, `provision_account_defaults`);
+  permissive insert policies on `accounts`/`leads`; leaked-password protection disabled; plus
+  expected unused-index/unindexed-FK noise on fresh/empty tables. The new queue RPC public-execute
+  warnings were resolved.
 - The worker package install reports 0 vulnerabilities. npm warns that local Node `22.12.0` is
   below a transitive ESLint engine preference (`^22.13.0`), but worker lint still exits 0.
 

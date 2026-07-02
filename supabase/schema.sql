@@ -1703,6 +1703,16 @@ begin
 end;
 $$;
 
+revoke all on function public.claim_next_agent_job(text, integer, integer) from public;
+revoke all on function public.claim_next_agent_job(text, integer, integer) from anon;
+revoke all on function public.claim_next_agent_job(text, integer, integer) from authenticated;
+grant execute on function public.claim_next_agent_job(text, integer, integer) to service_role;
+
+revoke all on function public.fail_agent_job(uuid, text, text) from public;
+revoke all on function public.fail_agent_job(uuid, text, text) from anon;
+revoke all on function public.fail_agent_job(uuid, text, text) from authenticated;
+grant execute on function public.fail_agent_job(uuid, text, text) to service_role;
+
 -- =============================================================================
 -- updated_at TRIGGERS (only tables with an updated_at column)
 -- =============================================================================

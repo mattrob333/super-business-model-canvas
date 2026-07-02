@@ -164,6 +164,30 @@ with checks as (
            where schemaname = 'public' and indexname = 'idx_agent_jobs_queue_claim'
          ) then 'PASS' else 'FAIL' end
 
+  union all
+
+  select 'function restricted: anon cannot claim_next_agent_job',
+         case when not has_function_privilege('anon', 'public.claim_next_agent_job(text, integer, integer)', 'EXECUTE')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'function restricted: authenticated cannot claim_next_agent_job',
+         case when not has_function_privilege('authenticated', 'public.claim_next_agent_job(text, integer, integer)', 'EXECUTE')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'function restricted: anon cannot fail_agent_job',
+         case when not has_function_privilege('anon', 'public.fail_agent_job(uuid, text, text)', 'EXECUTE')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'function restricted: authenticated cannot fail_agent_job',
+         case when not has_function_privilege('authenticated', 'public.fail_agent_job(uuid, text, text)', 'EXECUTE')
+         then 'PASS' else 'FAIL' end
+
 )
 select check_name, status from checks order by
   case status when 'FAIL' then 0 else 1 end,  -- surface failures first

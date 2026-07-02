@@ -134,3 +134,13 @@ comment on column public.agent_jobs.max_attempts is
   'Maximum attempts before fail_agent_job moves the job to failed_permanent.';
 comment on column public.agent_jobs.last_error is
   'Last failure message, safe for operator/debug display. Secrets must not be written here.';
+
+revoke all on function public.claim_next_agent_job(text, integer, integer) from public;
+revoke all on function public.claim_next_agent_job(text, integer, integer) from anon;
+revoke all on function public.claim_next_agent_job(text, integer, integer) from authenticated;
+grant execute on function public.claim_next_agent_job(text, integer, integer) to service_role;
+
+revoke all on function public.fail_agent_job(uuid, text, text) from public;
+revoke all on function public.fail_agent_job(uuid, text, text) from anon;
+revoke all on function public.fail_agent_job(uuid, text, text) from authenticated;
+grant execute on function public.fail_agent_job(uuid, text, text) to service_role;
