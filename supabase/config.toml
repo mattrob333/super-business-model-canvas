@@ -21,6 +21,9 @@ verify_jwt = true
 [functions.agent-run]
 verify_jwt = true
 
+[functions.workspace-chat]
+verify_jwt = true
+
 [functions.scheduled-loop-tick]
 verify_jwt = true
 

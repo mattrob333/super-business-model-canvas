@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 interface AgentRunRequest {
+  mode?: 'inline' | 'enqueue';
   agentProfileId: string;
   accountId: string;
   runType: string;
@@ -398,6 +399,62 @@ serve(async (req) => {
       console.warn('Failed to load agent instructions from DB, using fallback:', e);
     }
 
+    if (body.mode === 'enqueue') {
+      const nowIso = new Date().toISOString();
+      const runType = body.runType || 'canvas_section_analysis';
+      const { data: run, error: runError } = await adminClient
+        .from('agent_runs')
+        .insert({
+          account_id: accountId,
+          agent_profile_id: agentProfileId,
+          run_type: runType,
+          trigger_type: body.triggerType || 'manual',
+          triggered_by: body.triggeredBy || callerUserId,
+          status: 'pending',
+          input,
+          model_provider: modelProvider ?? null,
+          model_name: modelName ?? null,
+          started_at: nowIso,
+        })
+        .select('id, status')
+        .single();
+
+      if (runError) throw new Error(`Failed to create queued agent run: ${runError.message}`);
+
+      const jobKind = runType === 'workspace_chat' ? 'workspace_chat' : 'canvas_section_analysis';
+      const { error: jobError } = await adminClient.from('agent_jobs').insert({
+        account_id: accountId,
+        kind: jobKind,
+        payload: {
+          ...input,
+          agentProfileId,
+          modelProvider,
+          modelName,
+        },
+        status: 'queued',
+        agent_run_id: run.id,
+        run_after: nowIso,
+      });
+
+      if (jobError) {
+        await adminClient
+          .from('agent_runs')
+          .update({
+            status: 'failed',
+            error: `Failed to enqueue worker job: ${jobError.message}`,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', run.id)
+          .eq('account_id', accountId);
+        throw new Error(`Failed to enqueue worker job: ${jobError.message}`);
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, mode: 'enqueue', runId: run.id, status: run.status }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Build prompts (uses agent-specific instructions if available)
     const systemPrompt = buildSystemPrompt(agentKey, sectionLabel, agentInstructions);
     const userPrompt = buildUserPrompt(input);
@@ -427,7 +484,7 @@ serve(async (req) => {
     console.log(`Agent run complete: ${parsed.items.length} items, confidence=${parsed.confidence}, cost=$${estimatedCost.toFixed(4)}`);
 
     // Browser-triggered runs get their durable agent_runs record from the
-    // client-side runtime (hermes-runtime.ts). Server-side calls (scheduled
+    // client-side runtime (live-runtime.ts). Server-side calls (scheduled
     // loops) have no client, so record the run here — this is also what makes
     // scheduled-loop budget accounting work.
     if (isServiceCall) {
@@ -468,3 +525,4 @@ serve(async (req) => {
     );
   }
 });
+

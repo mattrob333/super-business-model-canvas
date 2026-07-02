@@ -2,11 +2,8 @@
  * AgentRuntime Interface Boundary
  *
  * This module defines the abstraction layer between the Enterprise Strategy
- * Workspace application and the Hermes agent runtime. The app NEVER calls
- * Hermes directly — it goes through this interface.
- *
- * Guardrail: "Hermes is the agent runtime, not the backend. Create
- * AgentRuntime interface boundary in src/lib/agent-runtime/."
+ * Workspace application and the live agent runtime. The app NEVER calls
+ * the LLM directly — it goes through this interface.
  *
  * The interface supports:
  * - Starting agent runs (with durable records in agent_runs table)
@@ -15,8 +12,8 @@
  * - Retrieving run output
  *
  * Implementations:
- * - MockAgentRuntime: for development without a live Hermes instance
- * - HermesAgentRuntime: connects to a real Hermes instance (future)
+ * - MockAgentRuntime: for development without a live runtime endpoint
+ * - LiveAgentRuntime: connects to the edge function or queued worker path
  */
 
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -106,7 +103,7 @@ export interface AgentRuntime {
 // ─── Mock Implementation ────────────────────────────────────────────────────
 
 /**
- * MockAgentRuntime — for development without a live Hermes instance.
+ * MockAgentRuntime — for development without a live runtime endpoint.
  *
  * Creates real agent_runs records in the database (so the Activity page
  * shows them), but does not execute any actual AI work. Runs transition
@@ -276,12 +273,12 @@ export class MockAgentRuntime implements AgentRuntime {
 // ─── Factory ────────────────────────────────────────────────────────────────
 
 export { getRuntimeMode, getRuntimeModeLabel, getRuntimeEndpoint } from "./config";
-export { HermesAgentRuntime } from "./hermes-runtime";
+export { LiveAgentRuntime } from "./live-runtime";
 export { resolveModelRoute, getAvailableRouteTiers } from "./model-routing";
 export type { ResolvedModelRoute } from "./model-routing";
 
 import { getRuntimeMode } from "./config";
-import { HermesAgentRuntime } from "./hermes-runtime";
+import { LiveAgentRuntime } from "./live-runtime";
 
 let runtimeInstance: AgentRuntime | null = null;
 let runtimeInstanceAccountId: string | undefined;
@@ -289,20 +286,18 @@ let runtimeInstanceAccountId: string | undefined;
 /**
  * Get the AgentRuntime instance for an account.
  *
- * Env-gated: when VITE_HERMES_RUNTIME_ENDPOINT is set, returns
- * HermesAgentRuntime (calls Supabase Edge Function for real LLM execution).
+ * Env-gated: when VITE_AGENT_RUNTIME_ENDPOINT is set, returns
+ * LiveAgentRuntime (calls Supabase Edge Function for real LLM execution).
  * Otherwise, returns MockAgentRuntime (development, no real AI).
  *
  * The instance is cached per accountId: if a caller resolves a different
  * account later (e.g. the panel rendered before useAccountId finished),
  * the runtime is re-created rather than staying bound to the stale account.
- *
- * Guardrail: "Hermes is the agent runtime, not the backend."
  */
 export function getAgentRuntime(accountId?: string): AgentRuntime {
   if (!runtimeInstance || (accountId && accountId !== runtimeInstanceAccountId)) {
-    if (getRuntimeMode() === "live") {
-      runtimeInstance = new HermesAgentRuntime(accountId);
+    if (getRuntimeMode() !== "mock") {
+      runtimeInstance = new LiveAgentRuntime(accountId);
     } else {
       runtimeInstance = new MockAgentRuntime(accountId);
     }
@@ -318,3 +313,4 @@ export function _resetAgentRuntime(): void {
   runtimeInstance = null;
   runtimeInstanceAccountId = undefined;
 }
+

@@ -6,6 +6,7 @@
 --   20260702100100_column_additions.sql
 --   20260702100200_rls_new_tables.sql
 --   20260702100300_seed_phase1.sql
+--   20260702110000_agent_job_queue_locking.sql
 -- It asserts (via information_schema / pg_catalog) that every new table
 -- exists, every new column exists on the altered tables, and every new
 -- table has RLS enabled with at least one policy. Prints one PASS/FAIL row
@@ -50,7 +51,13 @@ with checks as (
     ('model_routes', 'cost_per_1k_in'),
     ('model_routes', 'cost_per_1k_out'),
     ('model_routes', 'eval_score'),
-    ('model_routes', 'updated_by')
+    ('model_routes', 'updated_by'),
+    ('agent_jobs', 'claimed_by'),
+    ('agent_jobs', 'locked_at'),
+    ('agent_jobs', 'heartbeat_at'),
+    ('agent_jobs', 'run_after'),
+    ('agent_jobs', 'max_attempts'),
+    ('agent_jobs', 'last_error')
   ) as cols(tbl, col)
 
   union all
@@ -129,6 +136,70 @@ with checks as (
            select count(distinct task_class) from public.model_routes
            where account_id is null and task_class is not null
          ) = 9 then 'PASS' else 'FAIL' end
+
+  union all
+
+  -- ---- 7. Phase 2.2 queue claim functions exist ----
+  select 'function exists: claim_next_agent_job',
+         case when exists (
+           select 1 from pg_proc p
+           join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'claim_next_agent_job'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'function exists: fail_agent_job',
+         case when exists (
+           select 1 from pg_proc p
+           join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'fail_agent_job'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'index exists: idx_agent_jobs_queue_claim',
+         case when exists (
+           select 1 from pg_indexes
+           where schemaname = 'public' and indexname = 'idx_agent_jobs_queue_claim'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'function restricted: anon cannot claim_next_agent_job',
+         case when not has_function_privilege('anon', 'public.claim_next_agent_job(text, integer, integer)', 'EXECUTE')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'function restricted: authenticated cannot claim_next_agent_job',
+         case when not has_function_privilege('authenticated', 'public.claim_next_agent_job(text, integer, integer)', 'EXECUTE')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'function restricted: anon cannot fail_agent_job',
+         case when not has_function_privilege('anon', 'public.fail_agent_job(uuid, text, text)', 'EXECUTE')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'function restricted: authenticated cannot fail_agent_job',
+         case when not has_function_privilege('authenticated', 'public.fail_agent_job(uuid, text, text)', 'EXECUTE')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'function body: claim_next_agent_job reaps final stale jobs',
+         case when exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public'
+             and p.proname = 'claim_next_agent_job'
+             and pg_get_functiondef(p.oid) like '%failed_permanent%'
+             and pg_get_functiondef(p.oid) like '%attempts >= coalesce(max_attempts, p_default_max_attempts)%'
+         ) then 'PASS' else 'FAIL' end
 
 )
 select check_name, status from checks order by

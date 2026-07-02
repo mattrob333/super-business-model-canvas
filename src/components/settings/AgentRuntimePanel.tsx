@@ -31,10 +31,10 @@ import {
 } from "@/lib/agent-runtime";
 
 /**
- * Hermes Runtime configuration panel
+ * Agent Runtime configuration panel
  *
  * Displays and edits the AgentRuntime configuration. This is the interface
- * boundary between the app and Hermes — the app never calls Hermes directly.
+ * boundary between the app and the worker/edge runtime.
  *
  * Shows:
  * - Current active run count
@@ -44,7 +44,7 @@ import {
  * - Agent lifecycle policy
  * - Sandbox toggle
  */
-export function HermesRuntimePanel({ accountId }: { accountId: string }) {
+export function AgentRuntimePanel({ accountId }: { accountId: string }) {
   const { toast } = useToast();
   const [config, setConfig] = useState<RuntimeConfig>(DEFAULT_RUNTIME_CONFIG);
   const [activeRuns, setActiveRuns] = useState<number>(0);
@@ -172,11 +172,11 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
         <CardHeader>
           <CardTitle className="text-base font-medium flex items-center gap-2">
             <Cpu className="h-4 w-4" />
-            Hermes Runtime Status
+            Agent Runtime Status
           </CardTitle>
           <CardDescription>
             The AgentRuntime interface boundary manages agent execution lifecycle.
-            The app never calls Hermes directly — all operations go through this layer.
+            The app never calls the LLM directly — all operations go through this layer.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -207,7 +207,7 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground mb-1">Mode</p>
-              <Badge variant={getRuntimeMode() === "live" ? "default" : "outline"} className="text-xs">
+              <Badge variant={getRuntimeMode() !== "mock" ? "default" : "outline"} className="text-xs">
                 {getRuntimeModeLabel()}
               </Badge>
             </div>
@@ -421,3 +421,4 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
     </div>
   );
 }
+

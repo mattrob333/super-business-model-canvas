@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | 0 | Baseline verification & deploy prep | **APPROVED** | `build/phase-0-baseline` (merged, PR #2, `db7cd1f`) | 2026-07-02 |
 | 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
-| 2 | Agent worker service | NOT STARTED | — | — |
+| 2 | Agent worker service | **AWAITING REVIEW** | `build/phase-2-worker` | 2026-07-02 |
 | 3 | Research engine & evidence | NOT STARTED | — | — |
 | 4 | Competitor canvases & gap engine | NOT STARTED | — | — |
 | 5 | Section agent workspaces | NOT STARTED | — | — |
@@ -47,14 +47,71 @@ Status: OPEN | RESOLVED (<how>)
   `enterprise-strategy-workspace` (all fully merged into main; agent push access cannot
   delete branches). The unmerged `edit/edt-6cd24209-…` Lovable leftover (tip `958b1dd`) is
   yours to review or discard.
-- **From Phase 1:** apply the four Phase-1 migrations (`20260702100000` → `20260702100300`)
-  to the live Supabase project (SQL Editor, in order), then run `scripts/verify-schema.sql`
-  there and confirm 62 PASS / 0 FAIL. Verified clean on scratch Postgres 16 (fresh + incremental
-  + idempotent re-run) during review, but never against the live instance.
+- **Completed 2026-07-02 via Supabase MCP:** Phase-1 schema/seed migrations and Phase-2.2
+  queue-locking migration were applied to live project `mehhuxzamnpxnkbrslls`; verification
+  checks passed for tables, columns, enums, RLS/policies, seed sanity, queue RPC functions, and
+  queue RPC browser-role restrictions. A follow-up live migration
+  `restrict_agent_job_rpc_execute` was added after Supabase security advisors flagged the worker
+  queue RPCs as publicly executable by default; `anon`/`authenticated` execution is now revoked
+  and `service_role` execution granted.
+- **From Phase 2.5-2.6:** deploy updated edge functions after review approval:
+  `supabase functions deploy agent-run` and `supabase functions deploy workspace-chat`. Set
+  staging/frontend env `VITE_RUNTIME_MODE=enqueue` only when the worker service is deployed and
+  has `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, and any optional research keys. Keep
+  `VITE_RUNTIME_MODE=inline` (or omit it with the legacy endpoint configured) for rollback.
+- **From Phase 2.10:** deploy the worker service only after reviewer approval. Build context is
+  `worker/` and the container command is `node dist/index.js` from `worker/Dockerfile`. Required
+  runtime env: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`. Optional env:
+  `WORKER_ID`, `POLL_INTERVAL_MS`, `JOB_HEARTBEAT_STALE_SECONDS`, `JOB_MAX_ATTEMPTS`,
+  `SECTION_ANALYSIS_MAX_TURNS`, `SECTION_ANALYSIS_TASK_BUDGET_TOKENS`,
+  `SECTION_ANALYSIS_MAX_BUDGET_USD`, `WORKSPACE_CHAT_MAX_TURNS`,
+  `WORKSPACE_CHAT_TASK_BUDGET_TOKENS`, `WORKSPACE_CHAT_MAX_BUDGET_USD`, `XAI_API_KEY`,
+  `FIRECRAWL_API_KEY`. Example Fly path: from repo root run `fly launch --dockerfile
+  worker/Dockerfile --name super-bmc-worker --no-deploy`, set secrets with `fly secrets set
+  SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ANTHROPIC_API_KEY=...`, then `fly deploy
+  --dockerfile worker/Dockerfile`. After the worker is healthy, deploy the edge functions above
+  and only then switch frontend/staging `VITE_RUNTIME_MODE=enqueue`.
 
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
 
 ## REVIEW FINDINGS
+
+### Phase 2 - RF-2-4 (MEDIUM) - FIXED pending re-review (2026-07-02)
+**Problem:** Reviewer found model-route resolution for section analysis was nondeterministic:
+the profile's legacy `standard` route_key and the `section_analysis` task_class row could tie
+under the old query ordering.
+**Fix:** Worker route selection now ranks candidates explicitly:
+account route_key -> account task_class -> global route_key -> global task_class. Unit tests pin
+the precedence and preserve the legacy route_key fallback.
+
+### Phase 2 - RF-2-3 (HIGH) - FIXED pending re-review (2026-07-02)
+**Problem:** If a job handler threw after marking the linked `agent_runs` row `running`, the job
+retry/dead-letter path updated `agent_jobs` but left `agent_runs` stuck `running`, causing the UI
+to poll forever.
+**Fix:** The worker dispatcher now catches job-handler errors, marks the linked run `failed` with
+`error`, `summary`, and `completed_at` under `.eq("account_id", job.account_id)`, then rethrows so
+the queue retry/dead-letter path still runs. Unit coverage pins the failed-run update.
+
+### Phase 2 - RF-2-2 (HIGH) - FIXED pending re-review (2026-07-02)
+**Problem:** Reviewer found `ClaudeAgentRunner` treated every SDK result message as success,
+masking `error_max_budget_usd`, `error_max_turns`, and `error_during_execution` as later JSON
+parse failures.
+**Fix:** `runner.ts` now throws immediately when the result subtype is not `success`, preserving
+the SDK subtype in the error message for retry/dead-letter diagnosis.
+
+### Phase 2 — RF-2-1 (HIGH) — FIXED pending re-review (2026-07-02)
+**Problem:** Reviewer exercised the queue SQL on scratch Postgres and found that a stale
+`running` job with `attempts >= max_attempts` is skipped forever by `claim_next_agent_job`
+because the reclaim branch only allowed `attempts < max_attempts`; `fail_agent_job` also cannot
+be called after the owning worker has crashed. This creates an orphaned `running` row and
+violates the crash-recovery acceptance criterion.
+**Fix:** Added migration `20260702112000_reap_stale_agent_jobs.sql` and mirrored the change into
+`20260702110000_agent_job_queue_locking.sql` + `schema.sql`: `claim_next_agent_job` now first
+reaps stale final-attempt `running` jobs to `failed_permanent` before selecting the next claimable
+job. `scripts/verify-schema.sql` now asserts the reaper branch is present. Worker tests include a
+boundary test documenting that claim is where stale final-attempt jobs are reaped.
+**Note:** Reviewer requested a SQL-level test when work order 2.9's test suite is built; still
+tracked for 2.9.
 
 ### Phase 1 — RF-1-3 (MEDIUM) — RESOLVED by reviewer (2026-07-02)
 **Problem:** The RF-1-2 patch introduced a typo'd model ID on the premium route:
@@ -263,7 +320,205 @@ updated to match each model's current catalog price. Gates re-run clean: tsc cle
 green, lint 69 (unchanged). RF-1-2 marked RESOLVED.
 
 ### Phase 2 — Agent worker service
-Tasks: 2.1 ☐ · 2.2 ☐ · 2.3 ☐ · 2.4 ☐ · 2.5 ☐ · 2.6 ☐ · 2.7 ☐ · 2.8 ☐ · 2.9 ☐ · 2.10 ☐
+Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [x] · 2.8 [x] · 2.9 [x] · 2.10 [x] · **AWAITING REVIEW**
+
+**2026-07-02 — Phase 2 started on branch `build/phase-2-worker`; work orders 2.1–2.2 complete.**
+
+- **Orientation completed before worker code:** read `HANDOFF.md`, `docs/BUILD_PLAN.md` Part I
+  + Phase 2 work orders, `docs/BUILD_STATE.md`, required SDK guide
+  `docs/specs/07_CLAUDE_AGENT_SDK_INTEGRATION.md`, and skimmed specs 00–06 for product/runtime
+  context. Implementation intentionally stopped at the first natural seam (2.1–2.2).
+- **2.1 Worker package skeleton:** created `worker/` as an independent Node/TypeScript package
+  with `@anthropic-ai/claude-agent-sdk@0.3.198`, Supabase service-role client wiring, env parsing,
+  Dockerfile, `.env.example`, README, strict `tsconfig`, ESLint, and Vitest harness. Zod is v4 in
+  the worker package because the Agent SDK peers on `^4.0.0`; the root app remains unchanged.
+- **2.2 Job loop:** added a testable queue loop with claim/heartbeat/complete/fail repository
+  boundary. Added migration `20260702110000_agent_job_queue_locking.sql` with queue metadata
+  (`claimed_by`, `locked_at`, `heartbeat_at`, `run_after`, `max_attempts`, `last_error`), claim
+  indexes, `claim_next_agent_job(...)` using `FOR UPDATE SKIP LOCKED`, and `fail_agent_job(...)`
+  for retry backoff vs `failed_permanent`. Mirrored into `supabase/schema.sql`, updated
+  `src/integrations/supabase/types.ts`, and extended `scripts/verify-schema.sql` checks.
+- **Honest scope note:** workspace chat, edge enqueue mode, frontend runtime switch, guardrail
+  hooks, and the broader Phase 2 SQL-level/crash-recovery test suite remain 2.5–2.10.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  → exit 0
+cd worker && npm test           → 5 tests passed
+cd worker && npm run build      → exit 0
+cd worker && npm run lint       → exit 0
+npx tsc -p tsconfig.app.json --noEmit → exit 0
+npm run build                   → green
+npm run lint                    → 69 problems (50 errors, 19 warnings), frozen baseline unchanged
+```
+
+**Notes / constraints carried forward:**
+- Live Supabase project `mehhuxzamnpxnkbrslls` now has recorded MCP-applied migrations:
+  `workspace_orchestration_tables`, `column_additions`, `rls_new_tables`, `seed_phase1`,
+  `agent_job_queue_locking`, `restrict_agent_job_rpc_execute`, and `reap_stale_agent_jobs`. The
+  scheduled-loop cron/Vault migration remains an operator/deploy task because it requires the live
+  service-role key secret.
+- Supabase advisors still report pre-existing/broader warnings not introduced by Phase 2.2:
+  mutable `set_updated_at` search path; public/authenticated execution on older SECURITY DEFINER
+  functions (`handle_new_user`, `has_role`, `is_account_member`, `provision_account_defaults`);
+  permissive insert policies on `accounts`/`leads`; leaked-password protection disabled; plus
+  expected unused-index/unindexed-FK noise on fresh/empty tables. The new queue RPC public-execute
+  warnings were resolved.
+- The worker package install reports 0 vulnerabilities. npm warns that local Node `22.12.0` is
+  below a transitive ESLint engine preference (`^22.13.0`), but worker lint still exits 0.
+
+**2026-07-02 — Reviewer feedback RF-2-1 fixed and work orders 2.3–2.4 complete.**
+
+- **RF-2-1 fix:** added migration `20260702112000_reap_stale_agent_jobs.sql` and mirrored the
+  change into `20260702110000_agent_job_queue_locking.sql` plus `supabase/schema.sql`.
+  `claim_next_agent_job(...)` now first reaps stale `running` jobs whose attempts have reached
+  `max_attempts` by moving them to `failed_permanent`, preventing final-attempt crash zombies.
+  `scripts/verify-schema.sql` now asserts that the function body contains this reaper path.
+- **Live DB note:** user explicitly asked Codex to apply pending Supabase migrations; the reaper
+  migration was applied to live project `mehhuxzamnpxnkbrslls` and verified there. This remains
+  documented as sanctioned operator-scope work, not a normal worker responsibility.
+- **2.3 `canvas_section_analysis`:** added `CanvasSectionAnalysisHandler` and dispatcher wiring.
+  The handler loads the account/default agent profile, resolves the `section_analysis` model route,
+  builds SDK prompts, runs the Claude Agent SDK with `maxTurns`, `maxBudgetUsd`,
+  `settingSources: []`, `persistSession: false`, and BMC-only tool allowlist, parses the legacy
+  `items`/`notes`/`confidence`/`summary` JSON shape, and updates `agent_runs` with output,
+  summary, tokens, provider/model, and estimated cost under `.eq("account_id", job.account_id)`.
+- **2.4 core MCP tools:** added in-process SDK MCP server `bmc` with `read_canvas`,
+  `write_section_items` (proposal mode + own-section/evidence checks), `log_evidence`,
+  `open_gap`, `post_insight`, `read_competitor_canvas` stub, `search_web` graceful degrade, and
+  `firecrawl_scrape` graceful degrade. Every Supabase-backed handler scopes reads/writes by
+  `ctx.accountId`; no tool accepts `account_id` from the model.
+- **Tests added:** worker tests now cover queue-loop behavior, RF-2-1 repository boundary behavior,
+  and the section-analysis handler's legacy-output/update contract. The RF-2-1 SQL-level
+  regression test remains intentionally tracked for work order 2.9.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  → exit 0
+cd worker && npm test           → 5 tests passed
+cd worker && npm run build      → exit 0
+cd worker && npm run lint       → exit 0
+```
+
+**2026-07-02 - Reviewer findings RF-2-2/RF-2-3/RF-2-4 fixed; work orders 2.5-2.6 complete.**
+
+- **RF-2-2:** `ClaudeAgentRunner` now treats non-`success` SDK result subtypes as failures and
+  throws with the subtype in the message, preserving causes such as `error_max_budget_usd`.
+- **RF-2-3:** worker dispatch now marks linked `agent_runs` rows `failed` with `error`,
+  `summary`, and `completed_at` when a job handler throws, while still rethrowing for queue retry
+  and dead-letter behavior.
+- **RF-2-4:** model-route selection is deterministic via explicit precedence:
+  account route_key -> account task_class -> global route_key -> global task_class. Tests pin the
+  legacy `standard` route tie.
+- **2.5 `workspace_chat`:** added worker support for `workspace_chat` jobs. The handler loads the
+  account-scoped thread/profile/messages, runs the Claude Agent SDK with BMC tools and proposal
+  mode, writes the assistant reply to `workspace_messages`, and completes the linked run with
+  output/tokens/cost under `.eq("account_id", job.account_id)`.
+- **2.6 enqueue mode:** `agent-run` now accepts `mode: "enqueue"` to create a pending
+  `agent_runs` row and queued `agent_jobs` row, while the existing inline path remains the default
+  rollback path. Added `workspace-chat` edge function for auth -> user message insert -> queued
+  chat job. Frontend runtime mode now supports `VITE_RUNTIME_MODE=enqueue|inline|mock`.
+- **Honest scope note:** 2.7 frontend polling/runtime polish, 2.8 guardrail hooks, 2.9 SQL-level
+  crash-recovery tests, and 2.10 Docker/docs/final review prep remain open.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  -> exit 0
+cd worker && npm test           -> 7 tests passed
+cd worker && npm run build      -> exit 0
+cd worker && npm run lint       -> exit 0
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), frozen baseline unchanged
+```
+
+**2026-07-02 - Work order 2.7 runtime rename/config transition complete.**
+
+- Renamed the frontend live runtime implementation from `hermes-runtime.ts` /
+  `HermesAgentRuntime` to `live-runtime.ts` / `LiveAgentRuntime`.
+- Renamed the Settings panel from `HermesRuntimePanel` to `AgentRuntimePanel`, changed the
+  Settings tab id from `hermes` to `runtime`, and changed the visible label to "Agent Runtime".
+- Added `VITE_AGENT_RUNTIME_ENDPOINT` and `VITE_AGENT_RUNTIME_API_KEY` as the primary frontend
+  env vars, with the old `VITE_HERMES_RUNTIME_*` names retained as deprecated fallbacks.
+- Updated `.env.example`, README active setup/env docs, and active code comments. Historical
+  Hermes decision docs were intentionally left untouched.
+
+**Gate results for this slice:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
+```
+
+**2026-07-02 - Work order 2.8 guardrail hooks complete.**
+
+- Added Claude Agent SDK `PreToolUse` hooks in the worker runner path. Every BMC tool call is
+  audit-logged with account id, run id, job kind, tool name, tool-use id, and a redacted/truncated
+  args summary; secret-like keys are replaced with `[REDACTED]`.
+- Added a hook-level evidence gate for `mcp__bmc__write_section_items`: any item with
+  `confidence >= 0.7` and no `evidence_ids` is denied before the MCP tool executes. The existing
+  in-tool validation remains in place as defense in depth.
+- Added per-task runtime limits from worker config: section analysis and workspace chat now have
+  independent `maxTurns`, SDK `taskBudget` token ceilings, and optional max USD overrides. Defaults
+  are documented in `worker/.env.example` and `worker/README.md`.
+- Tests cover the hook denial path, allowed evidence path, audit redaction, and propagation of
+  section-analysis limits/hooks into the runner request.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  -> exit 0
+cd worker && npm test           -> 10 tests passed
+cd worker && npm run build      -> exit 0
+cd worker && npm run lint       -> exit 0
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
+```
+
+**2026-07-02 - Work order 2.9 test hardening complete.**
+
+- Added BMC MCP tool tests that exercise every registered tool handler through the SDK server's
+  in-process registry against a fake account-scoped schema. The tests assert account filters and
+  account-scoped inserts for Supabase-backed tools, plus graceful degraded responses for Phase-3
+  research stubs.
+- Added an explicit in-tool guardrail test for own-section writes and high-confidence writes
+  without evidence, complementing the 2.8 hook-level guardrail test.
+- Added a legacy-output fixture test for the exact `items`/`notes`/`confidence`/`summary` shape
+  expected by today's inline `agent-run` behavior.
+- Added an optional SQL-level crash-recovery integration test. When `WORKER_TEST_DATABASE_URL`
+  points at a scratch Postgres with the project schema applied, it inserts a stale final-attempt
+  `running` job, calls `claim_next_agent_job`, and asserts the job is reaped to
+  `failed_permanent` rather than orphaned. The test is skipped in local runs without that env var.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  -> exit 0
+cd worker && npm test           -> 13 passed, 1 skipped (SQL integration needs WORKER_TEST_DATABASE_URL)
+cd worker && npm run build      -> exit 0
+cd worker && npm run lint       -> exit 0
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
+```
+
+**2026-07-02 - Work order 2.10 complete; Phase 2 awaiting review.**
+
+- Added exact worker deployment steps to the OPERATOR QUEUE. No deploys, secrets, or live
+  database changes were executed in this slice.
+- Phase 2 is marked `AWAITING REVIEW`; reviewer should audit the branch, run the optional SQL
+  integration test with `WORKER_TEST_DATABASE_URL` against a scratch schema, and verify the queued
+  runtime path before any staging switch to `VITE_RUNTIME_MODE=enqueue`.
+
+**Final gate results for Phase 2 branch:**
+```
+cd worker && npm run typecheck  -> exit 0
+cd worker && npm test           -> 13 passed, 1 skipped (SQL integration needs WORKER_TEST_DATABASE_URL)
+cd worker && npm run build      -> exit 0
+cd worker && npm run lint       -> exit 0
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
+```
 
 ### Phase 3 — Research engine & evidence
 Tasks: 3.1 ☐ · 3.2 ☐ · 3.3 ☐ · 3.4 ☐ · 3.5 ☐ · 3.6 ☐ · 3.7 ☐

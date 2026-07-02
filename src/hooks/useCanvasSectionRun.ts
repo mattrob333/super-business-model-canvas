@@ -40,7 +40,7 @@ const MAX_POLL_ATTEMPTS = 30; // ~24 seconds max
 
 /**
  * Generates realistic mock analysis output for a canvas section.
- * In Phase 7, this will be replaced by real Hermes agent output.
+ * In live mode, this is replaced by real worker/edge agent output.
  */
 function generateMockAnalysis(sectionKey: CanvasSectionKey): {
   items: string[];
@@ -264,7 +264,7 @@ export function useCanvasSectionRun() {
           // In live mode, omit modelProvider/modelName so the edge function
           // auto-detects from env vars (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
           // In mock mode, these values are ignored by MockAgentRuntime.
-          ...(getRuntimeMode() === "live"
+          ...(getRuntimeMode() !== "mock"
             ? {}
             : { modelProvider: "mock", modelName: "mock-analyzer" }),
         });
@@ -329,7 +329,7 @@ export function useCanvasSectionRun() {
                 confidence: number;
                 summary: string;
               }> => {
-                if (getRuntimeMode() === "live") {
+                if (getRuntimeMode() !== "mock") {
                   const runOutput = await runtime.getRunOutput(runId);
                   const output = runOutput?.output as Record<string, unknown> | null;
                   if (output && Array.isArray(output.items)) {
@@ -489,3 +489,4 @@ export function useCanvasSectionRun() {
     getSectionResult,
   };
 }
+
