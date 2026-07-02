@@ -83,43 +83,83 @@ export const ChatDrawer = ({
     setInput("");
 
     try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      
-      const functionName = mode === 'competitor' ? 'competitor-chat' : 'bmc-chat';
-      const body = mode === 'competitor' 
-        ? {
+      if (mode === 'competitor') {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data, error } = await supabase.functions.invoke('competitor-chat', {
+          body: {
             messages: [...messages, userMessage],
             competitor,
             companyName,
             businessContext
           }
-        : {
-            section: section?.title,
-            sectionContent: Array.isArray(section?.items) ? section.items.join(', ') : section?.items,
-            userMessage: userInput,
-            conversationHistory: messages,
-            companyName: companyName,
-            businessContext: businessContext
-          };
+        });
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body
-      });
+        if (error) throw error;
 
-      if (error) throw error;
+        const aiMessage: Message = {
+          role: "assistant",
+          content: data.response
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      } else {
+        // bmc-chat streams SSE — consume it incrementally like BMCSectionEditor
+        const { getAccessToken, readGrokSseStream } = await import("@/lib/supabase-auth");
+        const accessToken = await getAccessToken();
 
-      const aiMessage: Message = {
-        role: "assistant",
-        content: data.response
-      };
-      setMessages((prev) => [...prev, aiMessage]);
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bmc-chat`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              section: section?.title,
+              sectionContent: Array.isArray(section?.items) ? section.items.join(', ') : section?.items,
+              userMessage: userInput,
+              conversationHistory: messages,
+              companyName: companyName,
+              businessContext: businessContext
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to get response");
+        }
+
+        setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+        let assistantMessage = "";
+        await readGrokSseStream(response, (content) => {
+          assistantMessage += content;
+          setMessages((prev) => {
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              role: "assistant",
+              content: assistantMessage,
+            };
+            return updated;
+          });
+        });
+      }
     } catch (error) {
       console.error('Chat error:', error);
       const errorMessage: Message = {
         role: "assistant",
         content: "Sorry, I encountered an error. Please try again."
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => {
+        // Drop an empty streaming placeholder left behind by a failed stream
+        const hasEmptyPlaceholder =
+          prev.length > 0 &&
+          prev[prev.length - 1].role === "assistant" &&
+          !prev[prev.length - 1].content;
+        const base = hasEmptyPlaceholder ? prev.slice(0, -1) : prev;
+        return [...base, errorMessage];
+      });
     }
   };
 

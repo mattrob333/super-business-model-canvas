@@ -70,7 +70,7 @@ export default function Agents() {
           .from("agent_runs")
           .select("id, agent_profile_id, run_type, status, started_at, completed_at, summary, trigger_type")
           .eq("account_id", effectiveAccountId)
-          .order("started_at", { ascending: false })
+          .order("created_at", { ascending: false })
           .limit(10),
       ]);
 
@@ -116,7 +116,13 @@ export default function Agents() {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled
+            title="Custom agents are coming soon — the nine section agents are provisioned automatically"
+          >
             <Plus className="h-4 w-4" />
             New Agent
           </Button>

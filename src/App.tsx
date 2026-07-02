@@ -3,8 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
@@ -41,6 +41,14 @@ const withSuspense = (Component: React.ComponentType) => (
   </Suspense>
 );
 
+/** Redirects unauthenticated users to /auth for every route in the shell. */
+const RequireAuth = () => {
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/auth" replace />;
+  return <Outlet />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -54,6 +62,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
 
           {/* Authenticated routes — inside AppShell */}
+          <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route path="/dashboard" element={withSuspense(Dashboard)} />
             <Route path="/canvas" element={withSuspense(Canvas)} />
@@ -72,6 +81,7 @@ const App = () => (
             <Route path="/admin/frameworks/new" element={withSuspense(FrameworkEditor)} />
             <Route path="/admin/frameworks/:id/edit" element={withSuspense(FrameworkEditor)} />
             <Route path="/settings" element={withSuspense(Settings)} />
+          </Route>
           </Route>
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

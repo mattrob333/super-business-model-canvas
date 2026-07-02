@@ -44,6 +44,7 @@ export function SecurityPanel() {
   const [mcpCount, setMcpCount] = useState(0);
   const [recentRuns, setRecentRuns] = useState(0);
   const [failedRuns, setFailedRuns] = useState(0);
+  const [successfulRuns, setSuccessfulRuns] = useState(0);
 
   const fetchSecurityData = useCallback(async () => {
     if (!accountId) return;
@@ -83,6 +84,7 @@ export function SecurityPanel() {
         );
         setRecentRuns(recent.length);
         setFailedRuns(recent.filter((r) => r.status === "failed").length);
+        setSuccessfulRuns(recent.filter((r) => r.status === "completed").length);
       }
     } catch (err) {
       console.error("Failed to load security data:", err);
@@ -221,7 +223,7 @@ export function SecurityPanel() {
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-2xl font-bold text-success">
-                  {recentRuns - failedRuns}
+                  {successfulRuns}
                 </span>
                 <span className="text-xs text-muted-foreground">Successful</span>
               </div>

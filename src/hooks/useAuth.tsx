@@ -53,7 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (nextSession?.user) {
         setAdminLoading(true);
-        void checkAdminStatus(nextSession.user.id);
+        // Defer: supabase-js warns against making Supabase calls directly
+        // inside the onAuthStateChange callback (can deadlock)
+        setTimeout(() => void checkAdminStatus(nextSession.user.id), 0);
       } else {
         setIsAdmin(false);
         setAdminLoading(false);

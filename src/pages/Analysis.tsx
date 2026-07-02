@@ -355,7 +355,18 @@ const Analysis = () => {
         })
         .eq('user_id', user.id)
         .eq('company_name', analysisData.company?.name || 'Unknown Company')
-        .then(() => {
+        .select('id')
+        .then(({ data, error }) => {
+          if (error || !data || data.length === 0) {
+            toast({
+              title: "Save failed",
+              description: error
+                ? error.message
+                : "No saved analysis found for this company — changes are kept locally only.",
+              variant: "destructive",
+            });
+            return;
+          }
           toast({
             title: "Saved",
             description: `${sectionTitle} updated and saved`,

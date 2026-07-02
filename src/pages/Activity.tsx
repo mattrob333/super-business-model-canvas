@@ -68,7 +68,7 @@ export default function ActivityPage() {
           "id, agent_profile_id, run_type, trigger_type, triggered_by, status, summary, started_at, completed_at, model_provider, model_name"
         )
         .eq("account_id", effectiveAccountId)
-        .order("started_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(50);
 
       if (triggerFilter === "scheduled") {
