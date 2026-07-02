@@ -274,6 +274,10 @@ node scripts/generate-framework-seed.mjs   # Regenerate seed_frameworks.sql from
 
 - **[supabase/SETUP.md](./supabase/SETUP.md)** — Database, secrets, edge-function deploy
 - **[HANDOFF.md](./HANDOFF.md)** — Architecture map, known issues, next steps for developers
+- **[docs/VISION.md](./docs/VISION.md)** — Product vision: the living Business Model Canvas
+- **[docs/AGENT_RUNTIME_DECISION.md](./docs/AGENT_RUNTIME_DECISION.md)** — Agent runtime architecture decision record
+- **[docs/ROADMAP.md](./docs/ROADMAP.md)** — Phased build plan (Phases 1–8)
+- **[docs/DEVLOG.md](./docs/DEVLOG.md)** — Dev log: audits, fixes, current state
 
 ---
 
