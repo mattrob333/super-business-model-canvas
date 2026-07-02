@@ -12,8 +12,17 @@ verify_jwt = true
 [functions.competitor-chat]
 verify_jwt = true
 
-[functions.seed-frameworks]
-verify_jwt = false
+[functions.manage-provider-key]
+verify_jwt = true
+
+[functions.test-mcp-server]
+verify_jwt = true
+
+[functions.agent-run]
+verify_jwt = true
+
+[functions.scheduled-loop-tick]
+verify_jwt = true
 
 [functions.recommend-frameworks]
 verify_jwt = true
