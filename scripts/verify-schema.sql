@@ -188,6 +188,19 @@ with checks as (
          case when not has_function_privilege('authenticated', 'public.fail_agent_job(uuid, text, text)', 'EXECUTE')
          then 'PASS' else 'FAIL' end
 
+  union all
+
+  select 'function body: claim_next_agent_job reaps final stale jobs',
+         case when exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public'
+             and p.proname = 'claim_next_agent_job'
+             and pg_get_functiondef(p.oid) like '%failed_permanent%'
+             and pg_get_functiondef(p.oid) like '%attempts >= coalesce(max_attempts, p_default_max_attempts)%'
+         ) then 'PASS' else 'FAIL' end
+
 )
 select check_name, status from checks order by
   case status when 'FAIL' then 0 else 1 end,  -- surface failures first

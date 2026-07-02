@@ -34,6 +34,15 @@ as $$
 declare
   v_job_id uuid;
 begin
+  update public.agent_jobs
+  set
+    status = 'failed_permanent',
+    heartbeat_at = now(),
+    last_error = coalesce(last_error, 'Worker heartbeat expired after final attempt')
+  where status = 'running'
+    and coalesce(heartbeat_at, locked_at, created_at) < now() - make_interval(secs => p_stale_after_seconds)
+    and attempts >= coalesce(max_attempts, p_default_max_attempts);
+
   select id
     into v_job_id
   from public.agent_jobs

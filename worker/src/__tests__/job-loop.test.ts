@@ -98,4 +98,28 @@ describe("JobLoop", () => {
     await expect(loop.runOnce()).resolves.toBe(false);
     expect(repository.completed).toEqual([]);
   });
+
+  it("relies on the repository claim path to reap stale final-attempt jobs", async () => {
+    class ReapingRepository extends MemoryRepository {
+      public reaped = false;
+
+      async claimNext(workerId: string, options: ClaimOptions): Promise<AgentJob | null> {
+        void workerId;
+        void options;
+        this.reaped = true;
+        return null;
+      }
+    }
+
+    const repository = new ReapingRepository(null);
+    const loop = new JobLoop("worker-a", repository, async () => undefined, {
+      pollIntervalMs: 1,
+      heartbeatIntervalMs: 1000,
+      staleAfterSeconds: 120,
+      defaultMaxAttempts: 3,
+    });
+
+    await expect(loop.runOnce()).resolves.toBe(false);
+    expect(repository.reaped).toBe(true);
+  });
 });

@@ -59,6 +59,20 @@ Status: OPEN | RESOLVED (<how>)
 
 ## REVIEW FINDINGS
 
+### Phase 2 — RF-2-1 (HIGH) — FIXED pending re-review (2026-07-02)
+**Problem:** Reviewer exercised the queue SQL on scratch Postgres and found that a stale
+`running` job with `attempts >= max_attempts` is skipped forever by `claim_next_agent_job`
+because the reclaim branch only allowed `attempts < max_attempts`; `fail_agent_job` also cannot
+be called after the owning worker has crashed. This creates an orphaned `running` row and
+violates the crash-recovery acceptance criterion.
+**Fix:** Added migration `20260702112000_reap_stale_agent_jobs.sql` and mirrored the change into
+`20260702110000_agent_job_queue_locking.sql` + `schema.sql`: `claim_next_agent_job` now first
+reaps stale final-attempt `running` jobs to `failed_permanent` before selecting the next claimable
+job. `scripts/verify-schema.sql` now asserts the reaper branch is present. Worker tests include a
+boundary test documenting that claim is where stale final-attempt jobs are reaped.
+**Note:** Reviewer requested a SQL-level test when work order 2.9's test suite is built; still
+tracked for 2.9.
+
 ### Phase 1 — RF-1-3 (MEDIUM) — RESOLVED by reviewer (2026-07-02)
 **Problem:** The RF-1-2 patch introduced a typo'd model ID on the premium route:
 `strategy_synthesis` seeded as provider `anthropic` + `claude-opus-4.8` (dots). Direct
@@ -266,7 +280,7 @@ updated to match each model's current catalog price. Gates re-run clean: tsc cle
 green, lint 69 (unchanged). RF-1-2 marked RESOLVED.
 
 ### Phase 2 — Agent worker service
-Tasks: 2.1 ☑ · 2.2 ☑ · 2.3 ☐ · 2.4 ☐ · 2.5 ☐ · 2.6 ☐ · 2.7 ☐ · 2.8 ☐ · 2.9 ☐ · 2.10 ☐
+Tasks: 2.1 ☑ · 2.2 ☑ · 2.3 ☑ · 2.4 ☑ · 2.5 ☐ · 2.6 ☐ · 2.7 ☐ · 2.8 ☐ · 2.9 ☐ · 2.10 ☐
 
 **2026-07-02 — Phase 2 started on branch `build/phase-2-worker`; work orders 2.1–2.2 complete.**
 
@@ -284,14 +298,13 @@ Tasks: 2.1 ☑ · 2.2 ☑ · 2.3 ☐ · 2.4 ☐ · 2.5 ☐ · 2.6 ☐ · 2.7 ☐
   indexes, `claim_next_agent_job(...)` using `FOR UPDATE SKIP LOCKED`, and `fail_agent_job(...)`
   for retry backoff vs `failed_permanent`. Mirrored into `supabase/schema.sql`, updated
   `src/integrations/supabase/types.ts`, and extended `scripts/verify-schema.sql` checks.
-- **Honest scope note:** no `canvas_section_analysis` execution, MCP tools, workspace chat, edge
-  enqueue mode, frontend runtime switch, or guardrail hooks are implemented yet; those remain
-  2.3–2.10.
+- **Honest scope note:** workspace chat, edge enqueue mode, frontend runtime switch, guardrail
+  hooks, and the broader Phase 2 SQL-level/crash-recovery test suite remain 2.5–2.10.
 
 **Gate results for this slice:**
 ```
 cd worker && npm run typecheck  → exit 0
-cd worker && npm test           → 3 tests passed
+cd worker && npm test           → 5 tests passed
 cd worker && npm run build      → exit 0
 cd worker && npm run lint       → exit 0
 npx tsc -p tsconfig.app.json --noEmit → exit 0
@@ -302,8 +315,9 @@ npm run lint                    → 69 problems (50 errors, 19 warnings), frozen
 **Notes / constraints carried forward:**
 - Live Supabase project `mehhuxzamnpxnkbrslls` now has recorded MCP-applied migrations:
   `workspace_orchestration_tables`, `column_additions`, `rls_new_tables`, `seed_phase1`,
-  `agent_job_queue_locking`, and `restrict_agent_job_rpc_execute`. The scheduled-loop cron/Vault
-  migration remains an operator/deploy task because it requires the live service-role key secret.
+  `agent_job_queue_locking`, `restrict_agent_job_rpc_execute`, and `reap_stale_agent_jobs`. The
+  scheduled-loop cron/Vault migration remains an operator/deploy task because it requires the live
+  service-role key secret.
 - Supabase advisors still report pre-existing/broader warnings not introduced by Phase 2.2:
   mutable `set_updated_at` search path; public/authenticated execution on older SECURITY DEFINER
   functions (`handle_new_user`, `has_role`, `is_account_member`, `provision_account_defaults`);
@@ -312,6 +326,39 @@ npm run lint                    → 69 problems (50 errors, 19 warnings), frozen
   warnings were resolved.
 - The worker package install reports 0 vulnerabilities. npm warns that local Node `22.12.0` is
   below a transitive ESLint engine preference (`^22.13.0`), but worker lint still exits 0.
+
+**2026-07-02 — Reviewer feedback RF-2-1 fixed and work orders 2.3–2.4 complete.**
+
+- **RF-2-1 fix:** added migration `20260702112000_reap_stale_agent_jobs.sql` and mirrored the
+  change into `20260702110000_agent_job_queue_locking.sql` plus `supabase/schema.sql`.
+  `claim_next_agent_job(...)` now first reaps stale `running` jobs whose attempts have reached
+  `max_attempts` by moving them to `failed_permanent`, preventing final-attempt crash zombies.
+  `scripts/verify-schema.sql` now asserts that the function body contains this reaper path.
+- **Live DB note:** user explicitly asked Codex to apply pending Supabase migrations; the reaper
+  migration was applied to live project `mehhuxzamnpxnkbrslls` and verified there. This remains
+  documented as sanctioned operator-scope work, not a normal worker responsibility.
+- **2.3 `canvas_section_analysis`:** added `CanvasSectionAnalysisHandler` and dispatcher wiring.
+  The handler loads the account/default agent profile, resolves the `section_analysis` model route,
+  builds SDK prompts, runs the Claude Agent SDK with `maxTurns`, `maxBudgetUsd`,
+  `settingSources: []`, `persistSession: false`, and BMC-only tool allowlist, parses the legacy
+  `items`/`notes`/`confidence`/`summary` JSON shape, and updates `agent_runs` with output,
+  summary, tokens, provider/model, and estimated cost under `.eq("account_id", job.account_id)`.
+- **2.4 core MCP tools:** added in-process SDK MCP server `bmc` with `read_canvas`,
+  `write_section_items` (proposal mode + own-section/evidence checks), `log_evidence`,
+  `open_gap`, `post_insight`, `read_competitor_canvas` stub, `search_web` graceful degrade, and
+  `firecrawl_scrape` graceful degrade. Every Supabase-backed handler scopes reads/writes by
+  `ctx.accountId`; no tool accepts `account_id` from the model.
+- **Tests added:** worker tests now cover queue-loop behavior, RF-2-1 repository boundary behavior,
+  and the section-analysis handler's legacy-output/update contract. The RF-2-1 SQL-level
+  regression test remains intentionally tracked for work order 2.9.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  → exit 0
+cd worker && npm test           → 5 tests passed
+cd worker && npm run build      → exit 0
+cd worker && npm run lint       → exit 0
+```
 
 ### Phase 3 — Research engine & evidence
 Tasks: 3.1 ☐ · 3.2 ☐ · 3.3 ☐ · 3.4 ☐ · 3.5 ☐ · 3.6 ☐ · 3.7 ☐
