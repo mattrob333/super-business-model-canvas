@@ -1,6 +1,24 @@
 # Dev Log
 
-Newest entries first. Companion docs: `VISION.md` (product), `AGENT_RUNTIME_DECISION.md` (architecture), `ROADMAP.md` (phases).
+Newest entries first. Companion docs: `VISION.md` (product), `AGENT_RUNTIME_DECISION.md` (architecture), `ROADMAP.md` (phases), `specs/` (workspace-era specs).
+
+---
+
+## 2026-07-02 (later) — Agent workspace spec suite
+
+Wrote the full specification set for the ten-agent workspace era (Matt's brief: unique
+full-screen workspaces for the 9 section agents + the orchestrator, with identity/context
+rails, centered collaborative chat, actions panels with cron-schedulable skills, cascade
+workflows, and a marquee orchestrator space — BMC remaining the shared source of truth).
+
+New in `docs/specs/`:
+- `00_OVERVIEW.md` — mental model, the cast, an end-to-end signal→strategy walkthrough, design principles
+- `01_AGENT_ROSTER.md` — all ten agents defined: callsigns (Atlas, Compass, Forge, Relay, Anchor, Yield, Vault, Tempo, Envoy, Ledger), personas, domain tools, outputs, standing orders, synergy map
+- `02_SECTION_WORKSPACE.md` — section room UI: identity block + settings sheet (system prompt/behavior), live section-canvas panel, context sources, threaded chat with tool-call/artifact/proposal cards, actions panel (Skills/Templates/Frameworks/Schedules) with per-action cron + "Atlas may trigger" toggles
+- `03_ORCHESTRATOR_WORKSPACE.md` — the War Room: BMC command Map (health/freshness/vs-competitor/activity modes), Atlas chat (delegation/brief/framework/conflict cards), Next Moves agenda, insight feed, cascades + approvals rails
+- `04_ORCHESTRATION_AND_CASCADES.md` — the four orchestration primitives (delegation, insight bus, agenda, approvals), scheduling authorship rules (human / Atlas-proposed / Atlas-autonomous), the v1 cascade library (Full Recon, Competitor Delta Sweep, Board Pack, Pricing War Response, Unit Economics Duet, Launch Readiness, Cost-Down Sprint), output types, complete data-model additions, and system-wide guardrails
+
+Also: README repositioned around the workspace direction with a spec index; ROADMAP Phases 5–6 now point at the specs. No code changes in this entry — specs slot into ROADMAP Phases 2–6 for implementation.
 
 ---
 

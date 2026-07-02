@@ -55,6 +55,7 @@ Goal: the deficiencies dashboard becomes real, computed from evidence.
 ## Phase 5 — Section agents as resident experts (≈ 2–3 weeks)
 
 Goal: each BMC section becomes an agent's room, proactive on a cadence.
+**Detailed specs: `docs/specs/01_AGENT_ROSTER.md` + `docs/specs/02_SECTION_WORKSPACE.md`.**
 
 - [ ] Redesign the section detail view: agent identity/personality, section canvas with evidence, KPI/benchmark cards, run history, standing-orders (loop) controls, chat — all in one room
 - [ ] Section chat routed through the worker with the section agent's profile + tools (replaces generic `bmc-chat`; thin-wrap or delete the old function)
@@ -65,6 +66,8 @@ Goal: each BMC section becomes an agent's room, proactive on a cadence.
 ## Phase 6 — The strategist orchestrator (≈ 2–3 weeks)
 
 Goal: the agent that sees everything and tells you what to do next.
+**Detailed specs: `docs/specs/03_ORCHESTRATOR_WORKSPACE.md` (the War Room) +
+`docs/specs/04_ORCHESTRATION_AND_CASCADES.md` (delegation, cascades, data model).**
 
 - [ ] Orchestrator agent in the worker: subagent delegation to the 9 section agents (Claude Agent SDK subagents), full read access to canvas + competitors + gaps + insights
 - [ ] Playbook frameworks as SDK skills: SWOT, Porter, Blue Ocean, Ansoff, PESTLE, unit economics — populated from live canvas data with citations (upgrade of `generate-framework-report`)
