@@ -32,7 +32,9 @@
 --  12. Provisioning (handle_new_user + provision_account_defaults + trigger)
 --  13. Row Level Security (enable + policies)
 --  14. Seeds (10 template agent profiles, 5 global model routes)
---  15. Drop dead/legacy tables
+--  15. Workspace & orchestration (Phase 1 -- workspace/context/insight/agenda/
+--      approval/job/cascade/metric/revision tables, RLS, seeds)
+--  16. Drop dead/legacy tables
 -- =============================================================================
 
 
@@ -1270,7 +1272,888 @@ where agent_key = 'agent_cost_structure' and account_id is null;
 
 
 -- =============================================================================
--- 15. DROP DEAD / LEGACY TABLES
+-- 15. WORKSPACE & ORCHESTRATION (Phase 1)
+-- =============================================================================
+-- Mirrors migrations 20260702100000_workspace_orchestration_tables.sql,
+-- 20260702100100_column_additions.sql, 20260702100200_rls_new_tables.sql, and
+-- 20260702100300_seed_phase1.sql. See those files for the full ordering-proof
+-- and assumption comments; reproduced verbatim below for the single-apply path.
+
+-- =============================================================================
+-- PHASE 1 (Super BMC build plan) — work order 1.1
+-- Data model wave 1: workspace & orchestration tables
+-- Spec reference: docs/specs/04_ORCHESTRATION_AND_CASCADES.md §5
+-- =============================================================================
+--
+-- ORDERING PROOF (never applied to a live database — this is the structural
+-- review the reviewer asked for in lieu of a local Supabase/Docker run):
+--
+-- The work order lists tables in this order:
+--   workspace_threads, workspace_messages, context_sources, insights,
+--   agenda_items, approvals, agent_jobs, cascades, cascade_steps,
+--   cascade_runs, metric_snapshots, agent_profile_revisions
+--
+-- That literal order contains a forward reference: `agent_jobs.cascade_run_id`
+-- points at `cascade_runs`, which is listed AFTER `agent_jobs`. Postgres
+-- evaluates `create table` statements top-to-bottom in a single file, so a
+-- table cannot reference a FK target that hasn't been created yet. To keep
+-- this migration applying cleanly in a single pass, this file creates tables
+-- in true dependency order instead:
+--
+--   1. workspace_threads      -> accounts, agent_profiles          (pre-existing tables)
+--   2. workspace_messages     -> workspace_threads (1), agent_runs (pre-existing)
+--   3. context_sources        -> accounts, agent_profiles, workspace_threads (1)
+--   4. insights               -> accounts, agent_profiles, agent_runs
+--   5. agenda_items           -> accounts, agent_runs
+--   6. approvals              -> accounts, agent_profiles
+--   7. cascades               -> accounts (nullable; null = template library)
+--   8. cascade_steps          -> cascades (7)
+--   9. cascade_runs           -> accounts, cascades (7)
+--  10. agent_jobs             -> accounts, agent_runs, cascade_runs (9)
+--  11. metric_snapshots       -> accounts
+--  12. agent_profile_revisions -> agent_profiles
+--
+-- Every FK target in this list is either a table that already exists on
+-- `main` (accounts, agent_profiles, agent_runs) or a table created earlier in
+-- this same file. No table below references a table defined later in the
+-- file, so this migration applies cleanly on top of the existing schema in a
+-- single pass. This was verified by manual read-through of every `references`
+-- clause below, not by running it against a real Postgres instance (no
+-- Supabase CLI/Docker is available in this environment).
+--
+-- All enums use the existing guarded-create convention from schema.sql
+-- (`do $$ begin create type ... exception when duplicate_object then null; end $$;`).
+-- =============================================================================
+
+
+-- =============================================================================
+-- ENUMS
+-- =============================================================================
+do $$ begin create type public.workspace_message_kind as enum ('text', 'tool_call', 'artifact', 'proposal', 'delegation'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.context_source_type as enum ('file', 'url', 'evidence_query', 'note'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.insight_severity as enum ('info', 'notable', 'warning', 'critical'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.agenda_item_status as enum ('proposed', 'accepted', 'dismissed', 'done'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.approval_kind as enum ('outreach', 'canvas_change', 'schedule_change'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.approval_status as enum ('pending', 'approved', 'declined'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.cascade_run_status as enum ('running', 'completed', 'partial', 'failed'); exception when duplicate_object then null; end $$;
+
+-- NOTE on agent_jobs.status: the work order lists `status` for agent_jobs
+-- without an explicit value enumeration (unlike insights/agenda_items/
+-- approvals/cascade_runs, which all have bracketed value lists in the spec).
+-- Phase 2 (the worker service, not yet built) owns the job-claim state
+-- machine and will very likely need additional statuses beyond a first guess
+-- here (e.g. `failed_permanent` for the dead-letter case described in
+-- BUILD_PLAN.md 2.2). Locking this into an enum now would force a Phase-2
+-- migration just to add a value. Conservative choice: `status text not null
+-- default 'queued'` with a documented expected value set in the column
+-- comment, no CHECK constraint. This is the most conservative interpretation
+-- per BUILD_PLAN.md Part I rule 5 (avoid overspecifying an under-specified
+-- work order) and is noted as a BLOCKER-adjacent judgment call in
+-- docs/BUILD_STATE.md.
+
+
+-- =============================================================================
+-- 1. workspace_threads
+-- =============================================================================
+create table if not exists public.workspace_threads (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  agent_profile_id uuid not null references public.agent_profiles(id) on delete cascade,
+  title text,
+  created_by uuid,
+  archived boolean not null default false,
+  created_at timestamptz not null default now()
+);
+comment on table public.workspace_threads is
+  'A chat room between a human and one agent profile (Spec 02/03 workspaces). One agent can have many threads.';
+
+-- =============================================================================
+-- 2. workspace_messages
+-- =============================================================================
+create table if not exists public.workspace_messages (
+  id uuid primary key default gen_random_uuid(),
+  thread_id uuid not null references public.workspace_threads(id) on delete cascade,
+  role text not null,
+  kind public.workspace_message_kind not null default 'text',
+  content jsonb not null default '{}'::jsonb,
+  agent_run_id uuid references public.agent_runs(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+comment on column public.workspace_messages.role is
+  'Free-text sender role (e.g. user | agent | system). Not enumerated in spec 04 §5, kept as text.';
+
+-- =============================================================================
+-- 3. context_sources
+-- =============================================================================
+create table if not exists public.context_sources (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  agent_profile_id uuid not null references public.agent_profiles(id) on delete cascade,
+  thread_id uuid references public.workspace_threads(id) on delete set null,
+  type public.context_source_type not null default 'note',
+  name text not null,
+  uri text,
+  config jsonb not null default '{}'::jsonb,
+  enabled boolean not null default true,
+  refreshed_at timestamptz,
+  created_by uuid,
+  created_at timestamptz not null default now()
+);
+
+-- =============================================================================
+-- 4. insights
+-- =============================================================================
+create table if not exists public.insights (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  agent_profile_id uuid not null references public.agent_profiles(id) on delete cascade,
+  severity public.insight_severity not null default 'info',
+  title text not null,
+  body text,
+  section_key text,
+  tags text[] not null default '{}',
+  evidence_ids uuid[] not null default '{}',
+  agent_run_id uuid references public.agent_runs(id) on delete set null,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- =============================================================================
+-- 5. agenda_items
+-- =============================================================================
+create table if not exists public.agenda_items (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  title text not null,
+  rationale text,
+  impact text,
+  effort text,
+  rank integer,
+  status public.agenda_item_status not null default 'proposed',
+  dismissed_reason text,
+  linked_gap_ids uuid[] not null default '{}',
+  linked_insight_ids uuid[] not null default '{}',
+  created_by_agent_run_id uuid references public.agent_runs(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- =============================================================================
+-- 6. approvals
+-- =============================================================================
+create table if not exists public.approvals (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  kind public.approval_kind not null,
+  payload jsonb not null default '{}'::jsonb,
+  status public.approval_status not null default 'pending',
+  requested_by_agent_profile_id uuid not null references public.agent_profiles(id) on delete cascade,
+  decided_by uuid,
+  decided_at timestamptz,
+  expires_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- =============================================================================
+-- 7. cascades  (account_id NULL = template library)
+-- =============================================================================
+create table if not exists public.cascades (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid references public.accounts(id) on delete cascade,
+  cascade_key text not null,
+  name text not null,
+  description text,
+  output_kind text,
+  version integer not null default 1,
+  enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Partial unique index for the GLOBAL (account_id IS NULL) template rows,
+-- mirroring the existing agent_profiles_global_key_unique /
+-- model_routes_global_key_unique pattern in schema.sql. Makes the cascade
+-- seed migration idempotent via `on conflict`.
+create unique index if not exists cascades_global_key_unique
+  on public.cascades(cascade_key) where account_id is null;
+
+-- =============================================================================
+-- 8. cascade_steps
+-- =============================================================================
+create table if not exists public.cascade_steps (
+  id uuid primary key default gen_random_uuid(),
+  cascade_id uuid not null references public.cascades(id) on delete cascade,
+  step_key text not null,
+  order_group integer not null default 1,
+  agent_key text not null,
+  action_key text not null,
+  input_template jsonb not null default '{}'::jsonb,
+  depends_on text[] not null default '{}',
+  created_at timestamptz not null default now(),
+  unique (cascade_id, step_key)
+);
+
+-- =============================================================================
+-- 9. cascade_runs
+-- =============================================================================
+create table if not exists public.cascade_runs (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  cascade_id uuid not null references public.cascades(id) on delete cascade,
+  status public.cascade_run_status not null default 'running',
+  step_states jsonb not null default '{}'::jsonb,
+  total_cost numeric(10,4),
+  triggered_by text,
+  started_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+-- =============================================================================
+-- 10. agent_jobs
+-- =============================================================================
+create table if not exists public.agent_jobs (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  kind text not null,
+  payload jsonb not null default '{}'::jsonb,
+  status text not null default 'queued',
+  attempts integer not null default 0,
+  agent_run_id uuid references public.agent_runs(id) on delete set null,
+  parent_run_id uuid references public.agent_runs(id) on delete set null,
+  cascade_run_id uuid references public.cascade_runs(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+comment on column public.agent_jobs.status is
+  'Expected values (Phase 2 worker owns the state machine): queued | running | completed | failed | failed_permanent | cancelled. Not enumerated at the DB level — see migration header comment.';
+
+-- =============================================================================
+-- 11. metric_snapshots
+-- =============================================================================
+create table if not exists public.metric_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  metric_key text not null,
+  section_key text,
+  value numeric not null,
+  label text,
+  inputs jsonb not null default '{}'::jsonb,
+  computed_at timestamptz not null default now()
+);
+
+-- =============================================================================
+-- 12. agent_profile_revisions
+-- =============================================================================
+create table if not exists public.agent_profile_revisions (
+  id uuid primary key default gen_random_uuid(),
+  agent_profile_id uuid not null references public.agent_profiles(id) on delete cascade,
+  system_instructions text,
+  behavior jsonb not null default '{}'::jsonb,
+  changed_by uuid,
+  created_at timestamptz not null default now()
+);
+
+
+-- =============================================================================
+-- INDEXES
+-- =============================================================================
+create index if not exists idx_workspace_threads_account on public.workspace_threads(account_id);
+create index if not exists idx_workspace_threads_agent_profile on public.workspace_threads(agent_profile_id);
+create index if not exists idx_workspace_messages_thread on public.workspace_messages(thread_id, created_at);
+create index if not exists idx_context_sources_account on public.context_sources(account_id);
+create index if not exists idx_context_sources_agent_profile on public.context_sources(agent_profile_id);
+create index if not exists idx_context_sources_thread on public.context_sources(thread_id);
+create index if not exists idx_insights_account on public.insights(account_id, created_at desc);
+create index if not exists idx_insights_severity on public.insights(severity);
+create index if not exists idx_agenda_items_account on public.agenda_items(account_id, rank);
+create index if not exists idx_agenda_items_status on public.agenda_items(status);
+create index if not exists idx_approvals_account on public.approvals(account_id, status);
+create index if not exists idx_cascades_account on public.cascades(account_id);
+create index if not exists idx_cascade_steps_cascade on public.cascade_steps(cascade_id, order_group);
+create index if not exists idx_cascade_runs_account on public.cascade_runs(account_id, started_at desc);
+create index if not exists idx_cascade_runs_cascade on public.cascade_runs(cascade_id);
+create index if not exists idx_agent_jobs_account on public.agent_jobs(account_id, status);
+create index if not exists idx_agent_jobs_status on public.agent_jobs(status);
+create index if not exists idx_agent_jobs_cascade_run on public.agent_jobs(cascade_run_id);
+create index if not exists idx_metric_snapshots_account on public.metric_snapshots(account_id, metric_key, computed_at desc);
+create index if not exists idx_agent_profile_revisions_profile on public.agent_profile_revisions(agent_profile_id, created_at desc);
+
+
+-- =============================================================================
+-- updated_at TRIGGERS (only tables with an updated_at column)
+-- =============================================================================
+do $$
+declare t text;
+begin
+  for t in select unnest(array['agenda_items', 'cascades']) loop
+    execute format('drop trigger if exists set_updated_at on public.%I', t);
+    execute format(
+      'create trigger set_updated_at before update on public.%I
+       for each row execute function public.set_updated_at()', t);
+  end loop;
+end $$;
+-- =============================================================================
+-- PHASE 1 — work order 1.2: column additions to existing tables
+-- =============================================================================
+-- Applies after 20260702100000_workspace_orchestration_tables.sql because the
+-- generated_reports.source_cascade_run_id FK targets cascade_runs, created in
+-- that prior file.
+
+-- ---- agent_profiles ----
+alter table public.agent_profiles
+  add column if not exists behavior jsonb not null default '{}'::jsonb;
+alter table public.agent_profiles
+  add column if not exists avatar jsonb;
+comment on column public.agent_profiles.avatar is
+  'Shape: {"icon": string, "accent": string} — deterministic per-agent avatar (spec 01 naming table).';
+
+-- ---- agent_skills ----
+alter table public.agent_skills
+  add column if not exists orchestrator_can_trigger boolean not null default false;
+alter table public.agent_skills
+  add column if not exists action_kind text;
+comment on column public.agent_skills.action_kind is
+  'Expected values: skill | template | framework. Not enumerated at the DB level (spec 04 §5 lists it as a bare "action_kind" without a bracketed value set unlike the other new enum columns) — conservative choice, kept as free text per BUILD_PLAN Part I rule 5.';
+
+-- ---- scheduled_loops ----
+alter table public.scheduled_loops
+  add column if not exists action_key text;
+alter table public.scheduled_loops
+  add column if not exists created_by_agent boolean not null default false;
+
+-- ---- model_routes ----
+alter table public.model_routes
+  add column if not exists task_class text;
+alter table public.model_routes
+  add column if not exists max_tokens_in integer;
+alter table public.model_routes
+  add column if not exists max_tokens_out integer;
+alter table public.model_routes
+  add column if not exists cost_per_1k_in numeric(10,6);
+alter table public.model_routes
+  add column if not exists cost_per_1k_out numeric(10,6);
+alter table public.model_routes
+  add column if not exists eval_score numeric;
+alter table public.model_routes
+  add column if not exists updated_by text;
+comment on column public.model_routes.updated_by is
+  'Expected values: human | sweep. Kept as free text (see agent_skills.action_kind note above for the same conservative-enum rationale).';
+
+create index if not exists idx_model_routes_task_class on public.model_routes(task_class);
+
+-- ---- generated_reports ----
+-- generated_reports today is user_id-scoped only (no account_id). We add both
+-- new columns nullable, backfill account_id for existing rows, and leave the
+-- column nullable afterwards (per work order 1.2's explicit instruction) since
+-- a user could theoretically have zero account_members rows and would then be
+-- unbackfillable — we do not want a NOT NULL constraint to fail the migration
+-- in that edge case.
+alter table public.generated_reports
+  add column if not exists account_id uuid references public.accounts(id) on delete cascade;
+alter table public.generated_reports
+  add column if not exists source_cascade_run_id uuid references public.cascade_runs(id) on delete set null;
+
+-- Backfill logic (documented per work order 1.2):
+--   For each generated_reports row with account_id still NULL, look up the
+--   user's account via account_members.user_id = generated_reports.user_id,
+--   and take the EARLIEST-CREATED account_members row for that user (in case
+--   a user belongs to multiple accounts — this is a real, if rare, case since
+--   account_members has no uniqueness constraint on user_id alone). This is a
+--   best-effort heuristic: a user's "first" account membership is not
+--   necessarily the account the report was actually generated for, but it is
+--   the most defensible default absent any other signal on the
+--   generated_reports row (there is no company_id -> account_id path either,
+--   since saved_analyses is also user_id-scoped, not account-scoped).
+-- Any row whose user has no account_members row at all is left with
+-- account_id = NULL and a NOTICE is raised (not a migration failure).
+do $$
+declare
+  _updated_count integer;
+  _unbackfilled_count integer;
+begin
+  update public.generated_reports gr
+  set account_id = am.account_id
+  from (
+    select distinct on (user_id) user_id, account_id
+    from public.account_members
+    order by user_id, created_at asc
+  ) am
+  where gr.user_id = am.user_id
+    and gr.account_id is null;
+
+  get diagnostics _updated_count = row_count;
+
+  select count(*) into _unbackfilled_count
+  from public.generated_reports
+  where account_id is null;
+
+  raise notice 'generated_reports.account_id backfill: % rows updated, % rows still NULL (user has no account_members row)',
+    _updated_count, _unbackfilled_count;
+end $$;
+
+create index if not exists idx_generated_reports_account on public.generated_reports(account_id);
+create index if not exists idx_generated_reports_source_cascade_run on public.generated_reports(source_cascade_run_id);
+-- =============================================================================
+-- PHASE 1 — work order 1.3: RLS on every new table
+-- =============================================================================
+-- Follows the exact patterns already established in schema.sql:
+--   (a) the generic account-scoped CRUD loop (`is_account_member(account_id)`)
+--   (b) the template-readable pattern used by agent_profiles / model_routes
+--       (`account_id is null or is_account_member(account_id)`)
+--   (c) explicit child-table policies that join to a parent's account_id
+--       (mirrors mcp_server_tools_all_account's join-through pattern)
+--
+-- Per BUILD_PLAN 1.3 exceptions:
+--   - insights, agenda_items: SELECT only for authenticated account members.
+--     No insert/update/delete policy for `authenticated` — the worker writes
+--     via the service role key, which bypasses RLS entirely.
+--   - approvals: SELECT + UPDATE for account members (so a human can decide
+--     pending approvals), no INSERT/DELETE for `authenticated` — only the
+--     service role inserts new approval requests.
+
+alter table public.workspace_threads          enable row level security;
+alter table public.workspace_messages         enable row level security;
+alter table public.context_sources            enable row level security;
+alter table public.insights                   enable row level security;
+alter table public.agenda_items               enable row level security;
+alter table public.approvals                  enable row level security;
+alter table public.agent_jobs                 enable row level security;
+alter table public.cascades                   enable row level security;
+alter table public.cascade_steps              enable row level security;
+alter table public.cascade_runs               enable row level security;
+alter table public.metric_snapshots           enable row level security;
+alter table public.agent_profile_revisions    enable row level security;
+
+-- ---- straightforward account-scoped CRUD (extend the existing loop pattern) ----
+-- workspace_threads, context_sources, agent_jobs, metric_snapshots, and
+-- cascade_runs all carry a direct account_id column and a plain
+-- is_account_member CRUD policy is the correct, conservative default for
+-- each (agent_jobs/cascade_runs/metric_snapshots are primarily written by
+-- the worker via service role, which bypasses RLS regardless, so granting
+-- authenticated CRUD here does not create a new write path in practice — it
+-- only helps the frontend read/poll these tables and lets a human cancel a
+-- job or dismiss a stale run if the worker exposes that later).
+do $$
+declare t text;
+begin
+  for t in select unnest(array[
+    'workspace_threads', 'context_sources', 'agent_jobs',
+    'metric_snapshots', 'cascade_runs'
+  ]) loop
+    execute format('drop policy if exists "%s_select_account" on public.%I', t, t);
+    execute format(
+      'create policy "%s_select_account" on public.%I
+         for select to authenticated using (public.is_account_member(account_id))', t, t);
+
+    execute format('drop policy if exists "%s_insert_account" on public.%I', t, t);
+    execute format(
+      'create policy "%s_insert_account" on public.%I
+         for insert to authenticated with check (public.is_account_member(account_id))', t, t);
+
+    execute format('drop policy if exists "%s_update_account" on public.%I', t, t);
+    execute format(
+      'create policy "%s_update_account" on public.%I
+         for update to authenticated using (public.is_account_member(account_id))', t, t);
+
+    execute format('drop policy if exists "%s_delete_account" on public.%I', t, t);
+    execute format(
+      'create policy "%s_delete_account" on public.%I
+         for delete to authenticated using (public.is_account_member(account_id))', t, t);
+  end loop;
+end $$;
+
+-- ---- insights (SELECT-only for members; writes are service-role only) ----
+drop policy if exists "insights_select_account" on public.insights;
+create policy "insights_select_account" on public.insights
+  for select to authenticated using (public.is_account_member(account_id));
+
+-- ---- agenda_items (SELECT-only for members; writes are service-role only) ----
+drop policy if exists "agenda_items_select_account" on public.agenda_items;
+create policy "agenda_items_select_account" on public.agenda_items
+  for select to authenticated using (public.is_account_member(account_id));
+
+-- ---- approvals (SELECT + UPDATE for members; INSERT/DELETE service-role only) ----
+drop policy if exists "approvals_select_account" on public.approvals;
+create policy "approvals_select_account" on public.approvals
+  for select to authenticated using (public.is_account_member(account_id));
+
+drop policy if exists "approvals_update_account" on public.approvals;
+create policy "approvals_update_account" on public.approvals
+  for update to authenticated using (public.is_account_member(account_id));
+
+-- ---- cascades (template rows account_id IS NULL readable by everyone;
+--       account rows follow is_account_member; template rows are not
+--       writable by `authenticated` — they ship via seed migrations only) ----
+drop policy if exists "cascades_select" on public.cascades;
+create policy "cascades_select" on public.cascades
+  for select to authenticated
+  using (account_id is null or public.is_account_member(account_id));
+
+drop policy if exists "cascades_insert_account" on public.cascades;
+create policy "cascades_insert_account" on public.cascades
+  for insert to authenticated with check (public.is_account_member(account_id));
+
+drop policy if exists "cascades_update_account" on public.cascades;
+create policy "cascades_update_account" on public.cascades
+  for update to authenticated using (public.is_account_member(account_id));
+
+drop policy if exists "cascades_delete_account" on public.cascades;
+create policy "cascades_delete_account" on public.cascades
+  for delete to authenticated using (public.is_account_member(account_id));
+
+-- ---- cascade_steps (child of cascades; inherit access via parent's
+--       account_id, which may be NULL for template cascades) ----
+drop policy if exists "cascade_steps_select" on public.cascade_steps;
+create policy "cascade_steps_select" on public.cascade_steps
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.cascades c
+      where c.id = cascade_id
+        and (c.account_id is null or public.is_account_member(c.account_id))
+    )
+  );
+
+drop policy if exists "cascade_steps_all_account" on public.cascade_steps;
+create policy "cascade_steps_all_account" on public.cascade_steps
+  for all to authenticated
+  using (
+    exists (
+      select 1 from public.cascades c
+      where c.id = cascade_id and c.account_id is not null
+        and public.is_account_member(c.account_id)
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.cascades c
+      where c.id = cascade_id and c.account_id is not null
+        and public.is_account_member(c.account_id)
+    )
+  );
+
+-- ---- workspace_messages (child of workspace_threads; inherit access via
+--       parent's account_id) ----
+drop policy if exists "workspace_messages_all_account" on public.workspace_messages;
+create policy "workspace_messages_all_account" on public.workspace_messages
+  for all to authenticated
+  using (
+    exists (
+      select 1 from public.workspace_threads wt
+      where wt.id = thread_id and public.is_account_member(wt.account_id)
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.workspace_threads wt
+      where wt.id = thread_id and public.is_account_member(wt.account_id)
+    )
+  );
+
+-- ---- agent_profile_revisions (child of agent_profiles; inherit access via
+--       parent's account_id, which may be NULL for template profiles — a
+--       revision on a template profile should be readable by any
+--       authenticated user, matching the agent_profiles template pattern) ----
+drop policy if exists "agent_profile_revisions_select" on public.agent_profile_revisions;
+create policy "agent_profile_revisions_select" on public.agent_profile_revisions
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.agent_profiles ap
+      where ap.id = agent_profile_id
+        and (ap.account_id is null or public.is_account_member(ap.account_id))
+    )
+  );
+
+drop policy if exists "agent_profile_revisions_insert" on public.agent_profile_revisions;
+create policy "agent_profile_revisions_insert" on public.agent_profile_revisions
+  for insert to authenticated
+  with check (
+    exists (
+      select 1 from public.agent_profiles ap
+      where ap.id = agent_profile_id
+        and ap.account_id is not null
+        and public.is_account_member(ap.account_id)
+    )
+  );
+-- =============================================================================
+-- PHASE 1 — work order 1.4: seed data
+-- =============================================================================
+-- All inserts are idempotent, matching the style of
+-- supabase/migrations/20250624000002_seed_agent_profiles.sql (ON CONFLICT DO
+-- NOTHING against the existing partial unique indexes for template rows).
+
+-- =============================================================================
+-- 1.4a — Rename template agent_profiles to callsigns (spec 01 naming table)
+-- =============================================================================
+-- display_name -> "<Callsign> — <Role title>"; avatar -> {"icon", "accent"}
+-- (both lowercase per work order 1.4). Source: docs/specs/01_AGENT_ROSTER.md
+-- "Naming system" table.
+
+update public.agent_profiles set
+  display_name = 'Atlas — Chief Strategist',
+  avatar = '{"icon": "globe", "accent": "indigo"}'::jsonb
+where agent_key = 'orchestrator' and account_id is null;
+
+update public.agent_profiles set
+  display_name = 'Compass — Head of Market Intelligence',
+  avatar = '{"icon": "compass", "accent": "teal"}'::jsonb
+where agent_key = 'agent_customer_segments' and account_id is null;
+
+update public.agent_profiles set
+  display_name = 'Forge — Head of Product Value',
+  avatar = '{"icon": "anvil", "accent": "orange"}'::jsonb
+where agent_key = 'agent_value_propositions' and account_id is null;
+
+update public.agent_profiles set
+  display_name = 'Relay — Head of Distribution',
+  avatar = '{"icon": "signal-tower", "accent": "sky"}'::jsonb
+where agent_key = 'agent_channels' and account_id is null;
+
+update public.agent_profiles set
+  display_name = 'Anchor — Head of Customer Success',
+  avatar = '{"icon": "anchor", "accent": "emerald"}'::jsonb
+where agent_key = 'agent_customer_relationships' and account_id is null;
+
+update public.agent_profiles set
+  display_name = 'Yield — Head of Monetization',
+  avatar = '{"icon": "ascending-chart", "accent": "gold"}'::jsonb
+where agent_key = 'agent_revenue_streams' and account_id is null;
+
+update public.agent_profiles set
+  display_name = 'Vault — Head of Assets & Capabilities',
+  avatar = '{"icon": "vault-door", "accent": "slate"}'::jsonb
+where agent_key = 'agent_key_resources' and account_id is null;
+
+update public.agent_profiles set
+  display_name = 'Tempo — Head of Operations',
+  avatar = '{"icon": "metronome", "accent": "violet"}'::jsonb
+where agent_key = 'agent_key_activities' and account_id is null;
+
+update public.agent_profiles set
+  display_name = 'Envoy — Head of Alliances',
+  avatar = '{"icon": "handshake", "accent": "rose"}'::jsonb
+where agent_key = 'agent_key_partnerships' and account_id is null;
+
+update public.agent_profiles set
+  display_name = 'Ledger — Head of Cost & Efficiency',
+  avatar = '{"icon": "ledger-book", "accent": "zinc"}'::jsonb
+where agent_key = 'agent_cost_structure' and account_id is null;
+
+-- (These UPDATEs are naturally idempotent — re-running them just re-applies
+-- the same values, matching the "safe to run more than once" convention of
+-- schema.sql.)
+
+
+-- =============================================================================
+-- 1.4b — Seed the 7 template cascades (spec 04 §3) + their steps
+-- =============================================================================
+-- ASSUMPTIONS (documented per work order 1.4's "use best structured judgment,
+-- document any assumption" instruction):
+--
+-- 1. "Research refresh" (Full Recon step 1) and "metric refresh" (Board Pack
+--    step 1) are not agent-specific work in spec 04 §3's prose — they are
+--    system/data-layer jobs (Phase 3's company_research / Phase 7's metric
+--    families), not one of the ten named agents. We assign agent_key
+--    'orchestrator' to these steps since Atlas is the one who kicks off a
+--    cascade and these steps aren't owned by a single section agent. The
+--    actual job dispatch logic (Phase 2/3/7, not yet built) is expected to
+--    special-case these action_keys rather than truly running them "as"
+--    Atlas.
+-- 2. Likewise "gap engine" / "gap engine delta" steps (Full Recon, Competitor
+--    Delta Sweep) are a dedicated job kind (Phase 4's gap engine), not an
+--    agent — assigned agent_key 'orchestrator' with a distinct action_key so
+--    the worker can route it correctly.
+-- 3. "3 at a time" concurrency for Full Recon's 9 parallel section steps is a
+--    runtime execution parameter (the delegation concurrency cap mentioned in
+--    spec 04 §3's "Execution" paragraph), not a column on cascade_steps in
+--    the spec 04 §5 table — it is NOT stored here. All 9 steps share
+--    order_group 2; the worker's DAG executor is expected to apply the
+--    concurrency cap when it walks a parallel order_group (this is a Phase 6
+--    build item — "Atlas: run_cascade" — not Phase 1's job).
+-- 4. Every step_key below is invented from the prose ("Yield pricing diff" ->
+--    step_key 'pricing_diff', agent_key 'agent_revenue_streams') since the
+--    spec gives agent+verb phrases, not literal step_keys.
+-- 5. input_template is left as '{}'::jsonb for all seeded steps — the spec's
+--    `{{steps.X.output}}` templating example (spec 04 §3) is illustrative,
+--    not a concrete requirement for the v1 seed; wiring real input templates
+--    per step is deferred to whichever phase actually implements the DAG
+--    executor (Phase 6) and can validate the template syntax against real
+--    step outputs.
+
+insert into public.cascades (account_id, cascade_key, name, description, output_kind, version, enabled) values
+  (null, 'full_recon', 'Full Recon',
+   'Research refresh, all 9 section agents in parallel, gap engine, then Atlas synthesis.',
+   'canvas_and_brief', 1, true),
+  (null, 'competitor_delta_sweep', 'Competitor Delta Sweep',
+   'Weekly parallel competitor-signal watches across pricing, claims, channels, alliances, and velocity, rolled into a gap-engine delta and an Atlas digest.',
+   'digest', 1, true),
+  (null, 'board_pack', 'Board Pack',
+   'Monthly metric refresh, per-agent section summaries, and an Atlas board memo assembled from the board-pack template.',
+   'pdf', 1, true),
+  (null, 'pricing_war_response', 'Pricing War Response',
+   'Triggered by a Yield critical insight: deep pricing analysis, margin floor check, price-sensitivity read, then an Atlas options memo.',
+   'decision_memo', 1, true),
+  (null, 'unit_economics_duet', 'Unit Economics Duet',
+   'Parallel revenue-model and cost-model analysis joined into a unit-economics report.',
+   'report', 1, true),
+  (null, 'launch_readiness', 'Launch Readiness',
+   'Parallel positioning, channel plan, onboarding readiness, and ops checks rolled into an Atlas go/no-go brief.',
+   'scorecard', 1, true),
+  (null, 'cost_down_sprint', 'Cost-Down Sprint',
+   'Ledger savings candidates checked for feasibility by Vault and Tempo, then ranked by Atlas into a cost-down brief.',
+   'brief', 1, true)
+on conflict (cascade_key) where account_id is null do nothing;
+
+-- ---- Full Recon ----
+insert into public.cascade_steps (cascade_id, step_key, order_group, agent_key, action_key, input_template, depends_on)
+select c.id, s.step_key, s.order_group, s.agent_key, s.action_key, '{}'::jsonb, s.depends_on
+from public.cascades c
+cross join (values
+  ('research_refresh',              1, 'orchestrator',                   'research_refresh',    array[]::text[]),
+  ('section_customer_segments',     2, 'agent_customer_segments',        'section_analysis',    array['research_refresh']),
+  ('section_value_propositions',    2, 'agent_value_propositions',       'section_analysis',    array['research_refresh']),
+  ('section_channels',              2, 'agent_channels',                 'section_analysis',    array['research_refresh']),
+  ('section_customer_relationships',2, 'agent_customer_relationships',   'section_analysis',    array['research_refresh']),
+  ('section_revenue_streams',       2, 'agent_revenue_streams',          'section_analysis',    array['research_refresh']),
+  ('section_key_resources',         2, 'agent_key_resources',            'section_analysis',    array['research_refresh']),
+  ('section_key_activities',        2, 'agent_key_activities',           'section_analysis',    array['research_refresh']),
+  ('section_key_partnerships',      2, 'agent_key_partnerships',         'section_analysis',    array['research_refresh']),
+  ('section_cost_structure',        2, 'agent_cost_structure',           'section_analysis',    array['research_refresh']),
+  ('gap_engine',                    3, 'orchestrator',                   'gap_engine',          array['section_customer_segments','section_value_propositions','section_channels','section_customer_relationships','section_revenue_streams','section_key_resources','section_key_activities','section_key_partnerships','section_cost_structure']),
+  ('atlas_synthesis',               4, 'orchestrator',                   'strategy_synthesis',  array['gap_engine'])
+) as s(step_key, order_group, agent_key, action_key, depends_on)
+where c.cascade_key = 'full_recon' and c.account_id is null
+on conflict (cascade_id, step_key) do nothing;
+
+-- ---- Competitor Delta Sweep ----
+insert into public.cascade_steps (cascade_id, step_key, order_group, agent_key, action_key, input_template, depends_on)
+select c.id, s.step_key, s.order_group, s.agent_key, s.action_key, '{}'::jsonb, s.depends_on
+from public.cascades c
+cross join (values
+  ('pricing_diff',       1, 'agent_revenue_streams',      'pricing_diff',      array[]::text[]),
+  ('claim_diff',         1, 'agent_value_propositions',   'claim_diff',        array[]::text[]),
+  ('channel_watch',      1, 'agent_channels',              'channel_watch',     array[]::text[]),
+  ('alliance_watch',     1, 'agent_key_partnerships',      'alliance_watch',    array[]::text[]),
+  ('velocity_watch',     1, 'agent_key_activities',        'velocity_watch',    array[]::text[]),
+  ('gap_engine_delta',   2, 'orchestrator',                'gap_engine_delta',  array['pricing_diff','claim_diff','channel_watch','alliance_watch','velocity_watch']),
+  ('atlas_delta_digest', 3, 'orchestrator',                'strategy_synthesis',array['gap_engine_delta'])
+) as s(step_key, order_group, agent_key, action_key, depends_on)
+where c.cascade_key = 'competitor_delta_sweep' and c.account_id is null
+on conflict (cascade_id, step_key) do nothing;
+
+-- ---- Board Pack ----
+insert into public.cascade_steps (cascade_id, step_key, order_group, agent_key, action_key, input_template, depends_on)
+select c.id, s.step_key, s.order_group, s.agent_key, s.action_key, '{}'::jsonb, s.depends_on
+from public.cascades c
+cross join (values
+  ('metric_refresh',                    1, 'orchestrator',                   'metric_refresh',      array[]::text[]),
+  ('summary_customer_segments',         2, 'agent_customer_segments',        'section_summary',     array['metric_refresh']),
+  ('summary_value_propositions',        2, 'agent_value_propositions',       'section_summary',     array['metric_refresh']),
+  ('summary_channels',                  2, 'agent_channels',                 'section_summary',     array['metric_refresh']),
+  ('summary_customer_relationships',    2, 'agent_customer_relationships',   'section_summary',     array['metric_refresh']),
+  ('summary_revenue_streams',           2, 'agent_revenue_streams',          'section_summary',     array['metric_refresh']),
+  ('summary_key_resources',             2, 'agent_key_resources',            'section_summary',     array['metric_refresh']),
+  ('summary_key_activities',            2, 'agent_key_activities',           'section_summary',     array['metric_refresh']),
+  ('summary_key_partnerships',          2, 'agent_key_partnerships',         'section_summary',     array['metric_refresh']),
+  ('summary_cost_structure',            2, 'agent_cost_structure',           'section_summary',     array['metric_refresh']),
+  ('atlas_board_memo',                  3, 'orchestrator',                   'draft_document',      array['summary_customer_segments','summary_value_propositions','summary_channels','summary_customer_relationships','summary_revenue_streams','summary_key_resources','summary_key_activities','summary_key_partnerships','summary_cost_structure'])
+) as s(step_key, order_group, agent_key, action_key, depends_on)
+where c.cascade_key = 'board_pack' and c.account_id is null
+on conflict (cascade_id, step_key) do nothing;
+
+-- ---- Pricing War Response (sequential, triggered by a Yield critical insight) ----
+insert into public.cascade_steps (cascade_id, step_key, order_group, agent_key, action_key, input_template, depends_on)
+select c.id, s.step_key, s.order_group, s.agent_key, s.action_key, '{}'::jsonb, s.depends_on
+from public.cascades c
+cross join (values
+  ('deep_pricing_analysis',   1, 'agent_revenue_streams', 'deep_pricing_analysis', array[]::text[]),
+  ('margin_floor',            2, 'agent_cost_structure',  'margin_floor',          array['deep_pricing_analysis']),
+  ('price_sensitivity_read',  3, 'agent_customer_segments','price_sensitivity_read',array['margin_floor']),
+  ('atlas_options_memo',      4, 'orchestrator',           'strategy_synthesis',    array['price_sensitivity_read'])
+) as s(step_key, order_group, agent_key, action_key, depends_on)
+where c.cascade_key = 'pricing_war_response' and c.account_id is null
+on conflict (cascade_id, step_key) do nothing;
+
+-- ---- Unit Economics Duet ----
+insert into public.cascade_steps (cascade_id, step_key, order_group, agent_key, action_key, input_template, depends_on)
+select c.id, s.step_key, s.order_group, s.agent_key, s.action_key, '{}'::jsonb, s.depends_on
+from public.cascades c
+cross join (values
+  ('revenue_model',        1, 'agent_revenue_streams', 'revenue_model',        array[]::text[]),
+  ('cost_model',           1, 'agent_cost_structure',  'cost_model',           array[]::text[]),
+  ('joint_unit_econ_report',2, 'orchestrator',          'draft_document',       array['revenue_model','cost_model'])
+) as s(step_key, order_group, agent_key, action_key, depends_on)
+where c.cascade_key = 'unit_economics_duet' and c.account_id is null
+on conflict (cascade_id, step_key) do nothing;
+
+-- ---- Launch Readiness ----
+insert into public.cascade_steps (cascade_id, step_key, order_group, agent_key, action_key, input_template, depends_on)
+select c.id, s.step_key, s.order_group, s.agent_key, s.action_key, '{}'::jsonb, s.depends_on
+from public.cascades c
+cross join (values
+  ('positioning',           1, 'agent_value_propositions',     'positioning',           array[]::text[]),
+  ('channel_plan',          1, 'agent_channels',                'channel_plan',          array[]::text[]),
+  ('onboarding_readiness',  1, 'agent_customer_relationships',  'onboarding_readiness',  array[]::text[]),
+  ('ops_check',             1, 'agent_key_activities',          'ops_check',             array[]::text[]),
+  ('atlas_go_no_go_brief',  2, 'orchestrator',                  'strategy_synthesis',    array['positioning','channel_plan','onboarding_readiness','ops_check'])
+) as s(step_key, order_group, agent_key, action_key, depends_on)
+where c.cascade_key = 'launch_readiness' and c.account_id is null
+on conflict (cascade_id, step_key) do nothing;
+
+-- ---- Cost-Down Sprint ----
+insert into public.cascade_steps (cascade_id, step_key, order_group, agent_key, action_key, input_template, depends_on)
+select c.id, s.step_key, s.order_group, s.agent_key, s.action_key, '{}'::jsonb, s.depends_on
+from public.cascades c
+cross join (values
+  ('savings_candidates',      1, 'agent_cost_structure', 'savings_candidates',      array[]::text[]),
+  ('vault_feasibility_check', 2, 'agent_key_resources',  'feasibility_check',       array['savings_candidates']),
+  ('tempo_feasibility_check', 2, 'agent_key_activities',  'feasibility_check',       array['savings_candidates']),
+  ('atlas_ranked_savings_plan',3, 'orchestrator',         'strategy_synthesis',      array['vault_feasibility_check','tempo_feasibility_check'])
+) as s(step_key, order_group, agent_key, action_key, depends_on)
+where c.cascade_key = 'cost_down_sprint' and c.account_id is null
+on conflict (cascade_id, step_key) do nothing;
+
+
+-- =============================================================================
+-- 1.4c — Default model_routes rows per task_class (spec 06 §1 matrix)
+-- =============================================================================
+-- NOTE: these are v1 placeholder-but-plausible model slugs. Exact current
+-- model identifiers drift constantly (new Claude/Gemini/Grok point releases
+-- ship monthly) — Phase 7's model-scout sweep job (spec 06, BUILD_PLAN 7.6)
+-- is the authoritative mechanism for keeping these current. Do not treat the
+-- model_name values below as verified-available on any provider today.
+--
+-- route_key is set equal to the task_class for these rows so they're easy to
+-- find/join by name; account_id NULL makes them global defaults, consistent
+-- with the existing premium/standard/economy/local rows already seeded in
+-- schema.sql section 14a.
+
+insert into public.model_routes
+  (account_id, route_key, label, provider, model_name, params, is_default, task_class, cost_per_1k_in, cost_per_1k_out, updated_by)
+values
+  (null, 'extract', 'Extract (budget)', 'openrouter', 'google/gemini-flash-1.5',
+   '{"temperature":0.2,"max_tokens":2000}'::jsonb, false, 'extract', 0.000075, 0.0003, 'human'),
+  (null, 'classify', 'Classify (budget)', 'openrouter', 'qwen/qwen-2.5-7b-instruct',
+   '{"temperature":0.1,"max_tokens":500}'::jsonb, false, 'classify', 0.00005, 0.00015, 'human'),
+  (null, 'summarize', 'Summarize (budget-mid)', 'openrouter', 'anthropic/claude-3-5-haiku',
+   '{"temperature":0.3,"max_tokens":1500}'::jsonb, false, 'summarize', 0.0008, 0.004, 'human'),
+  (null, 'embed', 'Embed', 'openrouter', 'openai/text-embedding-3-small',
+   '{}'::jsonb, false, 'embed', 0.00002, 0.0, 'human'),
+  (null, 'section_analysis', 'Section Analysis (mid)', 'anthropic', 'claude-sonnet-4-5',
+   '{"temperature":0.4,"max_tokens":4000}'::jsonb, false, 'section_analysis', 0.003, 0.015, 'human'),
+  (null, 'research_verify', 'Research Verify (mid — never downgraded)', 'anthropic', 'claude-sonnet-4-5',
+   '{"temperature":0.1,"max_tokens":2000}'::jsonb, false, 'research_verify', 0.003, 0.015, 'human'),
+  (null, 'draft_document', 'Draft Document (mid)', 'anthropic', 'claude-sonnet-4-5',
+   '{"temperature":0.5,"max_tokens":6000}'::jsonb, false, 'draft_document', 0.003, 0.015, 'human'),
+  (null, 'strategy_synthesis', 'Strategy Synthesis (premium)', 'anthropic', 'claude-opus-4-1',
+   '{"temperature":0.4,"max_tokens":8000}'::jsonb, false, 'strategy_synthesis', 0.015, 0.075, 'human'),
+  (null, 'live_search', 'Live Search (fixed: Grok)', 'xai', 'grok-4',
+   '{"temperature":0.3,"max_tokens":2000}'::jsonb, false, 'live_search', 0.002, 0.01, 'human')
+on conflict (route_key) where account_id is null do nothing;
+
+
+-- =============================================================================
+-- 16. DROP DEAD / LEGACY TABLES
 -- =============================================================================
 -- These were superseded by frameworks + generated_reports and are referenced
 -- only in generated types, never in app code. Safe to remove.
