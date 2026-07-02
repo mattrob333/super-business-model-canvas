@@ -183,14 +183,14 @@ Return in this exact JSON format:
             }
       
       // Validate competitor quality - warn if too many name-similar matches
-      if (analysis.competitors && analysis.competitors.length > 0 && analysis.company?.name) {
+      if (analysis.similarCompanies.length > 0 && analysis.company?.name) {
         const companyNameBase = analysis.company.name.split(' ')[0].toLowerCase();
-        const nameSimilarCount = analysis.competitors.filter((comp: any) => 
-          comp.name.toLowerCase().includes(companyNameBase)
+        const nameSimilarCount = analysis.similarCompanies.filter((comp: any) =>
+          typeof comp?.name === 'string' && comp.name.toLowerCase().includes(companyNameBase)
         ).length;
-        
-        if (nameSimilarCount > analysis.competitors.length / 2) {
-          console.warn(`Warning: ${nameSimilarCount}/${analysis.competitors.length} competitors appear name-similar to "${analysis.company.name}" - may need better industry context`);
+
+        if (nameSimilarCount > analysis.similarCompanies.length / 2) {
+          console.warn(`Warning: ${nameSimilarCount}/${analysis.similarCompanies.length} competitors appear name-similar to "${analysis.company.name}" - may need better industry context`);
         }
       }
       

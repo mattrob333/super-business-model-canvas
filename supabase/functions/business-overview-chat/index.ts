@@ -25,12 +25,19 @@ serve(async (req) => {
       );
     }
 
-    const { 
-      userMessage, 
-      conversationHistory = [], 
+    const {
+      userMessage,
+      conversationHistory = [],
       companyName,
-      overviewData 
+      overviewData
     } = await req.json();
+
+    if (typeof userMessage !== 'string' || !userMessage.trim() || !overviewData || typeof overviewData !== 'object') {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: userMessage, overviewData' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log('Business Overview Chat request received:', {
       userMessage,

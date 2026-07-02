@@ -15,7 +15,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { company_name, industry, sector } = await req.json();
+    // Accept both snake_case and camelCase field names (generate-framework-report
+    // sends camelCase; keep backward compatibility with older callers)
+    const rawBody = await req.json();
+    const company_name = rawBody.company_name ?? rawBody.companyName;
+    const industry = rawBody.industry;
+    const sector = rawBody.sector ?? rawBody.size;
     
     const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
     
@@ -32,7 +37,10 @@ Deno.serve(async (req) => {
     }
 
     const industryContext = industry || sector || 'technology';
-    const prompt = `Research 3-4 leading companies in the ${industryContext} industry and identify specific AI and automation initiatives they have publicly announced or implemented. Focus on:
+    const companyContext = company_name
+      ? `The research subject is "${company_name}" — find its direct competitors in the ${industryContext} industry. `
+      : '';
+    const prompt = `${companyContext}Research 3-4 leading companies in the ${industryContext} industry and identify specific AI and automation initiatives they have publicly announced or implemented. Focus on:
     - Company name
     - Specific AI/automation technology or initiative
     - Use case or department where it's deployed

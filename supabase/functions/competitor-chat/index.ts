@@ -30,6 +30,13 @@ serve(async (req) => {
 
     const { messages, competitor, companyName, businessContext } = await req.json();
 
+    if (!competitor || typeof competitor.name !== 'string' || !Array.isArray(messages)) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: competitor (with name), messages' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const companyInfo = businessContext?.company || {};
     const canvasInfo = businessContext?.canvas || {};
 

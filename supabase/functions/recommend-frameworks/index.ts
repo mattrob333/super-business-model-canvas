@@ -94,7 +94,9 @@ Analyze the goal and recommend 3-6 most relevant frameworks. Return JSON:
       temperature: 0.7,
     });
 
-    const recommendations = JSON.parse(text);
+    // Strip markdown code fences — models frequently wrap JSON in ```json blocks
+    const cleanText = text.trim().replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+    const recommendations = JSON.parse(cleanText);
 
     return new Response(
       JSON.stringify({ ...recommendations }),
