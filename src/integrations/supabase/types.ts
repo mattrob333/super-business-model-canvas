@@ -240,6 +240,8 @@ export type Database = {
           updated_at: string | null
           user_id: string
           version: number | null
+          account_id: string | null
+          source_cascade_run_id: string | null
         }
         Insert: {
           business_context: Json
@@ -257,6 +259,8 @@ export type Database = {
           updated_at?: string | null
           user_id: string
           version?: number | null
+          account_id?: string | null
+          source_cascade_run_id?: string | null
         }
         Update: {
           business_context?: Json
@@ -274,6 +278,8 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           version?: number | null
+          account_id?: string | null
+          source_cascade_run_id?: string | null
         }
         Relationships: [
           {
@@ -811,6 +817,8 @@ export type Database = {
           status: Database["public"]["Enums"]["agent_status"]
           system_instructions_summary: string | null
           system_instructions: string | null
+          behavior: Json
+          avatar: Json | null
           created_at: string
           updated_at: string
         }
@@ -827,6 +835,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["agent_status"]
           system_instructions_summary?: string | null
           system_instructions?: string | null
+          behavior?: Json
+          avatar?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -843,6 +853,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["agent_status"]
           system_instructions_summary?: string | null
           system_instructions?: string | null
+          behavior?: Json
+          avatar?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -946,6 +958,8 @@ export type Database = {
           last_run_at: string | null
           next_run_at: string | null
           failure_count: number
+          action_key: string | null
+          created_by_agent: boolean
           created_at: string
           updated_at: string
         }
@@ -965,6 +979,8 @@ export type Database = {
           last_run_at?: string | null
           next_run_at?: string | null
           failure_count?: number
+          action_key?: string | null
+          created_by_agent?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -984,6 +1000,8 @@ export type Database = {
           last_run_at?: string | null
           next_run_at?: string | null
           failure_count?: number
+          action_key?: string | null
+          created_by_agent?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -1171,6 +1189,13 @@ export type Database = {
           params: Json
           fallback_route_key: string | null
           is_default: boolean
+          task_class: string | null
+          max_tokens_in: number | null
+          max_tokens_out: number | null
+          cost_per_1k_in: number | null
+          cost_per_1k_out: number | null
+          eval_score: number | null
+          updated_by: string | null
           created_at: string
           updated_at: string
         }
@@ -1184,6 +1209,13 @@ export type Database = {
           params?: Json
           fallback_route_key?: string | null
           is_default?: boolean
+          task_class?: string | null
+          max_tokens_in?: number | null
+          max_tokens_out?: number | null
+          cost_per_1k_in?: number | null
+          cost_per_1k_out?: number | null
+          eval_score?: number | null
+          updated_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1197,6 +1229,13 @@ export type Database = {
           params?: Json
           fallback_route_key?: string | null
           is_default?: boolean
+          task_class?: string | null
+          max_tokens_in?: number | null
+          max_tokens_out?: number | null
+          cost_per_1k_in?: number | null
+          cost_per_1k_out?: number | null
+          eval_score?: number | null
+          updated_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1218,6 +1257,8 @@ export type Database = {
           framework_id: string
           enabled: boolean
           sort_order: number
+          orchestrator_can_trigger: boolean
+          action_kind: string | null
           created_at: string
         }
         Insert: {
@@ -1227,6 +1268,8 @@ export type Database = {
           framework_id: string
           enabled?: boolean
           sort_order?: number
+          orchestrator_can_trigger?: boolean
+          action_kind?: string | null
           created_at?: string
         }
         Update: {
@@ -1236,6 +1279,8 @@ export type Database = {
           framework_id?: string
           enabled?: boolean
           sort_order?: number
+          orchestrator_can_trigger?: boolean
+          action_kind?: string | null
           created_at?: string
         }
         Relationships: [
@@ -1263,6 +1308,636 @@ export type Database = {
         ]
       }
     }
+      workspace_threads: {
+        Row: {
+          id: string
+          account_id: string
+          agent_profile_id: string
+          title: string | null
+          created_by: string | null
+          archived: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          agent_profile_id: string
+          title?: string | null
+          created_by?: string | null
+          archived?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          agent_profile_id?: string
+          title?: string | null
+          created_by?: string | null
+          archived?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_threads_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_threads_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_messages: {
+        Row: {
+          id: string
+          thread_id: string
+          role: string
+          kind: Database["public"]["Enums"]["workspace_message_kind"]
+          content: Json
+          agent_run_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          thread_id: string
+          role: string
+          kind?: Database["public"]["Enums"]["workspace_message_kind"]
+          content?: Json
+          agent_run_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          thread_id?: string
+          role?: string
+          kind?: Database["public"]["Enums"]["workspace_message_kind"]
+          content?: Json
+          agent_run_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_messages_agent_run_id_fkey"
+            columns: ["agent_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      context_sources: {
+        Row: {
+          id: string
+          account_id: string
+          agent_profile_id: string
+          thread_id: string | null
+          type: Database["public"]["Enums"]["context_source_type"]
+          name: string
+          uri: string | null
+          config: Json
+          enabled: boolean
+          refreshed_at: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          agent_profile_id: string
+          thread_id?: string | null
+          type?: Database["public"]["Enums"]["context_source_type"]
+          name: string
+          uri?: string | null
+          config?: Json
+          enabled?: boolean
+          refreshed_at?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          agent_profile_id?: string
+          thread_id?: string | null
+          type?: Database["public"]["Enums"]["context_source_type"]
+          name?: string
+          uri?: string | null
+          config?: Json
+          enabled?: boolean
+          refreshed_at?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "context_sources_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "context_sources_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "context_sources_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insights: {
+        Row: {
+          id: string
+          account_id: string
+          agent_profile_id: string
+          severity: Database["public"]["Enums"]["insight_severity"]
+          title: string
+          body: string | null
+          section_key: string | null
+          tags: string[]
+          evidence_ids: string[]
+          agent_run_id: string | null
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          agent_profile_id: string
+          severity?: Database["public"]["Enums"]["insight_severity"]
+          title: string
+          body?: string | null
+          section_key?: string | null
+          tags?: string[]
+          evidence_ids?: string[]
+          agent_run_id?: string | null
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          agent_profile_id?: string
+          severity?: Database["public"]["Enums"]["insight_severity"]
+          title?: string
+          body?: string | null
+          section_key?: string | null
+          tags?: string[]
+          evidence_ids?: string[]
+          agent_run_id?: string | null
+          read_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insights_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insights_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insights_agent_run_id_fkey"
+            columns: ["agent_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agenda_items: {
+        Row: {
+          id: string
+          account_id: string
+          title: string
+          rationale: string | null
+          impact: string | null
+          effort: string | null
+          rank: number | null
+          status: Database["public"]["Enums"]["agenda_item_status"]
+          dismissed_reason: string | null
+          linked_gap_ids: string[]
+          linked_insight_ids: string[]
+          created_by_agent_run_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          title: string
+          rationale?: string | null
+          impact?: string | null
+          effort?: string | null
+          rank?: number | null
+          status?: Database["public"]["Enums"]["agenda_item_status"]
+          dismissed_reason?: string | null
+          linked_gap_ids?: string[]
+          linked_insight_ids?: string[]
+          created_by_agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          title?: string
+          rationale?: string | null
+          impact?: string | null
+          effort?: string | null
+          rank?: number | null
+          status?: Database["public"]["Enums"]["agenda_item_status"]
+          dismissed_reason?: string | null
+          linked_gap_ids?: string[]
+          linked_insight_ids?: string[]
+          created_by_agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_items_created_by_agent_run_id_fkey"
+            columns: ["created_by_agent_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approvals: {
+        Row: {
+          id: string
+          account_id: string
+          kind: Database["public"]["Enums"]["approval_kind"]
+          payload: Json
+          status: Database["public"]["Enums"]["approval_status"]
+          requested_by_agent_profile_id: string
+          decided_by: string | null
+          decided_at: string | null
+          expires_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          kind: Database["public"]["Enums"]["approval_kind"]
+          payload?: Json
+          status?: Database["public"]["Enums"]["approval_status"]
+          requested_by_agent_profile_id: string
+          decided_by?: string | null
+          decided_at?: string | null
+          expires_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          kind?: Database["public"]["Enums"]["approval_kind"]
+          payload?: Json
+          status?: Database["public"]["Enums"]["approval_status"]
+          requested_by_agent_profile_id?: string
+          decided_by?: string | null
+          decided_at?: string | null
+          expires_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approvals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approvals_requested_by_agent_profile_id_fkey"
+            columns: ["requested_by_agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cascades: {
+        Row: {
+          id: string
+          account_id: string | null
+          cascade_key: string
+          name: string
+          description: string | null
+          output_kind: string | null
+          version: number
+          enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id?: string | null
+          cascade_key: string
+          name: string
+          description?: string | null
+          output_kind?: string | null
+          version?: number
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string | null
+          cascade_key?: string
+          name?: string
+          description?: string | null
+          output_kind?: string | null
+          version?: number
+          enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cascades_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cascade_steps: {
+        Row: {
+          id: string
+          cascade_id: string
+          step_key: string
+          order_group: number
+          agent_key: string
+          action_key: string
+          input_template: Json
+          depends_on: string[]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          cascade_id: string
+          step_key: string
+          order_group?: number
+          agent_key: string
+          action_key: string
+          input_template?: Json
+          depends_on?: string[]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          cascade_id?: string
+          step_key?: string
+          order_group?: number
+          agent_key?: string
+          action_key?: string
+          input_template?: Json
+          depends_on?: string[]
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cascade_steps_cascade_id_fkey"
+            columns: ["cascade_id"]
+            isOneToOne: false
+            referencedRelation: "cascades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cascade_runs: {
+        Row: {
+          id: string
+          account_id: string
+          cascade_id: string
+          status: Database["public"]["Enums"]["cascade_run_status"]
+          step_states: Json
+          total_cost: number | null
+          triggered_by: string | null
+          started_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          cascade_id: string
+          status?: Database["public"]["Enums"]["cascade_run_status"]
+          step_states?: Json
+          total_cost?: number | null
+          triggered_by?: string | null
+          started_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          cascade_id?: string
+          status?: Database["public"]["Enums"]["cascade_run_status"]
+          step_states?: Json
+          total_cost?: number | null
+          triggered_by?: string | null
+          started_at?: string
+          completed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cascade_runs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cascade_runs_cascade_id_fkey"
+            columns: ["cascade_id"]
+            isOneToOne: false
+            referencedRelation: "cascades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_jobs: {
+        Row: {
+          id: string
+          account_id: string
+          kind: string
+          payload: Json
+          status: string
+          attempts: number
+          agent_run_id: string | null
+          parent_run_id: string | null
+          cascade_run_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          kind: string
+          payload?: Json
+          status?: string
+          attempts?: number
+          agent_run_id?: string | null
+          parent_run_id?: string | null
+          cascade_run_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          kind?: string
+          payload?: Json
+          status?: string
+          attempts?: number
+          agent_run_id?: string | null
+          parent_run_id?: string | null
+          cascade_run_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_jobs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_jobs_agent_run_id_fkey"
+            columns: ["agent_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_jobs_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_jobs_cascade_run_id_fkey"
+            columns: ["cascade_run_id"]
+            isOneToOne: false
+            referencedRelation: "cascade_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      metric_snapshots: {
+        Row: {
+          id: string
+          account_id: string
+          metric_key: string
+          section_key: string | null
+          value: number
+          label: string | null
+          inputs: Json
+          computed_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          metric_key: string
+          section_key?: string | null
+          value: number
+          label?: string | null
+          inputs?: Json
+          computed_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          metric_key?: string
+          section_key?: string | null
+          value?: number
+          label?: string | null
+          inputs?: Json
+          computed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metric_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_profile_revisions: {
+        Row: {
+          id: string
+          agent_profile_id: string
+          system_instructions: string | null
+          behavior: Json
+          changed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          agent_profile_id: string
+          system_instructions?: string | null
+          behavior?: Json
+          changed_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          agent_profile_id?: string
+          system_instructions?: string | null
+          behavior?: Json
+          changed_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_profile_revisions_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     Views: {
       skills: {
         Row: {
@@ -1314,6 +1989,13 @@ export type Database = {
       loop_status: "active" | "paused" | "error" | "exhausted_budget" | "exhausted_failures"
       freshness_status: "fresh" | "stale" | "outdated" | "unverified"
       evidence_source_type: "website" | "filing" | "news" | "transcript" | "social" | "api" | "document" | "manual"
+      workspace_message_kind: "text" | "tool_call" | "artifact" | "proposal" | "delegation"
+      context_source_type: "file" | "url" | "evidence_query" | "note"
+      insight_severity: "info" | "notable" | "warning" | "critical"
+      agenda_item_status: "proposed" | "accepted" | "dismissed" | "done"
+      approval_kind: "outreach" | "canvas_change" | "schedule_change"
+      approval_status: "pending" | "approved" | "declined"
+      cascade_run_status: "running" | "completed" | "partial" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1457,6 +2139,13 @@ export const Constants = {
       loop_status: ["active", "paused", "error", "exhausted_budget", "exhausted_failures"],
       freshness_status: ["fresh", "stale", "outdated", "unverified"],
       evidence_source_type: ["website", "filing", "news", "transcript", "social", "api", "document", "manual"],
+      workspace_message_kind: ["text", "tool_call", "artifact", "proposal", "delegation"],
+      context_source_type: ["file", "url", "evidence_query", "note"],
+      insight_severity: ["info", "notable", "warning", "critical"],
+      agenda_item_status: ["proposed", "accepted", "dismissed", "done"],
+      approval_kind: ["outreach", "canvas_change", "schedule_change"],
+      approval_status: ["pending", "approved", "declined"],
+      cascade_run_status: ["running", "completed", "partial", "failed"],
     },
   },
 } as const
