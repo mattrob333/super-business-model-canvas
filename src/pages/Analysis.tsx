@@ -605,7 +605,7 @@ Website: ${comp.website || 'N/A'}
   };
 
   return (
-    <div>
+    <div className="bg-grid-subtle min-h-full p-6">
       {/* Main Content */}
       <main className="space-y-4 sm:space-y-8 md:space-y-12">
         

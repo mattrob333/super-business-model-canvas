@@ -13,6 +13,8 @@ the chief strategist at your side, and every claim traceable to evidence. Visual
 darker, calmer, more cinematic than the section rooms — same 8px enterprise system, but the
 canvas map gets room to breathe and the indigo accent is reserved for Atlas alone. If a VC
 screenshots one screen of this product for their partner meeting, it's this one.
+Light-mode page canvases use the established subtle grid background; cards remain white,
+bordered, and lightly shadowed above that texture.
 
 ## Route & entry
 

@@ -56,7 +56,7 @@ const Settings = () => {
   const effectiveAccountId = accountId ?? "00000000-0000-0000-0000-000000000000";
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="bg-grid-subtle flex min-h-full flex-col gap-6 p-6">
       {/* Page heading */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
