@@ -4,6 +4,30 @@ Newest entries first. Companion docs: `VISION.md` (product), `AGENT_RUNTIME_DECI
 
 ---
 
+## 2026-07-02 (later still) — Metrics, data feeds & model economics specs
+
+Two more specs from Matt's brief (true public-data metrics, benchmarks/KPIs the orchestrator
+can interpret for the human, reliable data feeds, right-model-for-the-job economics via the
+OpenRouter catalog, competitor BMC click-through):
+
+- `specs/05_METRICS_AND_DATA_FEEDS.md` — metric catalog across five families (share of
+  voice/visibility — the flagship, competitor execution, market demand, macro via FRED,
+  sentiment) with T1/T2/T3 provenance tiers on every tile; four composite indices (Visibility,
+  Momentum, Threat, Tailwind) baselined at 100; a `kpis` table for human- or Atlas-set targets
+  with owner agents; the three-stage interpretation pipeline (free statistics → cheap pattern
+  matching → Atlas narrative "What's happening / Why it matters / What to do"); the
+  `data_feeds` registry (free-tier sources first, paid upgrades slot in without schema change);
+  and the competitor BMC drill-down with compare mode and "borrow idea" flow.
+- `specs/06_MODEL_ROUTING_ECONOMICS.md` — task-class routing matrix (extract/classify on
+  budget models, verification never downgraded, Atlas synthesis protected and rare), the
+  escalation ladder, the OpenRouter model-scout (monthly catalog sweep + eval harness proposing
+  route changes through Approvals; `scout_models` tool for Atlas), layered cost controls, and
+  cost-per-insight observability. Rich-doc editor (Plate over Tiptap) parked in ROADMAP Phase 8.
+
+README/overview indices updated; ROADMAP Phase 4 and Phase 8 reference the new specs.
+
+---
+
 ## 2026-07-02 (later) — Agent workspace spec suite
 
 Wrote the full specification set for the ten-agent workspace era (Matt's brief: unique

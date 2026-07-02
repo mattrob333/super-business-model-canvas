@@ -46,6 +46,8 @@ Goal: ground truth. Cited canvases, verified claims. This is the moat.
 ## Phase 4 — Competitor canvases & the gap engine (≈ 2 weeks)
 
 Goal: the deficiencies dashboard becomes real, computed from evidence.
+**Metric/KPI details: `docs/specs/05_METRICS_AND_DATA_FEEDS.md` (incl. the competitor BMC
+drill-down and compare mode); routing/cost details: `docs/specs/06_MODEL_ROUTING_ECONOMICS.md`.**
 
 - [ ] `companies` / competitor-canvas data model: run the Phase-3 pipeline on 3–5 competitors per account (competitor canvases stored like the primary, flagged `is_competitor`)
 - [ ] Gap engine job: per section, diff primary vs each competitor → write scored `gaps` rows (severity × impact × effort) with evidence links
@@ -91,6 +93,8 @@ Goal: the VC/portfolio experience; the system runs while nobody's looking.
 - [ ] Team roles beyond owner (`account_members.role` exists; enforce in RLS + UI)
 - [ ] SOC2-track basics: audit log UI on `agent_runs` (partially exists), key rotation for `CREDENTIALS_ENCRYPTION_KEY`, per-account data export/delete
 - [ ] Onboarding flow: URL → first canvas → competitor prompt → first gap report inside 10 minutes
+- [ ] Rich document editor for briefs/memos (Plate preferred over Tiptap — shadcn-native; see spec 06 §6)
+- [ ] Paid data-feed upgrades as revenue justifies (Similarweb, SEMrush, NewsAPI, Crunchbase — spec 05 §6)
 
 ---
 

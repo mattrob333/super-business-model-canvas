@@ -58,6 +58,8 @@ the memo links back to a scraped page with a timestamp.
 | **[02_SECTION_WORKSPACE.md](./02_SECTION_WORKSPACE.md)** | The full-screen section room: identity + context rail, chat, actions panel, behavior settings |
 | **[03_ORCHESTRATOR_WORKSPACE.md](./03_ORCHESTRATOR_WORKSPACE.md)** | The War Room ★: the BMC command Map, Atlas chat, agenda, insight feed, cascades & approvals rails |
 | **[04_ORCHESTRATION_AND_CASCADES.md](./04_ORCHESTRATION_AND_CASCADES.md)** | The mechanics: delegation, insight bus, scheduling authorship, cascade DAGs, outputs, data model, guardrails |
+| **[05_METRICS_AND_DATA_FEEDS.md](./05_METRICS_AND_DATA_FEEDS.md)** | The measurement layer: public-data metric catalog with provenance tiers, composite indices, KPIs/benchmarks, Atlas's interpretation pipeline, data-feed registry, competitor BMC drill-down |
+| **[06_MODEL_ROUTING_ECONOMICS.md](./06_MODEL_ROUTING_ECONOMICS.md)** | Token economics: task-class routing matrix, escalation ladder, OpenRouter model-scout, cost controls |
 
 Companions: [`../VISION.md`](../VISION.md) (why this wins), [`../AGENT_RUNTIME_DECISION.md`](../AGENT_RUNTIME_DECISION.md)
 (the engine: Claude Agent SDK worker + Supabase + pg_cron), [`../ROADMAP.md`](../ROADMAP.md)

@@ -293,6 +293,8 @@ node scripts/generate-framework-seed.mjs   # Regenerate seed_frameworks.sql from
 - **[docs/specs/02_SECTION_WORKSPACE.md](./docs/specs/02_SECTION_WORKSPACE.md)** — Section agent workspace UI spec
 - **[docs/specs/03_ORCHESTRATOR_WORKSPACE.md](./docs/specs/03_ORCHESTRATOR_WORKSPACE.md)** — The War Room (Atlas) UI spec
 - **[docs/specs/04_ORCHESTRATION_AND_CASCADES.md](./docs/specs/04_ORCHESTRATION_AND_CASCADES.md)** — Delegation, scheduling, cascades, data model
+- **[docs/specs/05_METRICS_AND_DATA_FEEDS.md](./docs/specs/05_METRICS_AND_DATA_FEEDS.md)** — Public-data metrics, KPIs/benchmarks, data feeds, competitor BMC drill-down
+- **[docs/specs/06_MODEL_ROUTING_ECONOMICS.md](./docs/specs/06_MODEL_ROUTING_ECONOMICS.md)** — Model-per-task routing, OpenRouter model-scout, cost controls
 
 ---
 
