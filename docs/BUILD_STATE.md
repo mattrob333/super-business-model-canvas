@@ -553,6 +553,13 @@ npm run build                   -> green
 npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
 ```
 
+**Side tasks merged after Phase 2 approval.**
+
+- **Landing page branch:** rebased `feat/landing-page` on updated `main`, re-ran gates, and
+  merged PR #7 at merge commit `3c10b26`. Gate results before merge: `npx tsc -p
+  tsconfig.app.json --noEmit` exit 0; `npm run build` green; `npm run lint` 68 problems, within
+  frozen <=69 baseline; worker typecheck/tests/lint still green.
+
 ### Phase 3 — Research engine & evidence
 Tasks: 3.1 ☐ · 3.2 ☐ · 3.3 ☐ · 3.4 ☐ · 3.5 ☐ · 3.6 ☐ · 3.7 ☐
 
