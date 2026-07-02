@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CanvasSectionAnalysisHandler } from "./canvas-section-analysis.js";
+import { FeedRefreshHandler } from "./feed-refresh.js";
 import { WorkspaceChatHandler } from "./workspace-chat.js";
 import type { AgentTaskLimits } from "../agent/limits.js";
 import type { AgentRunner } from "../agent/runner.js";
+import type { FeedRuntimeConfig } from "../feeds/types.js";
 import type { AgentJob, JobHandler } from "../queue/types.js";
 
-export interface JobDispatcherOptions {
+export interface JobDispatcherOptions extends FeedRuntimeConfig {
   client: SupabaseClient;
   runner?: AgentRunner;
   xaiApiKey?: string;
@@ -16,6 +18,7 @@ export interface JobDispatcherOptions {
 export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
   const canvasSectionAnalysis = new CanvasSectionAnalysisHandler(options);
   const workspaceChat = new WorkspaceChatHandler(options);
+  const feedRefresh = new FeedRefreshHandler(options);
 
   return async (job: AgentJob): Promise<void> => {
     try {
@@ -26,6 +29,11 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
 
       if (job.kind === "workspace_chat") {
         await workspaceChat.handle(job);
+        return;
+      }
+
+      if (job.kind === "feed_refresh") {
+        await feedRefresh.handle(job);
         return;
       }
 

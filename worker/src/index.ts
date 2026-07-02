@@ -10,8 +10,10 @@ const client = createServiceClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_
 const repository = new SupabaseJobRepository(client);
 const handler = createJobDispatcher({
   client,
-  xaiApiKey: process.env.XAI_API_KEY,
-  firecrawlApiKey: process.env.FIRECRAWL_API_KEY,
+  xaiApiKey: config.XAI_API_KEY,
+  firecrawlApiKey: config.FIRECRAWL_API_KEY,
+  fredApiKey: config.FRED_API_KEY,
+  githubToken: config.GITHUB_TOKEN,
   taskLimits: taskLimitsFromConfig(config),
 });
 

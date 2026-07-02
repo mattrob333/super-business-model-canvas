@@ -30,6 +30,10 @@ Optional env:
 - `WORKSPACE_CHAT_MAX_TURNS` defaults to `40`
 - `WORKSPACE_CHAT_TASK_BUDGET_TOKENS` defaults to `32000`
 - `WORKSPACE_CHAT_MAX_BUDGET_USD` defaults to route-derived budget
+- `XAI_API_KEY` enables Grok live-search feeds
+- `FIRECRAWL_API_KEY` enables Firecrawl scrape feeds
+- `FRED_API_KEY` enables FRED macro-series feeds
+- `GITHUB_TOKEN` raises GitHub feed rate limits; public unauthenticated fetches still work
 
 Run locally:
 

@@ -201,6 +201,54 @@ with checks as (
              and pg_get_functiondef(p.oid) like '%attempts >= coalesce(max_attempts, p_default_max_attempts)%'
          ) then 'PASS' else 'FAIL' end
 
+  union all
+
+  -- ---- 8. Phase 3.1 feed registry/cache ----
+  select 'table exists: data_feeds',
+         case when to_regclass('public.data_feeds') is not null then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'table exists: feed_cache',
+         case when to_regclass('public.feed_cache') is not null then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'enum type exists: data_feed_kind',
+         case when exists (select 1 from pg_type where typname = 'data_feed_kind' and typtype = 'e')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'enum type exists: data_feed_health',
+         case when exists (select 1 from pg_type where typname = 'data_feed_health' and typtype = 'e')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'index exists: idx_feed_cache_lookup',
+         case when exists (
+           select 1 from pg_indexes
+           where schemaname = 'public' and indexname = 'idx_feed_cache_lookup'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'index exists: idx_scheduled_loops_action_key',
+         case when exists (
+           select 1 from pg_indexes
+           where schemaname = 'public' and indexname = 'idx_scheduled_loops_action_key'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'seed: 6 global data feeds exist',
+         case when (
+           select count(distinct feed_key) from public.data_feeds
+           where account_id is null
+             and feed_key in ('firecrawl_scrape', 'grok_live_search', 'fred_series', 'google_trends', 'gdelt_count', 'github_repo_stats')
+         ) = 6 then 'PASS' else 'FAIL' end
+
 )
 select check_name, status from checks order by
   case status when 'FAIL' then 0 else 1 end,  -- surface failures first

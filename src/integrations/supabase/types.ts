@@ -738,6 +738,121 @@ export type Database = {
           },
         ]
       }
+      data_feeds: {
+        Row: {
+          id: string
+          account_id: string | null
+          feed_key: string
+          name: string
+          kind: Database["public"]["Enums"]["data_feed_kind"]
+          tier: string
+          config: Json
+          cadence: string
+          ttl_seconds: number
+          last_run_at: string | null
+          health: Database["public"]["Enums"]["data_feed_health"]
+          last_error: string | null
+          cost_class: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id?: string | null
+          feed_key: string
+          name: string
+          kind: Database["public"]["Enums"]["data_feed_kind"]
+          tier?: string
+          config?: Json
+          cadence?: string
+          ttl_seconds?: number
+          last_run_at?: string | null
+          health?: Database["public"]["Enums"]["data_feed_health"]
+          last_error?: string | null
+          cost_class?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string | null
+          feed_key?: string
+          name?: string
+          kind?: Database["public"]["Enums"]["data_feed_kind"]
+          tier?: string
+          config?: Json
+          cadence?: string
+          ttl_seconds?: number
+          last_run_at?: string | null
+          health?: Database["public"]["Enums"]["data_feed_health"]
+          last_error?: string | null
+          cost_class?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_feeds_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feed_cache: {
+        Row: {
+          id: string
+          account_id: string | null
+          feed_key: string
+          cache_key: string
+          payload: Json
+          evidence_candidates: Json
+          metric_candidates: Json
+          fetched_at: string
+          expires_at: string
+          health: Database["public"]["Enums"]["data_feed_health"]
+          error: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id?: string | null
+          feed_key: string
+          cache_key: string
+          payload?: Json
+          evidence_candidates?: Json
+          metric_candidates?: Json
+          fetched_at?: string
+          expires_at: string
+          health?: Database["public"]["Enums"]["data_feed_health"]
+          error?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string | null
+          feed_key?: string
+          cache_key?: string
+          payload?: Json
+          evidence_candidates?: Json
+          metric_candidates?: Json
+          fetched_at?: string
+          expires_at?: string
+          health?: Database["public"]["Enums"]["data_feed_health"]
+          error?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_cache_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gaps: {
         Row: {
           id: string
@@ -2023,6 +2138,8 @@ export type Database = {
       loop_status: "active" | "paused" | "error" | "exhausted_budget" | "exhausted_failures"
       freshness_status: "fresh" | "stale" | "outdated" | "unverified"
       evidence_source_type: "website" | "filing" | "news" | "transcript" | "social" | "api" | "document" | "manual"
+      data_feed_kind: "api" | "scrape" | "search"
+      data_feed_health: "ok" | "degraded" | "failing"
       workspace_message_kind: "text" | "tool_call" | "artifact" | "proposal" | "delegation"
       context_source_type: "file" | "url" | "evidence_query" | "note"
       insight_severity: "info" | "notable" | "warning" | "critical"
@@ -2173,6 +2290,8 @@ export const Constants = {
       loop_status: ["active", "paused", "error", "exhausted_budget", "exhausted_failures"],
       freshness_status: ["fresh", "stale", "outdated", "unverified"],
       evidence_source_type: ["website", "filing", "news", "transcript", "social", "api", "document", "manual"],
+      data_feed_kind: ["api", "scrape", "search"],
+      data_feed_health: ["ok", "degraded", "failing"],
       workspace_message_kind: ["text", "tool_call", "artifact", "proposal", "delegation"],
       context_source_type: ["file", "url", "evidence_query", "note"],
       insight_severity: ["info", "notable", "warning", "critical"],
