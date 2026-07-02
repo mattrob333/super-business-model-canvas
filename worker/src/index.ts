@@ -13,6 +13,7 @@ const handler = createJobDispatcher({
   xaiApiKey: config.XAI_API_KEY,
   firecrawlApiKey: config.FIRECRAWL_API_KEY,
   fredApiKey: config.FRED_API_KEY,
+  googleTrendsApiKey: config.GOOGLE_TRENDS_API_KEY,
   githubToken: config.GITHUB_TOKEN,
   taskLimits: taskLimitsFromConfig(config),
 });

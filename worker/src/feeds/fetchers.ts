@@ -8,7 +8,7 @@ export function createFeedFetchers(config: FeedRuntimeConfig = {}): Map<string, 
     firecrawlScrapeFetcher(config, fetcher),
     grokLiveSearchFetcher(config, fetcher),
     fredSeriesFetcher(config, fetcher),
-    googleTrendsFetcher(fetcher),
+    googleTrendsFetcher(config, fetcher),
     gdeltCountFetcher(fetcher),
     githubRepoStatsFetcher(config, fetcher),
   ];
@@ -136,26 +136,33 @@ function fredSeriesFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): FeedF
   };
 }
 
-function googleTrendsFetcher(fetcher: FetchLike): FeedFetcher {
+function googleTrendsFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): FeedFetcher {
   return {
     feedKey: "google_trends",
     async run(input) {
+      if (!config.googleTrendsApiKey) return degraded("google_trends", "GOOGLE_TRENDS_API_KEY is not configured");
       const keyword = readString(input.config.keyword) ?? input.companyName;
       if (!keyword) return degraded("google_trends", "No keyword configured for Google Trends");
-      const url = `https://trends.google.com/trends/explore?q=${encodeURIComponent(keyword)}`;
-      void fetcher;
+      const url = new URL("https://serpapi.com/search.json");
+      url.searchParams.set("engine", "google_trends");
+      url.searchParams.set("q", keyword);
+      url.searchParams.set("api_key", config.googleTrendsApiKey);
+      const response = await fetcher(url);
+      if (!response.ok) return degraded("google_trends", `Google Trends failed with HTTP ${response.status}`);
+      const payload = await response.json() as Record<string, unknown>;
+      const interest = latestTrendValue(payload, keyword);
       return {
-        health: "degraded",
-        payload: { url, reason: "Google Trends has no stable unauthenticated JSON endpoint configured yet" },
+        health: "ok",
+        payload,
         evidence: [{
           title: `Google Trends interest: ${keyword}`,
           sourceType: "api",
           sourceName: "Google Trends",
-          sourceUrl: url,
-          metadata: { keyword, manualReviewRequired: true },
+          sourceUrl: `https://trends.google.com/trends/explore?q=${encodeURIComponent(keyword)}`,
+          excerpt: interest === null ? undefined : `${keyword} latest Google Trends interest score: ${interest}.`,
+          metadata: { keyword, provider: "serpapi" },
         }],
-        metrics: [],
-        error: "Google Trends fetcher requires a stable provider adapter",
+        metrics: interest === null ? [] : [{ metricKey: "google_trends.interest", value: interest, label: keyword, inputs: { keyword } }],
       };
     },
   };
@@ -197,6 +204,7 @@ function githubRepoStatsFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): 
   return {
     feedKey: "github_repo_stats",
     async run(input) {
+      if (!config.githubToken) return degraded("github_repo_stats", "GITHUB_TOKEN is not configured");
       const repos = readStringArray(input.config.repos);
       if (repos.length === 0) return degraded("github_repo_stats", "No GitHub repos configured");
       const evidence = [];
@@ -204,7 +212,7 @@ function githubRepoStatsFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): 
       const payload: Record<string, unknown> = {};
       for (const repo of repos) {
         const response = await fetcher(`https://api.github.com/repos/${repo}`, {
-          headers: config.githubToken ? { authorization: `Bearer ${config.githubToken}` } : undefined,
+          headers: { authorization: `Bearer ${config.githubToken}` },
         });
         if (!response.ok) return degraded("github_repo_stats", `GitHub ${repo} failed with HTTP ${response.status}`);
         const json = await response.json() as Record<string, unknown>;
@@ -233,4 +241,27 @@ function readString(value: unknown): string | undefined {
 
 function readStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length > 0) : [];
+}
+
+function latestTrendValue(payload: Record<string, unknown>, keyword: string): number | null {
+  const interest = payload.interest_over_time;
+  if (!interest || typeof interest !== "object") return null;
+  const timeline = (interest as { timeline_data?: unknown }).timeline_data;
+  if (!Array.isArray(timeline) || timeline.length === 0) return null;
+  const latest = timeline[timeline.length - 1];
+  if (!latest || typeof latest !== "object") return null;
+  const values = (latest as { values?: unknown }).values;
+  if (!Array.isArray(values)) return null;
+  for (const value of values) {
+    if (!value || typeof value !== "object") continue;
+    const record = value as { query?: unknown; value?: unknown; extracted_value?: unknown };
+    if (record.query === keyword && typeof record.value === "number") return record.value;
+    if (record.query === keyword && typeof record.extracted_value === "number") return record.extracted_value;
+  }
+  const first = values[0] as { value?: unknown; extracted_value?: unknown } | undefined;
+  return typeof first?.value === "number"
+    ? first.value
+    : typeof first?.extracted_value === "number"
+      ? first.extracted_value
+      : null;
 }

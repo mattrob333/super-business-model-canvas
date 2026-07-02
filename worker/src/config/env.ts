@@ -7,6 +7,7 @@ const envSchema = z.object({
   XAI_API_KEY: z.string().min(1).optional(),
   FIRECRAWL_API_KEY: z.string().min(1).optional(),
   FRED_API_KEY: z.string().min(1).optional(),
+  GOOGLE_TRENDS_API_KEY: z.string().min(1).optional(),
   GITHUB_TOKEN: z.string().min(1).optional(),
   WORKER_ID: z.string().min(1).optional(),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),

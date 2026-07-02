@@ -1,0 +1,8 @@
+{
+  "data": {
+    "markdown": "# Acme Pricing\n\nAcme offers a Pro plan for $29 per seat and an Enterprise plan with custom pricing. Customers can start with a free trial."
+  },
+  "metadata": {
+    "sourceURL": "https://acme.example/pricing"
+  }
+}

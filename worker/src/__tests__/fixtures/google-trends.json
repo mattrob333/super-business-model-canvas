@@ -1,0 +1,15 @@
+{
+  "interest_over_time": {
+    "timeline_data": [
+      {
+        "date": "Jun 2026",
+        "values": [
+          {
+            "query": "Acme",
+            "value": 72
+          }
+        ]
+      }
+    ]
+  }
+}

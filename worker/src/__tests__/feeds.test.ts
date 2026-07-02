@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createFeedFetchers } from "../feeds/fetchers.js";
 import { FeedRefreshHandler } from "../jobs/feed-refresh.js";
 
@@ -12,14 +14,94 @@ describe("feed fetchers", () => {
       .resolves.toMatchObject({ health: "degraded", error: "XAI_API_KEY is not configured" });
     await expect(fetchers.get("fred_series")?.run(baseInput("fred_series")))
       .resolves.toMatchObject({ health: "degraded", error: "FRED_API_KEY is not configured" });
+    await expect(fetchers.get("google_trends")?.run(baseInput("google_trends")))
+      .resolves.toMatchObject({ health: "degraded", error: "GOOGLE_TRENDS_API_KEY is not configured" });
+    await expect(fetchers.get("github_repo_stats")?.run(baseInput("github_repo_stats")))
+      .resolves.toMatchObject({ health: "degraded", error: "GITHUB_TOKEN is not configured" });
   });
 
-  it("normalizes GitHub repo stats into evidence and metrics", async () => {
-    const fetch = vi.fn(async () => new Response(JSON.stringify({
-      stargazers_count: 42,
-      forks_count: 7,
-    }), { status: 200 }));
+  it("normalizes Firecrawl scrape fixtures into website evidence", async () => {
+    const fetch = fixtureFetch("firecrawl-scrape.json");
+    const fetchers = createFeedFetchers({ firecrawlApiKey: "firecrawl-key", fetch });
+
+    const result = await fetchers.get("firecrawl_scrape")?.run({
+      ...baseInput("firecrawl_scrape"),
+      companyUrl: "https://acme.example/pricing",
+    });
+
+    expect(result).toMatchObject({
+      health: "ok",
+      evidence: [{ title: "Acme page scrape", sourceType: "website", sourceUrl: "https://acme.example/pricing" }],
+    });
+    expect(result?.evidence[0]?.excerpt).toContain("Pro plan for $29");
+  });
+
+  it("normalizes Grok live-search fixtures into news evidence", async () => {
+    const fetch = fixtureFetch("grok-live-search.json");
+    const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", fetch });
+
+    const result = await fetchers.get("grok_live_search")?.run({
+      ...baseInput("grok_live_search"),
+      query: "Acme analytics",
+    });
+
+    expect(result).toMatchObject({
+      health: "ok",
+      evidence: [{ title: "Live search: Acme analytics", sourceType: "news", sourceName: "Grok Live Search" }],
+    });
+    expect(result?.evidence[0]?.excerpt).toContain("enterprise analytics product");
+  });
+
+  it("normalizes FRED fixtures into API evidence and metrics", async () => {
+    const fetch = fixtureFetch("fred-series.json");
+    const fetchers = createFeedFetchers({ fredApiKey: "fred-key", fetch });
+
+    const result = await fetchers.get("fred_series")?.run({
+      ...baseInput("fred_series"),
+      config: { series: ["FEDFUNDS"] },
+    });
+
+    expect(result).toMatchObject({
+      health: "ok",
+      evidence: [{ title: "FRED FEDFUNDS", sourceType: "api", sourceDate: "2026-06-01" }],
+      metrics: [{ metricKey: "fred.FEDFUNDS", value: 4.25, label: "FEDFUNDS" }],
+    });
+  });
+
+  it("normalizes Google Trends fixtures into interest evidence and metrics", async () => {
+    const fetch = fixtureFetch("google-trends.json");
+    const fetchers = createFeedFetchers({ googleTrendsApiKey: "trends-key", fetch });
+
+    const result = await fetchers.get("google_trends")?.run({
+      ...baseInput("google_trends"),
+      config: { keyword: "Acme" },
+    });
+
+    expect(result).toMatchObject({
+      health: "ok",
+      evidence: [{ title: "Google Trends interest: Acme", sourceType: "api", sourceName: "Google Trends" }],
+      metrics: [{ metricKey: "google_trends.interest", value: 72, label: "Acme" }],
+    });
+  });
+
+  it("normalizes GDELT timeline-count fixtures into a news-volume metric", async () => {
+    const fetch = fixtureFetch("gdelt-count.json");
     const fetchers = createFeedFetchers({ fetch });
+
+    const result = await fetchers.get("gdelt_count")?.run({
+      ...baseInput("gdelt_count"),
+      query: "Acme AI",
+    });
+
+    expect(result).toMatchObject({
+      health: "ok",
+      metrics: [{ metricKey: "gdelt.news_volume", value: 5, label: "Acme AI" }],
+    });
+  });
+
+  it("normalizes GitHub repo fixtures into evidence and metrics", async () => {
+    const fetch = fixtureFetch("github-repo.json");
+    const fetchers = createFeedFetchers({ githubToken: "github-token", fetch });
 
     const result = await fetchers.get("github_repo_stats")?.run({
       ...baseInput("github_repo_stats"),
@@ -33,23 +115,6 @@ describe("feed fetchers", () => {
         { metricKey: "github.stars", value: 42, label: "owner/repo" },
         { metricKey: "github.forks", value: 7, label: "owner/repo" },
       ],
-    });
-  });
-
-  it("normalizes GDELT timeline counts into a news-volume metric", async () => {
-    const fetch = vi.fn(async () => new Response(JSON.stringify({
-      timeline: [{ value: 2 }, { value: 3 }],
-    }), { status: 200 }));
-    const fetchers = createFeedFetchers({ fetch });
-
-    const result = await fetchers.get("gdelt_count")?.run({
-      ...baseInput("gdelt_count"),
-      query: "Acme AI",
-    });
-
-    expect(result).toMatchObject({
-      health: "ok",
-      metrics: [{ metricKey: "gdelt.news_volume", value: 5, label: "Acme AI" }],
     });
   });
 });
@@ -95,6 +160,18 @@ function baseInput(feedKey: string) {
     config: {},
     companyName: "Acme",
   };
+}
+
+function fixtureFetch(fileName: string) {
+  return vi.fn(async () => new Response(readFixture(fileName), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  }));
+}
+
+function readFixture(fileName: string): string {
+  const fixtureUrl = new URL(`./fixtures/${fileName}`, import.meta.url);
+  return readFileSync(fileURLToPath(fixtureUrl), "utf8");
 }
 
 class FakeSupabaseClient {

@@ -61,9 +61,13 @@ describe("BMC MCP tools", () => {
     await expect(tools.read_competitor_canvas.handler({ competitor_id: "competitor-1" }))
       .resolves.toMatchObject({ structuredContent: { items: [] } });
     await expect(tools.search_web.handler({ query: "Acme pricing" }))
-      .resolves.toMatchObject({ structuredContent: { degraded: true } });
+      .resolves.toMatchObject({ structuredContent: { degraded: false, health: "ok" } });
     await expect(tools.firecrawl_scrape.handler({ url: "https://example.com" }))
-      .resolves.toMatchObject({ structuredContent: { degraded: true } });
+      .resolves.toMatchObject({ structuredContent: { degraded: false, health: "ok" } });
+    expect((tools as unknown as { __feedCalls: Array<Record<string, unknown>> }).__feedCalls).toMatchObject([
+      { accountId: "account-1", feedKey: "grok_live_search", query: "Acme pricing" },
+      { accountId: "account-1", feedKey: "firecrawl_scrape", companyUrl: "https://example.com" },
+    ]);
   });
 
   it("rejects own-section and evidence guardrail violations inside the tool", async () => {
@@ -84,15 +88,29 @@ describe("BMC MCP tools", () => {
 });
 
 function registeredTools(client: never): Record<string, RegisteredTool> {
+  const feedCalls: Array<Record<string, unknown>> = [];
   const ctx: ToolContext = {
     accountId: "account-1",
     agentRunId: "run-1",
     ownSectionKey: "value_propositions",
     agentProfileId: "profile-1",
     proposalMode: true,
+    feedRunner: {
+      async refresh(request: Record<string, unknown>) {
+        feedCalls.push(request);
+        return {
+          health: "ok",
+          payload: { cached: true },
+          evidence: [{ title: "Cached evidence", sourceType: "website" }],
+          metrics: [],
+        };
+      },
+    } as never,
   };
   const server = createBmcServer(client, ctx) as unknown as SdkServerShape;
-  return server.instance._registeredTools;
+  const tools = server.instance._registeredTools;
+  Object.defineProperty(tools, "__feedCalls", { value: feedCalls });
+  return tools;
 }
 
 class FakeSupabaseClient {

@@ -66,7 +66,7 @@ Status: OPEN | RESOLVED (<how>)
   `SECTION_ANALYSIS_MAX_TURNS`, `SECTION_ANALYSIS_TASK_BUDGET_TOKENS`,
   `SECTION_ANALYSIS_MAX_BUDGET_USD`, `WORKSPACE_CHAT_MAX_TURNS`,
   `WORKSPACE_CHAT_TASK_BUDGET_TOKENS`, `WORKSPACE_CHAT_MAX_BUDGET_USD`, `XAI_API_KEY`,
-  `FIRECRAWL_API_KEY`. Example Fly path: from repo root run `fly launch --dockerfile
+  `FIRECRAWL_API_KEY`, `FRED_API_KEY`, `GOOGLE_TRENDS_API_KEY`, `GITHUB_TOKEN`. Example Fly path: from repo root run `fly launch --dockerfile
   worker/Dockerfile --name super-bmc-worker --no-deploy`, set secrets with `fly secrets set
   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ANTHROPIC_API_KEY=...`, then `fly deploy
   --dockerfile worker/Dockerfile`. After the worker is healthy, deploy the edge functions above
@@ -563,11 +563,24 @@ npm run lint                    -> 69 problems (50 errors, 19 warnings), within 
   `761c8de`. Added the shared subtle grid page-canvas treatment, card discipline, spec notes,
   and 1440px before/after screenshots for Dashboard, Canvas, and Settings. Gates before merge:
   `npx tsc -p tsconfig.app.json --noEmit` exit 0; `npm run build` green; `npm run lint`
-  68 problems, within frozen <=69 baseline.
+  68 problems, within frozen <=68 baseline.
 
 ### Phase 3 â€” Research engine & evidence
 Tasks: 3.1 [x] · 3.2 [x] · 3.3 [ ] · 3.4 [ ] · 3.5 [ ] · 3.6 [ ] · 3.7 [ ]
 
+**2026-07-02 - Reviewer follow-up for work orders 3.1-3.2 on `build/phase-3-research`.**
+
+- Pulled latest `main` after reviewer-merged PR #11 and rebased `build/phase-3-research` cleanly
+  before continuing.
+- Treat `npm run lint` **68 problems** as the new ceiling after a pre-existing lint issue was
+  removed elsewhere; rule remains "never increase."
+- Completed the remaining 3.2 gaps: all six wave-1 fetchers now have recorded-fixture tests with
+  mocked fetches and no live network calls. Firecrawl scrape, Grok live search, FRED, Google
+  Trends (via `GOOGLE_TRENDS_API_KEY` provider adapter), GDELT, and GitHub each normalize into
+  evidence candidates and, where applicable, metric candidates.
+- Wired Phase-2 MCP tools `search_web` and `firecrawl_scrape` through `FeedRunner.refresh`, so
+  they use the same account-scoped feed cache as `feed_refresh` jobs instead of returning Phase-3
+  stubs.
 **2026-07-02 - Work orders 3.1-3.2 feed framework complete on `build/phase-3-research`.**
 
 - **Orientation:** read BUILD_PLAN Phase 3 work orders, spec 05 §6, and spec 07 §3 before coding.
@@ -580,21 +593,21 @@ Tasks: 3.1 [x] · 3.2 [x] · 3.3 [ ] · 3.4 [ ] · 3.5 [ ] · 3.6 [ ] · 3.7 [ ]
   `scheduled_loops.action_key = feed_refresh:<feed_key>` row for the job account before running.
 - **3.2 wave-1 fetchers:** added Firecrawl scrape, Grok live search, FRED series, Google Trends,
   GDELT count, and GitHub repo stats fetchers. API-key-backed feeds degrade explicitly when env
-  is missing. GitHub can run unauthenticated or with `GITHUB_TOKEN`. Google Trends currently
-  returns a normalized manual-review evidence candidate plus degraded health because no stable
-  unauthenticated JSON provider is configured yet.
-- **Tests:** worker tests cover keyless degradation, GitHub/GDELT normalization, and scheduled-loop
+  is missing. GitHub uses `GITHUB_TOKEN`; Google Trends uses
+  `GOOGLE_TRENDS_API_KEY` for the provider adapter.
+- **Tests:** worker tests cover keyless degradation, fixture-backed normalization for all six
+  wave-1 fetchers, cached `search_web` / `firecrawl_scrape` MCP tool plumbing, and scheduled-loop
   enforcement for feed refresh jobs.
 
 **Gate results for this slice:**
 ```
 cd worker && npm run typecheck  -> exit 0
-cd worker && npm test           -> 17 passed, 1 skipped (SQL integration needs WORKER_TEST_DATABASE_URL)
+cd worker && npm test           -> 21 passed, 1 skipped (SQL integration needs WORKER_TEST_DATABASE_URL)
 cd worker && npm run build      -> exit 0
 cd worker && npm run lint       -> exit 0
 npx tsc -p tsconfig.app.json --noEmit -> exit 0
 npm run build                   -> green
-npm run lint                    -> 68 problems (49 errors, 19 warnings), within frozen <=69 baseline
+npm run lint                    -> 68 problems (49 errors, 19 warnings), within frozen <=68 baseline
 ```
 
 ### Phase 4 â€” Competitor canvases & gap engine

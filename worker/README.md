@@ -33,7 +33,8 @@ Optional env:
 - `XAI_API_KEY` enables Grok live-search feeds
 - `FIRECRAWL_API_KEY` enables Firecrawl scrape feeds
 - `FRED_API_KEY` enables FRED macro-series feeds
-- `GITHUB_TOKEN` raises GitHub feed rate limits; public unauthenticated fetches still work
+- `GOOGLE_TRENDS_API_KEY` enables the Google Trends feed through the configured provider adapter
+- `GITHUB_TOKEN` enables GitHub feed fetches
 
 Run locally:
 
