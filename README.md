@@ -287,6 +287,8 @@ node scripts/generate-framework-seed.mjs   # Regenerate seed_frameworks.sql from
 - **[docs/VISION.md](./docs/VISION.md)** — Product vision: the living Business Model Canvas
 - **[docs/AGENT_RUNTIME_DECISION.md](./docs/AGENT_RUNTIME_DECISION.md)** — Agent runtime architecture decision record
 - **[docs/ROADMAP.md](./docs/ROADMAP.md)** — Phased build plan (Phases 1–8)
+- **[docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md)** — Execution handoff for the AI build team: ground rules, phased work orders, acceptance criteria, review protocol
+- **[docs/BUILD_STATE.md](./docs/BUILD_STATE.md)** — Live build tracker (status board, blockers, operator queue, review findings)
 - **[docs/DEVLOG.md](./docs/DEVLOG.md)** — Dev log: audits, fixes, current state
 - **[docs/specs/00_OVERVIEW.md](./docs/specs/00_OVERVIEW.md)** — Agent workspaces: reading guide + mental model
 - **[docs/specs/01_AGENT_ROSTER.md](./docs/specs/01_AGENT_ROSTER.md)** — The ten agents: personas, tools, outputs, synergies

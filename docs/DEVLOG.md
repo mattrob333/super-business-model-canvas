@@ -4,6 +4,26 @@ Newest entries first. Companion docs: `VISION.md` (product), `AGENT_RUNTIME_DECI
 
 ---
 
+## 2026-07-02 (final) — Build plan & AI-team handoff
+
+Wrote the execution layer so an AI build team can start while Matt is away:
+
+- `BUILD_PLAN.md` — ground rules (branch/gate discipline, blockers protocol, no fake
+  completeness, operator-task flagging, guardrails-as-law), eight execution phases (0 baseline
+  → 1 migrations → 2 worker → 3 research/evidence → 4 competitors/gaps → 5 section workspaces
+  → 6 War Room/orchestration → 7 metrics/interpretation; 8 held) each with work orders,
+  acceptance criteria, and an adversarial reviewer checklist; review protocol (phase →
+  AWAITING REVIEW → audited against code and behavior, findings as RF items → APPROVED);
+  dependency map with the one allowed concurrency (P3 ∥ P5 on frozen migrations).
+- `BUILD_STATE.md` — the live tracker the team must maintain: status board, blockers,
+  operator queue (seeded with the July-2 deployment checklist), review findings, per-phase
+  task logs.
+
+The review cadence is deliberate: phases are sized to be completed by the team and then
+audited (by Claude, at Matt's direction) before the next begins.
+
+---
+
 ## 2026-07-02 (later still) — Metrics, data feeds & model economics specs
 
 Two more specs from Matt's brief (true public-data metrics, benchmarks/KPIs the orchestrator
