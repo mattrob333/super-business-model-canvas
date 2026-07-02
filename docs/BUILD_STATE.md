@@ -9,7 +9,7 @@
 | Phase | Title | Status | Branch | Last update |
 |---|---|---|---|---|
 | 0 | Baseline verification & deploy prep | **APPROVED** | `build/phase-0-baseline` (merged, PR #2, `db7cd1f`) | 2026-07-02 |
-| 1 | Data model wave 1 | **AWAITING REVIEW** | `build/phase-1-migrations` | 2026-07-02 |
+| 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
 | 2 | Agent worker service | NOT STARTED | — | — |
 | 3 | Research engine & evidence | NOT STARTED | — | — |
 | 4 | Competitor canvases & gap engine | NOT STARTED | — | — |
@@ -42,9 +42,25 @@ Status: OPEN | RESOLVED (<how>)
   since Phase 0 made no code changes, only verified/documented. When you do run the July-2
   deploy, use `scripts/smoke-test.md` (new, this phase) to confirm all 6 flows work afterward.
 
+- **From Phase 1:** apply the four Phase-1 migrations (`20260702100000` → `20260702100300`)
+  to the live Supabase project (SQL Editor, in order), then run `scripts/verify-schema.sql`
+  there and confirm 62 PASS / 0 FAIL. Verified clean on scratch Postgres 16 (fresh + incremental
+  + idempotent re-run) during review, but never against the live instance.
+
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
 
 ## REVIEW FINDINGS
+
+### Phase 1 — RF-1-3 (MEDIUM) — RESOLVED by reviewer (2026-07-02)
+**Problem:** The RF-1-2 patch introduced a typo'd model ID on the premium route:
+`strategy_synthesis` seeded as provider `anthropic` + `claude-opus-4.8` (dots). Direct
+Anthropic API IDs use dashes (`claude-opus-4-8`); the dotted form 404s, which would have
+failed Atlas's first run in Phase 2. (OpenRouter rows with dotted slugs are correct — that's
+OpenRouter's convention; only the direct-anthropic row was wrong.)
+**Fix:** Reviewer patched seed migration + schema.sql mirror while the team was rate-limited.
+Gates re-verified.
+**Note:** Phase 1 close-out (status-board flip + operator-queue entry) was interrupted by the
+rate limit after PR #4 merged; reviewer completed the bookkeeping in the same commit.
 
 ### Phase 1 — RF-1-2 (MEDIUM) — RESOLVED (2026-07-02)
 **Problem:** `model_routes` seed rows in `20260702100300_seed_phase1.sql` referenced
