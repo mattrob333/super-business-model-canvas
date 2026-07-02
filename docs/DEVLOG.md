@@ -4,6 +4,23 @@ Newest entries first. Companion docs: `VISION.md` (product), `AGENT_RUNTIME_DECI
 
 ---
 
+## 2026-07-02 (addendum) — Claude Agent SDK integration spec
+
+Gap spotted by Matt: the SDK was named everywhere but no doc told the build team *how* to
+use it — a recipe for hallucinated APIs in Phase 2. Wrote `specs/07_CLAUDE_AGENT_SDK_INTEGRATION.md`
+with the API surface verified against the official docs (TS SDK ≥ 0.3.198): the `query()`
+loop mapped to our job kinds, in-process MCP tools via `tool()`/`createSdkMcpServer()` with
+the account-scoping warning (service role bypasses RLS — scoping lives in tool handlers),
+guardrails as `PreToolUse` hooks (evidence gate, audit log), Atlas's depth-1 subagent
+topology via the `agents` option (structural enforcement: subagents never get the Agent
+tool), session-resume ↔ workspace_threads mapping, structured-output contract, model
+routing (budget models bypass the SDK entirely), headless gotchas (`settingSources: []`,
+`bypassPermissions` + hooks, `q.close()`), and a condensed Phase-2 checklist. Includes a
+recorded decision on Anthropic's Managed Agents alternative (revisit Phase 7+, not default).
+BUILD_PLAN Phase 2 now requires reading it first.
+
+---
+
 ## 2026-07-02 (final) — Build plan & AI-team handoff
 
 Wrote the execution layer so an AI build team can start while Matt is away:
