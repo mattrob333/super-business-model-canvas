@@ -2156,7 +2156,7 @@ values
    '{"temperature":0.1,"max_tokens":2000}'::jsonb, false, 'research_verify', 0.002, 0.01, 'human'),
   (null, 'draft_document', 'Draft Document (mid)', 'anthropic', 'claude-sonnet-5',
    '{"temperature":0.5,"max_tokens":6000}'::jsonb, false, 'draft_document', 0.002, 0.01, 'human'),
-  (null, 'strategy_synthesis', 'Strategy Synthesis (premium)', 'anthropic', 'claude-opus-4.8',
+  (null, 'strategy_synthesis', 'Strategy Synthesis (premium)', 'anthropic', 'claude-opus-4-8',
    '{"temperature":0.4,"max_tokens":8000}'::jsonb, false, 'strategy_synthesis', 0.005, 0.025, 'human'),
   (null, 'live_search', 'Live Search (fixed: Grok)', 'xai', 'grok-4.3',
    '{"temperature":0.3,"max_tokens":2000}'::jsonb, false, 'live_search', 0.00125, 0.0025, 'human')
