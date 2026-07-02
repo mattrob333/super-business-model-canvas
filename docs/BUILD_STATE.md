@@ -150,6 +150,33 @@ Merged to `main` via PR #2 (`db7cd1f`).
 
 ---
 
+## Side tasks
+
+### Public landing page rebuild — AWAITING REVIEW (2026-07-02)
+
+Branch: `feat/landing-page` (cut from `main`).
+
+- Rebuilt `/` in `src/pages/Landing.tsx` as a full SaaS landing page using the existing
+  shadcn/Tailwind design system: sticky nav, hero CTA, pure JSX/CSS miniature 9-block Business
+  Model Canvas, How it works, Agent Team, feature grid, audience cards, FAQ accordion, final CTA,
+  and footer.
+- Kept the early-access lead capture path: CTA validates email, inserts into `leads`, treats
+  duplicate-email `23505` as a graceful continuation, then routes to
+  `/auth?mode=signup&email=<prefill>`.
+- Added the requested Auth query-param support in `src/pages/Auth.tsx`: `mode=signup` opens the
+  sign-up tab and `email=` prefills the sign-up email field.
+- Added runtime page title and meta description from the landing page.
+- Scope intentionally limited to `src/pages/Landing.tsx`, `src/pages/Auth.tsx`, and this tracker
+  entry. No fabricated testimonials, customer logos, user counts, revenue metrics, or pricing
+  tiers added.
+- Design polish pass applied after review feedback: landing page pinned to light enterprise
+  theme, hero CTA fused into one bordered control, miniature canvas restyled as a light app
+  window, Atlas promoted to a feature card, feature/agent accents aligned to the roster, trust
+  band added, and quantitative mock metrics removed.
+- Alignment/association follow-up applied: shared landing agent accent constants added, canvas
+  mock tiles now use a consistent fixed-height title/agent-chip header with pinned status dots,
+  and every agent team card shows its owned BMC section in a matching accent pill.
+
 ## Phase logs
 
 ### Phase 0 — Baseline verification & deploy prep
