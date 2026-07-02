@@ -60,6 +60,7 @@ the memo links back to a scraped page with a timestamp.
 | **[04_ORCHESTRATION_AND_CASCADES.md](./04_ORCHESTRATION_AND_CASCADES.md)** | The mechanics: delegation, insight bus, scheduling authorship, cascade DAGs, outputs, data model, guardrails |
 | **[05_METRICS_AND_DATA_FEEDS.md](./05_METRICS_AND_DATA_FEEDS.md)** | The measurement layer: public-data metric catalog with provenance tiers, composite indices, KPIs/benchmarks, Atlas's interpretation pipeline, data-feed registry, competitor BMC drill-down |
 | **[06_MODEL_ROUTING_ECONOMICS.md](./06_MODEL_ROUTING_ECONOMICS.md)** | Token economics: task-class routing matrix, escalation ladder, OpenRouter model-scout, cost controls |
+| **[07_CLAUDE_AGENT_SDK_INTEGRATION.md](./07_CLAUDE_AGENT_SDK_INTEGRATION.md)** | The worker's engine: verified Claude Agent SDK usage — query loop, Supabase-backed tools, guardrail hooks, subagent topology, sessions |
 
 Companions: [`../VISION.md`](../VISION.md) (why this wins), [`../AGENT_RUNTIME_DECISION.md`](../AGENT_RUNTIME_DECISION.md)
 (the engine: Claude Agent SDK worker + Supabase + pg_cron), [`../ROADMAP.md`](../ROADMAP.md)

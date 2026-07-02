@@ -130,6 +130,10 @@ logic; confirm types.ts matches migrations column-for-column.
 Claude Agent SDK, executing `canvas_section_analysis` jobs with feature parity to today's
 `agent-run`, plus workspace chat plumbing.
 
+**Required reading before writing any worker code: `specs/07_CLAUDE_AGENT_SDK_INTEGRATION.md`**
+— verified SDK API usage (query loop, in-process MCP tools, hooks, subagents, sessions) plus
+the worker checklist that this phase's acceptance criteria assume. Do not guess SDK APIs.
+
 **Work orders**
 - 2.1 `worker/` package: TypeScript, `@anthropic-ai/claude-agent-sdk`, config via env,
   Dockerfile, `npm test` harness (vitest). Own tsconfig/eslint. README with run instructions.

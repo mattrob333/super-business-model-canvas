@@ -297,6 +297,7 @@ node scripts/generate-framework-seed.mjs   # Regenerate seed_frameworks.sql from
 - **[docs/specs/04_ORCHESTRATION_AND_CASCADES.md](./docs/specs/04_ORCHESTRATION_AND_CASCADES.md)** — Delegation, scheduling, cascades, data model
 - **[docs/specs/05_METRICS_AND_DATA_FEEDS.md](./docs/specs/05_METRICS_AND_DATA_FEEDS.md)** — Public-data metrics, KPIs/benchmarks, data feeds, competitor BMC drill-down
 - **[docs/specs/06_MODEL_ROUTING_ECONOMICS.md](./docs/specs/06_MODEL_ROUTING_ECONOMICS.md)** — Model-per-task routing, OpenRouter model-scout, cost controls
+- **[docs/specs/07_CLAUDE_AGENT_SDK_INTEGRATION.md](./docs/specs/07_CLAUDE_AGENT_SDK_INTEGRATION.md)** — Claude Agent SDK integration guide for the worker (verified API usage)
 
 ---
 
