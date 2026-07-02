@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | 0 | Baseline verification & deploy prep | **APPROVED** | `build/phase-0-baseline` (merged, PR #2, `db7cd1f`) | 2026-07-02 |
 | 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
-| 2 | Agent worker service | **IN PROGRESS** | `build/phase-2-worker` | 2026-07-02 |
+| 2 | Agent worker service | **AWAITING REVIEW** | `build/phase-2-worker` | 2026-07-02 |
 | 3 | Research engine & evidence | NOT STARTED | — | — |
 | 4 | Competitor canvases & gap engine | NOT STARTED | — | — |
 | 5 | Section agent workspaces | NOT STARTED | — | — |
@@ -59,6 +59,18 @@ Status: OPEN | RESOLVED (<how>)
   staging/frontend env `VITE_RUNTIME_MODE=enqueue` only when the worker service is deployed and
   has `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, and any optional research keys. Keep
   `VITE_RUNTIME_MODE=inline` (or omit it with the legacy endpoint configured) for rollback.
+- **From Phase 2.10:** deploy the worker service only after reviewer approval. Build context is
+  `worker/` and the container command is `node dist/index.js` from `worker/Dockerfile`. Required
+  runtime env: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`. Optional env:
+  `WORKER_ID`, `POLL_INTERVAL_MS`, `JOB_HEARTBEAT_STALE_SECONDS`, `JOB_MAX_ATTEMPTS`,
+  `SECTION_ANALYSIS_MAX_TURNS`, `SECTION_ANALYSIS_TASK_BUDGET_TOKENS`,
+  `SECTION_ANALYSIS_MAX_BUDGET_USD`, `WORKSPACE_CHAT_MAX_TURNS`,
+  `WORKSPACE_CHAT_TASK_BUDGET_TOKENS`, `WORKSPACE_CHAT_MAX_BUDGET_USD`, `XAI_API_KEY`,
+  `FIRECRAWL_API_KEY`. Example Fly path: from repo root run `fly launch --dockerfile
+  worker/Dockerfile --name super-bmc-worker --no-deploy`, set secrets with `fly secrets set
+  SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ANTHROPIC_API_KEY=...`, then `fly deploy
+  --dockerfile worker/Dockerfile`. After the worker is healthy, deploy the edge functions above
+  and only then switch frontend/staging `VITE_RUNTIME_MODE=enqueue`.
 
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
 
@@ -308,7 +320,7 @@ updated to match each model's current catalog price. Gates re-run clean: tsc cle
 green, lint 69 (unchanged). RF-1-2 marked RESOLVED.
 
 ### Phase 2 — Agent worker service
-Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [x] · 2.8 [x] · 2.9 [x] · 2.10 [ ]
+Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [x] · 2.8 [x] · 2.9 [x] · 2.10 [x] · **AWAITING REVIEW**
 
 **2026-07-02 — Phase 2 started on branch `build/phase-2-worker`; work orders 2.1–2.2 complete.**
 
@@ -479,6 +491,25 @@ npm run lint                    -> 69 problems (50 errors, 19 warnings), within 
   `failed_permanent` rather than orphaned. The test is skipped in local runs without that env var.
 
 **Gate results for this slice:**
+```
+cd worker && npm run typecheck  -> exit 0
+cd worker && npm test           -> 13 passed, 1 skipped (SQL integration needs WORKER_TEST_DATABASE_URL)
+cd worker && npm run build      -> exit 0
+cd worker && npm run lint       -> exit 0
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
+```
+
+**2026-07-02 - Work order 2.10 complete; Phase 2 awaiting review.**
+
+- Added exact worker deployment steps to the OPERATOR QUEUE. No deploys, secrets, or live
+  database changes were executed in this slice.
+- Phase 2 is marked `AWAITING REVIEW`; reviewer should audit the branch, run the optional SQL
+  integration test with `WORKER_TEST_DATABASE_URL` against a scratch schema, and verify the queued
+  runtime path before any staging switch to `VITE_RUNTIME_MODE=enqueue`.
+
+**Final gate results for Phase 2 branch:**
 ```
 cd worker && npm run typecheck  -> exit 0
 cd worker && npm test           -> 13 passed, 1 skipped (SQL integration needs WORKER_TEST_DATABASE_URL)
