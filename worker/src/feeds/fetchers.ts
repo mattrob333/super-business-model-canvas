@@ -71,22 +71,34 @@ function grokLiveSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): F
             { role: "system", content: "Search the live web and return concise sourced snippets." },
             { role: "user", content: query },
           ],
+          search_parameters: { mode: "on", return_citations: true },
           stream: false,
         }),
       });
       if (!response.ok) return degraded("grok_live_search", `Grok search failed with HTTP ${response.status}`);
       const payload = await response.json() as Record<string, unknown>;
       const content = readString((((payload.choices as unknown[])?.[0] as Record<string, unknown> | undefined)?.message as Record<string, unknown> | undefined)?.content);
+      const citations = extractCitationUrls(payload);
+      const evidence = citations.length > 0
+        ? citations.map((url, index) => ({
+            title: `Live search: ${query} (${index + 1})`,
+            sourceType: "news" as const,
+            sourceName: "Grok Live Search",
+            sourceUrl: url,
+            excerpt: content,
+            metadata: { feedKey: input.feedKey, query },
+          }))
+        : [{
+            title: `Live search: ${query}`,
+            sourceType: "news" as const,
+            sourceName: "Grok Live Search",
+            excerpt: content,
+            metadata: { feedKey: input.feedKey, query },
+          }];
       return {
         health: "ok",
         payload,
-        evidence: [{
-          title: `Live search: ${query}`,
-          sourceType: "news",
-          sourceName: "Grok Live Search",
-          excerpt: content,
-          metadata: { feedKey: input.feedKey, query },
-        }],
+        evidence,
         metrics: [],
       };
     },
@@ -241,6 +253,34 @@ function readString(value: unknown): string | undefined {
 
 function readStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length > 0) : [];
+}
+
+function extractCitationUrls(payload: Record<string, unknown>): string[] {
+  const urls = new Set<string>();
+  collectCitationUrls(payload.citations, urls);
+  const choices = payload.choices;
+  if (Array.isArray(choices)) {
+    for (const choice of choices) {
+      if (!choice || typeof choice !== "object") continue;
+      collectCitationUrls((choice as { citations?: unknown }).citations, urls);
+      const message = (choice as { message?: unknown }).message;
+      if (message && typeof message === "object") collectCitationUrls((message as { citations?: unknown }).citations, urls);
+    }
+  }
+  return [...urls];
+}
+
+function collectCitationUrls(value: unknown, urls: Set<string>): void {
+  if (!Array.isArray(value)) return;
+  for (const item of value) {
+    const url = typeof item === "string"
+      ? item
+      : item && typeof item === "object"
+        ? readString((item as { url?: unknown; source_url?: unknown }).url)
+          ?? readString((item as { url?: unknown; source_url?: unknown }).source_url)
+        : undefined;
+    if (url) urls.add(url);
+  }
 }
 
 function latestTrendValue(payload: Record<string, unknown>, keyword: string): number | null {

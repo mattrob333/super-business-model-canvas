@@ -1,4 +1,10 @@
 {
+  "citations": [
+    "https://news.example/acme-analytics",
+    {
+      "url": "https://acme.example/blog/enterprise-analytics"
+    }
+  ],
   "choices": [
     {
       "message": {

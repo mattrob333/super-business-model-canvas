@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createFeedFetchers } from "../feeds/fetchers.js";
+import { FeedRunner } from "../feeds/feed-runner.js";
 import { FeedRefreshHandler } from "../jobs/feed-refresh.js";
 
 describe("feed fetchers", () => {
@@ -47,9 +48,17 @@ describe("feed fetchers", () => {
 
     expect(result).toMatchObject({
       health: "ok",
-      evidence: [{ title: "Live search: Acme analytics", sourceType: "news", sourceName: "Grok Live Search" }],
+      evidence: [
+        { title: "Live search: Acme analytics (1)", sourceType: "news", sourceName: "Grok Live Search", sourceUrl: "https://news.example/acme-analytics" },
+        { title: "Live search: Acme analytics (2)", sourceType: "news", sourceName: "Grok Live Search", sourceUrl: "https://acme.example/blog/enterprise-analytics" },
+      ],
     });
     expect(result?.evidence[0]?.excerpt).toContain("enterprise analytics product");
+    const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
+    const requestInit = fetchMock.mock.calls[0]?.[1];
+    expect(JSON.parse(String(requestInit?.body))).toMatchObject({
+      search_parameters: { mode: "on", return_citations: true },
+    });
   });
 
   it("normalizes FRED fixtures into API evidence and metrics", async () => {
@@ -120,6 +129,58 @@ describe("feed fetchers", () => {
 });
 
 describe("FeedRefreshHandler", () => {
+  it("does not serve degraded cache rows after a later successful configuration", async () => {
+    const client = new FeedRunnerFakeClient();
+    const keylessRunner = new FeedRunner(client.asSupabase(), { fetch: fixtureFetch("github-repo.json") });
+
+    await expect(keylessRunner.refresh({
+      accountId: "account-1",
+      feedKey: "github_repo_stats",
+      cacheKey: "repo",
+      force: true,
+    })).resolves.toMatchObject({ health: "degraded" });
+
+    expect(client.cacheRows[0]?.health).toBe("degraded");
+    expect(Date.parse(client.cacheRows[0]?.expires_at ?? "") - Date.now()).toBeLessThanOrEqual(300_500);
+
+    const fetch = fixtureFetch("github-repo.json");
+    const configuredRunner = new FeedRunner(client.asSupabase(), { githubToken: "github-token", fetch });
+    const refreshed = await configuredRunner.refresh({
+      accountId: "account-1",
+      feedKey: "github_repo_stats",
+      cacheKey: "repo",
+    });
+    expect(refreshed.health).toBe("ok");
+    expect(refreshed.metrics).toContainEqual(expect.objectContaining({ metricKey: "github.stars", value: 42 }));
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("serves ok cache rows within TTL without refetching", async () => {
+    const client = new FeedRunnerFakeClient();
+    client.cacheRows.push({
+      account_id: "account-1",
+      feed_key: "github_repo_stats",
+      cache_key: "repo",
+      health: "ok",
+      payload: { cached: true },
+      evidence_candidates: [{ title: "Cached repo", sourceType: "api" }],
+      metric_candidates: [{ metricKey: "github.stars", value: 99 }],
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      error: null,
+    });
+    const fetch = vi.fn(async () => {
+      throw new Error("should not refetch");
+    });
+    const runner = new FeedRunner(client.asSupabase(), { githubToken: "github-token", fetch });
+
+    await expect(runner.refresh({
+      accountId: "account-1",
+      feedKey: "github_repo_stats",
+      cacheKey: "repo",
+    })).resolves.toMatchObject({ health: "ok", payload: { cached: true }, metrics: [{ metricKey: "github.stars", value: 99 }] });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("requires an active scheduled loop matching feed_refresh:<feed_key>", async () => {
     const client = new FakeSupabaseClient();
     const handler = new FeedRefreshHandler({
@@ -198,5 +259,108 @@ class FakeQuery {
   limit(): Promise<{ data: unknown[]; error: null }> {
     if (this.table !== "scheduled_loops") throw new Error(`Unexpected table ${this.table}`);
     return Promise.resolve({ data: [], error: null });
+  }
+}
+
+interface CacheFixtureRow {
+  account_id: string;
+  feed_key: string;
+  cache_key: string;
+  payload: Record<string, unknown>;
+  evidence_candidates: unknown[];
+  metric_candidates: unknown[];
+  health: "ok" | "degraded" | "failing";
+  error: string | null;
+  expires_at: string;
+}
+
+class FeedRunnerFakeClient {
+  public cacheRows: CacheFixtureRow[] = [];
+
+  asSupabase(): never {
+    return this as never;
+  }
+
+  from(table: string): FeedRunnerFakeQuery {
+    return new FeedRunnerFakeQuery(this, table);
+  }
+}
+
+class FeedRunnerFakeQuery {
+  private readonly filters = new Map<string, unknown>();
+  private gtFilter: [string, string] | null = null;
+  private upsertValue: CacheFixtureRow | null = null;
+
+  constructor(
+    private readonly client: FeedRunnerFakeClient,
+    private readonly table: string,
+  ) {}
+
+  select(): this {
+    return this;
+  }
+
+  or(): this {
+    return this;
+  }
+
+  eq(column: string, value: unknown): this {
+    this.filters.set(column, value);
+    return this;
+  }
+
+  gt(column: string, value: string): this {
+    this.gtFilter = [column, value];
+    return this;
+  }
+
+  order(): this {
+    return this;
+  }
+
+  limit(): this {
+    return this;
+  }
+
+  upsert(value: CacheFixtureRow): Promise<{ error: null }> {
+    this.upsertValue = value;
+    const existingIndex = this.client.cacheRows.findIndex((row) =>
+      row.account_id === value.account_id
+      && row.feed_key === value.feed_key
+      && row.cache_key === value.cache_key);
+    if (existingIndex >= 0) this.client.cacheRows[existingIndex] = value;
+    else this.client.cacheRows.push(value);
+    return Promise.resolve({ error: null });
+  }
+
+  update(): this {
+    return this;
+  }
+
+  maybeSingle(): Promise<{ data: unknown; error: null }> {
+    if (this.table === "data_feeds") {
+      return Promise.resolve({
+        data: {
+          id: "feed-1",
+          account_id: null,
+          feed_key: this.filters.get("feed_key"),
+          config: { repos: ["owner/repo"] },
+          ttl_seconds: 604800,
+        },
+        error: null,
+      });
+    }
+
+    if (this.table === "feed_cache") {
+      const row = this.client.cacheRows.find((candidate) =>
+        candidate.account_id === this.filters.get("account_id")
+        && candidate.feed_key === this.filters.get("feed_key")
+        && candidate.cache_key === this.filters.get("cache_key")
+        && candidate.health === this.filters.get("health")
+        && (!this.gtFilter || candidate.expires_at > this.gtFilter[1]));
+      return Promise.resolve({ data: row ?? null, error: null });
+    }
+
+    return Promise.resolve({ data: null, error: null });
   }
 }

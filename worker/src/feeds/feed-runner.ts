@@ -88,6 +88,7 @@ export class FeedRunner {
       .eq("account_id", accountId)
       .eq("feed_key", feedKey)
       .eq("cache_key", cacheKey)
+      .eq("health", "ok")
       .gt("expires_at", new Date().toISOString())
       .order("expires_at", { ascending: false })
       .limit(1)
@@ -105,7 +106,8 @@ export class FeedRunner {
   }
 
   private async writeCache(accountId: string, feed: DataFeedRow, cacheKey: string, result: FeedRunResult): Promise<void> {
-    const expiresAt = new Date(Date.now() + feed.ttl_seconds * 1000).toISOString();
+    const ttlSeconds = result.health === "ok" ? feed.ttl_seconds : 300;
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
     const { error } = await this.client
       .from("feed_cache")
       .upsert({
