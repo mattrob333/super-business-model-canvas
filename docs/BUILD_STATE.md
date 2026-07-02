@@ -51,6 +51,12 @@ Status: OPEN | RESOLVED (<how>)
   to the live Supabase project (SQL Editor, in order), then run `scripts/verify-schema.sql`
   there and confirm 62 PASS / 0 FAIL. Verified clean on scratch Postgres 16 (fresh + incremental
   + idempotent re-run) during review, but never against the live instance.
+- **From Phase 2.2:** apply `20260702110000_agent_job_queue_locking.sql` to the live Supabase
+  project after the Phase-1 migrations, then run the updated `scripts/verify-schema.sql` and
+  confirm all checks PASS. The build agent attempted to verify with the Supabase MCP plugin on
+  2026-07-02, but the connected session returned `MCP error -32600: You do not have permission
+  to perform this action` for migration listing, table listing, and read-only SQL. Local
+  Supabase CLI is not installed in this workspace.
 
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
 
