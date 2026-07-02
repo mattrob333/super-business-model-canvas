@@ -208,7 +208,15 @@ const Settings = () => {
         </TabsContent>
 
         <TabsContent value="hermes" className="space-y-6">
-          <HermesRuntimePanel accountId={effectiveAccountId} />
+          {accountLoading ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">Loading workspace...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <HermesRuntimePanel accountId={effectiveAccountId} />
+          )}
         </TabsContent>
 
         <TabsContent value="schedules" className="space-y-6">

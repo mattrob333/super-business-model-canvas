@@ -593,7 +593,7 @@ const Admin = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => navigate(`/admin/frameworks/${framework.id}/preview`)}
+                            onClick={() => navigate(`/playbooks/framework/${framework.id}`)}
                           >
                             <Eye className="h-3 w-3" />
                           </Button>

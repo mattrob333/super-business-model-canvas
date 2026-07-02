@@ -302,7 +302,9 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
         try {
           await streamGrokChat({
             messages,
-            webSearch: false,
+            // The system prompt promises real-time web research — the
+            // web_search tool must actually be enabled for that to be true
+            webSearch: true,
             temperature: 0.7,
             maxTokens: 3000,
             onChunk: (text: string) => {

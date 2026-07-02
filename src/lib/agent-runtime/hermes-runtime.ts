@@ -20,7 +20,7 @@
  * has actually completed.
  */
 
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   AgentRuntime,
@@ -82,7 +82,7 @@ export class HermesAgentRuntime implements AgentRuntime {
         trigger_type: input.triggerType,
         triggered_by: input.triggeredBy,
         status: "pending" as AgentRunStatus,
-        input: input.input,
+        input: input.input as Json,
         model_provider: resolvedProvider ?? null,
         model_name: resolvedModelName ?? null,
         started_at: new Date().toISOString(),

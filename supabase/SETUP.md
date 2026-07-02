@@ -93,10 +93,30 @@ supabase functions deploy generate-framework-report
 supabase functions deploy strategy-coach-chat
 supabase functions deploy research-competitors
 supabase functions deploy scheduled-loop-tick
+supabase functions deploy agent-run
+supabase functions deploy manage-provider-key
+supabase functions deploy test-mcp-server
 ```
 
-(You can skip `seed-frameworks` — it targets the old dropped table and is no
-longer used; framework seeding is done in Step 2.)
+Notes:
+
+- `seed-frameworks` was removed — it targeted the old dropped
+  `strategic_frameworks` table; framework seeding is done in Step 2.
+- `manage-provider-key` requires a `CREDENTIALS_ENCRYPTION_KEY` secret
+  (base64-encoded 32 bytes). Generate one with `openssl rand -base64 32` and
+  set it alongside the provider API keys in Step 3.
+- To run scheduled loops automatically, see "Scheduling loop ticks" below.
+
+### Scheduling loop ticks (pg_cron)
+
+`scheduled-loop-tick` processes due rows in `scheduled_loops`, but something
+has to call it on a cadence. Run
+`supabase/migrations/20260702090000_schedule_loop_tick.sql` in the SQL Editor
+after storing your service-role key in Vault:
+
+```sql
+select vault.create_secret('<service-role-key>', 'service_role_key');
+```
 
 ---
 

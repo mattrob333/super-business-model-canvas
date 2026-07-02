@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -116,14 +117,15 @@ async function callLLM(
   const openrouterKey = Deno.env.get('OPENROUTER_API_KEY');
   const xaiKey = Deno.env.get('XAI_API_KEY');
 
-  // Determine provider
+  // Determine provider — same priority as _shared/llm-client.ts so "auto"
+  // selection behaves identically across all edge functions
   let provider = modelProvider || '';
   if (!provider) {
-    if (openaiKey) provider = 'openai';
+    if (openrouterKey) provider = 'openrouter';
+    else if (openaiKey) provider = 'openai';
     else if (anthropicKey) provider = 'anthropic';
-    else if (openrouterKey) provider = 'openrouter';
     else if (xaiKey) provider = 'xai';
-    else throw new Error('No LLM API key configured. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, or XAI_API_KEY.');
+    else throw new Error('No LLM API key configured. Set OPENROUTER_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or XAI_API_KEY.');
   }
 
   if (provider === 'openai' && openaiKey) {
@@ -249,18 +251,31 @@ async function callLLM(
   throw new Error(`Provider "${provider}" not configured or key missing.`);
 }
 
-// Agent key → section label mapping
-const AGENT_SECTION_LABELS: Record<string, string> = {
-  orchestrator: 'Orchestrator',
-  agent_key_partners: 'Key Partners',
-  agent_key_activities: 'Key Activities',
-  agent_key_resources: 'Key Resources',
-  agent_value_propositions: 'Value Propositions',
-  agent_customer_relationships: 'Customer Relationships',
-  agent_channels: 'Channels',
-  agent_customer_segments: 'Customer Segments',
-  agent_cost_structure: 'Cost Structure',
-  agent_revenue_streams: 'Revenue Streams',
+// Section key → label / agent key mappings. Must stay in sync with
+// src/components/canvas/section-types.ts and the agent_profiles seed
+// (note: key_partners maps to agent_key_partnerships in the DB).
+const SECTION_LABELS: Record<string, string> = {
+  key_partners: 'Key Partners',
+  key_activities: 'Key Activities',
+  key_resources: 'Key Resources',
+  value_propositions: 'Value Propositions',
+  customer_relationships: 'Customer Relationships',
+  channels: 'Channels',
+  customer_segments: 'Customer Segments',
+  cost_structure: 'Cost Structure',
+  revenue_streams: 'Revenue Streams',
+};
+
+const SECTION_AGENT_KEYS: Record<string, string> = {
+  key_partners: 'agent_key_partnerships',
+  key_activities: 'agent_key_activities',
+  key_resources: 'agent_key_resources',
+  value_propositions: 'agent_value_propositions',
+  customer_relationships: 'agent_customer_relationships',
+  channels: 'agent_channels',
+  customer_segments: 'agent_customer_segments',
+  cost_structure: 'agent_cost_structure',
+  revenue_streams: 'agent_revenue_streams',
 };
 
 serve(async (req) => {
@@ -276,6 +291,30 @@ serve(async (req) => {
         JSON.stringify({ error: 'Unauthorized - Authentication required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+    // Server-to-server calls (scheduled-loop-tick) authenticate with the
+    // service-role key and bypass the per-user membership check.
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '');
+    const isServiceCall = serviceRoleKey.length > 0 && bearerToken === serviceRoleKey;
+
+    let callerUserId: string | null = null;
+    if (!isServiceCall) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: userError } = await userClient.auth.getUser();
+      if (userError || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized - Invalid token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      callerUserId = user.id;
     }
 
     const body: AgentRunRequest & { healthCheck?: boolean } = await req.json();
@@ -313,35 +352,47 @@ serve(async (req) => {
       );
     }
 
+    // Authorization: non-service callers must be members of the target account
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    if (!isServiceCall) {
+      const { data: membership } = await adminClient
+        .from('account_members')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('user_id', callerUserId)
+        .maybeSingle();
+      if (!membership) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden - Not a member of this account' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Determine agent key from input or default to canvas_section_analysis
     const sectionKey = input.section_key as string || '';
-    const sectionLabel = (input.section_label as string) || AGENT_SECTION_LABELS[sectionKey] || 'Unknown Section';
-    const agentKey = sectionKey ? `agent_${sectionKey}` : 'orchestrator';
+    const sectionLabel = (input.section_label as string) || SECTION_LABELS[sectionKey] || 'Unknown Section';
+    const agentKey = SECTION_AGENT_KEYS[sectionKey] || 'orchestrator';
 
     console.log(`Agent run: agent=${agentKey}, section=${sectionLabel}, account=${accountId}`);
 
-    // Load agent-specific system instructions from the database
+    // Load agent-specific system instructions from the database. The profile
+    // must belong to the target account (or be a global default).
     let agentInstructions: string | null = null;
     try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-      if (supabaseUrl && serviceRoleKey) {
-        const profileResponse = await fetch(
-          `${supabaseUrl}/rest/v1/agent_profiles?id=eq.${agentProfileId}&select=system_instructions`,
-          {
-            headers: {
-              'apikey': serviceRoleKey,
-              'Authorization': `Bearer ${serviceRoleKey}`,
-              'Content-Type': 'application/json',
-            },
-          }
+      const { data: profile } = await adminClient
+        .from('agent_profiles')
+        .select('system_instructions, account_id')
+        .eq('id', agentProfileId)
+        .or(`account_id.eq.${accountId},account_id.is.null`)
+        .maybeSingle();
+      if (profile) {
+        agentInstructions = profile.system_instructions || null;
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'Agent profile not found for this account' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json();
-          if (Array.isArray(profileData) && profileData.length > 0) {
-            agentInstructions = profileData[0].system_instructions || null;
-          }
-        }
       }
     } catch (e) {
       console.warn('Failed to load agent instructions from DB, using fallback:', e);
@@ -374,6 +425,33 @@ serve(async (req) => {
     };
 
     console.log(`Agent run complete: ${parsed.items.length} items, confidence=${parsed.confidence}, cost=$${estimatedCost.toFixed(4)}`);
+
+    // Browser-triggered runs get their durable agent_runs record from the
+    // client-side runtime (hermes-runtime.ts). Server-side calls (scheduled
+    // loops) have no client, so record the run here — this is also what makes
+    // scheduled-loop budget accounting work.
+    if (isServiceCall) {
+      const nowIso = new Date().toISOString();
+      const { error: recordError } = await adminClient.from('agent_runs').insert({
+        account_id: accountId,
+        agent_profile_id: agentProfileId,
+        run_type: body.runType || 'scheduled_loop',
+        trigger_type: body.triggerType || 'scheduled',
+        triggered_by: body.triggeredBy,
+        status: 'completed',
+        input,
+        output: parsed,
+        summary: parsed.summary,
+        model_provider: llmResult.provider,
+        model_name: llmResult.model,
+        tokens_in: llmResult.tokensIn,
+        tokens_out: llmResult.tokensOut,
+        estimated_cost: result.estimatedCost,
+        started_at: nowIso,
+        completed_at: nowIso,
+      });
+      if (recordError) console.error('Failed to record agent run:', recordError.message);
+    }
 
     return new Response(
       JSON.stringify({ success: true, result }),

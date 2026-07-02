@@ -21,6 +21,7 @@ import {
 import { Cpu, Activity, Loader2, Save, RotateCcw, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import {
   getAgentRuntime,
   DEFAULT_RUNTIME_CONFIG,
@@ -110,7 +111,7 @@ export function HermesRuntimePanel({ accountId }: { accountId: string }) {
       // Persist to accounts table
       const { error: updateError } = await supabase
         .from("accounts")
-        .update({ runtime_config: config as unknown as Record<string, unknown> })
+        .update({ runtime_config: config as unknown as Json })
         .eq("id", accountId);
 
       if (updateError) throw new Error(`Failed to persist: ${updateError.message}`);

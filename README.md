@@ -1,21 +1,31 @@
 # Super Business Model Canvas (Super BMC)
 
-AI-powered strategic analysis workspace. Enter a company URL, generate a full Business Model Canvas and competitive landscape in about 60 seconds, refine it with AI chat, then run strategy playbooks (SWOT, Porter's Five Forces, and more) on top of that shared business context.
+AI-powered strategy workspace built around a living Business Model Canvas. Enter a company URL, generate a full BMC and competitive landscape in about 60 seconds — then work the strategy with a team of ten AI agents: nine domain experts (one per BMC section) and **Atlas**, a chief-strategist orchestrator that reads all nine, runs playbook cascades, and keeps a ranked "what to do next" agenda.
 
 **Live site:** [superbmc.com](https://superbmc.com)  
 **Repository:** [github.com/mattrob333/super-business-model-canvas](https://github.com/mattrob333/super-business-model-canvas)
 
 ---
 
-## What this app does
+## The product direction (where this is going)
+
+The canvas is the **shared source of truth**; everything else is a room built around it:
+
+- **Section workspaces** — click any BMC section to enter that domain expert's full-screen room: agent avatar + context sources on the left, collaborative chat in the center, an actions panel of skills/templates/frameworks on the right (run manually, on a cron schedule, or triggered by Atlas). Spec: [`docs/specs/02_SECTION_WORKSPACE.md`](./docs/specs/02_SECTION_WORKSPACE.md)
+- **The War Room** — Atlas's marquee workspace: the BMC rendered as a live command map (health, freshness, vs-competitor modes), strategist chat with delegation/brief/conflict cards, the Next Moves agenda, and the approvals queue. Spec: [`docs/specs/03_ORCHESTRATOR_WORKSPACE.md`](./docs/specs/03_ORCHESTRATOR_WORKSPACE.md)
+- **Cascades** — sequenced multi-agent workflows (Competitor Delta Sweep, Board Pack, Pricing War Response, …) that produce cited reports and dashboard metrics on a cadence. Spec: [`docs/specs/04_ORCHESTRATION_AND_CASCADES.md`](./docs/specs/04_ORCHESTRATION_AND_CASCADES.md)
+
+Start with [`docs/specs/00_OVERVIEW.md`](./docs/specs/00_OVERVIEW.md) for the full mental model and the agent roster.
+
+## What the app does today
 
 1. **Landing** — Email capture and sign-in entry point.
 2. **Canvas** — Company analysis results: BMC grid, business overview, market competition, industry landscape.
-3. **Dashboard** — Workspace overview (metrics wiring in progress).
+3. **Dashboard** — Workspace overview wired to live data (gaps, agent runs, loops, reports, health score).
 4. **Playbooks** — Run strategy frameworks against your saved company context.
-5. **Settings** — Model routing, account preferences, admin tools.
+5. **Settings** — Model routing, provider keys, MCP registry, scheduled loops, admin tools.
 
-The frontend is a React SPA. All AI work runs on **Supabase Edge Functions** in the cloud — API keys never ship to the browser.
+The frontend is a React SPA. All AI work runs on **Supabase Edge Functions** in the cloud — API keys never ship to the browser. (An agent-worker service is planned as the execution engine; see [`docs/AGENT_RUNTIME_DECISION.md`](./docs/AGENT_RUNTIME_DECISION.md).)
 
 ---
 
@@ -274,6 +284,19 @@ node scripts/generate-framework-seed.mjs   # Regenerate seed_frameworks.sql from
 
 - **[supabase/SETUP.md](./supabase/SETUP.md)** — Database, secrets, edge-function deploy
 - **[HANDOFF.md](./HANDOFF.md)** — Architecture map, known issues, next steps for developers
+- **[docs/VISION.md](./docs/VISION.md)** — Product vision: the living Business Model Canvas
+- **[docs/AGENT_RUNTIME_DECISION.md](./docs/AGENT_RUNTIME_DECISION.md)** — Agent runtime architecture decision record
+- **[docs/ROADMAP.md](./docs/ROADMAP.md)** — Phased build plan (Phases 1–8)
+- **[docs/BUILD_PLAN.md](./docs/BUILD_PLAN.md)** — Execution handoff for the AI build team: ground rules, phased work orders, acceptance criteria, review protocol
+- **[docs/BUILD_STATE.md](./docs/BUILD_STATE.md)** — Live build tracker (status board, blockers, operator queue, review findings)
+- **[docs/DEVLOG.md](./docs/DEVLOG.md)** — Dev log: audits, fixes, current state
+- **[docs/specs/00_OVERVIEW.md](./docs/specs/00_OVERVIEW.md)** — Agent workspaces: reading guide + mental model
+- **[docs/specs/01_AGENT_ROSTER.md](./docs/specs/01_AGENT_ROSTER.md)** — The ten agents: personas, tools, outputs, synergies
+- **[docs/specs/02_SECTION_WORKSPACE.md](./docs/specs/02_SECTION_WORKSPACE.md)** — Section agent workspace UI spec
+- **[docs/specs/03_ORCHESTRATOR_WORKSPACE.md](./docs/specs/03_ORCHESTRATOR_WORKSPACE.md)** — The War Room (Atlas) UI spec
+- **[docs/specs/04_ORCHESTRATION_AND_CASCADES.md](./docs/specs/04_ORCHESTRATION_AND_CASCADES.md)** — Delegation, scheduling, cascades, data model
+- **[docs/specs/05_METRICS_AND_DATA_FEEDS.md](./docs/specs/05_METRICS_AND_DATA_FEEDS.md)** — Public-data metrics, KPIs/benchmarks, data feeds, competitor BMC drill-down
+- **[docs/specs/06_MODEL_ROUTING_ECONOMICS.md](./docs/specs/06_MODEL_ROUTING_ECONOMICS.md)** — Model-per-task routing, OpenRouter model-scout, cost controls
 
 ---
 

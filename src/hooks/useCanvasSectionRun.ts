@@ -352,7 +352,23 @@ export function useCanvasSectionRun() {
                 return generateMockAnalysis(sectionKey);
               };
 
-              fetchAnalysis().then((analysis) => {
+              // Any rejection below must clear the running state, or the
+              // section spinner sticks forever (the poll timeout only guards
+              // the status-polling phase, not the save phase)
+              const failSection = (err: unknown) => {
+                const message = err instanceof Error ? err.message : "Unknown error";
+                setRunningSections((prev) => {
+                  const next = new Set(prev);
+                  next.delete(sectionKey);
+                  return next;
+                });
+                setErrors((prev) => ({ ...prev, [sectionKey]: message }));
+                toast.error(
+                  `Failed to save analysis for ${CANVAS_SECTION_LABELS[sectionKey]}: ${message}`,
+                );
+              };
+
+              fetchAnalysis().then((analysis) =>
                 supabase
                 .from("canvas_section_versions")
                 .insert({
@@ -403,14 +419,27 @@ export function useCanvasSectionRun() {
                   toast.success(
                     `Analysis complete for ${CANVAS_SECTION_LABELS[sectionKey]} — ${analysis.items.length} items identified.`,
                   );
-                });
-              });
+                })
+              ).catch(failSection);
               return;
             }
 
             // Still running — schedule next poll
             const timer = setTimeout(() => pollRun(attempt + 1), POLL_INTERVAL_MS);
             pollTimers.current.set(sectionKey, timer);
+          }).catch((err) => {
+            // Status fetch rejected (network error) — clear state instead of
+            // leaving the section stuck "running"
+            const message = err instanceof Error ? err.message : "Unknown error";
+            setRunningSections((prev) => {
+              const next = new Set(prev);
+              next.delete(sectionKey);
+              return next;
+            });
+            setErrors((prev) => ({ ...prev, [sectionKey]: message }));
+            toast.error(
+              `Analysis failed for ${CANVAS_SECTION_LABELS[sectionKey]}: ${message}`,
+            );
           });
         };
 

@@ -19,7 +19,7 @@
  * - HermesAgentRuntime: connects to a real Hermes instance (future)
  */
 
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -129,7 +129,7 @@ export class MockAgentRuntime implements AgentRuntime {
         trigger_type: input.triggerType,
         triggered_by: input.triggeredBy,
         status: "pending",
-        input: input.input,
+        input: input.input as Json,
         model_provider: input.modelProvider ?? null,
         model_name: input.modelName ?? null,
         started_at: new Date().toISOString(),
@@ -284,23 +284,29 @@ import { getRuntimeMode } from "./config";
 import { HermesAgentRuntime } from "./hermes-runtime";
 
 let runtimeInstance: AgentRuntime | null = null;
+let runtimeInstanceAccountId: string | undefined;
 
 /**
- * Get the singleton AgentRuntime instance.
+ * Get the AgentRuntime instance for an account.
  *
  * Env-gated: when VITE_HERMES_RUNTIME_ENDPOINT is set, returns
  * HermesAgentRuntime (calls Supabase Edge Function for real LLM execution).
  * Otherwise, returns MockAgentRuntime (development, no real AI).
  *
+ * The instance is cached per accountId: if a caller resolves a different
+ * account later (e.g. the panel rendered before useAccountId finished),
+ * the runtime is re-created rather than staying bound to the stale account.
+ *
  * Guardrail: "Hermes is the agent runtime, not the backend."
  */
 export function getAgentRuntime(accountId?: string): AgentRuntime {
-  if (!runtimeInstance) {
+  if (!runtimeInstance || (accountId && accountId !== runtimeInstanceAccountId)) {
     if (getRuntimeMode() === "live") {
       runtimeInstance = new HermesAgentRuntime(accountId);
     } else {
       runtimeInstance = new MockAgentRuntime(accountId);
     }
+    runtimeInstanceAccountId = accountId;
   }
   return runtimeInstance;
 }
@@ -310,4 +316,5 @@ export function getAgentRuntime(accountId?: string): AgentRuntime {
  */
 export function _resetAgentRuntime(): void {
   runtimeInstance = null;
+  runtimeInstanceAccountId = undefined;
 }
