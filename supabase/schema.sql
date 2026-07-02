@@ -2123,6 +2123,17 @@ on conflict (cascade_id, step_key) do nothing;
 -- is the authoritative mechanism for keeping these current. Do not treat the
 -- model_name values below as verified-available on any provider today.
 --
+-- RF-1-2 (Phase 1 review, MEDIUM, fixed in this revision): the original
+-- seed referenced deprecated/retired model IDs (claude-opus-4-1,
+-- claude-3-5-haiku, gemini-flash-1.5, grok-4, claude-sonnet-4-5) that would
+-- 404 on first live use. Replaced with current slugs, cross-checked against
+-- the live OpenRouter catalog and this repo's own existing model references
+-- (supabase/functions/_shared/xai-models.ts already standardizes on
+-- grok-4.3; supabase/functions/recommend-frameworks/index.ts already uses
+-- google/gemini-2.5-flash) so these seeds stay consistent with the rest of
+-- the codebase, not just internally consistent with each other. Pricing
+-- (cost_per_1k_in/out) updated to match each model's current catalog price.
+--
 -- route_key is set equal to the task_class for these rows so they're easy to
 -- find/join by name; account_id NULL makes them global defaults, consistent
 -- with the existing premium/standard/economy/local rows already seeded in
@@ -2131,24 +2142,24 @@ on conflict (cascade_id, step_key) do nothing;
 insert into public.model_routes
   (account_id, route_key, label, provider, model_name, params, is_default, task_class, cost_per_1k_in, cost_per_1k_out, updated_by)
 values
-  (null, 'extract', 'Extract (budget)', 'openrouter', 'google/gemini-flash-1.5',
-   '{"temperature":0.2,"max_tokens":2000}'::jsonb, false, 'extract', 0.000075, 0.0003, 'human'),
+  (null, 'extract', 'Extract (budget)', 'openrouter', 'google/gemini-2.5-flash-lite',
+   '{"temperature":0.2,"max_tokens":2000}'::jsonb, false, 'extract', 0.0001, 0.0004, 'human'),
   (null, 'classify', 'Classify (budget)', 'openrouter', 'qwen/qwen-2.5-7b-instruct',
    '{"temperature":0.1,"max_tokens":500}'::jsonb, false, 'classify', 0.00005, 0.00015, 'human'),
-  (null, 'summarize', 'Summarize (budget-mid)', 'openrouter', 'anthropic/claude-3-5-haiku',
-   '{"temperature":0.3,"max_tokens":1500}'::jsonb, false, 'summarize', 0.0008, 0.004, 'human'),
+  (null, 'summarize', 'Summarize (budget-mid)', 'openrouter', 'anthropic/claude-haiku-4.5',
+   '{"temperature":0.3,"max_tokens":1500}'::jsonb, false, 'summarize', 0.001, 0.005, 'human'),
   (null, 'embed', 'Embed', 'openrouter', 'openai/text-embedding-3-small',
    '{}'::jsonb, false, 'embed', 0.00002, 0.0, 'human'),
-  (null, 'section_analysis', 'Section Analysis (mid)', 'anthropic', 'claude-sonnet-4-5',
-   '{"temperature":0.4,"max_tokens":4000}'::jsonb, false, 'section_analysis', 0.003, 0.015, 'human'),
-  (null, 'research_verify', 'Research Verify (mid — never downgraded)', 'anthropic', 'claude-sonnet-4-5',
-   '{"temperature":0.1,"max_tokens":2000}'::jsonb, false, 'research_verify', 0.003, 0.015, 'human'),
-  (null, 'draft_document', 'Draft Document (mid)', 'anthropic', 'claude-sonnet-4-5',
-   '{"temperature":0.5,"max_tokens":6000}'::jsonb, false, 'draft_document', 0.003, 0.015, 'human'),
-  (null, 'strategy_synthesis', 'Strategy Synthesis (premium)', 'anthropic', 'claude-opus-4-1',
-   '{"temperature":0.4,"max_tokens":8000}'::jsonb, false, 'strategy_synthesis', 0.015, 0.075, 'human'),
-  (null, 'live_search', 'Live Search (fixed: Grok)', 'xai', 'grok-4',
-   '{"temperature":0.3,"max_tokens":2000}'::jsonb, false, 'live_search', 0.002, 0.01, 'human')
+  (null, 'section_analysis', 'Section Analysis (mid)', 'anthropic', 'claude-sonnet-5',
+   '{"temperature":0.4,"max_tokens":4000}'::jsonb, false, 'section_analysis', 0.002, 0.01, 'human'),
+  (null, 'research_verify', 'Research Verify (mid — never downgraded)', 'anthropic', 'claude-sonnet-5',
+   '{"temperature":0.1,"max_tokens":2000}'::jsonb, false, 'research_verify', 0.002, 0.01, 'human'),
+  (null, 'draft_document', 'Draft Document (mid)', 'anthropic', 'claude-sonnet-5',
+   '{"temperature":0.5,"max_tokens":6000}'::jsonb, false, 'draft_document', 0.002, 0.01, 'human'),
+  (null, 'strategy_synthesis', 'Strategy Synthesis (premium)', 'anthropic', 'claude-opus-4.8',
+   '{"temperature":0.4,"max_tokens":8000}'::jsonb, false, 'strategy_synthesis', 0.005, 0.025, 'human'),
+  (null, 'live_search', 'Live Search (fixed: Grok)', 'xai', 'grok-4.3',
+   '{"temperature":0.3,"max_tokens":2000}'::jsonb, false, 'live_search', 0.00125, 0.0025, 'human')
 on conflict (route_key) where account_id is null do nothing;
 
 

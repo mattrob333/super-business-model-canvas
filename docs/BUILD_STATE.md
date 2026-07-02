@@ -46,6 +46,17 @@ Status: OPEN | RESOLVED (<how>)
 
 ## REVIEW FINDINGS
 
+### Phase 1 — RF-1-2 (MEDIUM) — RESOLVED (2026-07-02)
+**Problem:** `model_routes` seed rows in `20260702100300_seed_phase1.sql` referenced
+deprecated/retired model IDs (`claude-opus-4-1`, `claude-3-5-haiku`, `gemini-flash-1.5`,
+`grok-4`, `claude-sonnet-4-5`) that would 404 on first live use.
+**Fix:** Replaced with current slugs (`claude-opus-4.8`, `claude-haiku-4.5`,
+`google/gemini-2.5-flash-lite`, `grok-4.3`, `claude-sonnet-5`), cross-checked against the live
+OpenRouter catalog and this repo's own existing model references. Patched in both the seed
+migration and the `schema.sql` mirror. Gates re-verified clean.
+**Acceptance:** Phase 1 approved by reviewer contingent on this fix landing — considered
+RESOLVED per the reviewer's own sign-off criteria ("my sign-off stands once the patch lands").
+
 ### Phase 0 — APPROVED (2026-07-02)
 Reviewer independently re-ran all gates on `build/phase-0-baseline` (tsc clean, build green,
 lint 69 — matches logged claims), confirmed the diff is docs-only (127 lines, zero code
@@ -214,6 +225,21 @@ rule 5):**
 **No other BLOCKERS.** Ready for review — reviewer should expect the "meatier" schema audit
 flagged after Phase 0 (migrations read against a scratch DB if available, RLS coverage check,
 seed-vs-spec diff).
+
+**2026-07-02 — RF-1-2 fixed (post-review patch).** Reviewer's scratch-Postgres audit approved
+Phase 1 overall (34-table fresh install clean, 4-migration incremental path clean + idempotent
+on re-apply, verify-schema.sql 62/62 PASS, RLS/seed correctness all confirmed) with one MEDIUM
+finding: `model_routes` seed rows referenced deprecated/retired model IDs (`claude-opus-4-1`,
+`claude-3-5-haiku`, `gemini-flash-1.5`, `grok-4`, `claude-sonnet-4-5`) that would 404 on first
+live use. Fixed in `20260702100300_seed_phase1.sql` + mirrored in `schema.sql`: `strategy_synthesis`
+→ `claude-opus-4.8`, `section_analysis`/`research_verify`/`draft_document` → `claude-sonnet-5`,
+`summarize` → `claude-haiku-4.5` (OpenRouter), `extract` → `google/gemini-2.5-flash-lite`,
+`live_search` → `grok-4.3`. Cross-checked against the live OpenRouter catalog and this repo's
+own existing model references (`_shared/xai-models.ts` already uses `grok-4.3`;
+`recommend-frameworks/index.ts` already uses `google/gemini-2.5-flash`) so the fix stays
+consistent with the rest of the codebase, not just internally consistent. Pricing columns
+updated to match each model's current catalog price. Gates re-run clean: tsc clean, build
+green, lint 69 (unchanged). RF-1-2 marked RESOLVED.
 
 ### Phase 2 — Agent worker service
 Tasks: 2.1 ☐ · 2.2 ☐ · 2.3 ☐ · 2.4 ☐ · 2.5 ☐ · 2.6 ☐ · 2.7 ☐ · 2.8 ☐ · 2.9 ☐ · 2.10 ☐
