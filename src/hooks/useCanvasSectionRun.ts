@@ -40,7 +40,7 @@ const MAX_POLL_ATTEMPTS = 30; // ~24 seconds max
 
 /**
  * Generates realistic mock analysis output for a canvas section.
- * In Phase 7, this will be replaced by real Hermes agent output.
+ * In live mode, this is replaced by real worker/edge agent output.
  */
 function generateMockAnalysis(sectionKey: CanvasSectionKey): {
   items: string[];
@@ -489,3 +489,4 @@ export function useCanvasSectionRun() {
     getSectionResult,
   };
 }
+

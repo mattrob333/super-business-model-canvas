@@ -73,7 +73,7 @@ Copy `.env.example` to `.env` and fill in your Supabase values (Project Settings
 ```env
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key
-VITE_HERMES_RUNTIME_ENDPOINT=https://your-project-ref.supabase.co/functions/v1/agent-run
+VITE_AGENT_RUNTIME_ENDPOINT=https://your-project-ref.supabase.co/functions/v1/agent-run
 ```
 
 > **Important:** `.env` is gitignored. You must recreate it on every machine. Never commit real keys.
@@ -109,8 +109,10 @@ Open the URL Vite prints (usually `http://localhost:8080`).
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | Yes | Supabase project URL |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase anon/public key |
-| `VITE_HERMES_RUNTIME_ENDPOINT` | Recommended | Live agent runtime URL (`.../functions/v1/agent-run`). Without it, Canvas uses a mock runtime. |
-| `VITE_HERMES_RUNTIME_API_KEY` | No | Optional override; session JWT is used by default |
+| `VITE_AGENT_RUNTIME_ENDPOINT` | Recommended | Live agent runtime URL (`.../functions/v1/agent-run`). Without it, Canvas uses a mock runtime. |
+| `VITE_AGENT_RUNTIME_API_KEY` | No | Optional override; session JWT is used by default |
+| `VITE_HERMES_RUNTIME_ENDPOINT` | Deprecated | Backward-compatible fallback for `VITE_AGENT_RUNTIME_ENDPOINT` |
+| `VITE_HERMES_RUNTIME_API_KEY` | Deprecated | Backward-compatible fallback for `VITE_AGENT_RUNTIME_API_KEY` |
 
 ### Supabase secrets (server-side only)
 
@@ -172,7 +174,7 @@ Three lanes — full architecture detail in [docs/AGENT_RUNTIME_DECISION.md](./d
 
 1. **Research & generation** — `analyze-company`, `research-competitors`, `generate-framework-report` (one-shot JSON)
 2. **Streaming chat** — `bmc-chat`, `business-overview-chat`, `strategy-coach-chat`, `competitor-chat` (SSE)
-3. **Agent runs** — `agent-run` via Hermes runtime (structured, logged to `agent_runs`)
+3. **Agent runs** — `agent-run` via Agent Runtime (structured, logged to `agent_runs`)
 
 All lanes call Supabase Edge Functions. The browser only holds the Supabase anon key and the user's session token.
 
@@ -273,7 +275,7 @@ node scripts/generate-framework-seed.mjs   # Regenerate seed_frameworks.sql from
 | --- | --- | --- |
 | AI analysis fails immediately | `XAI_API_KEY` missing or function not deployed | Set secret in Supabase, deploy `analyze-company` |
 | Chat says "Not authenticated" | User not signed in | Sign in at `/auth` |
-| Canvas Analyze does nothing | `VITE_HERMES_RUNTIME_ENDPOINT` unset | Add to `.env` and rebuild |
+| Canvas Analyze does nothing | `VITE_AGENT_RUNTIME_ENDPOINT` unset | Add to `.env` and rebuild |
 | Porter's Five Forces report empty | Schema mismatch | Run `supabase/migrations/20250701120000_fix_porter_report_schema.sql`, redeploy `generate-framework-report` |
 | superbmc.com shows old UI | Production not republished | Publish from Lovable or redeploy `dist/` to your host |
 | Works locally, not on live site | Missing `VITE_*` at build time | Set env vars in hosting dashboard, rebuild |
@@ -304,3 +306,4 @@ node scripts/generate-framework-seed.mjs   # Regenerate seed_frameworks.sql from
 ## License
 
 Private project. All rights reserved.
+

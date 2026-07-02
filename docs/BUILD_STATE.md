@@ -420,6 +420,24 @@ npm run build                   -> green
 npm run lint                    -> 69 problems (50 errors, 19 warnings), frozen baseline unchanged
 ```
 
+**2026-07-02 - Work order 2.7 runtime rename/config transition complete.**
+
+- Renamed the frontend live runtime implementation from `hermes-runtime.ts` /
+  `HermesAgentRuntime` to `live-runtime.ts` / `LiveAgentRuntime`.
+- Renamed the Settings panel from `HermesRuntimePanel` to `AgentRuntimePanel`, changed the
+  Settings tab id from `hermes` to `runtime`, and changed the visible label to "Agent Runtime".
+- Added `VITE_AGENT_RUNTIME_ENDPOINT` and `VITE_AGENT_RUNTIME_API_KEY` as the primary frontend
+  env vars, with the old `VITE_HERMES_RUNTIME_*` names retained as deprecated fallbacks.
+- Updated `.env.example`, README active setup/env docs, and active code comments. Historical
+  Hermes decision docs were intentionally left untouched.
+
+**Gate results for this slice:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
+```
+
 ### Phase 3 — Research engine & evidence
 Tasks: 3.1 ☐ · 3.2 ☐ · 3.3 ☐ · 3.4 ☐ · 3.5 ☐ · 3.6 ☐ · 3.7 ☐
 

@@ -1,15 +1,15 @@
 /**
  * Agent Runtime Configuration Detection
  *
- * Determines whether the app uses a live Hermes runtime (real LLM execution
+ * Determines whether the app uses a live Agent Runtime (real LLM execution
  * via Supabase Edge Function) or falls back to MockAgentRuntime.
  *
- * Env-gated: when VITE_HERMES_RUNTIME_ENDPOINT is set, the factory returns
- * HermesAgentRuntime. Otherwise, MockAgentRuntime is used.
+ * Env-gated: when VITE_AGENT_RUNTIME_ENDPOINT is set, the factory returns
+ * LiveAgentRuntime. Otherwise, MockAgentRuntime is used. The deprecated
+ * VITE_HERMES_RUNTIME_ENDPOINT name remains a fallback for old deployments.
  *
- * Guardrail: "Hermes is the agent runtime, not the backend."
  * The "live" mode calls a Supabase Edge Function that executes the agent
- * loop — the browser never calls Hermes or the LLM directly.
+ * loop — the browser never calls the LLM directly.
  */
 
 /** The runtime mode selected by environment configuration. */
@@ -20,7 +20,9 @@ export type RuntimeMode = "enqueue" | "inline" | "mock";
  * which means "use mock runtime."
  */
 export function getRuntimeEndpoint(): string | null {
-  const endpoint = import.meta.env.VITE_HERMES_RUNTIME_ENDPOINT;
+  const endpoint =
+    import.meta.env.VITE_AGENT_RUNTIME_ENDPOINT ??
+    import.meta.env.VITE_HERMES_RUNTIME_ENDPOINT;
   if (typeof endpoint === "string" && endpoint.trim().length > 0) {
     return endpoint.trim();
   }
@@ -47,7 +49,9 @@ export function getRuntimeMode(): RuntimeMode {
  * Falls back to the Supabase anon key if not separately configured.
  */
 export function getRuntimeApiKey(): string | null {
-  const key = import.meta.env.VITE_HERMES_RUNTIME_API_KEY;
+  const key =
+    import.meta.env.VITE_AGENT_RUNTIME_API_KEY ??
+    import.meta.env.VITE_HERMES_RUNTIME_API_KEY;
   if (typeof key === "string" && key.trim().length > 0) {
     return key.trim();
   }
@@ -63,3 +67,4 @@ export function getRuntimeModeLabel(): string {
   if (mode === "inline") return "Inline Runtime";
   return "Mock Runtime";
 }
+

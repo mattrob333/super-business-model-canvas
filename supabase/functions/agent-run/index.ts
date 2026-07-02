@@ -484,7 +484,7 @@ serve(async (req) => {
     console.log(`Agent run complete: ${parsed.items.length} items, confidence=${parsed.confidence}, cost=$${estimatedCost.toFixed(4)}`);
 
     // Browser-triggered runs get their durable agent_runs record from the
-    // client-side runtime (hermes-runtime.ts). Server-side calls (scheduled
+    // client-side runtime (live-runtime.ts). Server-side calls (scheduled
     // loops) have no client, so record the run here — this is also what makes
     // scheduled-loop budget accounting work.
     if (isServiceCall) {
@@ -525,3 +525,4 @@ serve(async (req) => {
     );
   }
 });
+

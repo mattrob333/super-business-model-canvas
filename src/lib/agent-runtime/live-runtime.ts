@@ -1,12 +1,11 @@
 /**
- * HermesAgentRuntime — live agent runtime implementation.
+ * LiveAgentRuntime — live agent runtime implementation.
  *
- * When VITE_HERMES_RUNTIME_ENDPOINT is configured, this class calls the
+ * When VITE_AGENT_RUNTIME_ENDPOINT is configured, this class calls the
  * Supabase Edge Function `agent-run` to execute real LLM-backed analysis.
  * The browser NEVER calls the LLM directly — it goes through the edge
- * function, which is the "backend" that calls Hermes/LLM providers.
+ * function, which is the "backend" that calls LLM providers.
  *
- * Guardrail: "Hermes is the agent runtime, not the backend."
  * Guardrail: "Every agent run produces a durable record in agent_runs."
  *
  * Flow:
@@ -34,7 +33,7 @@ import { DEFAULT_RUNTIME_CONFIG } from "./index";
 import { getRuntimeEndpoint, getRuntimeApiKey, getRuntimeMode } from "./config";
 import { resolveModelRoute } from "./model-routing";
 
-export class HermesAgentRuntime implements AgentRuntime {
+export class LiveAgentRuntime implements AgentRuntime {
   private config: RuntimeConfig = { ...DEFAULT_RUNTIME_CONFIG };
   private endpoint: string;
   private apiKey: string | null;
@@ -43,7 +42,7 @@ export class HermesAgentRuntime implements AgentRuntime {
     const endpoint = getRuntimeEndpoint();
     if (!endpoint) {
       throw new Error(
-        "HermesAgentRuntime requires VITE_HERMES_RUNTIME_ENDPOINT to be set."
+        "LiveAgentRuntime requires VITE_AGENT_RUNTIME_ENDPOINT to be set."
       );
     }
     this.endpoint = endpoint;
@@ -376,3 +375,4 @@ export class HermesAgentRuntime implements AgentRuntime {
     return headers;
   }
 }
+

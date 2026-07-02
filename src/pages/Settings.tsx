@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ProviderCredentialsManager } from "@/components/settings/ProviderCredentialsManager";
 import { ModelRoutingPanel } from "@/components/settings/ModelRoutingPanel";
 import { McpConnectionsManager } from "@/components/settings/McpConnectionsManager";
-import { HermesRuntimePanel } from "@/components/settings/HermesRuntimePanel";
+import { AgentRuntimePanel } from "@/components/settings/AgentRuntimePanel";
 import { ScheduledLoopsManager } from "@/components/settings/ScheduledLoopsManager";
 import { SecurityPanel } from "@/components/settings/SecurityPanel";
 import { useAccountId } from "@/hooks/useAccountId";
@@ -19,7 +19,7 @@ const tabSections = [
   { id: "ai-providers", label: "AI Providers" },
   { id: "model-routing", label: "Model Routing" },
   { id: "mcp", label: "MCP Connections" },
-  { id: "hermes", label: "Hermes Runtime" },
+  { id: "runtime", label: "Agent Runtime" },
   { id: "schedules", label: "Schedules" },
   { id: "security", label: "Security" },
 ] as const;
@@ -207,7 +207,7 @@ const Settings = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="hermes" className="space-y-6">
+        <TabsContent value="runtime" className="space-y-6">
           {accountLoading ? (
             <Card>
               <CardContent className="py-8 text-center">
@@ -215,7 +215,7 @@ const Settings = () => {
               </CardContent>
             </Card>
           ) : (
-            <HermesRuntimePanel accountId={effectiveAccountId} />
+            <AgentRuntimePanel accountId={effectiveAccountId} />
           )}
         </TabsContent>
 
@@ -240,3 +240,4 @@ const Settings = () => {
 };
 
 export default Settings;
+
