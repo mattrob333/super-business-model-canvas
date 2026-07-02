@@ -1,3 +1,7 @@
+> ⚠️ **RETIRED (July 2026).** Historical record of the original Hermes build loop (phases 0–10).
+> The active build program is `docs/BUILD_PLAN.md` + `docs/BUILD_STATE.md`. Do not resume the
+> cron loops described here.
+
 # Build State: Enterprise Strategy Workspace
 
 **Spec source:** Hermes Build Brief (21-page enterprise revamp of super-business-model-canvas)

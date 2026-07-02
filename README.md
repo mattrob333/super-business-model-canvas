@@ -144,7 +144,7 @@ supabase/
   migrations/      Incremental SQL patches
   SETUP.md         Backend setup guide
 
-HANDOFF.md         Developer handoff notes and architecture map
+HANDOFF.md         Incoming build-agent handoff (state, rules, reading order)
 ```
 
 ---
@@ -168,7 +168,7 @@ HANDOFF.md         Developer handoff notes and architecture map
 
 ## AI architecture (summary)
 
-Three lanes — see [HANDOFF.md](./HANDOFF.md) for full detail.
+Three lanes — full architecture detail in [docs/AGENT_RUNTIME_DECISION.md](./docs/AGENT_RUNTIME_DECISION.md) and [docs/DEVLOG.md](./docs/DEVLOG.md).
 
 1. **Research & generation** — `analyze-company`, `research-competitors`, `generate-framework-report` (one-shot JSON)
 2. **Streaming chat** — `bmc-chat`, `business-overview-chat`, `strategy-coach-chat`, `competitor-chat` (SSE)
@@ -283,7 +283,7 @@ node scripts/generate-framework-seed.mjs   # Regenerate seed_frameworks.sql from
 ## Documentation
 
 - **[supabase/SETUP.md](./supabase/SETUP.md)** — Database, secrets, edge-function deploy
-- **[HANDOFF.md](./HANDOFF.md)** — Architecture map, known issues, next steps for developers
+- **[HANDOFF.md](./HANDOFF.md)** — Incoming build-agent handoff: current state, rules, reading order, first assignment
 - **[docs/VISION.md](./docs/VISION.md)** — Product vision: the living Business Model Canvas
 - **[docs/AGENT_RUNTIME_DECISION.md](./docs/AGENT_RUNTIME_DECISION.md)** — Agent runtime architecture decision record
 - **[docs/ROADMAP.md](./docs/ROADMAP.md)** — Phased build plan (Phases 1–8)

@@ -1,3 +1,5 @@
+> ⚠️ **RETIRED (July 2026).** Superseded by `docs/ROADMAP.md` and `docs/BUILD_PLAN.md`.
+
 # Enterprise Strategy Workspace — Execution Plan
 
 > For the two-tier autonomous build loop. The inner builder reads this each tick, the outer supervisor audits against it.
