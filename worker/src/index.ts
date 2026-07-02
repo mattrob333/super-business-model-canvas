@@ -3,6 +3,7 @@ import { createServiceClient } from "./db/supabase.js";
 import { JobLoop } from "./queue/job-loop.js";
 import { SupabaseJobRepository } from "./queue/supabase-job-repository.js";
 import { createJobDispatcher } from "./jobs/dispatch.js";
+import { taskLimitsFromConfig } from "./agent/limits.js";
 
 const config = loadConfig();
 const client = createServiceClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY);
@@ -11,6 +12,7 @@ const handler = createJobDispatcher({
   client,
   xaiApiKey: process.env.XAI_API_KEY,
   firecrawlApiKey: process.env.FIRECRAWL_API_KEY,
+  taskLimits: taskLimitsFromConfig(config),
 });
 
 const loop = new JobLoop(

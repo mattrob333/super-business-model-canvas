@@ -29,13 +29,24 @@ describe("CanvasSectionAnalysisHandler", () => {
   it("runs a section analysis job and writes the legacy output shape account-scoped", async () => {
     const client = new FakeSupabaseClient();
     const runner = new RecordingRunner();
-    const handler = new CanvasSectionAnalysisHandler({ client: client.asSupabase(), runner });
+    const handler = new CanvasSectionAnalysisHandler({
+      client: client.asSupabase(),
+      runner,
+      taskLimits: {
+        sectionAnalysis: { maxTurns: 12, taskBudgetTokens: 12345, maxBudgetUsd: 0.42 },
+        workspaceChat: { maxTurns: 8, taskBudgetTokens: 6789 },
+      },
+    });
 
     await handler.handle(makeJob());
 
     expect(runner.lastRequest?.allowedTools).toEqual(["mcp__bmc__*"]);
     expect(Object.keys(runner.lastRequest?.mcpServers ?? {})).toEqual(["bmc"]);
     expect(runner.lastRequest?.prompt).toContain("Existing value");
+    expect(runner.lastRequest?.maxTurns).toBe(12);
+    expect(runner.lastRequest?.taskBudgetTokens).toBe(12345);
+    expect(runner.lastRequest?.maxBudgetUsd).toBe(0.42);
+    expect(runner.lastRequest?.hooks?.PreToolUse).toHaveLength(2);
 
     expect(client.updates).toHaveLength(2);
     expect(client.updates[0]).toMatchObject({

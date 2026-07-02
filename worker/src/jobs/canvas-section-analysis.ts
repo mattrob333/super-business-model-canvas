@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AgentTaskLimits } from "../agent/limits.js";
+import { createAgentHooks } from "../agent/guardrails.js";
 import { ClaudeAgentRunner, type AgentRunner } from "../agent/runner.js";
 import { asRecord, asStringArray } from "../db/json.js";
 import { buildSystemPrompt, buildUserPrompt, parseLegacySectionAnalysis } from "../domain/legacy-output.js";
@@ -33,6 +35,7 @@ export interface CanvasSectionAnalysisDependencies {
   runner?: AgentRunner;
   xaiApiKey?: string;
   firecrawlApiKey?: string;
+  taskLimits?: AgentTaskLimits;
 }
 
 export class CanvasSectionAnalysisHandler {
@@ -73,14 +76,21 @@ export class CanvasSectionAnalysisHandler {
       firecrawlApiKey: this.deps.firecrawlApiKey,
     });
 
+    const limits = this.deps.taskLimits?.sectionAnalysis;
     const agentResult = await this.runner.run({
       prompt: userPrompt,
       systemPrompt,
       model: modelRoute.model_name,
-      maxTurns: 40,
-      maxBudgetUsd: budgetForRoute(modelRoute),
+      maxTurns: limits?.maxTurns ?? 40,
+      maxBudgetUsd: limits?.maxBudgetUsd ?? budgetForRoute(modelRoute),
+      taskBudgetTokens: limits?.taskBudgetTokens,
       mcpServers: { bmc: mcpServer },
       allowedTools: ["mcp__bmc__*"],
+      hooks: createAgentHooks({
+        accountId: job.account_id,
+        agentRunId: job.agent_run_id,
+        jobKind: job.kind,
+      }),
     });
 
     const parsed = parseLegacySectionAnalysis(agentResult.resultText);

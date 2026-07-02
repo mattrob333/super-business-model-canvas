@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CanvasSectionAnalysisHandler } from "./canvas-section-analysis.js";
 import { WorkspaceChatHandler } from "./workspace-chat.js";
+import type { AgentTaskLimits } from "../agent/limits.js";
 import type { AgentRunner } from "../agent/runner.js";
 import type { AgentJob, JobHandler } from "../queue/types.js";
 
@@ -9,6 +10,7 @@ export interface JobDispatcherOptions {
   runner?: AgentRunner;
   xaiApiKey?: string;
   firecrawlApiKey?: string;
+  taskLimits?: AgentTaskLimits;
 }
 
 export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {

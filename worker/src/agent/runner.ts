@@ -1,4 +1,4 @@
-import { query, type McpServerConfig, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { query, type HookCallbackMatcher, type HookEvent, type McpServerConfig, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 export interface AgentRunRequest {
   prompt: string;
@@ -6,8 +6,10 @@ export interface AgentRunRequest {
   model: string;
   maxTurns: number;
   maxBudgetUsd: number;
+  taskBudgetTokens?: number;
   mcpServers: Record<string, McpServerConfig>;
   allowedTools: string[];
+  hooks?: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
 }
 
 export interface AgentRunResult {
@@ -31,6 +33,7 @@ export class ClaudeAgentRunner implements AgentRunner {
         model: request.model,
         maxTurns: request.maxTurns,
         maxBudgetUsd: request.maxBudgetUsd,
+        taskBudget: request.taskBudgetTokens ? { total: request.taskBudgetTokens } : undefined,
         permissionMode: "bypassPermissions",
         settingSources: [],
         persistSession: false,
@@ -38,6 +41,7 @@ export class ClaudeAgentRunner implements AgentRunner {
         mcpServers: request.mcpServers,
         allowedTools: request.allowedTools,
         disallowedTools: ["Bash", "Write", "Edit"],
+        hooks: request.hooks,
       },
     });
 

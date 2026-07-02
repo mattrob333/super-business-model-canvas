@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AgentTaskLimits } from "../agent/limits.js";
+import { createAgentHooks } from "../agent/guardrails.js";
 import { ClaudeAgentRunner, type AgentRunner } from "../agent/runner.js";
 import { asRecord } from "../db/json.js";
 import { SECTION_LABELS, sectionKeyForAgentKey, type SectionKey } from "../domain/sections.js";
@@ -43,6 +45,7 @@ export interface WorkspaceChatDependencies {
   runner?: AgentRunner;
   xaiApiKey?: string;
   firecrawlApiKey?: string;
+  taskLimits?: AgentTaskLimits;
 }
 
 export class WorkspaceChatHandler {
@@ -64,12 +67,14 @@ export class WorkspaceChatHandler {
 
     await this.markRunRunning(job, profile, modelRoute, { threadId: thread.id, messageCount: messages.length });
 
+    const limits = this.deps.taskLimits?.workspaceChat;
     const result = await this.runner.run({
       prompt: buildChatPrompt(messages),
       systemPrompt: buildChatSystemPrompt(profile, sectionKey),
       model: modelRoute.model_name,
-      maxTurns: 40,
-      maxBudgetUsd: budgetForRoute(modelRoute),
+      maxTurns: limits?.maxTurns ?? 40,
+      maxBudgetUsd: limits?.maxBudgetUsd ?? budgetForRoute(modelRoute),
+      taskBudgetTokens: limits?.taskBudgetTokens,
       mcpServers: {
         bmc: createBmcServer(this.deps.client, {
           accountId: job.account_id,
@@ -82,6 +87,11 @@ export class WorkspaceChatHandler {
         }),
       },
       allowedTools: ["mcp__bmc__*"],
+      hooks: createAgentHooks({
+        accountId: job.account_id,
+        agentRunId: job.agent_run_id,
+        jobKind: job.kind,
+      }),
     });
 
     const assistantText = result.resultText.trim();

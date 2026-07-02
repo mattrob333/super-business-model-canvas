@@ -308,7 +308,7 @@ updated to match each model's current catalog price. Gates re-run clean: tsc cle
 green, lint 69 (unchanged). RF-1-2 marked RESOLVED.
 
 ### Phase 2 — Agent worker service
-Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [ ] · 2.8 [ ] · 2.9 [ ] · 2.10 [ ]
+Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [x] · 2.8 [x] · 2.9 [ ] · 2.10 [ ]
 
 **2026-07-02 — Phase 2 started on branch `build/phase-2-worker`; work orders 2.1–2.2 complete.**
 
@@ -433,6 +433,31 @@ npm run lint                    -> 69 problems (50 errors, 19 warnings), frozen 
 
 **Gate results for this slice:**
 ```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
+```
+
+**2026-07-02 - Work order 2.8 guardrail hooks complete.**
+
+- Added Claude Agent SDK `PreToolUse` hooks in the worker runner path. Every BMC tool call is
+  audit-logged with account id, run id, job kind, tool name, tool-use id, and a redacted/truncated
+  args summary; secret-like keys are replaced with `[REDACTED]`.
+- Added a hook-level evidence gate for `mcp__bmc__write_section_items`: any item with
+  `confidence >= 0.7` and no `evidence_ids` is denied before the MCP tool executes. The existing
+  in-tool validation remains in place as defense in depth.
+- Added per-task runtime limits from worker config: section analysis and workspace chat now have
+  independent `maxTurns`, SDK `taskBudget` token ceilings, and optional max USD overrides. Defaults
+  are documented in `worker/.env.example` and `worker/README.md`.
+- Tests cover the hook denial path, allowed evidence path, audit redaction, and propagation of
+  section-analysis limits/hooks into the runner request.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  -> exit 0
+cd worker && npm test           -> 10 tests passed
+cd worker && npm run build      -> exit 0
+cd worker && npm run lint       -> exit 0
 npx tsc -p tsconfig.app.json --noEmit -> exit 0
 npm run build                   -> green
 npm run lint                    -> 69 problems (50 errors, 19 warnings), within frozen <=69 baseline
