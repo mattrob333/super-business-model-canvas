@@ -17,8 +17,15 @@ bordered, and lightly shadowed above that texture.
 ## Route & entry
 
 - Route: `/workspace/:sectionKey` (e.g. `/workspace/revenue_streams`). `/agents/:agentKey`
-  detail page gains an "Enter workspace" primary action; clicking a section card on the Canvas
-  page navigates here (the current `BMCSectionEditor` side sheet is retired once this ships).
+  detail page gains an "Enter workspace" primary action.
+- **Two-tier entry from the Canvas page.** Clicking a section card opens the existing side
+  sheet demoted to a **peek drawer**: agent avatar + name + status at the top, the section's
+  items with confidence dots and evidence chips, and the plain bullet editor for ten-second
+  manual fixes. The drawer's AI chat is **removed** — in its place a single primary button,
+  "Open ⟨Agent⟩'s workspace →", which navigates here. Rationale: quick edits shouldn't cost a
+  navigation; conversations shouldn't happen against the stateless `bmc-chat` path when the
+  real agent (queued runtime, tools, evidence discipline) exists. Glance/edit in the drawer;
+  go deep in the workspace.
 - Full screen: workspace renders **outside the AppShell content column** — it keeps only a slim
   top bar (workspace switcher, back-to-canvas, account). Sidebar collapses to icon rail.
 - Workspace switcher: a compact 9-dot BMC mini-map in the top bar lets you jump between agent
@@ -89,7 +96,10 @@ source of truth, it is physically present in the room:
 - Header shows section title + tiny trend sparkline (item count / avg confidence over versions).
 
 ### 1c. Context sources panel ("files under the avatar", per the requirement)
-The agent's working set — what it reads on every run. Backed by new `context_sources` table
+The agent's working set — what it reads on every run. The **Company Brief** (the company
+name/industry/description/products block edited today via `BusinessOverviewSheet`) is always
+the first row — read-only here, every agent receives it on every run; clicking it opens the
+brief in the drawer viewer. The rest is backed by new `context_sources` table
 (Spec 04): 
 - Types: **file** (uploaded to Supabase Storage: PDFs, CSVs, decks), **url** (watched page —
   optionally re-scraped on schedule), **evidence collection** (saved filter over
@@ -98,6 +108,33 @@ The agent's working set — what it reads on every run. Backed by new `context_s
 - `[+ add source]` → dialog with tabs File / URL / Evidence / Note.
 - Sources are injected into the agent's context on every run and cited as `[S1]`-style refs
   in chat, distinguishable from web evidence `[1]` refs.
+
+## Zone 2a — Instrument strip (what makes each room unique)
+
+**One chassis, unique instruments.** The frame above (left rail / center / actions) is
+identical in all nine rooms — users learn it once. What makes Yield's office feel nothing
+like Compass's is the **instrument strip**: a collapsible row of 2–4 domain modules pinned to
+the top of the center column, above the thread header. Instruments are shared components
+(stat tile, trend sparkline, watchlist, delta board) configured per agent — same grid slots,
+different modules — reading `metric_snapshots`, `evidence_items`, and `gaps` filtered to the
+section. They are read-only views of what the agent's feeds and runs have produced; clicking
+any instrument inserts its subject into the composer as a quoted reference.
+
+| Agent | Instruments (v1) |
+|---|---|
+| Compass | segment cards (size/fit) · Google Trends interest sparkline · segment-drift alert |
+| Forge | differentiation matrix vs competitors · review-mining sentiment tile · feature-gap count |
+| Relay | share-of-voice trend (GDELT/social) · channel mix bar · competitor content cadence |
+| Anchor | review/NPS-proxy sentiment trend · churn-signal watchlist · community activity tile |
+| Yield | competitor pricing delta board · unit-economics tiles · pricing-change event feed |
+| Vault | resource/dependency health list · hiring-signal tile (careers scrapes) · tech-stack watch |
+| Tempo | ship-velocity tile (changelog/GitHub feeds) · launch-readiness checklist · activity coverage |
+| Envoy | partner watchlist w/ latest news · partnership-opportunity feed · ecosystem count |
+| Ledger | cost-line tiles · FRED macro overlay (rates/CPI) · cost-down opportunity count |
+
+Empty state per instrument: a quiet "no data yet — runs on ⟨feed cadence⟩" placeholder, never
+a fake chart. The strip collapses to a one-line summary chip row; collapsed state persists
+per user per room.
 
 ## Zone 2 — Center chat (the collaboration surface)
 
@@ -164,6 +201,24 @@ preloaded per agent per the roster (Spec 01).
 `Composer` (slash commands), `ActionsPanel` (+ `ActionCard`, `SchedulePopover`), `RunQueue`,
 `WorkspaceTopBar` (+ 9-dot switcher). Existing `BMCSectionEditor` chat logic is the seed for
 `WorkspaceThread`; existing `ScheduledLoopsManager` logic is the seed for `SchedulePopover`.
+
+## Migration of legacy chat surfaces (decided 2026-07-02)
+
+Three pre-workspace AI surfaces exist on `main`; when workspaces ship (Phase 5) they resolve
+as follows — the goal is **one chat per scope**, never two ways to talk about the same thing:
+
+1. **`BMCSectionEditor`** (canvas section side sheet, `bmc-chat` SSE) — *demoted, not
+   deleted*: becomes the chat-less peek drawer described in "Route & entry" (agent identity
+   header, items w/ confidence + evidence, plain editor, "Open workspace" CTA).
+2. **`ChatDrawer`** (Analysis page section/competitor chat, also `bmc-chat`) — *retired*
+   in the same pass; competitor Q&A moves to the Phase-4 competitor drill-down.
+3. **`BusinessOverviewSheet` / `BusinessOverviewEditor`** (`business-overview-chat`) — the
+   data it edits is promoted to the **Company Brief** (canonical context document, first row
+   of every workspace's context sources). The form editor stays; its embedded AI chat is kept
+   short-term and *retired in Phase 6*, when brief edits become an Atlas proposal ("update our
+   company brief to say…") passing through the normal approval flow with an audit trail.
+4. The `bmc-chat` / `business-overview-chat` edge functions stay for the drawer/editor until
+   their retirement steps, then are removed with their callers.
 
 ## Non-goals (v1)
 
