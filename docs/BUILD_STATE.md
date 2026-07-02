@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | 0 | Baseline verification & deploy prep | **APPROVED** | `build/phase-0-baseline` (merged, PR #2, `db7cd1f`) | 2026-07-02 |
 | 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
-| 2 | Agent worker service | **AWAITING REVIEW** | `build/phase-2-worker` | 2026-07-02 |
+| 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
 | 3 | Research engine & evidence | NOT STARTED | — | — |
 | 4 | Competitor canvases & gap engine | NOT STARTED | — | — |
 | 5 | Section agent workspaces | NOT STARTED | — | — |
@@ -320,7 +320,13 @@ updated to match each model's current catalog price. Gates re-run clean: tsc cle
 green, lint 69 (unchanged). RF-1-2 marked RESOLVED.
 
 ### Phase 2 — Agent worker service
-Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [x] · 2.8 [x] · 2.9 [x] · 2.10 [x] · **AWAITING REVIEW**
+Tasks: 2.1 [x] · 2.2 [x] · 2.3 [x] · 2.4 [x] · 2.5 [x] · 2.6 [x] · 2.7 [x] · 2.8 [x] · 2.9 [x] · 2.10 [x] · **APPROVED, merged to main (PR #8, `b6a8c40`)**
+
+**2026-07-02 - Phase 2 approved and merged.**
+
+- Reviewer approved Phase 2 after running the full suite, including SQL integration tests against
+  live Postgres: 14/14 passed. Merged PR #8 (`build/phase-2-worker` -> `main`) at merge commit
+  `b6a8c40`.
 
 **2026-07-02 — Phase 2 started on branch `build/phase-2-worker`; work orders 2.1–2.2 complete.**
 
