@@ -25,6 +25,12 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  LANDING_AGENT_ACCENTS,
+  LANDING_CANVAS_AGENT_ORDER,
+  type LandingAgentAccent,
+  type LandingAgentCallsign,
+} from "@/components/landing/agent-accents";
 
 const lightThemeVars = {
   "--background": "210 20% 98%",
@@ -57,117 +63,22 @@ const leadErrorCode = (error: unknown) =>
     ? String((error as { code?: unknown }).code)
     : "";
 
-const agents = [
-  {
-    callsign: "Atlas",
-    role: "Chief Strategist",
-    line: "Sees the whole board. Sets the agenda.",
-    dot: "bg-indigo-500",
-    text: "text-indigo-700",
-    tint: "bg-indigo-50",
-    border: "border-indigo-500",
-    initial: "A",
-  },
-  {
-    callsign: "Compass",
-    role: "Market Intelligence",
-    line: "Knows your customer better than they do.",
-    dot: "bg-teal-500",
-    text: "text-teal-700",
-    tint: "bg-teal-50",
-    initial: "C",
-  },
-  {
-    callsign: "Forge",
-    role: "Product Value",
-    line: "Keeps your promise sharp and provable.",
-    dot: "bg-orange-500",
-    text: "text-orange-700",
-    tint: "bg-orange-50",
-    initial: "F",
-  },
-  {
-    callsign: "Relay",
-    role: "Distribution",
-    line: "Finds the channels you're not using.",
-    dot: "bg-sky-500",
-    text: "text-sky-700",
-    tint: "bg-sky-50",
-    initial: "R",
-  },
-  {
-    callsign: "Anchor",
-    role: "Customer Success",
-    line: "Hears churn coming before it lands.",
-    dot: "bg-emerald-500",
-    text: "text-emerald-700",
-    tint: "bg-emerald-50",
-    initial: "A",
-  },
-  {
-    callsign: "Yield",
-    role: "Monetization",
-    line: "Watches every competitor price move.",
-    dot: "bg-amber-500",
-    text: "text-amber-700",
-    tint: "bg-amber-50",
-    initial: "Y",
-  },
-  {
-    callsign: "Vault",
-    role: "Assets & Capabilities",
-    line: "Flags the single points of failure.",
-    dot: "bg-slate-500",
-    text: "text-slate-700",
-    tint: "bg-slate-100",
-    initial: "V",
-  },
-  {
-    callsign: "Tempo",
-    role: "Operations",
-    line: "Benchmarks how fast you really ship.",
-    dot: "bg-violet-500",
-    text: "text-violet-700",
-    tint: "bg-violet-50",
-    initial: "T",
-  },
-  {
-    callsign: "Envoy",
-    role: "Alliances",
-    line: "Keeps a live pipeline of partners.",
-    dot: "bg-rose-500",
-    text: "text-rose-700",
-    tint: "bg-rose-50",
-    initial: "E",
-  },
-  {
-    callsign: "Ledger",
-    role: "Cost & Efficiency",
-    line: "Drives cost down on a schedule.",
-    dot: "bg-zinc-500",
-    text: "text-zinc-700",
-    tint: "bg-zinc-100",
-    initial: "L",
-  },
-];
-
-const agentByName = Object.fromEntries(agents.map((agent) => [agent.callsign, agent]));
-const atlas = agents[0];
-const sectionAgents = agents.slice(1);
+const atlas = LANDING_AGENT_ACCENTS.Atlas;
+const sectionAgents = LANDING_CANVAS_AGENT_ORDER.map((callsign) => LANDING_AGENT_ACCENTS[callsign]);
 
 const canvasBlocks = [
-  { label: "Key Partners", agent: "Envoy", className: "md:col-start-1 md:row-start-1 md:row-span-2" },
-  { label: "Key Activities", agent: "Tempo", className: "md:col-start-2 md:row-start-1" },
-  { label: "Key Resources", agent: "Vault", className: "md:col-start-2 md:row-start-2" },
-  { label: "Value Propositions", agent: "Forge", className: "md:col-start-3 md:row-start-1 md:row-span-2" },
-  { label: "Customer Relationships", agent: "Anchor", className: "md:col-start-4 md:row-start-1" },
-  { label: "Channels", agent: "Relay", className: "md:col-start-4 md:row-start-2" },
-  { label: "Customer Segments", agent: "Compass", className: "md:col-start-5 md:row-start-1 md:row-span-2" },
+  { label: "Key Partners", agent: "Envoy" as const, className: "md:col-start-1 md:row-start-1 md:row-span-2" },
+  { label: "Key Activities", agent: "Tempo" as const, className: "md:col-start-2 md:row-start-1" },
+  { label: "Key Resources", agent: "Vault" as const, className: "md:col-start-2 md:row-start-2" },
+  { label: "Value Propositions", agent: "Forge" as const, className: "md:col-start-3 md:row-start-1 md:row-span-2" },
+  { label: "Customer Relationships", agent: "Anchor" as const, className: "md:col-start-4 md:row-start-1" },
+  { label: "Channels", agent: "Relay" as const, className: "md:col-start-4 md:row-start-2" },
+  { label: "Customer Segments", agent: "Compass" as const, className: "md:col-start-5 md:row-start-1 md:row-span-2" },
 ];
 
 const bottomCanvasBlocks = [
-  { label: "Cost Structure", agent: "Ledger" },
-  { label: "Revenue Streams", agent: "Yield", live: true },
+  { label: "Cost Structure", agent: "Ledger" as const },
+  { label: "Revenue Streams", agent: "Yield" as const, live: true },
 ];
 
 const howItWorks = [
@@ -300,25 +211,52 @@ function Logo() {
   );
 }
 
-function CanvasBlock({ label, agent, className = "", live = false }: { label: string; agent: string; className?: string; live?: boolean }) {
-  const rosterAgent = agentByName[agent];
+function SectionPill({ agent }: { agent: LandingAgentAccent }) {
+  return (
+    <span
+      data-agent-section-pill={agent.callsign}
+      className={`rounded-md px-2 py-1 text-[11px] font-medium ${agent.tint} ${agent.text}`}
+    >
+      {agent.section}
+    </span>
+  );
+}
+
+function CanvasBlock({
+  label,
+  agent,
+  className = "",
+  live = false,
+}: {
+  label: string;
+  agent: LandingAgentCallsign;
+  className?: string;
+  live?: boolean;
+}) {
+  const rosterAgent = LANDING_AGENT_ACCENTS[agent];
 
   return (
     <div
       className={`${className} relative min-h-[132px] rounded-lg border border-border/60 bg-white p-3 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md md:min-h-full`}
     >
+      <span className={`absolute right-3 top-3 h-2.5 w-2.5 rounded-full ${rosterAgent.dot}`} />
       {live ? (
-        <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+        <div className="absolute right-3 top-7 inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
           Yield - analyzing
         </div>
       ) : null}
-      <div className={`flex items-start justify-between gap-2 ${live ? "pr-28" : ""}`}>
-        <div>
-          <h3 className="text-sm font-semibold leading-tight text-foreground">{label}</h3>
-          <p className="mt-1 text-xs text-muted-foreground">{agent}</p>
+      <div className={`${live ? "pr-28" : "pr-5"}`}>
+        <div className="flex min-h-10 items-start">
+          <h3 className="line-clamp-2 text-left text-xs font-semibold leading-5 text-foreground">{label}</h3>
         </div>
-        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${rosterAgent?.dot ?? "bg-primary"}`} />
+        <p
+          data-canvas-agent-chip={agent}
+          className="mt-1 flex items-center gap-1.5 text-left text-[10px] leading-none text-muted-foreground"
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${rosterAgent.dot}`} />
+          {agent}
+        </p>
       </div>
       <div className="mt-5 space-y-2">
         <div className={`h-2 rounded-full ${live ? "bg-primary/20" : "bg-muted"}`} />
@@ -580,8 +518,13 @@ const Landing = () => {
                   {atlas.initial}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xl font-semibold">{atlas.callsign}</p>
-                  <p className="mt-1 text-sm font-medium text-muted-foreground">{atlas.role}</p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xl font-semibold">{atlas.callsign}</p>
+                      <p className="mt-1 text-sm font-medium text-muted-foreground">{atlas.role}</p>
+                    </div>
+                    <SectionPill agent={atlas} />
+                  </div>
                   <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{atlas.line}</p>
                 </div>
               </div>
@@ -593,14 +536,17 @@ const Landing = () => {
                   key={agent.callsign}
                   className="rounded-lg border border-border/60 bg-white p-5 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${agent.tint} text-sm font-semibold ${agent.text}`}>
-                      {agent.initial}
-                    </span>
-                    <div>
-                      <h3 className="text-base font-semibold">{agent.callsign}</h3>
-                      <p className="text-xs text-muted-foreground">{agent.role}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${agent.tint} text-sm font-semibold ${agent.text}`}>
+                        {agent.initial}
+                      </span>
+                      <div>
+                        <h3 className="text-base font-semibold">{agent.callsign}</h3>
+                        <p className="text-xs text-muted-foreground">{agent.role}</p>
+                      </div>
                     </div>
+                    <SectionPill agent={agent} />
                   </div>
                   <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{agent.line}</p>
                 </div>

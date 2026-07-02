@@ -173,6 +173,9 @@ Branch: `feat/landing-page` (cut from `main`).
   theme, hero CTA fused into one bordered control, miniature canvas restyled as a light app
   window, Atlas promoted to a feature card, feature/agent accents aligned to the roster, trust
   band added, and quantitative mock metrics removed.
+- Alignment/association follow-up applied: shared landing agent accent constants added, canvas
+  mock tiles now use a consistent fixed-height title/agent-chip header with pinned status dots,
+  and every agent team card shows its owned BMC section in a matching accent pill.
 
 ## Phase logs
 
