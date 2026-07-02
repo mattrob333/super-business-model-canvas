@@ -169,6 +169,10 @@ Branch: `feat/landing-page` (cut from `main`).
 - Scope intentionally limited to `src/pages/Landing.tsx`, `src/pages/Auth.tsx`, and this tracker
   entry. No fabricated testimonials, customer logos, user counts, revenue metrics, or pricing
   tiers added.
+- Design polish pass applied after review feedback: landing page pinned to light enterprise
+  theme, hero CTA fused into one bordered control, miniature canvas restyled as a light app
+  window, Atlas promoted to a feature card, feature/agent accents aligned to the roster, trust
+  band added, and quantitative mock metrics removed.
 
 ## Phase logs
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import {
@@ -6,11 +7,15 @@ import {
   ArrowRight,
   Blocks,
   BriefcaseBusiness,
+  Check,
   ClipboardList,
+  FileSearch,
   FileText,
   Handshake,
+  Lock,
   Radar,
   SearchCheck,
+  ShieldCheck,
   Sparkles,
   Target,
 } from "lucide-react";
@@ -21,6 +26,30 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
+const lightThemeVars = {
+  "--background": "210 20% 98%",
+  "--foreground": "222 47% 11%",
+  "--card": "0 0% 100%",
+  "--card-foreground": "222 47% 11%",
+  "--popover": "0 0% 100%",
+  "--popover-foreground": "222 47% 11%",
+  "--primary": "28 90% 53%",
+  "--primary-foreground": "24 25% 10%",
+  "--secondary": "210 20% 96%",
+  "--secondary-foreground": "222 47% 11%",
+  "--muted": "210 20% 96%",
+  "--muted-foreground": "215 16% 43%",
+  "--accent": "28 90% 53%",
+  "--accent-foreground": "24 25% 10%",
+  "--destructive": "0 72% 51%",
+  "--destructive-foreground": "210 40% 98%",
+  "--border": "214 32% 88%",
+  "--input": "214 32% 88%",
+  "--ring": "28 90% 53%",
+  "--success": "142 71% 36%",
+  "--radius": "0.5rem",
+} as CSSProperties;
+
 const emailSchema = z.string().trim().email("Please enter a valid email address");
 
 const leadErrorCode = (error: unknown) =>
@@ -28,78 +57,117 @@ const leadErrorCode = (error: unknown) =>
     ? String((error as { code?: unknown }).code)
     : "";
 
-const agentTeam = [
+const agents = [
   {
     callsign: "Atlas",
     role: "Chief Strategist",
     line: "Sees the whole board. Sets the agenda.",
-    accent: "bg-indigo-500",
-    ring: "ring-indigo-500/35",
+    dot: "bg-indigo-500",
+    text: "text-indigo-700",
+    tint: "bg-indigo-50",
+    border: "border-indigo-500",
+    initial: "A",
   },
   {
     callsign: "Compass",
     role: "Market Intelligence",
     line: "Knows your customer better than they do.",
-    accent: "bg-teal-500",
+    dot: "bg-teal-500",
+    text: "text-teal-700",
+    tint: "bg-teal-50",
+    initial: "C",
   },
   {
     callsign: "Forge",
     role: "Product Value",
     line: "Keeps your promise sharp and provable.",
-    accent: "bg-orange-500",
+    dot: "bg-orange-500",
+    text: "text-orange-700",
+    tint: "bg-orange-50",
+    initial: "F",
   },
   {
     callsign: "Relay",
     role: "Distribution",
     line: "Finds the channels you're not using.",
-    accent: "bg-sky-500",
+    dot: "bg-sky-500",
+    text: "text-sky-700",
+    tint: "bg-sky-50",
+    initial: "R",
   },
   {
     callsign: "Anchor",
     role: "Customer Success",
     line: "Hears churn coming before it lands.",
-    accent: "bg-emerald-500",
+    dot: "bg-emerald-500",
+    text: "text-emerald-700",
+    tint: "bg-emerald-50",
+    initial: "A",
   },
   {
     callsign: "Yield",
     role: "Monetization",
     line: "Watches every competitor price move.",
-    accent: "bg-amber-500",
+    dot: "bg-amber-500",
+    text: "text-amber-700",
+    tint: "bg-amber-50",
+    initial: "Y",
   },
   {
     callsign: "Vault",
     role: "Assets & Capabilities",
     line: "Flags the single points of failure.",
-    accent: "bg-slate-500",
+    dot: "bg-slate-500",
+    text: "text-slate-700",
+    tint: "bg-slate-100",
+    initial: "V",
   },
   {
     callsign: "Tempo",
     role: "Operations",
     line: "Benchmarks how fast you really ship.",
-    accent: "bg-violet-500",
+    dot: "bg-violet-500",
+    text: "text-violet-700",
+    tint: "bg-violet-50",
+    initial: "T",
   },
   {
     callsign: "Envoy",
     role: "Alliances",
     line: "Keeps a live pipeline of partners.",
-    accent: "bg-rose-500",
+    dot: "bg-rose-500",
+    text: "text-rose-700",
+    tint: "bg-rose-50",
+    initial: "E",
   },
   {
     callsign: "Ledger",
     role: "Cost & Efficiency",
     line: "Drives cost down on a schedule.",
-    accent: "bg-zinc-500",
+    dot: "bg-zinc-500",
+    text: "text-zinc-700",
+    tint: "bg-zinc-100",
+    initial: "L",
   },
 ];
 
+const agentByName = Object.fromEntries(agents.map((agent) => [agent.callsign, agent]));
+const atlas = agents[0];
+const sectionAgents = agents.slice(1);
+
 const canvasBlocks = [
-  { label: "Key Partners", agent: "Envoy", accent: "bg-rose-500", className: "md:col-start-1 md:row-start-1 md:row-span-2" },
-  { label: "Key Activities", agent: "Tempo", accent: "bg-violet-500", className: "md:col-start-2 md:row-start-1" },
-  { label: "Key Resources", agent: "Vault", accent: "bg-slate-500", className: "md:col-start-2 md:row-start-2" },
-  { label: "Value Propositions", agent: "Forge", accent: "bg-orange-500", className: "md:col-start-3 md:row-start-1 md:row-span-2" },
-  { label: "Customer Relationships", agent: "Anchor", accent: "bg-emerald-500", className: "md:col-start-4 md:row-start-1" },
-  { label: "Channels", agent: "Relay", accent: "bg-sky-500", className: "md:col-start-4 md:row-start-2" },
-  { label: "Customer Segments", agent: "Compass", accent: "bg-teal-500", className: "md:col-start-5 md:row-start-1 md:row-span-2" },
+  { label: "Key Partners", agent: "Envoy", className: "md:col-start-1 md:row-start-1 md:row-span-2" },
+  { label: "Key Activities", agent: "Tempo", className: "md:col-start-2 md:row-start-1" },
+  { label: "Key Resources", agent: "Vault", className: "md:col-start-2 md:row-start-2" },
+  { label: "Value Propositions", agent: "Forge", className: "md:col-start-3 md:row-start-1 md:row-span-2" },
+  { label: "Customer Relationships", agent: "Anchor", className: "md:col-start-4 md:row-start-1" },
+  { label: "Channels", agent: "Relay", className: "md:col-start-4 md:row-start-2" },
+  { label: "Customer Segments", agent: "Compass", className: "md:col-start-5 md:row-start-1 md:row-span-2" },
+];
+
+const bottomCanvasBlocks = [
+  { label: "Cost Structure", agent: "Ledger" },
+  { label: "Revenue Streams", agent: "Yield", live: true },
 ];
 
 const howItWorks = [
@@ -122,31 +190,44 @@ const features = [
     icon: SearchCheck,
     title: "Evidence or it doesn't ship",
     body: "Every canvas item links to a source with a date and excerpt. Claims without evidence are visibly marked speculative - no confident hallucinations.",
+    tint: "bg-emerald-50",
+    text: "text-emerald-700",
+    wide: true,
   },
   {
     icon: Blocks,
     title: "Competitor canvases",
     body: "Run the same analysis on your rivals. See their business model side-by-side with yours, section by section, and borrow what works.",
+    tint: "bg-sky-50",
+    text: "text-sky-700",
   },
   {
     icon: Radar,
     title: "The War Room",
     body: "Your canvas as a live command map - health, freshness, and where competitors are outpacing you, at a glance.",
+    tint: "bg-indigo-50",
+    text: "text-indigo-700",
   },
   {
     icon: ClipboardList,
     title: "Strategy playbooks",
     body: "SWOT, Porter's Five Forces, Blue Ocean and more - populated from your live canvas instead of a blank template.",
+    tint: "bg-orange-50",
+    text: "text-orange-700",
   },
   {
     icon: Activity,
     title: "Always on cadence",
-    body: "Agents run on schedules you control: re-verify claims monthly, watch competitor pricing weekly, refresh the market read daily.",
+    body: "Agents run on schedules you control: re-verify claims, watch competitor pricing, and refresh the market read as conditions change.",
+    tint: "bg-violet-50",
+    text: "text-violet-700",
   },
   {
     icon: FileText,
     title: "Board-ready output",
     body: "One-click strategy briefs and exportable reports your leadership team can actually act on.",
+    tint: "bg-amber-50",
+    text: "text-amber-700",
   },
 ];
 
@@ -181,8 +262,7 @@ const faqs = [
   },
   {
     question: "Do I need to connect my internal data?",
-    answer:
-      "No. Super BMC works from public data - yours and your competitors'. Private-data integrations are on the roadmap.",
+    answer: "No. Super BMC works from public data - yours and your competitors'. Private-data integrations are on the roadmap.",
   },
   {
     question: "What does it cost?",
@@ -202,6 +282,10 @@ const navLinks = [
   { href: "#faq", label: "FAQ" },
 ];
 
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return <p className="mb-3 text-xs font-medium uppercase tracking-widest text-primary">{children}</p>;
+}
+
 function Logo() {
   return (
     <Link
@@ -216,72 +300,61 @@ function Logo() {
   );
 }
 
+function CanvasBlock({ label, agent, className = "", live = false }: { label: string; agent: string; className?: string; live?: boolean }) {
+  const rosterAgent = agentByName[agent];
+
+  return (
+    <div
+      className={`${className} relative min-h-[132px] rounded-lg border border-border/60 bg-white p-3 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md md:min-h-full`}
+    >
+      {live ? (
+        <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+          Yield - analyzing
+        </div>
+      ) : null}
+      <div className={`flex items-start justify-between gap-2 ${live ? "pr-28" : ""}`}>
+        <div>
+          <h3 className="text-sm font-semibold leading-tight text-foreground">{label}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{agent}</p>
+        </div>
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${rosterAgent?.dot ?? "bg-primary"}`} />
+      </div>
+      <div className="mt-5 space-y-2">
+        <div className={`h-2 rounded-full ${live ? "bg-primary/20" : "bg-muted"}`} />
+        <div className={`h-2 w-5/6 rounded-full ${live ? "bg-primary/20" : "bg-muted"}`} />
+        <div className={`h-2 w-2/3 rounded-full ${live ? "bg-primary/20" : "bg-muted"}`} />
+      </div>
+    </div>
+  );
+}
+
 function MiniCanvas() {
   return (
-    <div className="mx-auto w-full max-w-6xl rounded-lg border bg-card p-3 shadow-sm sm:p-5">
-      <div className="mb-4 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold">Business Model Canvas</p>
-          <p className="text-xs text-muted-foreground">Nine sections, ten strategists, live evidence graph</p>
+    <div className="mx-auto w-full max-w-5xl rounded-lg border border-border/60 bg-white shadow-xl shadow-slate-900/10">
+      <div className="flex h-11 items-center justify-between border-b border-border/60 px-4">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-rose-300" />
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
         </div>
+        <p className="hidden text-xs font-medium text-muted-foreground sm:block">Super BMC - Acme Corp</p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="h-2 w-2 rounded-full bg-success" />
-          34 cited claims refreshed today
+          Evidence-linked
         </div>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-5 md:grid-rows-2">
-        {canvasBlocks.map((block) => (
-          <div
-            key={block.label}
-            className={`${block.className} min-h-[130px] rounded-md border bg-background p-3 transition-colors hover:border-primary/35`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold leading-tight">{block.label}</h3>
-                <p className="mt-1 text-xs text-muted-foreground">{block.agent}</p>
-              </div>
-              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${block.accent}`} />
-            </div>
-            <div className="mt-5 space-y-2">
-              <div className="h-2 rounded-full bg-muted" />
-              <div className="h-2 w-4/5 rounded-full bg-muted" />
-              <div className="h-2 w-2/3 rounded-full bg-muted" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-2 grid gap-2 md:grid-cols-2">
-        <div className="min-h-[118px] rounded-md border bg-background p-3 transition-colors hover:border-primary/35">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h3 className="text-sm font-semibold">Cost Structure</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Ledger</p>
-            </div>
-            <span className="h-2.5 w-2.5 rounded-full bg-zinc-500" />
-          </div>
-          <div className="mt-5 space-y-2">
-            <div className="h-2 rounded-full bg-muted" />
-            <div className="h-2 w-3/4 rounded-full bg-muted" />
-          </div>
+      <div className="p-3 sm:p-5">
+        <div className="grid gap-2 md:grid-cols-5 md:grid-rows-[132px_132px]">
+          {canvasBlocks.map((block) => (
+            <CanvasBlock key={block.label} {...block} />
+          ))}
         </div>
-        <div className="relative min-h-[118px] overflow-hidden rounded-md border border-primary/45 bg-primary/5 p-3 shadow-[0_0_0_1px_hsl(var(--primary)/0.08)]">
-          <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md border border-primary/30 bg-background px-2 py-1 text-[11px] font-medium text-primary">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-            Yield · analyzing
-          </div>
-          <div className="flex items-start justify-between gap-2 pr-28">
-            <div>
-              <h3 className="text-sm font-semibold">Revenue Streams</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Yield</p>
-            </div>
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-          </div>
-          <div className="mt-5 space-y-2">
-            <div className="h-2 rounded-full bg-primary/20" />
-            <div className="h-2 w-4/5 rounded-full bg-primary/20" />
-          </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          {bottomCanvasBlocks.map((block) => (
+            <CanvasBlock key={block.label} {...block} />
+          ))}
         </div>
       </div>
     </div>
@@ -338,13 +411,13 @@ function SignupForm({ compact = false }: { compact?: boolean }) {
 
   return (
     <form onSubmit={handleSubmit} className={compact ? "mx-auto w-full max-w-xl" : "mx-auto w-full max-w-2xl"}>
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-white p-1.5 shadow-sm sm:flex-row">
         <Input
           type="email"
           placeholder="work@email.com"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="h-12 bg-background text-base"
+          className="h-12 border-0 bg-transparent text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
           disabled={isSubmitting}
           aria-label="Email address"
         />
@@ -376,8 +449,8 @@ const Landing = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
+    <div className="light min-h-screen bg-background text-foreground" style={lightThemeVars}>
+      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <Logo />
           <nav className="hidden items-center gap-6 md:flex" aria-label="Primary navigation">
@@ -406,169 +479,226 @@ const Landing = () => {
       </header>
 
       <main>
-        <section className="relative overflow-hidden border-b">
+        <section className="relative overflow-hidden border-b border-border/60 bg-background">
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.32] dark:opacity-[0.18]"
+            className="pointer-events-none absolute inset-0 opacity-60"
             style={{
               backgroundImage:
                 "linear-gradient(hsl(var(--border)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px)",
-              backgroundSize: "44px 44px",
+              backgroundSize: "48px 48px",
+              maskImage: "linear-gradient(to bottom, black, transparent 78%)",
             }}
             aria-hidden="true"
           />
-          <div className="relative mx-auto max-w-6xl px-4 py-20 text-center sm:px-6 lg:py-24">
-            <div className="mx-auto inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-sm font-medium text-primary shadow-sm">
+          <div className="relative mx-auto max-w-6xl px-4 py-24 text-center sm:px-6 lg:py-28">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-border/70 bg-white px-3 py-1 text-sm font-medium text-primary shadow-sm">
               <Sparkles className="h-4 w-4" />
               AI-native strategy workspace
             </div>
 
-            <h1 className="mx-auto mt-7 max-w-5xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-              Your business model, run by a team of AI strategists
+            <h1 className="mx-auto mt-7 max-w-4xl text-5xl font-semibold tracking-tight text-foreground md:text-7xl">
+              Your business model, run by AI strategists
             </h1>
-            <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
+            <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-muted-foreground">
               Paste your company's URL. Super BMC builds your Business Model Canvas from public evidence in about 60
               seconds - then ten AI agents keep it alive: researching your market, watching your competitors, and
               telling you what to do next.
             </p>
 
-            <div className="mt-8">
+            <div className="mt-9">
               <SignupForm />
-              <div className="mt-4 flex flex-col items-center justify-center gap-3 text-sm text-muted-foreground sm:flex-row">
+              <div className="mx-auto mt-4 flex max-w-2xl flex-col items-start justify-center gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center">
+                {["Free to start", "No credit card", "Every claim cited to source"].map((item) => (
+                  <span key={item} className="inline-flex items-center gap-2">
+                    <Check className="h-4 w-4 text-primary" />
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Already have an account?{" "}
                 <Link
                   to="/auth"
                   className="rounded-md font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  I already have an account
+                  Sign in
                 </Link>
-                <span className="hidden h-1 w-1 rounded-full bg-muted-foreground/40 sm:block" />
-                <span>Free to start · No credit card · Built on live public data, cited to the source</span>
-              </div>
+              </p>
             </div>
 
-            <div className="mt-14">
+            <div className="mt-16">
               <MiniCanvas />
             </div>
           </div>
         </section>
 
-        <section id="how-it-works" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold text-primary">How it works</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              From public footprint to living strategy system.
-            </h2>
-          </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {howItWorks.map((step, index) => (
-              <div key={step.title} className="rounded-lg border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
-                <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
-                  {index + 1}
+        <section id="how-it-works" className="bg-muted/40">
+          <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-28">
+            <div className="max-w-2xl">
+              <Eyebrow>How it works</Eyebrow>
+              <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
+                From public footprint to living strategy system.
+              </h2>
+              <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
+                The workflow stays simple while the agents do the heavy lifting.
+              </p>
+            </div>
+            <div className="relative mt-12 grid gap-5 md:grid-cols-3">
+              <div className="absolute left-[16%] right-[16%] top-[25px] hidden border-t border-border md:block" />
+              {howItWorks.map((step, index) => (
+                <div
+                  key={step.title}
+                  className="relative rounded-lg border border-border/60 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm">
+                    {index + 1}
+                  </div>
+                  <h3 className="mt-6 text-lg font-semibold">{step.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
                 </div>
-                <h3 className="mt-5 text-lg font-semibold">{step.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">{step.body}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </section>
 
-        <section id="agents" className="border-y bg-muted/35">
-          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+        <section id="agents" className="border-y border-border/60 bg-white">
+          <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-28">
             <div className="max-w-3xl">
-              <p className="text-sm font-semibold text-primary">The agent team</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+              <Eyebrow>The agent team</Eyebrow>
+              <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
                 Ten strategists. One canvas. Zero standing meetings.
               </h2>
-              <p className="mt-4 text-base leading-7 text-muted-foreground">
+              <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
                 Every section of the Business Model Canvas is owned by a specialist agent that actually works the
                 problem.
               </p>
             </div>
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              {agentTeam.map((agent) => (
+            <div className={`mt-12 rounded-lg border border-l-4 ${atlas.border} bg-white p-6 shadow-sm`}>
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-lg ${atlas.tint} text-2xl font-semibold ${atlas.text}`}>
+                  {atlas.initial}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xl font-semibold">{atlas.callsign}</p>
+                  <p className="mt-1 text-sm font-medium text-muted-foreground">{atlas.role}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{atlas.line}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              {sectionAgents.map((agent) => (
                 <div
                   key={agent.callsign}
-                  className={`rounded-lg border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                    agent.callsign === "Atlas" ? `ring-2 ${agent.ring}` : ""
-                  }`}
+                  className="rounded-lg border border-border/60 bg-white p-5 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md"
                 >
                   <div className="flex items-center gap-3">
-                    <span className={`h-3 w-3 rounded-full ${agent.accent}`} />
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${agent.tint} text-sm font-semibold ${agent.text}`}>
+                      {agent.initial}
+                    </span>
                     <div>
                       <h3 className="text-base font-semibold">{agent.callsign}</h3>
                       <p className="text-xs text-muted-foreground">{agent.role}</p>
                     </div>
                   </div>
-                  <p className="mt-4 text-sm leading-6 text-muted-foreground">{agent.line}</p>
+                  <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{agent.line}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-          <div className="max-w-3xl">
-            <p className="text-sm font-semibold text-primary">Workspace capabilities</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              The canvas becomes the operating system.
-            </h2>
-          </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => (
-              <div key={feature.title} className="rounded-lg border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
-                  <feature.icon className="h-5 w-5" />
+        <section className="bg-muted/40">
+          <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-28">
+            <div className="max-w-3xl">
+              <Eyebrow>Workspace capabilities</Eyebrow>
+              <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
+                The canvas becomes the operating system.
+              </h2>
+              <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
+                Evidence, competitors, playbooks, and agent cadence stay connected in one place.
+              </p>
+            </div>
+            <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {features.map((feature) => (
+                <div
+                  key={feature.title}
+                  className={`rounded-lg border border-border/60 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
+                    feature.wide ? "lg:col-span-2" : ""
+                  }`}
+                >
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${feature.tint} ${feature.text}`}>
+                    <feature.icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="mt-5 text-lg font-semibold">{feature.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{feature.body}</p>
                 </div>
-                <h3 className="mt-5 text-lg font-semibold">{feature.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">{feature.body}</p>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="border-y border-border/60 bg-white">
+          <div className="mx-auto grid max-w-6xl gap-4 px-4 py-8 sm:px-6 md:grid-cols-3">
+            {[
+              { icon: ShieldCheck, text: "Propose-before-execute - agents draft, you approve" },
+              { icon: FileSearch, text: "Every claim traceable to a dated source" },
+              { icon: Lock, text: "Your workspace data is never shared" },
+            ].map((item) => (
+              <div key={item.text} className="flex items-center gap-3 text-sm text-muted-foreground">
+                <item.icon className="h-5 w-5 shrink-0 text-primary" />
+                <span>{item.text}</span>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="border-y bg-card">
-          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+        <section className="bg-white">
+          <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-28">
             <div className="max-w-3xl">
-              <p className="text-sm font-semibold text-primary">Who it's for</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+              <Eyebrow>Who it's for</Eyebrow>
+              <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
                 Built for people accountable for the next move.
               </h2>
             </div>
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
+            <div className="mt-12 grid gap-4 md:grid-cols-3">
               {audiences.map((audience) => (
-                <div key={audience.title} className="rounded-lg border bg-background p-6">
+                <div key={audience.title} className="rounded-lg border border-border/60 bg-background p-6 shadow-sm">
                   <audience.icon className="h-6 w-6 text-primary" />
                   <h3 className="mt-5 text-lg font-semibold">{audience.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{audience.body}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{audience.body}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="faq" className="mx-auto max-w-4xl px-4 py-20 sm:px-6">
-          <div className="text-center">
-            <p className="text-sm font-semibold text-primary">FAQ</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">What early users ask first.</h2>
+        <section id="faq" className="bg-muted/40">
+          <div className="mx-auto max-w-4xl px-4 py-24 sm:px-6 lg:py-28">
+            <div>
+              <Eyebrow>FAQ</Eyebrow>
+              <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">What early users ask first.</h2>
+            </div>
+            <Accordion type="single" collapsible className="mt-10 rounded-lg border border-border/60 bg-white px-5 shadow-sm">
+              {faqs.map((faq) => (
+                <AccordionItem key={faq.question} value={faq.question}>
+                  <AccordionTrigger className="text-left text-base font-semibold hover:no-underline">
+                    {faq.question}
+                  </AccordionTrigger>
+                  <AccordionContent className="text-sm leading-relaxed text-muted-foreground">{faq.answer}</AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
-          <Accordion type="single" collapsible className="mt-10 rounded-lg border bg-card px-5">
-            {faqs.map((faq) => (
-              <AccordionItem key={faq.question} value={faq.question}>
-                <AccordionTrigger className="text-left text-base font-semibold hover:no-underline">
-                  {faq.question}
-                </AccordionTrigger>
-                <AccordionContent className="text-sm leading-6 text-muted-foreground">{faq.answer}</AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
         </section>
 
-        <section className="border-y bg-muted/45">
-          <div className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6">
-            <h2 className="mx-auto max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
+        <section className="border-y border-border/60 bg-white">
+          <div className="mx-auto max-w-6xl px-4 py-20 text-center sm:px-6">
+            <h2 className="mx-auto max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
               See your business the way your smartest competitor sees it.
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">Your first canvas takes about 60 seconds.</p>
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">Your first canvas takes about 60 seconds.</p>
             <div className="mt-8">
               <SignupForm compact />
             </div>
@@ -577,14 +707,14 @@ const Landing = () => {
       </main>
 
       <footer className="bg-background">
-        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 md:flex-row md:items-center md:justify-between">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <Logo />
             <p className="mt-3 max-w-md text-sm text-muted-foreground">
               AI strategy workspace on a living Business Model Canvas.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-muted-foreground">
             {navLinks.map((link) => (
               <a
                 key={link.href}
@@ -601,7 +731,7 @@ const Landing = () => {
               Sign in
             </Link>
           </div>
-          <p className="text-sm text-muted-foreground">© 2026 Super BMC. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">2026 Super BMC. All rights reserved.</p>
         </div>
       </footer>
     </div>
