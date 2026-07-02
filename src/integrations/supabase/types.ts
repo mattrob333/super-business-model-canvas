@@ -1802,9 +1802,15 @@ export type Database = {
           payload: Json
           status: string
           attempts: number
+          max_attempts: number
           agent_run_id: string | null
           parent_run_id: string | null
           cascade_run_id: string | null
+          claimed_by: string | null
+          locked_at: string | null
+          heartbeat_at: string | null
+          run_after: string
+          last_error: string | null
           created_at: string
         }
         Insert: {
@@ -1814,9 +1820,15 @@ export type Database = {
           payload?: Json
           status?: string
           attempts?: number
+          max_attempts?: number
           agent_run_id?: string | null
           parent_run_id?: string | null
           cascade_run_id?: string | null
+          claimed_by?: string | null
+          locked_at?: string | null
+          heartbeat_at?: string | null
+          run_after?: string
+          last_error?: string | null
           created_at?: string
         }
         Update: {
@@ -1826,9 +1838,15 @@ export type Database = {
           payload?: Json
           status?: string
           attempts?: number
+          max_attempts?: number
           agent_run_id?: string | null
           parent_run_id?: string | null
           cascade_run_id?: string | null
+          claimed_by?: string | null
+          locked_at?: string | null
+          heartbeat_at?: string | null
+          run_after?: string
+          last_error?: string | null
           created_at?: string
         }
         Relationships: [
@@ -1958,6 +1976,22 @@ export type Database = {
       }
     }
     Functions: {
+      claim_next_agent_job: {
+        Args: {
+          p_worker_id: string
+          p_stale_after_seconds?: number
+          p_default_max_attempts?: number
+        }
+        Returns: Json
+      }
+      fail_agent_job: {
+        Args: {
+          p_job_id: string
+          p_worker_id: string
+          p_error: string
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

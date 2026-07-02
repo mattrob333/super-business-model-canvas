@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | 0 | Baseline verification & deploy prep | **APPROVED** | `build/phase-0-baseline` (merged, PR #2, `db7cd1f`) | 2026-07-02 |
 | 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
-| 2 | Agent worker service | NOT STARTED | — | — |
+| 2 | Agent worker service | **IN PROGRESS** | `build/phase-2-worker` | 2026-07-02 |
 | 3 | Research engine & evidence | NOT STARTED | — | — |
 | 4 | Competitor canvases & gap engine | NOT STARTED | — | — |
 | 5 | Section agent workspaces | NOT STARTED | — | — |
@@ -263,7 +263,45 @@ updated to match each model's current catalog price. Gates re-run clean: tsc cle
 green, lint 69 (unchanged). RF-1-2 marked RESOLVED.
 
 ### Phase 2 — Agent worker service
-Tasks: 2.1 ☐ · 2.2 ☐ · 2.3 ☐ · 2.4 ☐ · 2.5 ☐ · 2.6 ☐ · 2.7 ☐ · 2.8 ☐ · 2.9 ☐ · 2.10 ☐
+Tasks: 2.1 ☑ · 2.2 ☑ · 2.3 ☐ · 2.4 ☐ · 2.5 ☐ · 2.6 ☐ · 2.7 ☐ · 2.8 ☐ · 2.9 ☐ · 2.10 ☐
+
+**2026-07-02 — Phase 2 started on branch `build/phase-2-worker`; work orders 2.1–2.2 complete.**
+
+- **Orientation completed before worker code:** read `HANDOFF.md`, `docs/BUILD_PLAN.md` Part I
+  + Phase 2 work orders, `docs/BUILD_STATE.md`, required SDK guide
+  `docs/specs/07_CLAUDE_AGENT_SDK_INTEGRATION.md`, and skimmed specs 00–06 for product/runtime
+  context. Implementation intentionally stopped at the first natural seam (2.1–2.2).
+- **2.1 Worker package skeleton:** created `worker/` as an independent Node/TypeScript package
+  with `@anthropic-ai/claude-agent-sdk@0.3.198`, Supabase service-role client wiring, env parsing,
+  Dockerfile, `.env.example`, README, strict `tsconfig`, ESLint, and Vitest harness. Zod is v4 in
+  the worker package because the Agent SDK peers on `^4.0.0`; the root app remains unchanged.
+- **2.2 Job loop:** added a testable queue loop with claim/heartbeat/complete/fail repository
+  boundary. Added migration `20260702110000_agent_job_queue_locking.sql` with queue metadata
+  (`claimed_by`, `locked_at`, `heartbeat_at`, `run_after`, `max_attempts`, `last_error`), claim
+  indexes, `claim_next_agent_job(...)` using `FOR UPDATE SKIP LOCKED`, and `fail_agent_job(...)`
+  for retry backoff vs `failed_permanent`. Mirrored into `supabase/schema.sql`, updated
+  `src/integrations/supabase/types.ts`, and extended `scripts/verify-schema.sql` checks.
+- **Honest scope note:** no `canvas_section_analysis` execution, MCP tools, workspace chat, edge
+  enqueue mode, frontend runtime switch, or guardrail hooks are implemented yet; those remain
+  2.3–2.10.
+
+**Gate results for this slice:**
+```
+cd worker && npm run typecheck  → exit 0
+cd worker && npm test           → 3 tests passed
+cd worker && npm run build      → exit 0
+cd worker && npm run lint       → exit 0
+npx tsc -p tsconfig.app.json --noEmit → exit 0
+npm run build                   → green
+npm run lint                    → 69 problems (50 errors, 19 warnings), frozen baseline unchanged
+```
+
+**Notes / constraints carried forward:**
+- `claim_next_agent_job` and `fail_agent_job` are migration/schema definitions only in this
+  environment; no live or local Supabase database was available to execute them. `verify-schema.sql`
+  now includes assertions the operator/reviewer can run after applying the migration.
+- The worker package install reports 0 vulnerabilities. npm warns that local Node `22.12.0` is
+  below a transitive ESLint engine preference (`^22.13.0`), but worker lint still exits 0.
 
 ### Phase 3 — Research engine & evidence
 Tasks: 3.1 ☐ · 3.2 ☐ · 3.3 ☐ · 3.4 ☐ · 3.5 ☐ · 3.6 ☐ · 3.7 ☐
