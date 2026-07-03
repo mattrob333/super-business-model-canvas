@@ -61,6 +61,27 @@ describe("CompanyResearchHandler", () => {
     expect(item).toMatchObject({ confidence: 0.5, flags: ["unsupported"] });
   });
 
+  it("reuses existing evidence rows instead of duplicating (RF-3-7)", async () => {
+    const client = new (class extends CompanyResearchFakeClient {
+      selectOne(table: string): Record<string, unknown> | null {
+        if (table === "evidence_items") return { id: "evidence-existing" };
+        return super.selectOne(table);
+      }
+    })();
+    const runner = new ScriptedRunner([
+      JSON.stringify({ claims: [{ section_key: "channels", text: "Acme has self-serve signup.", confidence: 0.7, evidence_index: 0 }] }),
+      JSON.stringify({ status: "confirmed", reason: "Supported." }),
+    ]);
+    const handler = new CompanyResearchHandler({ client: client.asSupabase(), runner, feedRunner: fixtureFeedRunner() });
+
+    await handler.handle(makeCompanyJob());
+
+    expect(client.inserts.filter((insert) => insert.table === "evidence_items")).toHaveLength(0);
+    const canvasInsert = client.inserts.find((insert) => insert.table === "canvas_section_versions");
+    const items = canvasInsert?.value.items as Array<{ evidence_ids: string[] }>;
+    expect(items[0]?.evidence_ids).toEqual(["evidence-existing"]);
+  });
+
   it("escalates extraction to mid route when budget extraction fails validation", async () => {
     const client = new CompanyResearchFakeClient();
     const runner = new ScriptedRunner([

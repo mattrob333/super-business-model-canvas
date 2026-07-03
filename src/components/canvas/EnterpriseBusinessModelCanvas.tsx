@@ -11,6 +11,7 @@ import {
 } from "./section-types";
 import type { CanvasSectionKey } from "./section-types";
 import { BMCSectionEditor } from "@/components/BMCSectionEditor";
+import { useCanvasEvidence } from "@/hooks/useCanvasEvidence";
 
 /** Two-row pillar sections — extra vertical room for all bullets */
 const TALL_PILLAR_SECTIONS = new Set<CanvasSectionKey>([
@@ -85,6 +86,11 @@ export function EnterpriseBusinessModelCanvas({
   const [selectedSection, setSelectedSection] =
     useState<SelectedSection | null>(null);
 
+  // Latest canvas_section_versions with hydrated evidence_items — the real
+  // data behind evidence popovers. Sections without versions fall back to
+  // the legacy analysis strings below.
+  const { itemsBySection: versionItems } = useCanvasEvidence();
+
   const handleEditorOpenChange = useCallback(
     (open: boolean) => {
       setEditorOpen(open);
@@ -97,12 +103,15 @@ export function EnterpriseBusinessModelCanvas({
     (key: CanvasSectionKey): { items: Array<string | CanvasItemEvidence>; notes?: string } => {
       const legacyKey = LEGACY_SECTION_KEYS[key];
       const notesKey = `${legacyKey}_notes` as keyof LegacyCanvasData;
+      const versioned = versionItems[key];
       return {
-        items: normalizeCanvasItems(data[legacyKey as keyof LegacyCanvasData]),
+        items: versioned && versioned.length > 0
+          ? versioned
+          : normalizeCanvasItems(data[legacyKey as keyof LegacyCanvasData]),
         notes: data[notesKey] as string | undefined,
       };
     },
-    [data],
+    [data, versionItems],
   );
 
   const handleSectionClick = useCallback(

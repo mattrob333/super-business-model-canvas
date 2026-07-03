@@ -3,7 +3,7 @@ import { StalenessSweepHandler } from "../jobs/staleness-sweep.js";
 import type { AgentJob } from "../queue/types.js";
 
 describe("StalenessSweepHandler", () => {
-  it("downgrades old canvas sections account-scoped", async () => {
+  it("downgrades old canvas sections account-scoped, including never-verified rows", async () => {
     const client = new FakeClient();
     const handler = new StalenessSweepHandler({ client: client.asSupabase() });
 
@@ -11,16 +11,35 @@ describe("StalenessSweepHandler", () => {
 
     expect(client.updates).toHaveLength(2);
     expect(client.updates[0]).toMatchObject({
+      table: "canvas_section_versions",
       values: { freshness_status: "outdated" },
       filters: [["account_id", "account-1"], ["freshness_status", "stale"]],
     });
-    expect(client.updates[0]?.lessThan?.[0]).toBe("last_verified_at");
     expect(client.updates[1]).toMatchObject({
+      table: "canvas_section_versions",
       values: { freshness_status: "stale" },
       filters: [["account_id", "account-1"]],
       inFilters: [["freshness_status", ["fresh", "unverified"]]],
     });
-    expect(client.updates[1]?.lessThan?.[0]).toBe("last_verified_at");
+
+    // Null last_verified_at rows must be aged by created_at, not skipped.
+    for (const update of client.updates) {
+      expect(update.orFilter).toContain("last_verified_at.lt.");
+      expect(update.orFilter).toContain("last_verified_at.is.null,created_at.lt.");
+    }
+  });
+
+  it("marks the durable agent run completed when the job carries one", async () => {
+    const client = new FakeClient();
+    const handler = new StalenessSweepHandler({ client: client.asSupabase() });
+
+    await handler.handle({ ...makeJob(), agent_run_id: "run-9" });
+
+    const runUpdate = client.updates.find((update) => update.table === "agent_runs");
+    expect(runUpdate).toMatchObject({
+      values: { status: "completed" },
+      filters: [["id", "run-9"], ["account_id", "account-1"]],
+    });
   });
 });
 
@@ -47,28 +66,29 @@ function makeJob(): AgentJob {
 
 class FakeClient {
   public updates: Array<{
+    table: string;
     values: Record<string, unknown>;
     filters: Array<[string, unknown]>;
     inFilters: Array<[string, unknown[]]>;
-    lessThan: [string, unknown] | null;
+    orFilter: string | null;
   }> = [];
 
   asSupabase(): never {
     return this as never;
   }
 
-  from(): FakeQuery {
-    return new FakeQuery(this);
+  from(table: string): FakeQuery {
+    return new FakeQuery(this, table);
   }
 }
 
-class FakeQuery {
+class FakeQuery implements PromiseLike<{ error: null }> {
   private values: Record<string, unknown> = {};
   private readonly filters: Array<[string, unknown]> = [];
   private readonly inFilters: Array<[string, unknown[]]> = [];
-  private lessThan: [string, unknown] | null = null;
+  private orFilter: string | null = null;
 
-  constructor(private readonly client: FakeClient) {}
+  constructor(private readonly client: FakeClient, private readonly table: string) {}
 
   update(values: Record<string, unknown>): this {
     this.values = values;
@@ -85,14 +105,21 @@ class FakeQuery {
     return this;
   }
 
-  lt(column: string, value: unknown): Promise<{ error: null }> {
-    this.lessThan = [column, value];
+  or(filter: string): this {
+    this.orFilter = filter;
+    return this;
+  }
+
+  then<TResult1 = { error: null }, TResult2 = never>(
+    onfulfilled?: ((value: { error: null }) => TResult1 | PromiseLike<TResult1>) | null,
+  ): PromiseLike<TResult1 | TResult2> {
     this.client.updates.push({
+      table: this.table,
       values: this.values,
       filters: this.filters,
       inFilters: this.inFilters,
-      lessThan: this.lessThan,
+      orFilter: this.orFilter,
     });
-    return Promise.resolve({ error: null });
+    return Promise.resolve({ error: null as null }).then(onfulfilled);
   }
 }

@@ -421,7 +421,9 @@ serve(async (req) => {
 
       if (runError) throw new Error(`Failed to create queued agent run: ${runError.message}`);
 
-      const jobKind = runType === 'workspace_chat' ? 'workspace_chat' : 'canvas_section_analysis';
+      // Worker-dispatched kinds; anything else falls back to section analysis.
+      const workerJobKinds = ['workspace_chat', 'company_research', 'feed_refresh', 'staleness_sweep'];
+      const jobKind = workerJobKinds.includes(runType) ? runType : 'canvas_section_analysis';
       const { error: jobError } = await adminClient.from('agent_jobs').insert({
         account_id: accountId,
         kind: jobKind,

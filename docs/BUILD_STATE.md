@@ -11,7 +11,7 @@
 | 0 | Baseline verification & deploy prep | **APPROVED** | `build/phase-0-baseline` (merged, PR #2, `db7cd1f`) | 2026-07-02 |
 | 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
 | 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
-| 3 | Research engine & evidence | **AWAITING REVIEW** | `build/phase-3-research` | 2026-07-02 |
+| 3 | Research engine & evidence | **APPROVED** | `build/phase-3-research` (merged with reviewer fixes, PR #13) | 2026-07-03 |
 | 4 | Competitor canvases & gap engine | NOT STARTED | â€” | â€” |
 | 5 | Section agent workspaces | NOT STARTED | â€” | â€” |
 | 6 | War Room & orchestration | NOT STARTED | â€” | â€” |
@@ -71,6 +71,15 @@ Status: OPEN | RESOLVED (<how>)
   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ANTHROPIC_API_KEY=...`, then `fly deploy
   --dockerfile worker/Dockerfile`. After the worker is healthy, deploy the edge functions above
   and only then switch frontend/staging `VITE_RUNTIME_MODE=enqueue`.
+
+- **From Phase 3 reviewer pass (2026-07-03):**
+  1. Apply migration `20260703090000_staleness_loop_provisioning.sql` to live project
+     `mehhuxzamnpxnkbrslls` (build agent can do this via Supabase MCP, same as prior phases).
+  2. Redeploy the two edge functions updated in this pass when doing the standing deploy:
+     `supabase functions deploy agent-run` and `supabase functions deploy scheduled-loop-tick`.
+  3. After `ANTHROPIC_API_KEY` exists in the worker env, run the live verifier golden set once
+     and record the score here: from `worker/`:
+     `GOLDEN_LIVE=1 ANTHROPIC_API_KEY=sk-... npx vitest run verifier-golden` (must be >= 9/10).
 
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
 
@@ -567,6 +576,44 @@ npm run lint                    -> 69 problems (50 errors, 19 warnings), within 
 
 ### Phase 3 - Research engine & evidence
 Tasks: 3.1 [x] - 3.2 [x] - 3.3 [x] - 3.4 [x] - 3.5 [x] - 3.6 [x] - 3.7 [x]
+
+**2026-07-03 - REVIEWER PASS: RF-3-8..11 fixed directly by the reviewer; Phase 3 APPROVED and
+merged to main (PR #13).**
+
+- **RF-3-8 (BLOCKER, fixed):** the verifier golden set now exercises the real verification
+  unit. `verifyClaimAgainstExcerpt` is exported from `worker/src/jobs/company-research.ts`
+  (same prompt/parsing/mapping the pipeline uses) and the test runs all 10 golden claims
+  through it: fixture mode replays recorded verifier responses (including fenced and malformed
+  outputs, which must fail closed to `unsupported`) and asserts the claim/excerpt actually
+  reach the prompt; live mode (`GOLDEN_LIVE=1` + `ANTHROPIC_API_KEY`) runs the same claims
+  against the real research_verify model and requires >= 9/10.
+- **RF-3-9 (HIGH, fixed):** evidence popovers now have a real data path. New
+  `src/hooks/useCanvasEvidence.ts` loads the latest `canvas_section_versions` per section for
+  the active account and hydrates `evidence_ids` into `evidence_items` rows;
+  `EnterpriseBusinessModelCanvas` prefers versioned rich items and falls back to legacy
+  analysis strings per section.
+- **RF-3-10 (MEDIUM, fixed):** the staleness sweep is now actually scheduled and complete:
+  - Migration `20260703090000_staleness_loop_provisioning.sql`: unique partial index
+    `(account_id, action_key)`, `provision_account_defaults` now seeds a weekly
+    `staleness_sweep` loop (Mon 06:00 UTC, orchestrator-owned) for new accounts, plus a
+    backfill for existing accounts. Mirrored in `schema.sql`; provisioning + idempotency
+    functionally tested on scratch Postgres.
+  - `scheduled-loop-tick` now routes action-key loops (`staleness_sweep`,
+    `feed_refresh:<feed_key>`) to enqueued worker jobs; `agent-run` maps those runTypes to the
+    matching job kinds (previously ONLY workspace_chat/canvas_section_analysis were reachable,
+    so loop-driven worker jobs had no producer at all).
+  - Worker sweep treats null `last_verified_at` as never-verified (ages by `created_at`).
+  - New `run-status.ts` helper: `feed_refresh` and `staleness_sweep` jobs now mark their
+    durable `agent_runs` row completed (previously left `pending` forever).
+- **RF-3-11 (LOW, fixed):** verify-schema task_class count updated to 10; added checks for the
+  unique loop index and staleness provisioning.
+- **RF-3-7 (LOW, fixed early):** research evidence writes now reuse an existing
+  `evidence_items` row matching (account, source_url, excerpt) instead of duplicating; test added.
+- **Reviewer gate results:** worker typecheck/test/build/lint clean (36 passed, 2 skipped:
+  SQL integration + live golden, both env-gated); root tsc exit 0; `npm run build` green;
+  `npm run lint` 68 problems (frozen ceiling 68). Scratch Postgres: fresh `schema.sql` -> 86/86
+  verification assertions PASS; main schema + three Phase-3 migrations applied in order ->
+  86/86 PASS; provisioning functional test seeds exactly one staleness loop per account.
 
 **2026-07-02 - RF-3-4 through RF-3-7 fixed/logged; work orders 3.5-3.7 complete.**
 

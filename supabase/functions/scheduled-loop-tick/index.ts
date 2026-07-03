@@ -21,6 +21,7 @@ interface ScheduledLoop {
   last_run_at: string | null;
   next_run_at: string | null;
   failure_count: number;
+  action_key: string | null;
 }
 
 /**
@@ -102,13 +103,30 @@ async function executeAgentRun(
 ): Promise<{ success: boolean; error?: string }> {
   const agentRunUrl = `${supabaseUrl}/functions/v1/agent-run`;
 
-  // Build input from the loop's prompt template (or default canvas analysis)
-  const input: Record<string, unknown> = {
+  // Action-key loops map to durable worker jobs (staleness_sweep,
+  // feed_refresh:<feed_key>); everything else keeps the legacy inline
+  // section-analysis behavior.
+  let runType = 'scheduled_loop';
+  let mode: 'enqueue' | undefined;
+  let input: Record<string, unknown> = {
     section_key: 'value_propositions', // Default section for scheduled runs
     section_label: 'Value Propositions',
     triggered_by_loop: loop.loop_name,
     prompt_template: loop.prompt_template,
   };
+
+  if (loop.action_key === 'staleness_sweep') {
+    runType = 'staleness_sweep';
+    mode = 'enqueue';
+    input = { triggered_by_loop: loop.loop_name };
+  } else if (loop.action_key?.startsWith('feed_refresh:')) {
+    runType = 'feed_refresh';
+    mode = 'enqueue';
+    input = {
+      feed_key: loop.action_key.slice('feed_refresh:'.length),
+      triggered_by_loop: loop.loop_name,
+    };
+  }
 
   try {
     const response = await fetch(agentRunUrl, {
@@ -120,9 +138,10 @@ async function executeAgentRun(
       body: JSON.stringify({
         agentProfileId: loop.agent_profile_id,
         accountId: loop.account_id,
-        runType: 'scheduled_loop',
+        runType,
         triggerType: 'scheduled',
         triggeredBy: `scheduled_loop:${loop.id}`,
+        mode,
         input,
       }),
     });

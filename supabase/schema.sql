@@ -629,6 +629,17 @@ begin
   from public.model_routes
   where account_id is null
   on conflict (account_id, route_key) do nothing;
+
+  -- Default weekly canvas staleness sweep (Mondays 06:00 UTC), owned by the
+  -- account's orchestrator. The loop tick enqueues a staleness_sweep worker job.
+  insert into public.scheduled_loops (
+    account_id, agent_profile_id, loop_name, schedule, action_key, status
+  )
+  select
+    _account_id, p.id, 'Canvas staleness sweep', '0 6 * * 1', 'staleness_sweep', 'active'
+  from public.agent_profiles p
+  where p.account_id = _account_id and p.agent_key = 'orchestrator'
+  on conflict (account_id, action_key) where action_key is not null do nothing;
 end;
 $$;
 
@@ -2379,6 +2390,9 @@ create index if not exists idx_data_feeds_account_key on public.data_feeds(accou
 create index if not exists idx_data_feeds_health on public.data_feeds(health);
 create index if not exists idx_feed_cache_lookup on public.feed_cache(account_id, feed_key, cache_key, expires_at desc);
 create index if not exists idx_scheduled_loops_action_key on public.scheduled_loops(action_key);
+create unique index if not exists idx_scheduled_loops_account_action
+  on public.scheduled_loops(account_id, action_key)
+  where action_key is not null;
 
 alter table public.data_feeds enable row level security;
 alter table public.feed_cache enable row level security;

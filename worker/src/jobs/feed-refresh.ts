@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { asRecord } from "../db/json.js";
 import { FeedRunner } from "../feeds/feed-runner.js";
 import type { FeedRuntimeConfig } from "../feeds/types.js";
+import { markJobRunCompleted } from "./run-status.js";
 import type { AgentJob } from "../queue/types.js";
 
 export interface FeedRefreshDependencies extends FeedRuntimeConfig {
@@ -22,7 +23,7 @@ export class FeedRefreshHandler {
     const actionKey = `feed_refresh:${feedKey}`;
     await this.ensureScheduledLoopAllows(job.account_id, actionKey);
 
-    await this.runner.refresh({
+    const result = await this.runner.refresh({
       accountId: job.account_id,
       feedKey,
       cacheKey: readOptionalString(payload.cache_key ?? payload.cacheKey),
@@ -30,6 +31,13 @@ export class FeedRefreshHandler {
       companyUrl: readOptionalString(payload.company_url ?? payload.companyUrl),
       query: readOptionalString(payload.query),
       force: payload.force === true,
+    });
+
+    await markJobRunCompleted(this.deps.client, job, `Feed ${feedKey} refreshed (${result.health}).`, {
+      feed_key: feedKey,
+      health: result.health,
+      evidence_count: result.evidence.length,
+      metric_count: result.metrics.length,
     });
   }
 

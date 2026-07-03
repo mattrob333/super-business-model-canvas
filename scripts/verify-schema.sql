@@ -131,11 +131,11 @@ with checks as (
 
   union all
 
-  select 'seed: model_routes has 9 task_class default rows',
+  select 'seed: model_routes has 10 task_class default rows',
          case when (
            select count(distinct task_class) from public.model_routes
            where account_id is null and task_class is not null
-         ) = 9 then 'PASS' else 'FAIL' end
+         ) = 10 then 'PASS' else 'FAIL' end
 
   union all
 
@@ -259,6 +259,26 @@ with checks as (
              and task_class = 'extract_escalated'
              and provider = 'anthropic'
              and model_name = 'claude-haiku-4-5-20251001'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  -- ---- 9. RF-3-10 staleness sweep scheduling ----
+  select 'index exists: idx_scheduled_loops_account_action (unique partial)',
+         case when exists (
+           select 1 from pg_indexes
+           where schemaname = 'public' and indexname = 'idx_scheduled_loops_account_action'
+             and indexdef like '%UNIQUE%' and indexdef like '%action_key IS NOT NULL%'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'provisioning seeds the staleness_sweep loop',
+         case when exists (
+           select 1 from pg_proc p
+           join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'provision_account_defaults'
+             and pg_get_functiondef(p.oid) like '%staleness_sweep%'
          ) then 'PASS' else 'FAIL' end
 
 )

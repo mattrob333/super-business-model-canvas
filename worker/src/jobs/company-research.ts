@@ -33,7 +33,7 @@ interface ExtractedClaim {
   evidenceIndex: number;
 }
 
-type VerificationStatus = "confirmed" | "unsupported" | "contradicted";
+export type VerificationStatus = "confirmed" | "unsupported" | "contradicted";
 
 interface VerifiedClaim extends ExtractedClaim {
   status: VerificationStatus;
@@ -152,17 +152,7 @@ export class CompanyResearchHandler {
   }
 
   private async verifyClaim(route: ModelRoute, claim: ExtractedClaim, evidence: EvidenceCandidate | undefined): Promise<{ status: VerificationStatus; reason: string }> {
-    const result = await this.runnerForRoute(route).run({
-      model: route.model_name,
-      modelParams: route.params ?? undefined,
-      maxTurns: 8,
-      maxBudgetUsd: budgetForRoute(route),
-      prompt: `Classify the claim against the source excerpt as confirmed, unsupported, or contradicted. Return JSON only: {"status":"confirmed","reason":"..."}.\n\nClaim: ${claim.text}\n\nSource excerpt:\n${evidence?.excerpt ?? ""}`,
-      systemPrompt: "You are an adversarial verifier. Never give credit for claims not supported by the excerpt.",
-      mcpServers: {},
-      allowedTools: [],
-    });
-    return safeParseVerification(result.resultText);
+    return verifyClaimAgainstExcerpt(this.runnerForRoute(route), route, claim.text, evidence?.excerpt ?? "");
   }
 
   private runnerForRoute(route: ModelRoute): AgentRunner {
@@ -177,6 +167,11 @@ export class CompanyResearchHandler {
   private async writeEvidence(job: AgentJob, evidence: EvidenceCandidate[]): Promise<string[]> {
     const ids: string[] = [];
     for (const item of evidence) {
+      const existingId = await this.findExistingEvidence(job.account_id, item);
+      if (existingId) {
+        ids.push(existingId);
+        continue;
+      }
       const { data, error } = await this.deps.client
         .from("evidence_items")
         .insert({
@@ -196,6 +191,21 @@ export class CompanyResearchHandler {
       ids.push(data.id);
     }
     return ids;
+  }
+
+  /** RF-3-7: reuse an existing evidence row for the same account/source/excerpt instead of duplicating. */
+  private async findExistingEvidence(accountId: string, item: EvidenceCandidate): Promise<string | null> {
+    if (!item.sourceUrl || !item.excerpt) return null;
+    const { data, error } = await this.deps.client
+      .from("evidence_items")
+      .select("id")
+      .eq("account_id", accountId)
+      .eq("source_url", item.sourceUrl)
+      .eq("excerpt", item.excerpt)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to check existing evidence: ${error.message}`);
+    return data?.id ?? null;
   }
 
   private async writeVerifiedClaims(job: AgentJob, context: BusinessContext, claims: VerifiedClaim[]): Promise<void> {
@@ -294,6 +304,30 @@ export class CompanyResearchHandler {
   }
 }
 
+/**
+ * The verification step, exported as a standalone unit so the golden-set test
+ * exercises the REAL prompt construction, parsing, and status mapping — not a
+ * reimplementation. `route` only needs model_name/params/cost fields here.
+ */
+export async function verifyClaimAgainstExcerpt(
+  runner: AgentRunner,
+  route: Pick<ModelRoute, "model_name" | "params" | "cost_per_1k_in" | "cost_per_1k_out">,
+  claimText: string,
+  excerpt: string,
+): Promise<{ status: VerificationStatus; reason: string }> {
+  const result = await runner.run({
+    model: route.model_name,
+    modelParams: route.params ?? undefined,
+    maxTurns: 8,
+    maxBudgetUsd: budgetForRoute(route),
+    prompt: `Classify the claim against the source excerpt as confirmed, unsupported, or contradicted. Return JSON only: {"status":"confirmed","reason":"..."}.\n\nClaim: ${claimText}\n\nSource excerpt:\n${excerpt}`,
+    systemPrompt: "You are an adversarial verifier. Never give credit for claims not supported by the excerpt.",
+    mcpServers: {},
+    allowedTools: [],
+  });
+  return safeParseVerification(result.resultText);
+}
+
 function requiredRoute(routes: ModelRoute[], accountId: string, routeKey: string, taskClass: string): ModelRoute {
   const route = chooseModelRoute(routes.filter((candidate) => candidate.task_class === taskClass), accountId, routeKey, taskClass);
   if (!route) throw new Error(`No model route configured for ${taskClass}/${routeKey}`);
@@ -371,7 +405,7 @@ function average(values: number[]): number | null {
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 100) / 100;
 }
 
-function budgetForRoute(route: ModelRoute): number {
+function budgetForRoute(route: Pick<ModelRoute, "cost_per_1k_in" | "cost_per_1k_out">): number {
   const input = route.cost_per_1k_in ?? 0.002;
   const output = route.cost_per_1k_out ?? 0.01;
   return Math.max(0.03, input * 8 + output * 4);
