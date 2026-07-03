@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentRunner } from "../agent/runner.js";
-import { ClaudeAgentRunner } from "../agent/runner.js";
+import { ClaudeAgentRunner, OpenRouterChatRunner } from "../agent/runner.js";
 import { asRecord } from "../db/json.js";
 import { SECTION_LABELS, isSectionKey, type SectionKey } from "../domain/sections.js";
 import { FeedRunner } from "../feeds/feed-runner.js";
@@ -14,6 +14,7 @@ interface ModelRoute {
   task_class?: string | null;
   provider: string;
   model_name: string;
+  params?: Record<string, unknown> | null;
   cost_per_1k_in: number | null;
   cost_per_1k_out: number | null;
 }
@@ -44,6 +45,8 @@ export interface CompanyResearchDependencies extends FeedRuntimeConfig {
   client: SupabaseClient;
   runner?: AgentRunner;
   feedRunner?: Pick<FeedRunner, "refresh">;
+  openRouterApiKey?: string;
+  fetch?: typeof fetch;
 }
 
 export class CompanyResearchHandler {
@@ -74,15 +77,18 @@ export class CompanyResearchHandler {
 
     const evidenceIds = await this.writeEvidence(job, feedResult.evidence);
     const routes = await this.loadModelRoutes(job.account_id);
-    const extractRoute = requiredRoute(routes, job.account_id, "budget", "extract");
-    const verifyRoute = requiredRoute(routes, job.account_id, "mid", "research_verify");
-    if (verifyRoute.route_key === "budget") throw new Error("research_verify route must not resolve to budget tier");
+    const extractRoute = requiredRoute(routes, job.account_id, "extract", "extract");
+    const escalatedRoute = requiredRoute(routes, job.account_id, "extract_escalated", "extract_escalated");
+    assertDifferentRoute(extractRoute, escalatedRoute);
+    const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
+    assertVerifierRoute(verifyRoute);
 
     const extract = await this.extractClaims(extractRoute, context, feedResult.evidence);
     const escalated = extract.length === 0;
     const claims = escalated
-      ? await this.extractClaims(requiredRoute(routes, job.account_id, "mid", "extract"), context, feedResult.evidence)
+      ? await this.extractClaims(escalatedRoute, context, feedResult.evidence)
       : extract;
+    if (escalated && claims.length === 0) throw new Error("company_research extraction failed validation after escalation");
 
     await this.writeEscalationMetric(job.account_id, escalated);
 
@@ -123,17 +129,18 @@ export class CompanyResearchHandler {
   private async loadModelRoutes(accountId: string): Promise<ModelRoute[]> {
     const { data, error } = await this.deps.client
       .from("model_routes")
-      .select("account_id, route_key, task_class, provider, model_name, cost_per_1k_in, cost_per_1k_out")
+      .select("account_id, route_key, task_class, provider, model_name, params, cost_per_1k_in, cost_per_1k_out")
       .or(`account_id.eq.${accountId},account_id.is.null`)
-      .or("task_class.eq.extract,task_class.eq.research_verify,route_key.eq.budget,route_key.eq.mid")
+      .or("task_class.eq.extract,task_class.eq.extract_escalated,task_class.eq.research_verify")
       .order("account_id", { ascending: false, nullsFirst: false });
     if (error) throw new Error(`Failed to load research model routes: ${error.message}`);
     return (data ?? []) as ModelRoute[];
   }
 
   private async extractClaims(route: ModelRoute, context: BusinessContext, evidence: EvidenceCandidate[]): Promise<ExtractedClaim[]> {
-    const result = await this.runner.run({
+    const result = await this.runnerForRoute(route).run({
       model: route.model_name,
+      modelParams: route.params ?? undefined,
       maxTurns: 12,
       maxBudgetUsd: budgetForRoute(route),
       prompt: `Extract Business Model Canvas claims for ${context.company_name ?? "the company"} from these source excerpts. Return JSON only: {"claims":[{"section_key":"value_propositions","text":"...","confidence":0.7,"evidence_index":0}]}.\n\n${evidencePrompt(evidence)}`,
@@ -141,12 +148,13 @@ export class CompanyResearchHandler {
       mcpServers: {},
       allowedTools: [],
     });
-    return parseClaims(result.resultText);
+    return safeParseClaims(result.resultText);
   }
 
   private async verifyClaim(route: ModelRoute, claim: ExtractedClaim, evidence: EvidenceCandidate | undefined): Promise<{ status: VerificationStatus; reason: string }> {
-    const result = await this.runner.run({
+    const result = await this.runnerForRoute(route).run({
       model: route.model_name,
+      modelParams: route.params ?? undefined,
       maxTurns: 8,
       maxBudgetUsd: budgetForRoute(route),
       prompt: `Classify the claim against the source excerpt as confirmed, unsupported, or contradicted. Return JSON only: {"status":"confirmed","reason":"..."}.\n\nClaim: ${claim.text}\n\nSource excerpt:\n${evidence?.excerpt ?? ""}`,
@@ -154,7 +162,16 @@ export class CompanyResearchHandler {
       mcpServers: {},
       allowedTools: [],
     });
-    return parseVerification(result.resultText);
+    return safeParseVerification(result.resultText);
+  }
+
+  private runnerForRoute(route: ModelRoute): AgentRunner {
+    if (this.deps.runner) return this.deps.runner;
+    if (route.provider === "anthropic") return this.runner;
+    if (route.provider === "openrouter") {
+      return new OpenRouterChatRunner(this.deps.openRouterApiKey, this.deps.fetch);
+    }
+    throw new Error(`Unsupported model route provider for company_research: ${route.provider}`);
   }
 
   private async writeEvidence(job: AgentJob, evidence: EvidenceCandidate[]): Promise<string[]> {
@@ -283,8 +300,9 @@ function requiredRoute(routes: ModelRoute[], accountId: string, routeKey: string
   return route;
 }
 
-function parseClaims(text: string): ExtractedClaim[] {
-  const parsed = JSON.parse(text) as { claims?: unknown };
+function safeParseClaims(text: string): ExtractedClaim[] {
+  const parsed = parseJsonObject(text);
+  if (!parsed) return [];
   if (!Array.isArray(parsed.claims)) return [];
   return parsed.claims.flatMap((claim) => {
     const record = asRecord(claim);
@@ -300,13 +318,38 @@ function parseClaims(text: string): ExtractedClaim[] {
   });
 }
 
-function parseVerification(text: string): { status: VerificationStatus; reason: string } {
-  const parsed = asRecord(JSON.parse(text));
+function safeParseVerification(text: string): { status: VerificationStatus; reason: string } {
+  const parsed = parseJsonObject(text);
+  if (!parsed) return { status: "unsupported", reason: "verifier output unparseable" };
   const status = parsed.status;
   if (status !== "confirmed" && status !== "unsupported" && status !== "contradicted") {
     return { status: "unsupported", reason: "Verifier returned an invalid status." };
   }
   return { status, reason: readString(parsed.reason) ?? "" };
+}
+
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  const unfenced = text.replace(/```(?:json)?/gi, "```").replace(/```/g, "").trim();
+  const start = unfenced.indexOf("{");
+  const end = unfenced.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return asRecord(JSON.parse(unfenced.slice(start, end + 1)));
+  } catch {
+    return null;
+  }
+}
+
+function assertDifferentRoute(primary: ModelRoute, escalated: ModelRoute): void {
+  if (primary.provider === escalated.provider && primary.model_name === escalated.model_name) {
+    throw new Error("extract_escalated route must differ from primary extract route");
+  }
+}
+
+function assertVerifierRoute(route: ModelRoute): void {
+  if (route.task_class !== "research_verify") throw new Error("research_verify route resolved to the wrong task_class");
+  if (route.provider !== "anthropic") throw new Error("research_verify route must use a mid-or-better Anthropic model");
+  if (!/claude-(haiku|sonnet|opus)/.test(route.model_name)) throw new Error("research_verify route must use a mid-or-better Claude model");
 }
 
 function earnedConfidence(claim: VerifiedClaim): number {

@@ -2288,6 +2288,8 @@ insert into public.model_routes
 values
   (null, 'extract', 'Extract (budget)', 'openrouter', 'google/gemini-2.5-flash-lite',
    '{"temperature":0.2,"max_tokens":2000}'::jsonb, false, 'extract', 0.0001, 0.0004, 'human'),
+  (null, 'extract_escalated', 'Extract Escalated (mid)', 'anthropic', 'claude-haiku-4-5-20251001',
+   '{"temperature":0.2,"max_tokens":3000}'::jsonb, false, 'extract_escalated', 0.001, 0.005, 'human'),
   (null, 'classify', 'Classify (budget)', 'openrouter', 'qwen/qwen-2.5-7b-instruct',
    '{"temperature":0.1,"max_tokens":500}'::jsonb, false, 'classify', 0.00005, 0.00015, 'human'),
   (null, 'summarize', 'Summarize (budget-mid)', 'openrouter', 'anthropic/claude-haiku-4.5',

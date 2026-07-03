@@ -181,6 +181,24 @@ describe("FeedRefreshHandler", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("writes degraded feed health when an upstream returns 404", async () => {
+    const client = new FeedRunnerFakeClient();
+    const fetch = vi.fn(async () => new Response("not found", { status: 404 }));
+    const runner = new FeedRunner(client.asSupabase(), { githubToken: "github-token", fetch });
+
+    await expect(runner.refresh({
+      accountId: "account-1",
+      feedKey: "github_repo_stats",
+      cacheKey: "repo-404",
+      force: true,
+    })).resolves.toMatchObject({ health: "degraded", error: "GitHub owner/repo failed with HTTP 404" });
+    expect(client.cacheRows.at(-1)).toMatchObject({ health: "degraded" });
+    expect(client.healthUpdates.at(-1)).toMatchObject({
+      health: "degraded",
+      last_error: "GitHub owner/repo failed with HTTP 404",
+    });
+  });
+
   it("requires an active scheduled loop matching feed_refresh:<feed_key>", async () => {
     const client = new FakeSupabaseClient();
     const handler = new FeedRefreshHandler({
@@ -276,6 +294,7 @@ interface CacheFixtureRow {
 
 class FeedRunnerFakeClient {
   public cacheRows: CacheFixtureRow[] = [];
+  public healthUpdates: Array<Record<string, unknown>> = [];
 
   asSupabase(): never {
     return this as never;
@@ -289,7 +308,7 @@ class FeedRunnerFakeClient {
 class FeedRunnerFakeQuery {
   private readonly filters = new Map<string, unknown>();
   private gtFilter: [string, string] | null = null;
-  private upsertValue: CacheFixtureRow | null = null;
+  private updateValue: Record<string, unknown> | null = null;
 
   constructor(
     private readonly client: FeedRunnerFakeClient,
@@ -323,7 +342,6 @@ class FeedRunnerFakeQuery {
   }
 
   upsert(value: CacheFixtureRow): Promise<{ error: null }> {
-    this.upsertValue = value;
     const existingIndex = this.client.cacheRows.findIndex((row) =>
       row.account_id === value.account_id
       && row.feed_key === value.feed_key
@@ -333,7 +351,8 @@ class FeedRunnerFakeQuery {
     return Promise.resolve({ error: null });
   }
 
-  update(): this {
+  update(value: Record<string, unknown>): this {
+    this.updateValue = value;
     return this;
   }
 
@@ -362,5 +381,12 @@ class FeedRunnerFakeQuery {
     }
 
     return Promise.resolve({ data: null, error: null });
+  }
+
+  then(resolve: (value: { error: null }) => void): void {
+    if (this.table === "data_feeds" && this.updateValue) {
+      this.client.healthUpdates.push(this.updateValue);
+    }
+    resolve({ error: null });
   }
 }

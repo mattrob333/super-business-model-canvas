@@ -11,7 +11,7 @@
 | 0 | Baseline verification & deploy prep | **APPROVED** | `build/phase-0-baseline` (merged, PR #2, `db7cd1f`) | 2026-07-02 |
 | 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
 | 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
-| 3 | Research engine & evidence | **IN PROGRESS** | `build/phase-3-research` | 2026-07-02 |
+| 3 | Research engine & evidence | **AWAITING REVIEW** | `build/phase-3-research` | 2026-07-02 |
 | 4 | Competitor canvases & gap engine | NOT STARTED | â€” | â€” |
 | 5 | Section agent workspaces | NOT STARTED | â€” | â€” |
 | 6 | War Room & orchestration | NOT STARTED | â€” | â€” |
@@ -66,7 +66,7 @@ Status: OPEN | RESOLVED (<how>)
   `SECTION_ANALYSIS_MAX_TURNS`, `SECTION_ANALYSIS_TASK_BUDGET_TOKENS`,
   `SECTION_ANALYSIS_MAX_BUDGET_USD`, `WORKSPACE_CHAT_MAX_TURNS`,
   `WORKSPACE_CHAT_TASK_BUDGET_TOKENS`, `WORKSPACE_CHAT_MAX_BUDGET_USD`, `XAI_API_KEY`,
-  `FIRECRAWL_API_KEY`, `FRED_API_KEY`, `GOOGLE_TRENDS_API_KEY`, `GITHUB_TOKEN`. Example Fly path: from repo root run `fly launch --dockerfile
+  `FIRECRAWL_API_KEY`, `FRED_API_KEY`, `GOOGLE_TRENDS_API_KEY`, `GITHUB_TOKEN`, `OPENROUTER_API_KEY`. Example Fly path: from repo root run `fly launch --dockerfile
   worker/Dockerfile --name super-bmc-worker --no-deploy`, set secrets with `fly secrets set
   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ANTHROPIC_API_KEY=...`, then `fly deploy
   --dockerfile worker/Dockerfile`. After the worker is healthy, deploy the edge functions above
@@ -566,7 +566,43 @@ npm run lint                    -> 69 problems (50 errors, 19 warnings), within 
   68 problems, within frozen <=68 baseline.
 
 ### Phase 3 - Research engine & evidence
-Tasks: 3.1 [x] - 3.2 [x] - 3.3 [x] - 3.4 [x] - 3.5 [ ] - 3.6 [ ] - 3.7 [ ]
+Tasks: 3.1 [x] - 3.2 [x] - 3.3 [x] - 3.4 [x] - 3.5 [x] - 3.6 [x] - 3.7 [x]
+
+**2026-07-02 - RF-3-4 through RF-3-7 fixed/logged; work orders 3.5-3.7 complete.**
+
+- **RF-3-4:** added provider-aware research execution. Anthropic routes use `ClaudeAgentRunner`;
+  OpenRouter routes use `OpenRouterChatRunner` against `https://openrouter.ai/api/v1/chat/completions`
+  with route params and clear `OPENROUTER_API_KEY not configured` failures. Worker env/docs now include
+  `OPENROUTER_API_KEY`.
+- **RF-3-5:** added migration `20260702190000_add_extract_escalated_route.sql`, mirrored in
+  `supabase/schema.sql`, and extended `scripts/verify-schema.sql`. `company_research` now escalates
+  to task class `extract_escalated`, guards that the escalated model differs from primary extract,
+  and enforces `research_verify` stays on an Anthropic Claude route.
+- **RF-3-6:** model output parsing is tolerant of fenced/prose-wrapped JSON. Unparseable primary
+  extraction triggers escalation; unparseable verifier output becomes an unsupported verdict with
+  confidence capped at 0.5.
+- **RF-3-7:** logged as known debt: repeated research runs can duplicate `evidence_items` for the same
+  source URL. Candidate fix is source URL plus content-hash dedup before insert.
+- **3.5:** Canvas section cards now render evidence popovers for evidence-bearing canvas item objects,
+  including source, date, excerpt, link, confidence, and freshness while preserving legacy string items.
+- **3.6:** added `staleness_sweep` worker job to downgrade account-scoped canvas section freshness after
+  stale/outdated thresholds.
+- **3.7:** added fixture-only verifier golden set (10 claims, requires at least 9/10), cited-item ratio
+  assertion for company research, cache TTL/reuse tests, and feed-health-on-404 test. CI remains offline.
+- **Live DB:** applied `20260702190000_add_extract_escalated_route.sql` to live project
+  `mehhuxzamnpxnkbrslls` via Supabase MCP as migration `add_extract_escalated_route`; verification query
+  returned the expected global `extract_escalated` Anthropic route.
+
+**Final Phase 3 gate results:**
+```
+cd worker && npm run typecheck  -> exit 0
+cd worker && npm test           -> 33 passed, 1 skipped (SQL integration needs WORKER_TEST_DATABASE_URL)
+cd worker && npm run build      -> exit 0
+cd worker && npm run lint       -> exit 0
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                   -> green
+npm run lint                    -> 68 problems (49 errors, 19 warnings), within frozen <=68 baseline
+```
 
 **2026-07-02 - Work orders 3.3-3.4 company research slice complete on `build/phase-3-research`.**
 

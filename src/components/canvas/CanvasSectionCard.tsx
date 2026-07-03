@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { summarizePreviewItem } from "@/lib/canvas-preview";
 import {
@@ -11,6 +12,7 @@ import {
   Sparkles,
   Loader2,
   AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 
 export type FreshnessStatus =
@@ -34,9 +36,25 @@ export interface CanvasSectionMeta {
   hasNotes?: boolean;
 }
 
+export interface CanvasEvidenceItem {
+  id: string;
+  title: string;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
+  sourceDate?: string | null;
+  excerpt?: string | null;
+}
+
+export interface CanvasItemEvidence {
+  text: string;
+  confidence?: number | null;
+  freshness?: FreshnessStatus;
+  evidence?: CanvasEvidenceItem[];
+}
+
 export interface CanvasSectionCardProps {
   title: string;
-  items: string[];
+  items: Array<string | CanvasItemEvidence>;
   notes?: string;
   meta?: CanvasSectionMeta;
   /** Grid span classes */
@@ -107,7 +125,8 @@ export function CanvasSectionCard({
   tallPreview = false,
 }: CanvasSectionCardProps) {
   const previewLimit = maxPreviewItems;
-  const previewItems = items.slice(0, previewLimit);
+  const normalizedItems = items.map(normalizeCanvasItem);
+  const previewItems = normalizedItems.slice(0, previewLimit);
   const remainingCount = Math.max(0, items.length - previewLimit);
   const freshness = meta?.freshness ?? "unverified";
   const freshnessCfg = freshnessConfig[freshness];
@@ -244,9 +263,12 @@ export function CanvasSectionCard({
                     )}
                   >
                     {compactPreview
-                      ? summarizePreviewItem(item, tallPreview ? 96 : 80)
-                      : item}
+                      ? summarizePreviewItem(item.text, tallPreview ? 96 : 80)
+                      : item.text}
                   </span>
+                  {(item.evidence?.length ?? 0) > 0 && (
+                    <EvidencePopover item={item} />
+                  )}
                 </li>
               ))}
             </ul>
@@ -281,5 +303,74 @@ export function CanvasSectionCard({
         )}
       </div>
     </Card>
+  );
+}
+
+function normalizeCanvasItem(item: string | CanvasItemEvidence): CanvasItemEvidence {
+  return typeof item === "string" ? { text: item } : item;
+}
+
+function EvidencePopover({ item }: { item: CanvasItemEvidence }) {
+  const evidence = item.evidence ?? [];
+  if (evidence.length === 0) return null;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(event) => event.stopPropagation()}
+          className="ml-auto mt-0.5 shrink-0 rounded p-0.5 text-primary/70 transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title="View evidence"
+          aria-label="View evidence"
+        >
+          <FileCheck className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-80 space-y-3 p-3 text-xs"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="space-y-1">
+          <p className="font-medium text-foreground">Evidence</p>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            {typeof item.confidence === "number" && (
+              <span>{Math.round(item.confidence * 100)}% confidence</span>
+            )}
+            {item.freshness && <span>{item.freshness}</span>}
+          </div>
+        </div>
+        <div className="space-y-3">
+          {evidence.map((entry) => (
+            <div key={entry.id} className="space-y-1 border-t border-border/60 pt-2 first:border-t-0 first:pt-0">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-medium leading-snug text-foreground">{entry.title}</p>
+                {entry.sourceUrl && (
+                  <a
+                    href={entry.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 rounded text-muted-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={(event) => event.stopPropagation()}
+                    aria-label="Open evidence source"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {[entry.sourceName, entry.sourceDate].filter(Boolean).join(" - ")}
+              </p>
+              {entry.excerpt && (
+                <p className="line-clamp-4 text-[11px] leading-relaxed text-foreground/80">
+                  {entry.excerpt}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -33,6 +33,8 @@ describe("CompanyResearchHandler", () => {
     });
     const items = canvasInsert?.value.items as Array<{ evidence_ids: string[] }> | undefined;
     expect(items?.[0]?.evidence_ids).toEqual(["evidence-1"]);
+    const citedRatio = (items ?? []).filter((item) => item.evidence_ids.length > 0).length / Math.max(1, items?.length ?? 0);
+    expect(citedRatio).toBeGreaterThanOrEqual(0.8);
     expect(client.inserts.find((insert) => insert.table === "gaps")?.value).toMatchObject({
       account_id: "account-1",
       gap_type: "contradictory",
@@ -62,24 +64,41 @@ describe("CompanyResearchHandler", () => {
   it("escalates extraction to mid route when budget extraction fails validation", async () => {
     const client = new CompanyResearchFakeClient();
     const runner = new ScriptedRunner([
-      JSON.stringify({ claims: [] }),
-      JSON.stringify({
+      "```json\n{\"claims\": []}\n```",
+      "Here is the JSON:\n```json\n" + JSON.stringify({
         claims: [{ section_key: "channels", text: "Acme sells through self-serve signup.", confidence: 0.72, evidence_index: 0 }],
-      }),
-      JSON.stringify({ status: "confirmed", reason: "The excerpt mentions self-serve signup." }),
+      }) + "\n```",
+      "```json\n{\"status\":\"confirmed\",\"reason\":\"The excerpt mentions self-serve signup.\"}\n```",
     ]);
     const handler = new CompanyResearchHandler({ client: client.asSupabase(), runner, feedRunner: fixtureFeedRunner() });
 
     await handler.handle(makeCompanyJob());
 
     expect(runner.requests[0]?.model).toBe("budget-extract-model");
-    expect(runner.requests[1]?.model).toBe("mid-extract-model");
-    expect(runner.requests[2]?.model).toBe("mid-verify-model");
+    expect(runner.requests[1]?.model).toBe("escalated-extract-model");
+    expect(runner.requests[2]?.model).toBe("claude-sonnet-5");
     expect(client.inserts.find((insert) => insert.table === "metric_snapshots")?.value).toMatchObject({
       metric_key: "research.escalation_rate",
       value: 1,
       label: "firecrawl_scrape",
     });
+  });
+
+  it("treats unparseable verifier output as unsupported", async () => {
+    const client = new CompanyResearchFakeClient();
+    const runner = new ScriptedRunner([
+      JSON.stringify({
+        claims: [{ section_key: "customer_segments", text: "Acme sells to banks.", confidence: 0.91, evidence_index: 0 }],
+      }),
+      "I cannot provide JSON today.",
+    ]);
+    const handler = new CompanyResearchHandler({ client: client.asSupabase(), runner, feedRunner: fixtureFeedRunner() });
+
+    await handler.handle(makeCompanyJob());
+
+    const canvasInsert = client.inserts.find((insert) => insert.table === "canvas_section_versions");
+    const item = (canvasInsert?.value.items as Array<{ confidence: number; verification_status: string }>)[0];
+    expect(item).toMatchObject({ confidence: 0.5, verification_status: "unsupported" });
   });
 
   it("dispatcher supports company_research jobs", async () => {
@@ -179,9 +198,9 @@ class CompanyResearchFakeClient {
   selectMany(table: string): Record<string, unknown>[] {
     if (table === "model_routes") {
       return [
-        route("budget", "extract", "budget-extract-model"),
-        route("mid", "extract", "mid-extract-model"),
-        route("mid", "research_verify", "mid-verify-model"),
+        route("extract", "extract", "budget-extract-model", "openrouter"),
+        route("extract_escalated", "extract_escalated", "escalated-extract-model", "anthropic"),
+        route("research_verify", "research_verify", "claude-sonnet-5", "anthropic"),
       ];
     }
     return [];
@@ -253,13 +272,14 @@ class CompanyResearchFakeQuery {
   }
 }
 
-function route(routeKey: string, taskClass: string, modelName: string) {
+function route(routeKey: string, taskClass: string, modelName: string, provider = "anthropic") {
   return {
     account_id: null,
     route_key: routeKey,
     task_class: taskClass,
-    provider: "anthropic",
+    provider,
     model_name: modelName,
+    params: { temperature: 0.2, max_tokens: 1000 },
     cost_per_1k_in: 0.001,
     cost_per_1k_out: 0.005,
   };

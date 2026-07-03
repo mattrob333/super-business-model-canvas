@@ -249,6 +249,18 @@ with checks as (
              and feed_key in ('firecrawl_scrape', 'grok_live_search', 'fred_series', 'google_trends', 'gdelt_count', 'github_repo_stats')
          ) = 6 then 'PASS' else 'FAIL' end
 
+  union all
+
+  select 'seed: extract_escalated model route exists',
+         case when exists (
+           select 1 from public.model_routes
+           where account_id is null
+             and route_key = 'extract_escalated'
+             and task_class = 'extract_escalated'
+             and provider = 'anthropic'
+             and model_name = 'claude-haiku-4-5-20251001'
+         ) then 'PASS' else 'FAIL' end
+
 )
 select check_name, status from checks order by
   case status when 'FAIL' then 0 else 1 end,  -- surface failures first

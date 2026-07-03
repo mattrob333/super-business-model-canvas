@@ -17,6 +17,7 @@ Required runtime env:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ANTHROPIC_API_KEY` (used by later Phase 2 job execution work)
+- `OPENROUTER_API_KEY` enables OpenRouter-backed research extract routes
 
 Optional env:
 

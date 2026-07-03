@@ -10,6 +10,7 @@ const client = createServiceClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_
 const repository = new SupabaseJobRepository(client);
 const handler = createJobDispatcher({
   client,
+  openRouterApiKey: config.OPENROUTER_API_KEY,
   xaiApiKey: config.XAI_API_KEY,
   firecrawlApiKey: config.FIRECRAWL_API_KEY,
   fredApiKey: config.FRED_API_KEY,
