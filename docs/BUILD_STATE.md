@@ -81,6 +81,13 @@ Status: OPEN | RESOLVED (<how>)
   --dockerfile worker/Dockerfile`. After the worker is healthy, deploy the edge functions above
   and only then switch frontend/staging `VITE_RUNTIME_MODE=enqueue`.
 
+- **LIVE GOLDEN SET PASSED (2026-07-03 22:05 UTC, Ops run 28685290194):** the verifier
+  golden set ran against the real research_verify model and classified >= 9/10 claims
+  (vitest green at commit `b157207`, 26s). First attempt failed with
+  `error_max_budget_usd` — a real production-parameter catch, fixed in PR #18 (per-call
+  budget floor $0.03 -> $0.25 to cover Claude Agent SDK session overhead). XAI_API_KEY
+  is now set and synced; edge functions redeployed with the PR #17 provider fallback.
+  The research engine's acceptance criteria are now fully verified live.
 - **DEPLOYMENT EXECUTED (2026-07-03, owner + reviewer):** Fly apps `super-bmc-web` and
   `super-bmc-worker` created; all GitHub repo secrets set (XAI/FRED/Trends/GH_FEED still
   unset — optional); Ops `sync-secrets` + `deploy-edge-functions` ran green (after PR #15
