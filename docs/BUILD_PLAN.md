@@ -258,6 +258,9 @@ accounts (must be forbidden); confirm competitor canvases can't pollute primary 
 ### PHASE 5 — Section agent workspaces (L) — *spec 02, the full room*
 
 **Objective:** the nine full-screen rooms, exactly per spec 02.
+**Required pre-reading:** spec 08 (knowledge stack) — Phase 5 also delivers `agent_documents`
++ revisions, `watched_sources`, `owner_questions`, the dossier viewer, `dossier_refresh`/
+`summary_update` jobs, the groundedness score, and the grounding wizard (spec 08 §§1, 3, 4, 9).
 
 **Work orders**
 - 5.1 Route `/workspace/:sectionKey` outside AppShell content column; `WorkspaceTopBar` with
@@ -299,7 +302,7 @@ actions; visual pass against spec 02 layout.
 
 ---
 
-### PHASE 6 — The War Room & orchestration (L) — *spec 03 + 04, the marquee*
+### PHASE 6 — The War Room & orchestration (L) — *spec 03 + 04, the marquee; spec 08 §§5–7 required pre-reading (Atlas context stack, Goals & Guardrails, playbook contracts + framework_outputs + native renderers, Theory of Constraints loop + strategy_state, onboarding_deep_research cascade)*
 
 **Objective:** Atlas's room, delegation, cascades, agenda, approvals — the full loop.
 
