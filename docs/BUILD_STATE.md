@@ -81,6 +81,19 @@ Status: OPEN | RESOLVED (<how>)
   --dockerfile worker/Dockerfile`. After the worker is healthy, deploy the edge functions above
   and only then switch frontend/staging `VITE_RUNTIME_MODE=enqueue`.
 
+- **DEPLOYMENT EXECUTED (2026-07-03, owner + reviewer):** Fly apps `super-bmc-web` and
+  `super-bmc-worker` created; all GitHub repo secrets set (XAI/FRED/Trends/GH_FEED still
+  unset — optional); Ops `sync-secrets` + `deploy-edge-functions` ran green (after PR #15
+  fixed an errexit bug that silently killed the job on the first empty optional key);
+  Deploy workflow green; worker live and polling after a manual `fly machine start`
+  (machines stay stopped after exhausting restarts — earlier crash-loop was the
+  pre-secrets ZodError, resolved). **Remaining:** DNS cutover for superbmc.com; Ops
+  `live-golden-set` run; BLK-OPS-1 (Vault secret → live cron/staleness migrations).
+- **From reviewer hardening pass (2026-07-03, PR #17):** re-run Ops
+  `deploy-edge-functions` once merged — the grok-client OpenRouter fallback (below) only
+  takes effect on redeploy. Adding a real `XAI_API_KEY` later restores native xAI
+  web-search (Responses API); until then Grok routes through OpenRouter (`x-ai/*` slugs,
+  `:online` for web search; override slug via `OPENROUTER_GROK_FALLBACK_MODEL` if needed).
 - **HOSTING MOVED OFF LOVABLE (2026-07-03, PR #14):** the repo now self-hosts on Fly.io with
   GitHub Actions auto-deploy. **`DEPLOY.md` at the repo root is the single deployment
   checklist and supersedes the Fly example commands and any Lovable republish steps below.**
@@ -104,6 +117,30 @@ Status: OPEN | RESOLVED (<how>)
      `GOLDEN_LIVE=1 ANTHROPIC_API_KEY=sk-... npx vitest run verifier-golden` (must be >= 9/10).
 
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
+
+## HARDENING PASS — 2026-07-03 (reviewer, PR #17)
+
+Production-readiness audit after the first live deploy, plus public-surface UX polish:
+
+- **LIVE BLOCKER FIXED — Grok provider fallback.** Seven edge functions hard-required
+  `XAI_API_KEY` (no key set in prod), so the core "paste URL -> analyze" flow and all
+  chat functions failed on the live site. `_shared/grok-client.ts` now resolves a
+  provider: xAI direct when `XAI_API_KEY` exists, otherwise OpenRouter
+  (`x-ai/<model>` slug convention, web search via the `:online` suffix, unified
+  `reasoning` param mapping; escape hatch `OPENROUTER_GROK_FALLBACK_MODEL`). The four
+  hard key guards (analyze-company, bmc-chat, business-overview-chat,
+  strategy-coach-chat) now use a shared `hasGrokProvider()`; agent-run and
+  research-competitors already degraded gracefully. `deno check` clean on grok-client;
+  the frontend enqueue path was verified to send `mode: 'enqueue'` correctly.
+- **Auth page brand break fixed.** /auth rendered hardcoded-dark with a generic
+  "Welcome" card — a jarring transition from the light-pinned landing page at the most
+  important funnel moment. Now pinned light via shared `src/lib/light-theme.ts`
+  (extracted from Landing), with the grid texture, SUPER logo mark linking home, and
+  contextual copy per tab ("Create your workspace" / "Welcome back").
+- **UI sweep:** Playwright screenshots of Landing + Auth at 1440px and 390px — zero
+  horizontal overflow, no JS errors (the only console error is Google Fonts blocked by
+  the sandbox proxy, environmental).
+- **Gates:** root tsc exit 0, build green, lint 68 (frozen ceiling), worker untouched.
 
 ## REVIEW FINDINGS
 

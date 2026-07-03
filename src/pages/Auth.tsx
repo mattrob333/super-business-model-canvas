@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
+import { lightThemeVars } from '@/lib/light-theme';
 
 const authSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -134,12 +135,30 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-6">
-      <Card className="w-full max-w-md">
+    <div
+      style={lightThemeVars}
+      className="bg-grid-subtle flex min-h-screen flex-col items-center justify-center bg-background p-6 text-foreground"
+    >
+      <Link
+        to="/"
+        className="mb-8 flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        <span className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-sm font-semibold tracking-wide text-primary-foreground">
+          SUPER
+        </span>
+        <span className="text-sm font-medium tracking-wide text-foreground sm:text-base">
+          Business Model Canvas
+        </span>
+      </Link>
+      <Card className="w-full max-w-md border-border/70 shadow-sm">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome</CardTitle>
+          <CardTitle className="text-center text-2xl font-semibold tracking-tight">
+            {activeTab === 'signup' ? 'Create your workspace' : 'Welcome back'}
+          </CardTitle>
           <CardDescription className="text-center">
-            Sign in to your account or create a new one
+            {activeTab === 'signup'
+              ? 'Your first canvas takes about 60 seconds'
+              : 'Sign in to your strategy workspace'}
           </CardDescription>
         </CardHeader>
         <CardContent>

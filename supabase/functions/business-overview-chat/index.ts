@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { streamGrokChat } from "../_shared/grok-client.ts";
+import { hasGrokProvider, streamGrokChat } from "../_shared/grok-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,9 +45,8 @@ serve(async (req) => {
       hasOverviewData: !!overviewData
     });
 
-    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
-    if (!XAI_API_KEY) {
-      throw new Error('XAI_API_KEY not configured');
+    if (!hasGrokProvider()) {
+      throw new Error('No chat provider configured: set XAI_API_KEY or OPENROUTER_API_KEY');
     }
 
     // Build comprehensive context from overview data
