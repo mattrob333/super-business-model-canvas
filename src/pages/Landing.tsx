@@ -384,7 +384,7 @@ const Landing = () => {
             </Button>
             <Button asChild className="hidden gap-2 sm:inline-flex">
               <Link to="/auth?mode=signup">
-                Start free
+                Start free analysis
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
@@ -404,30 +404,12 @@ const Landing = () => {
               Your business model, run by AI strategists
             </h1>
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-muted-foreground">
-              Paste your company's URL. Super BMC builds your Business Model Canvas from public evidence in about 60
-              seconds - then ten AI agents keep it alive: researching your market, watching your competitors, and
-              telling you what to do next.
+              Ten AI agents build your Business Model Canvas from public evidence, watch your competitors, and tell
+              you your next move.
             </p>
 
             <div className="mt-9">
               <SignupForm />
-              <div className="mx-auto mt-4 flex max-w-2xl flex-col items-start justify-center gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center">
-                {["Free to start", "No credit card", "Every claim cited to source"].map((item) => (
-                  <span key={item} className="inline-flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    {item}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-4 text-sm text-muted-foreground">
-                Already have an account?{" "}
-                <Link
-                  to="/auth"
-                  className="rounded-md font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  Sign in
-                </Link>
-              </p>
             </div>
 
             <div className="mt-16">
@@ -450,15 +432,12 @@ const Landing = () => {
             <div className="relative mt-12 grid gap-5 md:grid-cols-3">
               <div className="absolute left-[16%] right-[16%] top-[25px] hidden border-t border-border md:block" />
               {howItWorks.map((step, index) => (
-                <div
-                  key={step.title}
-                  className="relative rounded-lg border border-border/60 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm">
+                <div key={step.title} className="relative">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-sm ring-4 ring-background">
                     {index + 1}
                   </div>
                   <h3 className="mt-6 text-lg font-semibold">{step.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
+                  <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">{step.body}</p>
                 </div>
               ))}
             </div>
@@ -468,7 +447,6 @@ const Landing = () => {
         <section id="agents" className="border-y border-border/60 bg-white">
           <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-28">
             <div className="max-w-3xl">
-              <Eyebrow>The agent team</Eyebrow>
               <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
                 Ten strategists. One canvas. Zero standing meetings.
               </h2>
@@ -524,7 +502,6 @@ const Landing = () => {
         <section className="bg-muted/40">
           <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-28">
             <div className="max-w-3xl">
-              <Eyebrow>Workspace capabilities</Eyebrow>
               <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
                 The canvas becomes the operating system.
               </h2>
@@ -574,12 +551,14 @@ const Landing = () => {
                 Built for people accountable for the next move.
               </h2>
             </div>
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
+            <div className="mt-12 divide-y divide-border/60 rounded-lg border border-border/60 bg-background shadow-sm">
               {audiences.map((audience) => (
-                <div key={audience.title} className="rounded-lg border border-border/60 bg-background p-6 shadow-sm">
-                  <audience.icon className="h-6 w-6 text-primary" />
-                  <h3 className="mt-5 text-lg font-semibold">{audience.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{audience.body}</p>
+                <div key={audience.title} className="flex flex-col gap-2 p-6 sm:flex-row sm:items-start sm:gap-6">
+                  <div className="flex items-center gap-3 sm:w-64 sm:shrink-0">
+                    <audience.icon className="h-5 w-5 text-primary" />
+                    <h3 className="text-base font-semibold">{audience.title}</h3>
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted-foreground">{audience.body}</p>
                 </div>
               ))}
             </div>
@@ -589,7 +568,6 @@ const Landing = () => {
         <section id="faq" className="bg-muted/40">
           <div className="mx-auto max-w-4xl px-4 py-24 sm:px-6 lg:py-28">
             <div>
-              <Eyebrow>FAQ</Eyebrow>
               <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">What early users ask first.</h2>
             </div>
             <Accordion type="single" collapsible className="mt-10 rounded-lg border border-border/60 bg-white px-5 shadow-sm">
@@ -610,7 +588,7 @@ const Landing = () => {
             <h2 className="mx-auto max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">
               See your business the way your smartest competitor sees it.
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">Your first canvas takes about 60 seconds.</p>
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">Free to start. No credit card. Your first canvas takes about 60 seconds.</p>
             <div className="mt-8">
               <SignupForm compact />
             </div>
