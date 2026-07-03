@@ -408,7 +408,10 @@ function average(values: number[]): number | null {
 function budgetForRoute(route: Pick<ModelRoute, "cost_per_1k_in" | "cost_per_1k_out">): number {
   const input = route.cost_per_1k_in ?? 0.002;
   const output = route.cost_per_1k_out ?? 0.01;
-  return Math.max(0.03, input * 8 + output * 4);
+  // Floor must cover Claude Agent SDK session overhead, not just the visible
+  // prompt: the 2026-07-03 live golden-set run hit error_max_budget_usd at the
+  // old $0.056 cap (seeded research_verify costs) before a single verdict.
+  return Math.max(0.25, input * 8 + output * 4);
 }
 
 function readString(value: unknown): string | undefined {
