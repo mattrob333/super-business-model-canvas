@@ -25,6 +25,26 @@ bordered, and lightly shadowed above that texture.
 - The Dashboard remains the passive at-a-glance page; the War Room is the *active* room. The
   Dashboard's Strategic Health tile deep-links here.
 
+### The Atlas dock — Atlas's second stage (decided 2026-07-02)
+
+Atlas and the BMC both want the spotlight; they get **two rooms where the hierarchy flips**
+instead of competing in one:
+
+- **Canvas page (home): the BMC is the star, Atlas is docked.** A collapsible panel on the
+  right edge of the Canvas page (~380px expanded; a slim avatar tab collapsed — canvas keeps
+  full width). Contents, top to bottom: a one-line **pulse** ("Yield flagged a competitor
+  price drop 2h ago"), a badge-counted **pending approvals** link (deep-links to the War Room
+  approvals rail), and the **Atlas chat** with composer. The dock replaces the old section
+  drawer's role as "the AI on the canvas page" — the canvas page's AI is Atlas, whole-business
+  scope; per-section conversation lives in the section workspaces (Spec 02).
+- **War Room: Atlas is the star, the BMC shrinks into his instrument** — the Map below.
+- **One thread, two stages.** The dock and the War Room chat are the *same* Atlas thread
+  (same `workspace_threads` row); a conversation started beside the canvas continues
+  seamlessly in the War Room. The dock shows the active thread only; thread management
+  (list, new, rename) lives in the War Room.
+- The dock ships with the War Room (same phase); until then the Canvas page keeps its current
+  behavior.
+
 ## Layout
 
 ```
@@ -162,7 +182,8 @@ Tabs: **Playbooks · Cascades · Schedules · Digests**.
 
 - Shares all Spec 02 components; new: `WarRoomMap` (+ `MapTile`, `MapFooterStrip`, mode control),
   `AgendaPanel`, `InsightFeed`, `DelegationCard`, `BriefCard`, `FrameworkCard`, `ConflictCard`,
-  `ApprovalsQueue`, `CascadeCard`.
+  `ApprovalsQueue`, `CascadeCard`, `AtlasDock` (Canvas-page docked chat; wraps the same
+  `WorkspaceThread` bound to Atlas's active thread).
 - The Map's health computation runs server-side (worker writes `metric_snapshots` per section
   after relevant events) so the frontend only reads — keeps the map instant and the formula
   centrally versioned.
