@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { CanvasSectionCard } from "./CanvasSectionCard";
 import { CanvasGridFrame } from "./CanvasGridFrame";
 import type { CanvasSectionMeta } from "./CanvasSectionCard";
+import type { CanvasItemEvidence } from "./CanvasSectionCard";
 import {
   CANVAS_SECTION_KEYS,
   CANVAS_SECTION_LABELS,
@@ -10,6 +11,7 @@ import {
 } from "./section-types";
 import type { CanvasSectionKey } from "./section-types";
 import { BMCSectionEditor } from "@/components/BMCSectionEditor";
+import { useCanvasEvidence } from "@/hooks/useCanvasEvidence";
 
 /** Two-row pillar sections — extra vertical room for all bullets */
 const TALL_PILLAR_SECTIONS = new Set<CanvasSectionKey>([
@@ -84,6 +86,11 @@ export function EnterpriseBusinessModelCanvas({
   const [selectedSection, setSelectedSection] =
     useState<SelectedSection | null>(null);
 
+  // Latest canvas_section_versions with hydrated evidence_items — the real
+  // data behind evidence popovers. Sections without versions fall back to
+  // the legacy analysis strings below.
+  const { itemsBySection: versionItems } = useCanvasEvidence();
+
   const handleEditorOpenChange = useCallback(
     (open: boolean) => {
       setEditorOpen(open);
@@ -93,15 +100,18 @@ export function EnterpriseBusinessModelCanvas({
   );
 
   const getSectionData = useCallback(
-    (key: CanvasSectionKey): { items: string[]; notes?: string } => {
+    (key: CanvasSectionKey): { items: Array<string | CanvasItemEvidence>; notes?: string } => {
       const legacyKey = LEGACY_SECTION_KEYS[key];
       const notesKey = `${legacyKey}_notes` as keyof LegacyCanvasData;
+      const versioned = versionItems[key];
       return {
-        items: (data[legacyKey as keyof LegacyCanvasData] as string[]) ?? [],
+        items: versioned && versioned.length > 0
+          ? versioned
+          : normalizeCanvasItems(data[legacyKey as keyof LegacyCanvasData]),
         notes: data[notesKey] as string | undefined,
       };
     },
-    [data],
+    [data, versionItems],
   );
 
   const handleSectionClick = useCallback(
@@ -109,7 +119,7 @@ export function EnterpriseBusinessModelCanvas({
       const { items, notes } = getSectionData(key);
       setSelectedSection({
         title: CANVAS_SECTION_LABELS[key],
-        items,
+        items: items.map((item) => typeof item === "string" ? item : item.text),
         notes,
         sectionKey: key,
       });
@@ -227,4 +237,29 @@ export function EnterpriseBusinessModelCanvas({
       )}
     </>
   );
+}
+
+function normalizeCanvasItems(value: unknown): Array<string | CanvasItemEvidence> {
+  if (!Array.isArray(value)) return [];
+  const items: Array<string | CanvasItemEvidence> = [];
+  for (const item of value) {
+    if (typeof item === "string") {
+      items.push(item);
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    if (typeof record.text !== "string") continue;
+    const evidence = Array.isArray(record.evidence)
+      ? record.evidence.filter((entry): entry is CanvasItemEvidence["evidence"][number] =>
+          Boolean(entry && typeof entry === "object" && typeof (entry as { id?: unknown }).id === "string" && typeof (entry as { title?: unknown }).title === "string"))
+      : [];
+    items.push({
+      text: record.text,
+      confidence: typeof record.confidence === "number" ? record.confidence : null,
+      freshness: typeof record.freshness === "string" ? record.freshness as CanvasItemEvidence["freshness"] : undefined,
+      evidence,
+    });
+  }
+  return items;
 }

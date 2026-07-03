@@ -2,6 +2,8 @@ import { createSdkMcpServer, tool, type McpServerConfig } from "@anthropic-ai/cl
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { SECTION_KEYS, type SectionKey } from "../domain/sections.js";
+import { FeedRunner } from "../feeds/feed-runner.js";
+import type { FeedRuntimeConfig } from "../feeds/types.js";
 
 export interface ToolContext {
   accountId: string;
@@ -11,6 +13,10 @@ export interface ToolContext {
   proposalMode: boolean;
   xaiApiKey?: string;
   firecrawlApiKey?: string;
+  fredApiKey?: string;
+  googleTrendsApiKey?: string;
+  githubToken?: string;
+  feedRunner?: FeedRunner;
 }
 
 const sectionKeySchema = z.enum(SECTION_KEYS as [SectionKey, ...SectionKey[]]);
@@ -22,6 +28,8 @@ const evidenceItemSchema = z.object({
 });
 
 export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpServerConfig {
+  const feedRunner = ctx.feedRunner ?? new FeedRunner(client, feedConfigFromContext(ctx));
+
   const readCanvas = tool(
     "read_canvas",
     "Read current Business Model Canvas items for a section. Always account-scoped by worker context.",
@@ -199,22 +207,32 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
 
   const searchWeb = tool(
     "search_web",
-    "Search the live web through xAI/Grok when configured. Gracefully degrades when unset.",
+    "Search the live web through the cached Grok feed when configured. Gracefully degrades when unset.",
     { query: z.string().min(1) },
     async (args) => {
-      if (!ctx.xaiApiKey) return toolResult({ degraded: true, reason: "XAI_API_KEY is not configured", query: args.query });
-      return toolResult({ degraded: true, reason: "Live Grok search fetcher lands in Phase 3", query: args.query });
+      const result = await feedRunner.refresh({
+        accountId: ctx.accountId,
+        feedKey: "grok_live_search",
+        cacheKey: `tool:search_web:${args.query}`,
+        query: args.query,
+      });
+      return toolResult(feedToolResult(result, { query: args.query }));
     },
     { annotations: { readOnlyHint: true } },
   );
 
   const firecrawlScrape = tool(
     "firecrawl_scrape",
-    "Scrape a URL with Firecrawl when configured. Gracefully degrades when unset.",
+    "Scrape a URL through the cached Firecrawl feed when configured. Gracefully degrades when unset.",
     { url: z.string().url() },
     async (args) => {
-      if (!ctx.firecrawlApiKey) return toolResult({ degraded: true, reason: "FIRECRAWL_API_KEY is not configured", url: args.url });
-      return toolResult({ degraded: true, reason: "Firecrawl fetcher/cache lands in Phase 3", url: args.url });
+      const result = await feedRunner.refresh({
+        accountId: ctx.accountId,
+        feedKey: "firecrawl_scrape",
+        cacheKey: `tool:firecrawl_scrape:${args.url}`,
+        companyUrl: args.url,
+      });
+      return toolResult(feedToolResult(result, { url: args.url }));
     },
     { annotations: { readOnlyHint: true } },
   );
@@ -224,6 +242,28 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
     version: "1.0.0",
     tools: [readCanvas, writeSectionItems, logEvidence, openGap, postInsight, readCompetitorCanvas, searchWeb, firecrawlScrape],
   });
+}
+
+function feedConfigFromContext(ctx: ToolContext): FeedRuntimeConfig {
+  return {
+    xaiApiKey: ctx.xaiApiKey,
+    firecrawlApiKey: ctx.firecrawlApiKey,
+    fredApiKey: ctx.fredApiKey,
+    googleTrendsApiKey: ctx.googleTrendsApiKey,
+    githubToken: ctx.githubToken,
+  };
+}
+
+function feedToolResult(result: Awaited<ReturnType<FeedRunner["refresh"]>>, input: Record<string, unknown>) {
+  return {
+    degraded: result.health !== "ok",
+    health: result.health,
+    input,
+    evidence: result.evidence,
+    metrics: result.metrics,
+    payload: result.payload,
+    error: result.error,
+  };
 }
 
 function toolResult(structuredContent: Record<string, unknown>) {

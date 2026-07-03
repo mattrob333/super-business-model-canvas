@@ -35,6 +35,9 @@ export interface CanvasSectionAnalysisDependencies {
   runner?: AgentRunner;
   xaiApiKey?: string;
   firecrawlApiKey?: string;
+  fredApiKey?: string;
+  googleTrendsApiKey?: string;
+  githubToken?: string;
   taskLimits?: AgentTaskLimits;
 }
 
@@ -74,6 +77,9 @@ export class CanvasSectionAnalysisHandler {
       proposalMode: true,
       xaiApiKey: this.deps.xaiApiKey,
       firecrawlApiKey: this.deps.firecrawlApiKey,
+      fredApiKey: this.deps.fredApiKey,
+      googleTrendsApiKey: this.deps.googleTrendsApiKey,
+      githubToken: this.deps.githubToken,
     });
 
     const limits = this.deps.taskLimits?.sectionAnalysis;

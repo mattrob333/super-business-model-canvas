@@ -1,13 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CanvasSectionAnalysisHandler } from "./canvas-section-analysis.js";
+import { CompanyResearchHandler } from "./company-research.js";
+import { FeedRefreshHandler } from "./feed-refresh.js";
+import { StalenessSweepHandler } from "./staleness-sweep.js";
 import { WorkspaceChatHandler } from "./workspace-chat.js";
 import type { AgentTaskLimits } from "../agent/limits.js";
 import type { AgentRunner } from "../agent/runner.js";
+import type { FeedRunner } from "../feeds/feed-runner.js";
+import type { FeedRuntimeConfig } from "../feeds/types.js";
 import type { AgentJob, JobHandler } from "../queue/types.js";
 
-export interface JobDispatcherOptions {
+export interface JobDispatcherOptions extends FeedRuntimeConfig {
   client: SupabaseClient;
   runner?: AgentRunner;
+  feedRunner?: FeedRunner;
+  openRouterApiKey?: string;
   xaiApiKey?: string;
   firecrawlApiKey?: string;
   taskLimits?: AgentTaskLimits;
@@ -15,7 +22,10 @@ export interface JobDispatcherOptions {
 
 export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
   const canvasSectionAnalysis = new CanvasSectionAnalysisHandler(options);
+  const companyResearch = new CompanyResearchHandler(options);
   const workspaceChat = new WorkspaceChatHandler(options);
+  const feedRefresh = new FeedRefreshHandler(options);
+  const stalenessSweep = new StalenessSweepHandler(options);
 
   return async (job: AgentJob): Promise<void> => {
     try {
@@ -26,6 +36,21 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
 
       if (job.kind === "workspace_chat") {
         await workspaceChat.handle(job);
+        return;
+      }
+
+      if (job.kind === "company_research") {
+        await companyResearch.handle(job);
+        return;
+      }
+
+      if (job.kind === "feed_refresh") {
+        await feedRefresh.handle(job);
+        return;
+      }
+
+      if (job.kind === "staleness_sweep") {
+        await stalenessSweep.handle(job);
         return;
       }
 

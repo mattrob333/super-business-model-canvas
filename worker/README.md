@@ -17,6 +17,7 @@ Required runtime env:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `ANTHROPIC_API_KEY` (used by later Phase 2 job execution work)
+- `OPENROUTER_API_KEY` enables OpenRouter-backed research extract routes
 
 Optional env:
 
@@ -30,6 +31,11 @@ Optional env:
 - `WORKSPACE_CHAT_MAX_TURNS` defaults to `40`
 - `WORKSPACE_CHAT_TASK_BUDGET_TOKENS` defaults to `32000`
 - `WORKSPACE_CHAT_MAX_BUDGET_USD` defaults to route-derived budget
+- `XAI_API_KEY` enables Grok live-search feeds
+- `FIRECRAWL_API_KEY` enables Firecrawl scrape feeds
+- `FRED_API_KEY` enables FRED macro-series feeds
+- `GOOGLE_TRENDS_API_KEY` enables the Google Trends feed through the configured provider adapter
+- `GITHUB_TOKEN` enables GitHub feed fetches
 
 Run locally:
 

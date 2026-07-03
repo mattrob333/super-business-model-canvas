@@ -131,11 +131,11 @@ with checks as (
 
   union all
 
-  select 'seed: model_routes has 9 task_class default rows',
+  select 'seed: model_routes has 10 task_class default rows',
          case when (
            select count(distinct task_class) from public.model_routes
            where account_id is null and task_class is not null
-         ) = 9 then 'PASS' else 'FAIL' end
+         ) = 10 then 'PASS' else 'FAIL' end
 
   union all
 
@@ -199,6 +199,86 @@ with checks as (
              and p.proname = 'claim_next_agent_job'
              and pg_get_functiondef(p.oid) like '%failed_permanent%'
              and pg_get_functiondef(p.oid) like '%attempts >= coalesce(max_attempts, p_default_max_attempts)%'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  -- ---- 8. Phase 3.1 feed registry/cache ----
+  select 'table exists: data_feeds',
+         case when to_regclass('public.data_feeds') is not null then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'table exists: feed_cache',
+         case when to_regclass('public.feed_cache') is not null then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'enum type exists: data_feed_kind',
+         case when exists (select 1 from pg_type where typname = 'data_feed_kind' and typtype = 'e')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'enum type exists: data_feed_health',
+         case when exists (select 1 from pg_type where typname = 'data_feed_health' and typtype = 'e')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'index exists: idx_feed_cache_lookup',
+         case when exists (
+           select 1 from pg_indexes
+           where schemaname = 'public' and indexname = 'idx_feed_cache_lookup'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'index exists: idx_scheduled_loops_action_key',
+         case when exists (
+           select 1 from pg_indexes
+           where schemaname = 'public' and indexname = 'idx_scheduled_loops_action_key'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'seed: 6 global data feeds exist',
+         case when (
+           select count(distinct feed_key) from public.data_feeds
+           where account_id is null
+             and feed_key in ('firecrawl_scrape', 'grok_live_search', 'fred_series', 'google_trends', 'gdelt_count', 'github_repo_stats')
+         ) = 6 then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'seed: extract_escalated model route exists',
+         case when exists (
+           select 1 from public.model_routes
+           where account_id is null
+             and route_key = 'extract_escalated'
+             and task_class = 'extract_escalated'
+             and provider = 'anthropic'
+             and model_name = 'claude-haiku-4-5-20251001'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  -- ---- 9. RF-3-10 staleness sweep scheduling ----
+  select 'index exists: idx_scheduled_loops_account_action (unique partial)',
+         case when exists (
+           select 1 from pg_indexes
+           where schemaname = 'public' and indexname = 'idx_scheduled_loops_account_action'
+             and indexdef like '%UNIQUE%' and indexdef like '%action_key IS NOT NULL%'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'provisioning seeds the staleness_sweep loop',
+         case when exists (
+           select 1 from pg_proc p
+           join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.proname = 'provision_account_defaults'
+             and pg_get_functiondef(p.oid) like '%staleness_sweep%'
          ) then 'PASS' else 'FAIL' end
 
 )

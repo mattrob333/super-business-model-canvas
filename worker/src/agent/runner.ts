@@ -4,6 +4,7 @@ export interface AgentRunRequest {
   prompt: string;
   systemPrompt: string;
   model: string;
+  modelParams?: Record<string, unknown>;
   maxTurns: number;
   maxBudgetUsd: number;
   taskBudgetTokens?: number;
@@ -66,6 +67,46 @@ export class ClaudeAgentRunner implements AgentRunner {
     }
 
     throw new Error("Claude Agent SDK query ended without a result message");
+  }
+}
+
+export class OpenRouterChatRunner implements AgentRunner {
+  constructor(
+    private readonly apiKey: string | undefined,
+    private readonly fetcher: typeof fetch = fetch,
+  ) {}
+
+  async run(request: AgentRunRequest): Promise<AgentRunResult> {
+    if (!this.apiKey) throw new Error("OPENROUTER_API_KEY not configured");
+
+    const response = await this.fetcher("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: request.model,
+        ...request.modelParams,
+        messages: [
+          { role: "system", content: request.systemPrompt },
+          { role: "user", content: request.prompt },
+        ],
+      }),
+    });
+    if (!response.ok) throw new Error(`OpenRouter chat completion failed with HTTP ${response.status}`);
+
+    const payload = await response.json() as Record<string, unknown>;
+    const choice = Array.isArray(payload.choices) ? payload.choices[0] as Record<string, unknown> | undefined : undefined;
+    const message = choice?.message as Record<string, unknown> | undefined;
+    const usage = payload.usage as Record<string, unknown> | undefined;
+    return {
+      resultText: typeof message?.content === "string" ? message.content : "",
+      sessionId: typeof payload.id === "string" ? payload.id : null,
+      costUsd: typeof payload.total_cost_usd === "number" ? payload.total_cost_usd : null,
+      tokensIn: typeof usage?.prompt_tokens === "number" ? usage.prompt_tokens : null,
+      tokensOut: typeof usage?.completion_tokens === "number" ? usage.completion_tokens : null,
+    };
   }
 }
 
