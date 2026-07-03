@@ -44,7 +44,7 @@ jobs:
           GH_FEED_TOKEN: ${{ secrets.GH_FEED_TOKEN }}
         run: |
           args=()
-          add() { [ -n "$2" ] && args+=("$1=$2"); }
+          add() { if [ -n "$2" ]; then args+=("$1=$2"); fi; }
           add SUPABASE_URL "$SUPABASE_URL"
           add SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
           add ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
@@ -67,7 +67,7 @@ jobs:
           CREDENTIALS_ENCRYPTION_KEY: ${{ secrets.CREDENTIALS_ENCRYPTION_KEY }}
         run: |
           args=()
-          add() { [ -n "$2" ] && args+=("$1=$2"); }
+          add() { if [ -n "$2" ]; then args+=("$1=$2"); fi; }
           add ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
           add OPENROUTER_API_KEY "$OPENROUTER_API_KEY"
           add XAI_API_KEY "$XAI_API_KEY"
