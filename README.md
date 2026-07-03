@@ -214,33 +214,14 @@ Code changes → git push → GitHub
 
 Pushing to `main` updates the repo. The live URL only changes after someone **builds and publishes** a new version to the hosting provider.
 
-### Current hosting: Lovable
+### Hosting: Fly.io (self-owned, auto-deploy)
 
-superbmc.com is currently served through **Lovable** (Cloudflare in front, Lovable analytics scripts in the HTML). The domain is connected to the original Lovable project:
+superbmc.com is served from **Fly.io** (`super-bmc-web`), alongside the agent
+worker (`super-bmc-worker`). **Every push to `main` deploys both automatically**
+via GitHub Actions (`.github/workflows/deploy.yml`); edge functions and secret
+syncing run from the **Ops** workflow in the Actions tab.
 
-`https://lovable.dev/projects/5520ad34-2e41-4f42-ad72-88d4d0c6c178`
-
-**To publish the latest code to superbmc.com:**
-
-1. Log in to [Lovable](https://lovable.dev)
-2. Open the Super BMC project
-3. Confirm the project is synced with this GitHub repo (`mattrob333/super-business-model-canvas`, branch `main`)
-4. Set production environment variables in Lovable (same `VITE_*` values as your `.env`)
-5. Click **Share → Publish** (not just preview)
-
-> **Common pitfall:** Lovable can show the latest Git commit in page metadata while still serving an **older compiled JS bundle**. If the landing page looks unchanged or `/dashboard` 404s, the production publish step was not completed — republish from Lovable.
-
-### Alternative hosts (recommended long-term)
-
-You can move off Lovable to any static host:
-
-| Host | Notes |
-| --- | --- |
-| **Vercel / Netlify** | Connect GitHub repo, set `VITE_*` env vars, auto-deploy on push |
-| **Hostinger / cPanel** | Upload `dist/` folder, configure SPA rewrite to `index.html` |
-| **Cloudflare Pages** | Git integration + env vars |
-
-On any host, set the three `VITE_*` variables before building. AI will work as long as the Supabase project and edge-function secrets are configured.
+Full setup, DNS, secrets map, and day-2 operations: see **`DEPLOY.md`**.
 
 ### Deploying edge functions (backend)
 
@@ -277,7 +258,7 @@ node scripts/generate-framework-seed.mjs   # Regenerate seed_frameworks.sql from
 | Chat says "Not authenticated" | User not signed in | Sign in at `/auth` |
 | Canvas Analyze does nothing | `VITE_AGENT_RUNTIME_ENDPOINT` unset | Add to `.env` and rebuild |
 | Porter's Five Forces report empty | Schema mismatch | Run `supabase/migrations/20250701120000_fix_porter_report_schema.sql`, redeploy `generate-framework-report` |
-| superbmc.com shows old UI | Production not republished | Publish from Lovable or redeploy `dist/` to your host |
+| superbmc.com shows old UI | Deploy workflow failed | Check GitHub Actions -> Deploy run; re-run or `fly releases -a super-bmc-web` |
 | Works locally, not on live site | Missing `VITE_*` at build time | Set env vars in hosting dashboard, rebuild |
 
 ---
