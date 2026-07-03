@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callGrokChat } from "../_shared/grok-client.ts";
+import { callGrokChat, hasGrokProvider } from "../_shared/grok-client.ts";
 import {
   XAI_RESEARCH_MODEL,
   XAI_RESEARCH_REASONING,
@@ -43,10 +43,8 @@ serve(async (req) => {
       throw new Error('URL is required');
     }
 
-    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
-
-    if (!XAI_API_KEY) {
-      throw new Error('xAI API key not configured');
+    if (!hasGrokProvider()) {
+      throw new Error('No research provider configured: set XAI_API_KEY or OPENROUTER_API_KEY');
     }
 
     console.log('Analyzing company:', url);

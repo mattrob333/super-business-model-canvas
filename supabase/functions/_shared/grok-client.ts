@@ -47,18 +47,78 @@ function splitMessages(messages: GrokMessage[]) {
   return { instructions: system, conversation };
 }
 
+// ─── Provider resolution ─────────────────────────────────────────────────────
+// xAI direct when XAI_API_KEY is set; otherwise fall back to the same Grok
+// models through OpenRouter (slug convention `x-ai/<model>`, web search via
+// OpenRouter's `:online` suffix). Override the fallback slug with
+// OPENROUTER_GROK_FALLBACK_MODEL if the derived one ever mismatches.
+
+interface GrokProvider {
+  name: "xai" | "openrouter";
+  apiKey: string;
+  chatEndpoint: string;
+  /** Only xAI supports the Responses API (web_search agent tools). */
+  supportsResponsesApi: boolean;
+  resolveModel: (requestedModel: string, webSearch: boolean) => string;
+}
+
+/** True when any Grok-capable provider key is configured. */
+export function hasGrokProvider(): boolean {
+  return Boolean(Deno.env.get("XAI_API_KEY") || Deno.env.get("OPENROUTER_API_KEY"));
+}
+
+const NO_PROVIDER_ERROR =
+  "No Grok-capable provider configured. Set XAI_API_KEY (preferred) or OPENROUTER_API_KEY (fallback via x-ai/* models).";
+
+function resolveGrokProvider(): GrokProvider {
+  const xaiKey = Deno.env.get("XAI_API_KEY");
+  if (xaiKey) {
+    return {
+      name: "xai",
+      apiKey: xaiKey,
+      chatEndpoint: "https://api.x.ai/v1/chat/completions",
+      supportsResponsesApi: true,
+      resolveModel: (model) => model,
+    };
+  }
+  const openrouterKey = Deno.env.get("OPENROUTER_API_KEY");
+  if (openrouterKey) {
+    return {
+      name: "openrouter",
+      apiKey: openrouterKey,
+      chatEndpoint: "https://openrouter.ai/api/v1/chat/completions",
+      supportsResponsesApi: false,
+      resolveModel: (model, webSearch) => {
+        const base = Deno.env.get("OPENROUTER_GROK_FALLBACK_MODEL") || `x-ai/${model}`;
+        return webSearch ? `${base}:online` : base;
+      },
+    };
+  }
+  throw new Error(NO_PROVIDER_ERROR);
+}
+
 function buildChatCompletionsBody(
   options: GrokChatOptions,
   stream: boolean,
+  provider: GrokProvider,
+  useWebSearch: boolean,
 ): Record<string, unknown> {
-  return {
-    model: options.model || XAI_CHAT_MODEL,
+  const requested = options.model || XAI_CHAT_MODEL;
+  const body: Record<string, unknown> = {
+    model: provider.resolveModel(requested, useWebSearch),
     messages: options.messages,
     temperature: options.temperature ?? 0.7,
     max_tokens: options.maxTokens,
     stream,
-    reasoning_effort: options.reasoning_effort ?? XAI_CHAT_REASONING,
   };
+  const effort = options.reasoning_effort ?? XAI_CHAT_REASONING;
+  if (provider.name === "xai") {
+    body.reasoning_effort = effort;
+  } else if (effort !== "none") {
+    // OpenRouter's unified reasoning parameter
+    body.reasoning = { effort };
+  }
+  return body;
 }
 
 function buildResponsesBody(
@@ -171,28 +231,30 @@ async function readResponsesStream(
 }
 
 export async function streamGrokChat(options: StreamGrokChatOptions): Promise<string> {
-  const apiKey = Deno.env.get("XAI_API_KEY");
-  if (!apiKey) throw new Error("XAI_API_KEY not configured");
+  const provider = resolveGrokProvider();
 
   const useWebSearch = wantsWebSearch(options);
+  // The Responses API (web_search agent tools) is xAI-only; on OpenRouter,
+  // web search rides the chat-completions path via the :online model suffix.
+  const useResponsesApi = useWebSearch && provider.supportsResponsesApi;
   const model = options.model || XAI_CHAT_MODEL;
   console.log(
-    `Grok stream: model=${model}, webSearch=${useWebSearch}, reasoning=${
+    `Grok stream: provider=${provider.name}, model=${model}, webSearch=${useWebSearch}, reasoning=${
       options.reasoning_effort ?? XAI_CHAT_REASONING
     }`,
   );
 
-  const endpoint = useWebSearch
+  const endpoint = useResponsesApi
     ? "https://api.x.ai/v1/responses"
-    : "https://api.x.ai/v1/chat/completions";
-  const body = useWebSearch
+    : provider.chatEndpoint;
+  const body = useResponsesApi
     ? buildResponsesBody(options, true)
-    : buildChatCompletionsBody(options, true);
+    : buildChatCompletionsBody(options, true, provider, useWebSearch);
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${provider.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -207,7 +269,7 @@ export async function streamGrokChat(options: StreamGrokChatOptions): Promise<st
   try {
     let fullResponse = "";
 
-    if (useWebSearch) {
+    if (useResponsesApi) {
       fullResponse = await readResponsesStream(response, options.onChunk);
     } else {
       const reader = response.body?.getReader();
@@ -260,7 +322,7 @@ export async function streamGrokChat(options: StreamGrokChatOptions): Promise<st
     if (options.onDone) options.onDone();
     if (!fullResponse.trim()) {
       throw new Error(
-        "Grok API returned an empty response. Check your xAI API key and account credits at console.x.ai",
+        `Grok (${provider.name}) returned an empty response. Check the API key and account credits.`,
       );
     }
     return fullResponse;
@@ -274,28 +336,28 @@ export async function streamGrokChat(options: StreamGrokChatOptions): Promise<st
 export async function callGrokChat(
   options: Omit<StreamGrokChatOptions, "onChunk" | "onDone" | "onError">,
 ): Promise<string> {
-  const apiKey = Deno.env.get("XAI_API_KEY");
-  if (!apiKey) throw new Error("XAI_API_KEY not configured");
+  const provider = resolveGrokProvider();
 
   const useWebSearch = wantsWebSearch(options);
+  const useResponsesApi = useWebSearch && provider.supportsResponsesApi;
   const model = options.model || XAI_CHAT_MODEL;
   console.log(
-    `Grok request: model=${model}, webSearch=${useWebSearch}, reasoning=${
+    `Grok request: provider=${provider.name}, model=${model}, webSearch=${useWebSearch}, reasoning=${
       options.reasoning_effort ?? XAI_CHAT_REASONING
     }`,
   );
 
-  const endpoint = useWebSearch
+  const endpoint = useResponsesApi
     ? "https://api.x.ai/v1/responses"
-    : "https://api.x.ai/v1/chat/completions";
-  const body = useWebSearch
+    : provider.chatEndpoint;
+  const body = useResponsesApi
     ? buildResponsesBody(options, false)
-    : buildChatCompletionsBody(options, false);
+    : buildChatCompletionsBody(options, false, provider, useWebSearch);
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${provider.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -304,17 +366,17 @@ export async function callGrokChat(
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Grok API error:", response.status, errorText);
-    throw new Error(`Grok API error: ${response.status} - ${errorText}`);
+    throw new Error(`Grok API error (${provider.name}): ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
-  const text = useWebSearch
+  const text = useResponsesApi
     ? extractResponsesText(data)
     : (data.choices?.[0]?.message?.content || "");
 
   if (!text.trim()) {
     throw new Error(
-      "Grok API returned an empty response. Check your xAI API key and account credits at console.x.ai",
+      `Grok (${provider.name}) returned an empty response. Check the API key and account credits.`,
     );
   }
   return text;

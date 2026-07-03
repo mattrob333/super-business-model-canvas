@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { streamGrokChat } from "../_shared/grok-client.ts";
+import { hasGrokProvider, streamGrokChat } from "../_shared/grok-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -265,9 +265,8 @@ Remember: You're helping them navigate strategic challenges with the wisdom of a
       { role: 'user' as const, content: userMessage }
     ];
 
-    const XAI_API_KEY = Deno.env.get('XAI_API_KEY');
-    if (!XAI_API_KEY) {
-      throw new Error('XAI_API_KEY not configured');
+    if (!hasGrokProvider()) {
+      throw new Error('No chat provider configured: set XAI_API_KEY or OPENROUTER_API_KEY');
     }
 
     console.log('Calling Grok API with streaming and auto web search...');
