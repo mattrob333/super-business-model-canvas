@@ -72,6 +72,12 @@ Status: OPEN | RESOLVED (<how>)
   --dockerfile worker/Dockerfile`. After the worker is healthy, deploy the edge functions above
   and only then switch frontend/staging `VITE_RUNTIME_MODE=enqueue`.
 
+- **HOSTING MOVED OFF LOVABLE (2026-07-03, PR #14):** the repo now self-hosts on Fly.io with
+  GitHub Actions auto-deploy. **`DEPLOY.md` at the repo root is the single deployment
+  checklist and supersedes the Fly example commands and any Lovable republish steps below.**
+  Owner one-time setup: create Fly apps + token, fill GitHub repo secrets (one page), Supabase
+  Vault secret + pending SQL migrations, run Ops workflow (`sync-secrets`, then
+  `deploy-edge-functions`), DNS cutover for superbmc.com, then Ops `live-golden-set`.
 - **From Phase 3 reviewer pass (2026-07-03):**
   1. Apply migration `20260703090000_staleness_loop_provisioning.sql` to live project
      `mehhuxzamnpxnkbrslls` (build agent can do this via Supabase MCP, same as prior phases).

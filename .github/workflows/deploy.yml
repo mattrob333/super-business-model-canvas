@@ -1,0 +1,42 @@
+name: Deploy
+
+# Every push to main deploys frontend + worker to Fly.io.
+# One-time setup (GitHub secrets, Fly apps, DNS): see DEPLOY.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  web:
+    name: Deploy frontend (super-bmc-web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy to Fly
+        run: |
+          flyctl deploy --remote-only --config fly.web.toml \
+            --build-arg VITE_SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}" \
+            --build-arg VITE_SUPABASE_PUBLISHABLE_KEY="${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" \
+            --build-arg VITE_RUNTIME_MODE="${{ vars.VITE_RUNTIME_MODE || 'enqueue' }}" \
+            --build-arg VITE_AGENT_RUNTIME_ENDPOINT="${{ secrets.VITE_SUPABASE_URL }}/functions/v1/agent-run"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  worker:
+    name: Deploy worker (super-bmc-worker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy to Fly
+        working-directory: worker
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

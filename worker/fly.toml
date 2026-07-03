@@ -1,0 +1,18 @@
+# Fly.io config — agent worker (background job poller, no HTTP service).
+# Deploy from the worker/ directory so the Docker build context is correct:
+#   cd worker && flyctl deploy
+# Secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY, ...)
+# are set via `flyctl secrets set` — see DEPLOY.md.
+
+app = "super-bmc-worker"
+primary_region = "iad"
+
+kill_signal = "SIGINT"
+kill_timeout = "30s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
