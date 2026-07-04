@@ -61,7 +61,7 @@ export function BusinessOverviewSheet({
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+        <SheetContent className="w-full overflow-y-auto sm:max-w-2xl lg:max-w-3xl">
           <SheetHeader className="text-left">
             <SheetTitle className="text-xl">{data.name}</SheetTitle>
             <SheetDescription className="text-sm font-medium text-primary">
