@@ -3,6 +3,7 @@ import { CanvasSectionAnalysisHandler } from "./canvas-section-analysis.js";
 import { CompanyResearchHandler } from "./company-research.js";
 import { FeedRefreshHandler } from "./feed-refresh.js";
 import { GapEngineHandler } from "./gap-engine.js";
+import { KnowledgeJobHandler } from "./knowledge-jobs.js";
 import { StalenessSweepHandler } from "./staleness-sweep.js";
 import { WorkspaceChatHandler } from "./workspace-chat.js";
 import type { AgentTaskLimits } from "../agent/limits.js";
@@ -27,6 +28,7 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
   const workspaceChat = new WorkspaceChatHandler(options);
   const feedRefresh = new FeedRefreshHandler(options);
   const gapEngine = new GapEngineHandler(options.client);
+  const knowledgeJobs = new KnowledgeJobHandler(options);
   const stalenessSweep = new StalenessSweepHandler(options);
 
   return async (job: AgentJob): Promise<void> => {
@@ -58,6 +60,21 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
 
       if (job.kind === "gap_engine") {
         await gapEngine.handle(job);
+        return;
+      }
+
+      if (job.kind === "dossier_refresh") {
+        await knowledgeJobs.handleDossierRefresh(job);
+        return;
+      }
+
+      if (job.kind === "summary_update") {
+        await knowledgeJobs.handleSummaryUpdate(job);
+        return;
+      }
+
+      if (job.kind === "onboarding_extract") {
+        await knowledgeJobs.handleOnboardingExtract(job);
         return;
       }
 

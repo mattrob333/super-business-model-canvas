@@ -488,6 +488,15 @@ with checks as (
              )
          ) = 4 then 'PASS' else 'FAIL' end
 
+  union all
+
+  select 'seed: Phase 5A model routes exist',
+         case when (
+           select count(distinct task_class) from public.model_routes
+           where account_id is null
+             and task_class in ('onboarding_extract', 'dossier_refresh', 'summary_update')
+         ) = 3 then 'PASS' else 'FAIL' end
+
 )
 select check_name, status from checks order by
   case status when 'FAIL' then 0 else 1 end,  -- surface failures first
