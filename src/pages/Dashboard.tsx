@@ -151,7 +151,9 @@ const Dashboard = () => {
             .eq("account_id", accountId)
             .eq("metric_key", "competitor.threat_index")
             .order("computed_at", { ascending: false })
-            .limit(12),
+            // Window sized so one frequently re-scored competitor cannot evict
+            // the others before the latest-per-competitor dedupe below (RF-4-8).
+            .limit(100),
         ]);
 
       // Each section degrades independently — a failed query shows its empty state

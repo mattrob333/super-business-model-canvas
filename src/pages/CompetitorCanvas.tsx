@@ -28,43 +28,78 @@ export default function CompetitorCanvas() {
   const { toast } = useToast();
   const [compareMode, setCompareMode] = useState(false);
   const [borrowingKey, setBorrowingKey] = useState<string | null>(null);
-  const ownCanvas = useCanvasEvidence();
-  const { competitor, itemsBySection, metrics, loading } = useCompetitorCanvasEvidence(competitorId);
+  // Own-canvas fan-out only runs when compare mode needs it (RF-4-13).
+  const ownCanvas = useCanvasEvidence({ enabled: compareMode });
+  const { competitor, itemsBySection, freshnessBySection, metrics, loading, error } =
+    useCompetitorCanvasEvidence(competitorId);
 
   const threat = metrics.find((metric) => metric.metric_key === "competitor.threat_index");
-  const sectionDeltaCount = metrics.filter((metric) => metric.metric_key === "competitor.section_delta").length;
+  const sectionDeltas = useMemo(
+    () => metrics.filter((metric) => metric.metric_key === "competitor.section_delta"),
+    [metrics],
+  );
   const populatedSections = useMemo(
     () => CANVAS_SECTION_KEYS.filter((key) => (itemsBySection[key]?.length ?? 0) > 0).length,
     [itemsBySection],
   );
+  // Honest freshness (RF-4-6): derived from real per-section freshness_status.
+  const freshnessLabel = useMemo(() => {
+    // Runtime values include "verified" (worker writes) beyond the typed union.
+    const statuses = CANVAS_SECTION_KEYS
+      .map((key) => freshnessBySection[key] as string | undefined)
+      .filter((status): status is string => Boolean(status));
+    if (statuses.length === 0) return "--";
+    if (statuses.every((status) => status === "verified" || status === "fresh")) return "Verified";
+    if (statuses.some((status) => status === "outdated")) return "Outdated";
+    if (statuses.some((status) => status === "stale")) return "Stale";
+    return "Mixed";
+  }, [freshnessBySection]);
 
-  const borrowIdea = async (sectionKey: CanvasSectionKey, item: CanvasItemEvidence) => {
+  const borrowIdea = async (sectionKey: CanvasSectionKey, item: CanvasItemEvidence, index: number) => {
     if (!accountId) return;
-    setBorrowingKey(`${sectionKey}:${item.text}`);
+    setBorrowingKey(`${sectionKey}:${index}`);
     try {
       const agentKey = CANVAS_SECTION_AGENT_KEYS[sectionKey];
-      const { data: profile, error: profileError } = await supabase
+      // Account-scoped profile wins over the global template (deterministic, RF-4-13).
+      const { data: profiles, error: profileError } = await supabase
         .from("agent_profiles")
         .select("id")
         .eq("agent_key", agentKey)
         .or(`account_id.eq.${accountId},account_id.is.null`)
-        .limit(1)
-        .maybeSingle();
+        .order("account_id", { ascending: false, nullsFirst: false })
+        .limit(1);
+      const profile = profiles?.[0];
       if (profileError || !profile) throw new Error(profileError?.message ?? "No section agent found");
 
-      const { data: thread, error: threadError } = await supabaseUntyped
+      // Borrowed ideas land in the section's DEFAULT thread (RF-4-4): reuse the
+      // agent's earliest active thread; create it once if the room has none yet.
+      const { data: existingThreads } = await supabaseUntyped
         .from<ThreadRow>("workspace_threads")
-        .insert({
-          account_id: accountId,
-          agent_profile_id: profile.id,
-          title: `Explore ${competitor?.name ?? "competitor"} idea`,
-        })
         .select("id")
-        .single();
-      if (threadError) throw new Error(threadError.message);
+        .eq("account_id", accountId)
+        .eq("agent_profile_id", profile.id)
+        .eq("archived", false)
+        .order("created_at", { ascending: true })
+        .limit(1);
+      let threadId = existingThreads?.[0]?.id;
+      if (!threadId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: thread, error: threadError } = await supabaseUntyped
+          .from<ThreadRow>("workspace_threads")
+          .insert({
+            account_id: accountId,
+            agent_profile_id: profile.id,
+            title: `${CANVAS_SECTION_LABELS[sectionKey]} workspace`,
+            created_by: user?.id ?? null,
+          })
+          .select("id")
+          .single();
+        if (threadError || !thread) throw new Error(threadError?.message ?? "Failed to create thread");
+        threadId = thread.id;
+      }
 
       const { error: messageError } = await supabaseUntyped.from("workspace_messages").insert({
-        thread_id: thread.id,
+        thread_id: threadId,
         role: "user",
         kind: "proposal",
         content: {
@@ -104,9 +139,15 @@ export default function CompetitorCanvas() {
       <div className="bg-grid-subtle min-h-full p-6">
         <Card className="border-border/60 bg-card shadow-sm">
           <CardContent className="py-10">
-            <p className="text-sm text-muted-foreground">
-              No account-scoped competitor was found for this route.
-            </p>
+            {error ? (
+              <p className="text-sm text-destructive" role="alert">
+                Could not load this competitor: {error}. Check your connection and reload.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No account-scoped competitor was found for this route.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -153,8 +194,8 @@ export default function CompetitorCanvas() {
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Threat Index" value={threat ? String(Math.round(threat.value)) : "--"} />
         <MetricCard label="BMC Sections" value={`${populatedSections}/9`} />
-        <MetricCard label="Section Deltas" value={String(sectionDeltaCount)} />
-        <MetricCard label="Freshness" value="Verified" />
+        <MetricCard label="Section Deltas" value={String(sectionDeltas.length)} />
+        <MetricCard label="Freshness" value={freshnessLabel} />
       </section>
 
       <section className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
@@ -166,6 +207,7 @@ export default function CompetitorCanvas() {
             competitorItems={itemsBySection[sectionKey] ?? []}
             ownItems={compareMode ? ownCanvas.itemsBySection[sectionKey] ?? [] : []}
             compareMode={compareMode}
+            deltaScore={sectionDeltas.find((metric) => metric.section_key === sectionKey)?.value}
             borrowingKey={borrowingKey}
             onBorrow={borrowIdea}
           />
@@ -186,12 +228,33 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
+interface SectionVerdict {
+  label: string;
+  className: string;
+}
+
+/**
+ * Win/lose verdict (RF-4-3), derived from the gap engine's section_delta metric:
+ * the delta is the average score of open competitive gaps in this section, so a
+ * high delta means the competitor has strong items your canvas doesn't cover.
+ */
+function sectionVerdict(deltaScore: number | undefined, competitorCount: number): SectionVerdict | null {
+  if (competitorCount === 0) return null;
+  if (typeof deltaScore !== "number") {
+    return { label: "Covered", className: "bg-success/10 text-success border-success/30" };
+  }
+  if (deltaScore >= 45) return { label: "They lead", className: "bg-destructive/10 text-destructive border-destructive/30" };
+  if (deltaScore >= 20) return { label: "Contested", className: "bg-warning/10 text-warning border-warning/30" };
+  return { label: "Slight edge", className: "bg-muted text-muted-foreground border-border" };
+}
+
 function SectionCompareCard({
   sectionKey,
   competitorName,
   competitorItems,
   ownItems,
   compareMode,
+  deltaScore,
   borrowingKey,
   onBorrow,
 }: {
@@ -200,17 +263,26 @@ function SectionCompareCard({
   competitorItems: CanvasItemEvidence[];
   ownItems: CanvasItemEvidence[];
   compareMode: boolean;
+  deltaScore?: number;
   borrowingKey: string | null;
-  onBorrow: (sectionKey: CanvasSectionKey, item: CanvasItemEvidence) => void;
+  onBorrow: (sectionKey: CanvasSectionKey, item: CanvasItemEvidence, index: number) => void;
 }) {
+  const verdict = compareMode ? sectionVerdict(deltaScore, competitorItems.length) : null;
   return (
     <Card className="border-border/60 bg-card shadow-sm transition-shadow hover:shadow-md">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="text-sm font-semibold">{CANVAS_SECTION_LABELS[sectionKey]}</CardTitle>
-          <Badge variant="outline" className="shrink-0 text-[10px]">
-            {competitorItems.length} items
-          </Badge>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {verdict && (
+              <Badge variant="outline" className={`text-[10px] ${verdict.className}`} title="Based on the latest gap-engine comparison">
+                {verdict.label}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-[10px]">
+              {competitorItems.length} items
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className={compareMode ? "grid gap-4 md:grid-cols-2" : "space-y-3"}>
@@ -248,7 +320,7 @@ function ItemColumn({
   empty: string;
   sectionKey: CanvasSectionKey;
   borrowingKey?: string | null;
-  onBorrow?: (sectionKey: CanvasSectionKey, item: CanvasItemEvidence) => void;
+  onBorrow?: (sectionKey: CanvasSectionKey, item: CanvasItemEvidence, index: number) => void;
 }) {
   return (
     <div className="min-w-0 space-y-2">
@@ -259,8 +331,8 @@ function ItemColumn({
         </p>
       ) : (
         <div className="space-y-2">
-          {items.map((item) => {
-            const key = `${sectionKey}:${item.text}`;
+          {items.map((item, index) => {
+            const key = `${sectionKey}:${index}`;
             const busy = borrowingKey === key;
             return (
               <div key={key} className="rounded-md border border-border/60 p-3">
@@ -282,7 +354,7 @@ function ItemColumn({
                       size="sm"
                       className="ml-auto h-7 px-2 text-xs"
                       disabled={busy}
-                      onClick={() => onBorrow(sectionKey, item)}
+                      onClick={() => onBorrow(sectionKey, item, index)}
                     >
                       {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Lightbulb className="mr-1 h-3 w-3" />}
                       Explore

@@ -40,20 +40,26 @@ interface MetricRow {
 export function useCompetitorCanvasEvidence(competitorId: string | undefined): {
   competitor: CompanyRow | null;
   itemsBySection: CompetitorCanvasBySection;
+  freshnessBySection: Partial<Record<CanvasSectionKey, FreshnessStatus>>;
   metrics: CompetitorMetric[];
   loading: boolean;
+  error: string | null;
 } {
   const { accountId } = useAccountId();
   const [competitor, setCompetitor] = useState<CompanyRow | null>(null);
   const [itemsBySection, setItemsBySection] = useState<CompetitorCanvasBySection>({});
+  const [freshnessBySection, setFreshnessBySection] = useState<Partial<Record<CanvasSectionKey, FreshnessStatus>>>({});
   const [metrics, setMetrics] = useState<CompetitorMetric[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accountId || !competitorId) {
       setCompetitor(null);
       setItemsBySection({});
+      setFreshnessBySection({});
       setMetrics([]);
+      setError(null);
       setLoading(false);
       return;
     }
@@ -82,12 +88,16 @@ export function useCompetitorCanvasEvidence(competitorId: string | undefined): {
             .from<MetricRow>("metric_snapshots")
             .select("metric_key, value, label, inputs, section_key, computed_at")
             .eq("account_id", accountId)
+            // Server-side scope (RF-4-8): only this competitor's snapshots compete for the window.
+            .contains("inputs", { competitor_id: competitorId })
             .in("metric_key", ["competitor.section_delta", "competitor.threat_index"])
             .order("computed_at", { ascending: false })
-            .limit(100),
+            .limit(200),
         ]);
         if (cancelled) return;
 
+        const firstError = companyRes.error ?? versionsRes.error ?? metricsRes.error;
+        setError(firstError ? firstError.message : null);
         setCompetitor(companyRes.error ? null : companyRes.data ?? null);
 
         const parsed = new Map<CanvasSectionKey, ParsedItem[]>();
@@ -127,20 +137,26 @@ export function useCompetitorCanvasEvidence(competitorId: string | undefined): {
           }));
         }
         setItemsBySection(result);
-        setMetrics(
-          metricsRes.error
-            ? []
-            : (metricsRes.data ?? [])
-                .filter((metric) => metric.inputs && (metric.inputs as Record<string, unknown>).competitor_id === competitorId)
-                .map((metric) => ({
-                  metric_key: metric.metric_key,
-                  value: Number(metric.value),
-                  label: metric.label,
-                  inputs: (metric.inputs ?? {}) as Record<string, unknown>,
-                  section_key: metric.section_key,
-                  computed_at: metric.computed_at,
-                })),
-        );
+        const freshness: Partial<Record<CanvasSectionKey, FreshnessStatus>> = {};
+        for (const [key, items] of parsed) {
+          freshness[key] = items[0]?.freshness ?? "unverified";
+        }
+        setFreshnessBySection(freshness);
+        // Latest snapshot per (metric_key, section_key) — history must not inflate counts (RF-4-8).
+        const latestMetrics = new Map<string, CompetitorMetric>();
+        for (const metric of metricsRes.error ? [] : metricsRes.data ?? []) {
+          const dedupeKey = `${metric.metric_key}:${metric.section_key ?? ""}`;
+          if (latestMetrics.has(dedupeKey)) continue;
+          latestMetrics.set(dedupeKey, {
+            metric_key: metric.metric_key,
+            value: Number(metric.value),
+            label: metric.label,
+            inputs: (metric.inputs ?? {}) as Record<string, unknown>,
+            section_key: metric.section_key,
+            computed_at: metric.computed_at,
+          });
+        }
+        setMetrics([...latestMetrics.values()]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -153,7 +169,7 @@ export function useCompetitorCanvasEvidence(competitorId: string | undefined): {
     };
   }, [accountId, competitorId]);
 
-  return { competitor, itemsBySection, metrics, loading };
+  return { competitor, itemsBySection, freshnessBySection, metrics, loading, error };
 }
 
 interface ParsedItem {
