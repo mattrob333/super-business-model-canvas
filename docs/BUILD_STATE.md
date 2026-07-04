@@ -24,6 +24,10 @@ concurrency rule is invoked (note it here if so).
 
 ## BLOCKERS (open)
 
+_(none)_
+
+### Resolved blocker history
+
 ### BLK-OPS-1: Supabase Vault service-role key missing (raised 2026-07-03, ops)
 Context: Live migration `20260702090000_schedule_loop_tick.sql` requires a Supabase Vault
 secret named `service_role_key` so pg_cron can call the `scheduled-loop-tick` edge function.
@@ -33,7 +37,13 @@ and staleness-loop migrations.
 Recommended resolution: Matt should add the Vault secret named `service_role_key` in the
 Supabase dashboard using the service-role key value, then ask the build agent to rerun the
 pending live migrations.
-Status: OPEN
+Status: RESOLVED 2026-07-03 via Supabase MCP. Re-verified `has_service_role_key = true`, then
+applied live migrations `schedule_loop_tick` (recorded version `20260704030046`) and
+`staleness_loop_provisioning` (recorded version `20260704030114`) to project
+`mehhuxzamnpxnkbrslls`. Verification: cron job `scheduled-loop-tick` is active on
+`*/5 * * * *`; existing accounts check returned `accounts_total = 1`, `loops_total = 1`,
+`accounts_with_loop = 1`, `accounts_with_duplicate_loops = 0`, and
+`exactly_one_staleness_sweep_per_account = true`.
 
 <!-- Format:
 ### BLK-<n>: <title> (raised <date>, phase <n>)
@@ -113,16 +123,17 @@ Status: OPEN | RESOLVED (<how>)
   Owner one-time setup: create Fly apps + token, fill GitHub repo secrets (one page), Supabase
   Vault secret + pending SQL migrations, run Ops workflow (`sync-secrets`, then
   `deploy-edge-functions`), DNS cutover for superbmc.com, then Ops `live-golden-set`.
-- **Blocked 2026-07-03 via Supabase MCP:** checked live project `mehhuxzamnpxnkbrslls` before
-  applying pending migrations. Migration `20260702090000_schedule_loop_tick.sql` has a hard
-  prerequisite on Vault secret `service_role_key`; the live check returned false, so no
-  pending live migrations were applied. After Matt adds the Vault secret, rerun the MCP apply
-  for `20260702090000_schedule_loop_tick.sql` and
-  `20260703090000_staleness_loop_provisioning.sql`, then verify `staleness_sweep` loops and
-  the `scheduled-loop-tick` cron registration.
+- **Completed 2026-07-03 via Supabase MCP:** after Matt added Vault secret
+  `service_role_key`, re-verified the secret exists without reading its value, applied live
+  migrations `20260702090000_schedule_loop_tick.sql` and
+  `20260703090000_staleness_loop_provisioning.sql` to project `mehhuxzamnpxnkbrslls`, and
+  verified cron + loop provisioning. Results: `scheduled-loop-tick` is active on
+  `*/5 * * * *`; one existing account has exactly one `staleness_sweep` scheduled loop
+  (`accounts_total = 1`, `loops_total = 1`, `accounts_with_duplicate_loops = 0`). BLK-OPS-1
+  resolved.
 - **From Phase 3 reviewer pass (2026-07-03):**
-  1. Apply migration `20260703090000_staleness_loop_provisioning.sql` to live project
-     `mehhuxzamnpxnkbrslls` (build agent can do this via Supabase MCP, same as prior phases).
+  1. Live migration `20260703090000_staleness_loop_provisioning.sql` is complete; see the
+     2026-07-03 Supabase MCP completion note above.
   2. Redeploy the two edge functions updated in this pass when doing the standing deploy:
      `supabase functions deploy agent-run` and `supabase functions deploy scheduled-loop-tick`.
   3. After `ANTHROPIC_API_KEY` exists in the worker env, run the live verifier golden set once
