@@ -12,7 +12,7 @@
 | 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
 | 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
 | 3 | Research engine & evidence | **APPROVED** | `build/phase-3-research` (merged with reviewer fixes, PR #13) | 2026-07-03 |
-| 4 | Competitor canvases & gap engine | NOT STARTED | â€” | â€” |
+| 4 | Competitor canvases & gap engine | AWAITING REVIEW | `build/phase-4-competitors` | 2026-07-04 |
 | 5 | Section agent workspaces | NOT STARTED | â€” | â€” |
 | 6 | War Room & orchestration | NOT STARTED | â€” | â€” |
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | â€” | â€” |
@@ -817,8 +817,115 @@ npm run build                   -> green
 npm run lint                    -> 68 problems (49 errors, 19 warnings), within frozen <=68 baseline
 ```
 
-### Phase 4 â€” Competitor canvases & gap engine
-Tasks: 4.1 â˜ Â· 4.2 â˜ Â· 4.3 â˜ Â· 4.4 â˜ Â· 4.5 â˜ Â· 4.6 â˜ Â· 4.7 â˜
+### Phase 4 - Competitor canvases & gap engine
+Tasks: 4.1 [x] - 4.2 [x] - 4.3 [x] - 4.4 [x] - 4.5 [x] - 4.6 [x] - 4.7 [x]
+
+**2026-07-04 - Slice 3 UI complete; Phase 4 awaiting review.**
+
+- **4.4-4.5 visible gap/threat surfaces:** Dashboard now shows a Competitor Watch strip from
+  `metric_snapshots` rows keyed by `competitor.threat_index`, linking each competitor to its
+  drill-down canvas. The legacy Competitive Landscape component can link competitor cards to
+  those canvases when a persisted competitor id is available.
+- **4.6 competitor drill-down/compare:** added `/competitors/:competitorId/canvas`, loading the
+  account-scoped competitor, latest competitor-linked canvas section versions, hydrated evidence,
+  and Threat Index/section-delta metrics. The page supports a side-by-side compare mode against
+  the user's own canvas and keeps own-canvas evidence queries filtered to
+  `competitor_id is null` so competitor versions cannot replace first-party canvas content.
+- **4.7 evidence + action plumbing:** competitor canvas items show confidence, evidence counts,
+  source excerpts, and source links. The Explore action creates a section-agent
+  `workspace_threads` row and a proposal `workspace_messages` row for adapting the competitor
+  idea. Empty states are explicit for missing research, missing own-canvas sections, and missing
+  competitors.
+- **Design/test notes:** UI uses the established light grid page canvas, white cards with
+  `border-border/60`, subtle shadows, responsive grids, and break-word guards for long names,
+  URLs, excerpts, and item text. There is no dedicated frontend unit-test harness in the repo, so
+  verification for the UI slice is through TypeScript/build/lint gates plus worker regression
+  tests for the backend data path.
+
+**Final Phase 4 gate results before review:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 68 problems (49 errors, 19 warnings), within frozen <=68 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 40 passed, 2 skipped (SQL integration + live golden env-gated)
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
+
+**2026-07-03 - Slice 1 complete: work orders 4.1-4.2.**
+
+- **4.1 competitor entities schema:** added migration
+  `20260704090000_competitor_entities.sql` with account-scoped `companies` rows,
+  `is_competitor`, metadata, RLS policies, hot-path indexes, and
+  `canvas_section_versions.competitor_id` for competitor-linked BMC versions. Mirrored into
+  `supabase/schema.sql`, updated Supabase types, and extended `scripts/verify-schema.sql`.
+- **4.2 `competitor_research` job kind:** reused the Phase-3 `CompanyResearchHandler`
+  pipeline instead of cloning it: Firecrawl through `FeedRunner`, budget extraction, escalation
+  to `extract_escalated`, adversarial `research_verify`, evidence dedup, unsupported
+  confidence cap, contradiction gaps/insights, and evidence-linked canvas writes. Competitor
+  runs load `companies` with `.eq("account_id", job.account_id)` and write
+  `canvas_section_versions.competitor_id`.
+- **Worker/edge routing:** added `competitor_research` to the worker dispatcher and
+  `agent-run` enqueue allowlist. `read_competitor_canvas` now reads account-scoped competitor
+  canvas versions instead of returning the Phase-2 stub.
+- **Live DB:** applied migration `20260704090000_competitor_entities.sql` to Supabase project
+  `mehhuxzamnpxnkbrslls` via MCP as `competitor_entities` (recorded version
+  `20260704034153`). Verification returned `companies_exists = true`,
+  `competitor_id_exists = true`, `companies_rls_enabled = true`, `companies_policy_count = 4`,
+  and `competitor_latest_index_exists = true`.
+
+**Slice 1 focused checks run before full gates:**
+```
+cd worker && npm run typecheck                  -> exit 0
+cd worker && npm test -- --run company-research -> 8 passed
+cd worker && npm test -- --run company-research bmc-tools -> 10 passed
+npx tsc -p tsconfig.app.json --noEmit           -> exit 0
+```
+
+**Full gate results before commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 68 problems (49 errors, 19 warnings), within frozen <=68 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 38 passed, 2 skipped (SQL integration + live golden env-gated)
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
+
+**2026-07-03 - Slice 2 backend complete: work order 4.3.**
+
+- **4.3 gap engine job:** added non-LLM `gap_engine` worker job that compares latest own
+  canvas section versions against latest competitor canvas versions, writes competitor-linked
+  `gaps` rows with deterministic `competitor_gap_v1` scores, and emits `metric_snapshots` for
+  `competitor.section_delta` plus `competitor.threat_index` with formula inputs stored for
+  audit. The job calls `markJobRunCompleted` because it is a non-LLM handler.
+- **Schema:** added migration `20260704100000_competitor_gap_engine.sql` with
+  `gap_type = competitive`, `gaps.competitor_id`, `score`, `score_inputs`, `formula_version`,
+  and `idx_gaps_competitor`. Mirrored into `schema.sql`, Supabase types, and
+  `scripts/verify-schema.sql`.
+- **Worker/edge routing:** added `gap_engine` to the worker dispatcher and `agent-run` enqueue
+  allowlist. Tests cover deterministic gap scoring, account-scoped competitor loading,
+  Threat Index metric inputs, run completion, and dispatcher routing.
+- **Live DB:** applied migration `20260704100000_competitor_gap_engine.sql` to Supabase project
+  `mehhuxzamnpxnkbrslls` via MCP as `competitor_gap_engine` (recorded version
+  `20260704035103`). Verification returned `competitive_gap_type_exists = true`,
+  `gaps_competitor_id_exists = true`, `gaps_score_exists = true`,
+  `gaps_score_inputs_exists = true`, and `gaps_competitor_index_exists = true`.
+- **Honest scope note:** UI portions of 4.4-4.5 (drill-down compare, landscape links, visible
+  Threat Index surfaces) remain open for the next slice alongside 4.6-4.7.
+
+**Full gate results before Slice 2 commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 68 problems (49 errors, 19 warnings), within frozen <=68 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 40 passed, 2 skipped (SQL integration + live golden env-gated)
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
 
 ### Phase 5 â€” Section agent workspaces
 Tasks: 5.1 â˜ Â· 5.2 â˜ Â· 5.3 â˜ Â· 5.4 â˜ Â· 5.5 â˜ Â· 5.6 â˜ Â· 5.7 â˜ Â· 5.8 â˜ Â· 5.9 â˜

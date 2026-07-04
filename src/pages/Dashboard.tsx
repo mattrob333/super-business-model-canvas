@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Heart, AlertTriangle, Clock, Shield, FileText, RefreshCw, Bot, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Heart, AlertTriangle, Clock, Shield, FileText, RefreshCw, Bot, Loader2, Building2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow, formatDistanceToNowStrict } from "date-fns";
@@ -7,6 +8,7 @@ import { MetricTile } from "@/components/dashboard/MetricTile";
 import { StrategicHealthPanel } from "@/components/dashboard/StrategicHealthPanel";
 import { useActiveAnalysis } from "@/hooks/useActiveAnalysis";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useAuth } from "@/hooks/useAuth";
 import type { Database } from "@/integrations/supabase/types";
@@ -26,6 +28,20 @@ interface DashboardReport {
   company_name: string;
   created_at: string | null;
   frameworks: { title: string } | null;
+}
+
+interface CompetitorThreat {
+  competitorId: string;
+  name: string;
+  threatIndex: number;
+  gapCount: number;
+}
+
+interface ThreatMetricRow {
+  value: number | string;
+  label: string | null;
+  inputs: Record<string, unknown> | null;
+  computed_at: string;
 }
 
 const RUN_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -80,6 +96,7 @@ const Dashboard = () => {
   const [pausedLoops, setPausedLoops] = useState(0);
   const [attentionLoops, setAttentionLoops] = useState(0);
   const [recentReports, setRecentReports] = useState<DashboardReport[]>([]);
+  const [competitorThreats, setCompetitorThreats] = useState<CompetitorThreat[]>([]);
 
   const fetchDashboard = useCallback(async () => {
     if (accountLoading) return;
@@ -92,7 +109,7 @@ const Dashboard = () => {
     setLoading(true);
 
     try {
-      const [gapsRes, evidenceRes, contextRes, runsRes, loopsRes, reportsRes] =
+      const [gapsRes, evidenceRes, contextRes, runsRes, loopsRes, reportsRes, threatRes] =
         await Promise.all([
           supabase
             .from("gaps")
@@ -128,6 +145,13 @@ const Dashboard = () => {
                 .order("created_at", { ascending: false })
                 .limit(3)
             : Promise.resolve({ data: null, error: null }),
+          supabaseUntyped
+            .from<ThreatMetricRow>("metric_snapshots")
+            .select("value, label, inputs, computed_at")
+            .eq("account_id", accountId)
+            .eq("metric_key", "competitor.threat_index")
+            .order("computed_at", { ascending: false })
+            .limit(12),
         ]);
 
       // Each section degrades independently — a failed query shows its empty state
@@ -154,6 +178,23 @@ const Dashboard = () => {
         reportsRes.error
           ? []
           : ((reportsRes.data ?? []) as unknown as DashboardReport[]),
+      );
+      const seenCompetitors = new Set<string>();
+      setCompetitorThreats(
+        threatRes.error
+          ? []
+          : (threatRes.data ?? []).flatMap((row) => {
+              const inputs = (row.inputs ?? {}) as Record<string, unknown>;
+              const competitorId = typeof inputs.competitor_id === "string" ? inputs.competitor_id : "";
+              if (!competitorId || seenCompetitors.has(competitorId)) return [];
+              seenCompetitors.add(competitorId);
+              return [{
+                competitorId,
+                name: row.label ?? "Competitor",
+                threatIndex: Number(row.value),
+                gapCount: typeof inputs.gap_count === "number" ? inputs.gap_count : 0,
+              }];
+            }),
       );
     } catch (err) {
       console.error("Failed to load dashboard data:", err);
@@ -247,6 +288,47 @@ const Dashboard = () => {
           icon={Shield}
         />
       </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            Competitor Watch
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : competitorThreats.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No competitor threat metrics yet. Run competitor research and the gap engine to populate this strip.
+            </p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {competitorThreats.map((competitor) => (
+                <Link
+                  key={competitor.competitorId}
+                  to={`/competitors/${competitor.competitorId}/canvas`}
+                  className="rounded-lg border border-border/60 bg-card p-3 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <p className="truncate text-sm font-medium text-foreground">{competitor.name}</p>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Threat Index</p>
+                      <p className="text-2xl font-semibold tracking-tight">{Math.round(competitor.threatIndex)}</p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px]">
+                      {competitor.gapCount} gaps
+                    </Badge>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Middle row — 3 equal-height panels */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-stretch">

@@ -199,9 +199,19 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
 
   const readCompetitorCanvas = tool(
     "read_competitor_canvas",
-    "Read a competitor canvas. Stubbed until Phase 4 competitor canvases ship.",
-    { competitor_id: z.string().optional() },
-    async () => toolResult({ items: [] }),
+    "Read the latest account-scoped competitor canvas versions.",
+    { competitor_id: z.string().uuid() },
+    async (args) => {
+      const { data, error } = await client
+        .from("canvas_section_versions")
+        .select("id, competitor_id, section_key, section_title, items, notes, confidence, freshness_status, last_verified_at, created_at")
+        .eq("account_id", ctx.accountId)
+        .eq("competitor_id", args.competitor_id)
+        .order("created_at", { ascending: false });
+
+      if (error) return toolError(`read_competitor_canvas failed: ${error.message}`);
+      return toolResult({ competitor_id: args.competitor_id, rows: latestBySection(data ?? []) });
+    },
     { annotations: { readOnlyHint: true } },
   );
 
@@ -278,6 +288,18 @@ function toolError(text: string) {
     content: [{ type: "text" as const, text }],
     isError: true,
   };
+}
+
+function latestBySection(rows: Array<Record<string, unknown>>) {
+  const seen = new Set<string>();
+  const latest: Array<Record<string, unknown>> = [];
+  for (const row of rows) {
+    const sectionKey = typeof row.section_key === "string" ? row.section_key : "";
+    if (!sectionKey || seen.has(sectionKey)) continue;
+    seen.add(sectionKey);
+    latest.push(row);
+  }
+  return latest;
 }
 
 function averageConfidence(items: Array<{ confidence: number }>): number | null {
