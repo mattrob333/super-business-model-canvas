@@ -198,6 +198,102 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase 5A jobs-slice review — RESOLVED: RF-5A-1..9 fixed by the reviewer (2026-07-04, PR #38)
+
+All findings below fixed on main (worker suite now 51 tests):
+- **RF-5A-1 fixed:** `safeParseDocUpdateStrict` — unparseable summary output never writes;
+  budget→mid escalation via new `summary_update_escalated` route (migration
+  `20260704170000_summary_escalated_route.sql` + mirrors + verify-schema count 3→4);
+  hard-fail if both tiers fail. Tests pin both the hard-fail and the escalation path.
+- **RF-5A-2 fixed:** onboarding claims now pass `verifyClaimAgainstExcerpt` per item
+  (confirmed → ≤0.95; unsupported/contradicted → capped 0.5, grounded dropped, flagged,
+  `verification_status` recorded); dossier_refresh spot-checks up to 3 NEW claim lines
+  against collected evidence — a contradicted claim hard-fails the refresh; refresh with
+  zero new evidence now skips without calling the LLM (never rewrite on vibes).
+- **RF-5A-3 fixed:** material change on a changed dossier posts a `notable` insight and
+  enqueues a durable chained `summary_update` (gap-engine chain pattern). Test pins both.
+- **RF-5A-4 fixed:** current-row `claim_sources.default` now derives from provenance
+  (owner_provided when founder-doc sourced) + spot-check stats recorded.
+- **RF-5A-5 fixed:** ingestion failures write `founder_documents.status='failed'` + error.
+  (`needs_review` remains reserved for the grounding-wizard slice — UI decision.)
+- **RF-5A-6 fixed:** evidence dedup on (account, source_url, excerpt) in both document
+  and watched-source paths. Disclosed residual: `canvas_section_versions` re-inserts on
+  full-handler retry remain (versioned table, latest-wins reads — accepted for now).
+- **RF-5A-7 fixed:** 10 tests — both previously-untested handlers covered; groundedness
+  grounded-without-evidence boundary; 0.95 cap; claim_sources pinned; atlas_summary
+  doc_key rejection pinned.
+- **RF-5A-8 fixed:** onboarding cannot write `atlas_summary`; model evidence_ids
+  validated as UUIDs with worker-id fallback.
+- **RF-5A-9 fixed:** source text truncated at 60k chars; budget floor documented;
+  routes-migration style noted (is_default/updated_at omission left as-is — the columns
+  keep their prior values under upsert, which is the desired behavior).
+- RF-5A-10 logged (dependency weight accepted).
+
+**Operator/live queue additions:** apply `20260704170000_summary_escalated_route.sql`
+live (plus verify 20260704150000/20260704153000 which the build agent reports applied);
+redeploy `agent-run` (allowlist gained dossier_refresh/summary_update/onboarding_extract)
+— same MCP path as v6.
+
+#### Original jobs-slice review (fix list as issued)
+
+Gates re-verified green from a clean checkout (root tsc/build/lint 65; worker 43 tests).
+Strong: wiring exact in both allowlist+dispatcher; routes migration idempotent against the
+real partial unique index with correct per-provider model-ID conventions; account scoping
+clean throughout; real-handler tests with exact groundedness values; owner-question 3-cap
+in code AND trigger; schema mirror byte-consistent. Findings (slice-level, phase stays in
+progress; BLOCKER/HIGH are the immediate queue):
+
+- **RF-5A-1 (BLOCKER): a malformed LLM response silently overwrites `atlas_summary` with
+  an empty body.** `handleSummaryUpdate` feeds a synthetic empty "existing" doc into
+  `safeParseDocUpdate`; when `parseJsonObject` returns null (prose/truncated JSON from the
+  budget Haiku route), bodyMd falls back to `""`, the upsert sees a change, bumps the
+  version, and the run completes green. One bad response destroys Atlas's standing context
+  doc. Fix: unparseable output is a HARD failure; and implement the spec 08 §8
+  budget→mid escalation for summary_update (a `summary_update_escalated` route) instead of
+  any silent fallback. Add tests for this handler (it has zero).
+- **RF-5A-2 (HIGH): spec-mandated verifier steps are missing, and unverified writes are
+  stamped verified.** dossier_refresh must verifier-spot-check new claims
+  (`research_verify`, never downgraded — spec 08 §1.2) before version++; onboarding
+  writes canvas versions with `freshness_status: "fresh"` + `last_verified_at: now()`
+  though no verifier ever saw them. Same defect class as the Phase-3 "verified" enum bug:
+  mislabeling unverified data. Owner-provided items should be `unverified` (or verified
+  against the document excerpt via the existing `verifyClaimAgainstExcerpt`) and must not
+  get `last_verified_at` until a verifier ran.
+- **RF-5A-3 (HIGH): `material_change` cascade not implemented and not disclosed.**
+  Spec 08 §1.2: material dossier change → refresh Atlas summary + post an insight.
+  The flag is stored and nothing happens. BUILD_STATE marked `jobs [x]` without
+  disclosing this, the missing verifier, or the missing escalation — that's the
+  hedged-checkbox pattern again (HANDOFF §8 lesson 2). Restate honestly.
+- **RF-5A-4 (HIGH→MEDIUM): onboarding dossiers mislabeled.** `upsertAgentDocument`
+  hardcodes `claim_sources: {default: "researched"}` on the current row even when built
+  from a founder document, contradicting its own revision row (`owner_provided`). The
+  dossier viewer will render the wrong provenance. Pass provenance through.
+- **RF-5A-5 (MEDIUM): failed ingestion strands `founder_documents.status='parsing'`** —
+  write `status: 'failed'` + `error` on handler failure (enum has the value; column
+  exists); decide where `needs_review` fits (currently unreachable).
+- **RF-5A-6 (MEDIUM): onboarding_extract not retry-idempotent** — re-runs duplicate
+  `evidence_items` and `canvas_section_versions`. Dedup evidence on
+  (account, source, excerpt) like Phase 3; consider supersede semantics for repeated
+  ingestion of the same document.
+- **RF-5A-7 (MEDIUM): test gaps** — zero tests for dossier_refresh + summary_update;
+  groundedness `grounded && evidence_ids.length>0` second condition untested; 0.95 cap
+  untested; claim_sources unpinned; fake ignores read filters so read-scoping is
+  unasserted.
+- **RF-5A-8 (LOW): constrain LLM-controlled fields** — reject `doc_key: "atlas_summary"`
+  from onboarding dossiers (contract-doc clobber) and validate `evidence_ids` as UUIDs
+  (model-invented ids currently fail as cryptic DB errors); prefer always using the real
+  ids written by the worker.
+- **RF-5A-9 (LOW): consistency nits** — routes upsert omits `is_default`/`updated_at`
+  vs the extract_escalated precedent; `budgetForRoute` floor differs from
+  canvas-section-analysis without comment; run-status helpers duplicated instead of
+  reused; consider truncating huge `sourceText` before prompting.
+- **RF-5A-10 (LOW, note): pdf-parse pulls pdfjs-dist + native canvas binaries** —
+  heavy but bounded for text-only extraction; acceptable, revisit if image size hurts.
+- **Ops note:** `agent-run` allowlist changed again — needs an edge-function redeploy
+  when this lands on main (same MCP/Ops path as v6).
+
+### RF-4-15
+
 ### RF-4-15 (HIGH, live smoke finding) — FIXED (2026-07-04, reviewer)
 **Problem:** first live "Research this competitor" click failed:
 `company_research requires a business context version`. Accounts created before the
