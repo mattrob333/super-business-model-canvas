@@ -631,6 +631,9 @@ export type Database = {
           description: string | null
           industry: string | null
           is_competitor: boolean
+          logo_url: string | null
+          logo_source: Database["public"]["Enums"]["company_logo_source"] | null
+          brand_assets: Json
           metadata: Json
           created_by: string | null
           created_at: string
@@ -644,6 +647,9 @@ export type Database = {
           description?: string | null
           industry?: string | null
           is_competitor?: boolean
+          logo_url?: string | null
+          logo_source?: Database["public"]["Enums"]["company_logo_source"] | null
+          brand_assets?: Json
           metadata?: Json
           created_by?: string | null
           created_at?: string
@@ -657,6 +663,9 @@ export type Database = {
           description?: string | null
           industry?: string | null
           is_competitor?: boolean
+          logo_url?: string | null
+          logo_source?: Database["public"]["Enums"]["company_logo_source"] | null
+          brand_assets?: Json
           metadata?: Json
           created_by?: string | null
           created_at?: string
@@ -683,6 +692,8 @@ export type Database = {
           items: Json
           notes: string | null
           confidence: number | null
+          groundedness_score: number | null
+          groundedness_inputs: Json
           freshness_status: Database["public"]["Enums"]["freshness_status"]
           last_verified_at: string | null
           created_by_agent_profile_id: string | null
@@ -699,6 +710,8 @@ export type Database = {
           items?: Json
           notes?: string | null
           confidence?: number | null
+          groundedness_score?: number | null
+          groundedness_inputs?: Json
           freshness_status?: Database["public"]["Enums"]["freshness_status"]
           last_verified_at?: string | null
           created_by_agent_profile_id?: string | null
@@ -715,6 +728,8 @@ export type Database = {
           items?: Json
           notes?: string | null
           confidence?: number | null
+          groundedness_score?: number | null
+          groundedness_inputs?: Json
           freshness_status?: Database["public"]["Enums"]["freshness_status"]
           last_verified_at?: string | null
           created_by_agent_profile_id?: string | null
@@ -741,6 +756,364 @@ export type Database = {
             columns: ["competitor_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      watched_sources: {
+        Row: {
+          id: string
+          account_id: string
+          agent_profile_id: string
+          kind: Database["public"]["Enums"]["watched_source_kind"]
+          target: string
+          label: string
+          cadence: Database["public"]["Enums"]["watch_cadence"]
+          last_checked_at: string | null
+          health: Database["public"]["Enums"]["watch_health"]
+          last_error: string | null
+          added_by: Database["public"]["Enums"]["watch_added_by"]
+          entity: Json
+          enabled: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          agent_profile_id: string
+          kind: Database["public"]["Enums"]["watched_source_kind"]
+          target: string
+          label: string
+          cadence?: Database["public"]["Enums"]["watch_cadence"]
+          last_checked_at?: string | null
+          health?: Database["public"]["Enums"]["watch_health"]
+          last_error?: string | null
+          added_by?: Database["public"]["Enums"]["watch_added_by"]
+          entity?: Json
+          enabled?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          agent_profile_id?: string
+          kind?: Database["public"]["Enums"]["watched_source_kind"]
+          target?: string
+          label?: string
+          cadence?: Database["public"]["Enums"]["watch_cadence"]
+          last_checked_at?: string | null
+          health?: Database["public"]["Enums"]["watch_health"]
+          last_error?: string | null
+          added_by?: Database["public"]["Enums"]["watch_added_by"]
+          entity?: Json
+          enabled?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watched_sources_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "watched_sources_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      founder_documents: {
+        Row: {
+          id: string
+          account_id: string
+          title: string
+          file_name: string | null
+          storage_bucket: string
+          storage_path: string | null
+          content_type: string | null
+          file_size_bytes: number | null
+          status: Database["public"]["Enums"]["founder_document_status"]
+          source_summary: string | null
+          extracted_text: string | null
+          section_claims: Json
+          evidence_ids: string[]
+          agent_run_id: string | null
+          uploaded_by: string | null
+          error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          title: string
+          file_name?: string | null
+          storage_bucket?: string
+          storage_path?: string | null
+          content_type?: string | null
+          file_size_bytes?: number | null
+          status?: Database["public"]["Enums"]["founder_document_status"]
+          source_summary?: string | null
+          extracted_text?: string | null
+          section_claims?: Json
+          evidence_ids?: string[]
+          agent_run_id?: string | null
+          uploaded_by?: string | null
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          title?: string
+          file_name?: string | null
+          storage_bucket?: string
+          storage_path?: string | null
+          content_type?: string | null
+          file_size_bytes?: number | null
+          status?: Database["public"]["Enums"]["founder_document_status"]
+          source_summary?: string | null
+          extracted_text?: string | null
+          section_claims?: Json
+          evidence_ids?: string[]
+          agent_run_id?: string | null
+          uploaded_by?: string | null
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "founder_documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "founder_documents_agent_run_id_fkey"
+            columns: ["agent_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_documents: {
+        Row: {
+          id: string
+          account_id: string
+          agent_profile_id: string
+          doc_key: string
+          title: string
+          body_md: string
+          version: number
+          refresh_cadence: Database["public"]["Enums"]["watch_cadence"]
+          last_refreshed_at: string | null
+          freshness_status: Database["public"]["Enums"]["freshness_status"]
+          evidence_ids: string[]
+          material_change: boolean
+          claim_sources: Json
+          founder_document_id: string | null
+          agent_run_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          agent_profile_id: string
+          doc_key: string
+          title: string
+          body_md?: string
+          version?: number
+          refresh_cadence?: Database["public"]["Enums"]["watch_cadence"]
+          last_refreshed_at?: string | null
+          freshness_status?: Database["public"]["Enums"]["freshness_status"]
+          evidence_ids?: string[]
+          material_change?: boolean
+          claim_sources?: Json
+          founder_document_id?: string | null
+          agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          agent_profile_id?: string
+          doc_key?: string
+          title?: string
+          body_md?: string
+          version?: number
+          refresh_cadence?: Database["public"]["Enums"]["watch_cadence"]
+          last_refreshed_at?: string | null
+          freshness_status?: Database["public"]["Enums"]["freshness_status"]
+          evidence_ids?: string[]
+          material_change?: boolean
+          claim_sources?: Json
+          founder_document_id?: string | null
+          agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_documents_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_documents_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_documents_founder_document_id_fkey"
+            columns: ["founder_document_id"]
+            isOneToOne: false
+            referencedRelation: "founder_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_document_revisions: {
+        Row: {
+          id: string
+          agent_document_id: string
+          version: number
+          title: string
+          body_md: string
+          evidence_ids: string[]
+          material_change: boolean
+          change_summary: string | null
+          claim_sources: Json
+          founder_document_id: string | null
+          agent_run_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          agent_document_id: string
+          version: number
+          title: string
+          body_md: string
+          evidence_ids?: string[]
+          material_change?: boolean
+          change_summary?: string | null
+          claim_sources?: Json
+          founder_document_id?: string | null
+          agent_run_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          agent_document_id?: string
+          version?: number
+          title?: string
+          body_md?: string
+          evidence_ids?: string[]
+          material_change?: boolean
+          change_summary?: string | null
+          claim_sources?: Json
+          founder_document_id?: string | null
+          agent_run_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_document_revisions_agent_document_id_fkey"
+            columns: ["agent_document_id"]
+            isOneToOne: false
+            referencedRelation: "agent_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_document_revisions_founder_document_id_fkey"
+            columns: ["founder_document_id"]
+            isOneToOne: false
+            referencedRelation: "founder_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_questions: {
+        Row: {
+          id: string
+          account_id: string
+          agent_profile_id: string
+          question: string
+          why_needed: string
+          doc_key: string
+          status: Database["public"]["Enums"]["owner_question_status"]
+          answer: string | null
+          answered_at: string | null
+          dismissed_at: string | null
+          evidence_id: string | null
+          created_by_agent_run_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          agent_profile_id: string
+          question: string
+          why_needed: string
+          doc_key: string
+          status?: Database["public"]["Enums"]["owner_question_status"]
+          answer?: string | null
+          answered_at?: string | null
+          dismissed_at?: string | null
+          evidence_id?: string | null
+          created_by_agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          agent_profile_id?: string
+          question?: string
+          why_needed?: string
+          doc_key?: string
+          status?: Database["public"]["Enums"]["owner_question_status"]
+          answer?: string | null
+          answered_at?: string | null
+          dismissed_at?: string | null
+          evidence_id?: string | null
+          created_by_agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_questions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_questions_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "agent_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2219,6 +2592,14 @@ export type Database = {
       evidence_source_type: "website" | "filing" | "news" | "transcript" | "social" | "api" | "document" | "manual"
       data_feed_kind: "api" | "scrape" | "search"
       data_feed_health: "ok" | "degraded" | "failing"
+      watched_source_kind: "url" | "social_handle" | "search_query" | "feed_config"
+      watch_cadence: "daily" | "weekly" | "biweekly" | "monthly"
+      watch_health: "unknown" | "ok" | "degraded" | "failed" | "paused"
+      watch_added_by: "agent" | "user"
+      knowledge_claim_source: "researched" | "owner_provided"
+      owner_question_status: "open" | "answered" | "dismissed"
+      founder_document_status: "uploaded" | "parsing" | "needs_review" | "distributed" | "failed"
+      company_logo_source: "firecrawl_metadata" | "og_image" | "favicon" | "manual" | "fallback"
       workspace_message_kind: "text" | "tool_call" | "artifact" | "proposal" | "delegation"
       context_source_type: "file" | "url" | "evidence_query" | "note"
       insight_severity: "info" | "notable" | "warning" | "critical"
@@ -2371,6 +2752,14 @@ export const Constants = {
       evidence_source_type: ["website", "filing", "news", "transcript", "social", "api", "document", "manual"],
       data_feed_kind: ["api", "scrape", "search"],
       data_feed_health: ["ok", "degraded", "failing"],
+      watched_source_kind: ["url", "social_handle", "search_query", "feed_config"],
+      watch_cadence: ["daily", "weekly", "biweekly", "monthly"],
+      watch_health: ["unknown", "ok", "degraded", "failed", "paused"],
+      watch_added_by: ["agent", "user"],
+      knowledge_claim_source: ["researched", "owner_provided"],
+      owner_question_status: ["open", "answered", "dismissed"],
+      founder_document_status: ["uploaded", "parsing", "needs_review", "distributed", "failed"],
+      company_logo_source: ["firecrawl_metadata", "og_image", "favicon", "manual", "fallback"],
       workspace_message_kind: ["text", "tool_call", "artifact", "proposal", "delegation"],
       context_source_type: ["file", "url", "evidence_query", "note"],
       insight_severity: ["info", "notable", "warning", "critical"],

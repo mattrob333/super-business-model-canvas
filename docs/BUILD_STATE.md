@@ -13,7 +13,7 @@
 | 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
 | 3 | Research engine & evidence | **APPROVED** | `build/phase-3-research` (merged with reviewer fixes, PR #13) | 2026-07-03 |
 | 4 | Competitor canvases & gap engine | **APPROVED** (merged with reviewer fixes — RF-4-1..14 all resolved, see REVIEW FINDINGS) | `build/phase-4-competitors` + reviewer-fix merge | 2026-07-04 |
-| 5 | Section agent workspaces | NOT STARTED | — | — |
+| 5 | Knowledge stack, grounding & section workspaces | IN PROGRESS (5A jobs slice) | `build/phase-5-knowledge` | 2026-07-04 |
 | 6 | War Room & orchestration | NOT STARTED | — | — |
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | — | — |
 | 8 | Hardening & commercial | HELD (await direction) | — | — |
@@ -198,7 +198,43 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
-### Phase 5A jobs-slice review (2026-07-04, reviewer, commit `4d08998`) — fix RF-5A-1..4 before the next slice
+### Phase 5A jobs-slice review — RESOLVED: RF-5A-1..9 fixed by the reviewer (2026-07-04, PR #38)
+
+All findings below fixed on main (worker suite now 51 tests):
+- **RF-5A-1 fixed:** `safeParseDocUpdateStrict` — unparseable summary output never writes;
+  budget→mid escalation via new `summary_update_escalated` route (migration
+  `20260704170000_summary_escalated_route.sql` + mirrors + verify-schema count 3→4);
+  hard-fail if both tiers fail. Tests pin both the hard-fail and the escalation path.
+- **RF-5A-2 fixed:** onboarding claims now pass `verifyClaimAgainstExcerpt` per item
+  (confirmed → ≤0.95; unsupported/contradicted → capped 0.5, grounded dropped, flagged,
+  `verification_status` recorded); dossier_refresh spot-checks up to 3 NEW claim lines
+  against collected evidence — a contradicted claim hard-fails the refresh; refresh with
+  zero new evidence now skips without calling the LLM (never rewrite on vibes).
+- **RF-5A-3 fixed:** material change on a changed dossier posts a `notable` insight and
+  enqueues a durable chained `summary_update` (gap-engine chain pattern). Test pins both.
+- **RF-5A-4 fixed:** current-row `claim_sources.default` now derives from provenance
+  (owner_provided when founder-doc sourced) + spot-check stats recorded.
+- **RF-5A-5 fixed:** ingestion failures write `founder_documents.status='failed'` + error.
+  (`needs_review` remains reserved for the grounding-wizard slice — UI decision.)
+- **RF-5A-6 fixed:** evidence dedup on (account, source_url, excerpt) in both document
+  and watched-source paths. Disclosed residual: `canvas_section_versions` re-inserts on
+  full-handler retry remain (versioned table, latest-wins reads — accepted for now).
+- **RF-5A-7 fixed:** 10 tests — both previously-untested handlers covered; groundedness
+  grounded-without-evidence boundary; 0.95 cap; claim_sources pinned; atlas_summary
+  doc_key rejection pinned.
+- **RF-5A-8 fixed:** onboarding cannot write `atlas_summary`; model evidence_ids
+  validated as UUIDs with worker-id fallback.
+- **RF-5A-9 fixed:** source text truncated at 60k chars; budget floor documented;
+  routes-migration style noted (is_default/updated_at omission left as-is — the columns
+  keep their prior values under upsert, which is the desired behavior).
+- RF-5A-10 logged (dependency weight accepted).
+
+**Operator/live queue additions:** apply `20260704170000_summary_escalated_route.sql`
+live (plus verify 20260704150000/20260704153000 which the build agent reports applied);
+redeploy `agent-run` (allowlist gained dossier_refresh/summary_update/onboarding_extract)
+— same MCP path as v6.
+
+#### Original jobs-slice review (fix list as issued)
 
 Gates re-verified green from a clean checkout (root tsc/build/lint 65; worker 43 tests).
 Strong: wiring exact in both allowlist+dispatcher; routes migration idempotent against the
@@ -1158,8 +1194,98 @@ cd worker && npm run build            -> exit 0
 cd worker && npm run lint             -> exit 0
 ```
 
-### Phase 5 — Section agent workspaces
-Tasks: 5.1 ☐ · 5.2 ☐ · 5.3 ☐ · 5.4 ☐ · 5.5 ☐ · 5.6 ☐ · 5.7 ☐ · 5.8 ☐ · 5.9 ☐
+### Phase 5 - Knowledge stack, grounding & section workspaces
+5A tasks: schema [x] - jobs [x] - ingestion [worker pipeline only] - UI/wizard [ ] - live walkthrough [ ]
+5B tasks: 5.1 [ ] - 5.2 [ ] - 5.3 [ ] - 5.4 [ ] - 5.5 [ ] - 5.6 [ ] - 5.7 [ ] - 5.8 [ ] - 5.9 [ ]
+5A additions from BUILD_PLAN: 5.10 [schema + worker extraction pipeline] - 5.11 [schema only]
+
+**2026-07-04 - Phase 5A jobs slice continued after schema review.**
+
+- Merged latest `origin/main` into `build/phase-5-knowledge` before new work, inheriting
+  the reviewer fix for the invalid `freshness_status: "verified"` write. Phase 5A jobs
+  now write `fresh` where they create canvas versions and set `last_verified_at`.
+- Applied live migration `20260704150000_phase_5a_knowledge_stack.sql` to Supabase project
+  `mehhuxzamnpxnkbrslls` via MCP from the checked-in file after the reviewer note. Live
+  verification: migration record exists; all five new public tables exist with RLS enabled;
+  `founder-documents` private bucket exists; four storage policies exist; owner-question
+  limit trigger exists; `canvas_section_versions.groundedness_score` and company logo fields
+  exist.
+- Added and live-applied `20260704153000_phase_5a_model_routes.sql`, mirrored in
+  `supabase/schema.sql`, and extended `scripts/verify-schema.sql`. Verification:
+  `onboarding_extract`, `dossier_refresh`, and `summary_update` model routes are present.
+- Added worker job handlers for `onboarding_extract`, `dossier_refresh`, and
+  `summary_update`; added all three job kinds to both the `agent-run` allowlist and the
+  worker dispatcher.
+- `onboarding_extract` is account-scoped on `founder_documents`, extracts text from
+  payload/existing text or uploaded text/markdown/PDF/DOCX files, writes owner-provided
+  `evidence_items`, writes own-canvas versions with `competitor_id = null`, `fresh`,
+  `last_verified_at`, evidence ids, and `groundedness_score`, then writes dossiers and
+  up to three open owner questions per agent.
+- `dossier_refresh` reuses `FeedRunner` for watched URL sources, runs the configured model
+  route, and idempotently avoids new dossier revisions when the generated body is unchanged.
+  `summary_update` builds the `atlas_summary` from existing dossier documents and uses the
+  same idempotent revision pattern.
+- Added tests for the exact `groundedness_v1` score formula and the onboarding extraction
+  write path, including owner-provided evidence metadata, `fresh` canvas versions,
+  `last_verified_at`, and completed run status.
+- Honest remaining scope: no Knowledge page upload UI, dossier viewer on `FocusDrawer`,
+  grounding wizard, company branding fetch job, or logged-in live walkthrough is complete
+  yet. Those remain for the ingestion/UI slices before 5A can go to AWAITING REVIEW.
+
+**Gate results for jobs slice commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 65 problems (47 errors, 18 warnings), within frozen <=65 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 43 passed, 2 skipped (SQL integration + live golden env-gated)
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
+
+**2026-07-04 - Phase 5A schema slice started on `build/phase-5-knowledge`.**
+
+- Orientation complete: read HANDOFF.md including binding section 8 review lessons,
+  BUILD_STATE review findings/resolution log, NORTH_STAR.md, BUILD_PLAN Part I and
+  Phase 5, spec 08 sections 1/3/4/9, spec 09 FocusDrawer, DESIGN_TASTE.md, and spec 07
+  before touching schema or worker code.
+- Added migration `20260704150000_phase_5a_knowledge_stack.sql` for 5A data foundations:
+  `watched_sources`, `founder_documents`, `agent_documents`, `agent_document_revisions`,
+  `owner_questions`, groundedness columns on `canvas_section_versions`, company logo fields
+  on `companies`, and the private `founder-documents` storage bucket with account-folder
+  storage policies.
+- RLS: every new public table has account-scoped policies. `agent_document_revisions`
+  inherits access through `agent_documents`. Storage objects are scoped by the first folder
+  segment matching an account id in `account_members`.
+- Invariants: owner questions are researched-or-elicited only by design, and max 3 open
+  questions per agent is enforced by trigger `enforce_owner_question_open_limit`.
+  Groundedness lives on canvas section versions as `groundedness_score` plus auditable
+  `groundedness_inputs`.
+- Mirrored the schema into `supabase/schema.sql`, updated generated Supabase types by hand,
+  and extended `scripts/verify-schema.sql` with Phase 5A assertions.
+- Tooling note: the Supabase CLI is not installed in this environment, so the migration file
+  was created manually using the repo's existing timestamp convention instead of
+  `supabase migration new`. No live migration has been applied yet in this slice.
+- Live DB note: two Supabase MCP `apply_migration` attempts failed before any migration
+  record or table was created because the SQL was manually pasted incorrectly into the MCP
+  call (`when_duplicate_object`). Verification after the failures returned
+  `migration_recorded = false`, `watched_sources_exists = false`, and
+  `watch_added_by_exists = false`. The checked-in migration file and schema mirror use the
+  correct `exception when duplicate_object` syntax. Follow-up: live migration was later
+  applied successfully from the checked-in file; see the 2026-07-04 jobs-slice log above.
+- Honest scope: no `dossier_refresh`, `summary_update`, or document extraction worker code
+  is complete yet; no dossier UI or grounding wizard is complete yet.
+
+**Gate results for schema slice commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 65 problems (47 errors, 18 warnings), within frozen <=65 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 41 passed, 2 skipped (SQL integration + live golden env-gated)
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
 
 ### Phase 6 — War Room & orchestration
 Tasks: 6.1 ☐ · 6.2 ☐ · 6.3 ☐ · 6.4 ☐ · 6.5 ☐ · 6.6 ☐ · 6.7 ☐ · 6.8 ☐ · 6.9 ☐
