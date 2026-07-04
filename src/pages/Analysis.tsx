@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
-import { BusinessOverviewSheet } from "@/components/BusinessOverviewSheet";
+import { CompanyProfileDrawer } from "@/components/CompanyProfileDrawer";
 import { EnterpriseBusinessModelCanvas } from "@/components/canvas/EnterpriseBusinessModelCanvas";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
@@ -769,7 +769,7 @@ Website: ${comp.website || 'N/A'}
                   <p className="text-sm font-medium text-primary md:text-base">
                     {analysisData.company?.industry || "Unknown industry"}
                   </p>
-                  <BusinessOverviewSheet
+                  <CompanyProfileDrawer
                     data={{
                       name: analysisData.company?.name || "Unknown Company",
                       industry: analysisData.company?.industry || "Unknown",
