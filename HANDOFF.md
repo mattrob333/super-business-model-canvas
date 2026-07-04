@@ -117,9 +117,10 @@ scrutiny.
   the same pattern.
 - **Lint ceiling is exactly 65 problems (47 errors / 18 warnings)** — pre-existing
   `no-explicit-any` noise, deliberately frozen. Never increase; decreases lower the ceiling.
-- **UTF-8 discipline:** mojibake (`â€"` etc.) has regressed twice (RF-3-3, and
-  `docs/BUILD_STATE.md` on main as of July 4). Write docs with a tool that preserves UTF-8;
-  reviewer greps for it.
+- **UTF-8 discipline:** mojibake (double-encoded em-dashes/arrows) has regressed twice
+  (RF-3-3, and `docs/BUILD_STATE.md` on main as of July 4). Write docs with a tool that
+  preserves UTF-8; the reviewer greps every touched doc for the tell-tale `a-circumflex`
+  byte sequences.
 - **Env:** frontend `.env` holds only `VITE_*` values (`VITE_SUPABASE_URL`,
   `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_AGENT_RUNTIME_ENDPOINT`, `VITE_RUNTIME_MODE`).
   Server keys live in Supabase Edge Function secrets; worker keys in `worker/.env` /
