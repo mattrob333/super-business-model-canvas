@@ -246,6 +246,13 @@ the drill-down/compare UI.
   (side-by-side per section with win/lose scoring); **borrow idea** action → creates a
   proposal message in the target section's default thread (thread plumbing exists from
   Phase 2).
+- 4.4b **Canvas lens swap (owner decision 2026-07-04, may land as a review follow-up):** the
+  *primary* way to view a competitor's BMC is in place — click a competitor chip below the
+  main canvas and the same grid re-renders with their data (scroll to canvas, no navigation
+  away). Requirements: an unmissable viewing-state banner ("Viewing: <competitor> — read
+  only") + one-click return to your company; editing affordances disabled under a competitor
+  lens; the `/competitors/:id/canvas` route stays for deep-linking and compare mode. The
+  canvas is one stage with switchable lenses, not N pages.
 - 4.5 Competitive Landscape page: competitor cards now link into the drill-down; Threat Index
   displayed; "run competitor research" action (enqueue).
 - 4.6 Dashboard: competitor strip row (spec 05 §8, third row) reading `metric_snapshots`.
@@ -281,7 +288,11 @@ stage **5B** is the room chrome and may trail 6.
 
 **Work orders**
 - 5.1 Route `/workspace/:sectionKey` outside AppShell content column; `WorkspaceTopBar` with
-  9-dot switcher (+War Room stop, disabled until Phase 6).
+  9-dot switcher (+War Room stop, disabled until Phase 6). **Entry must feel like the canvas
+  opening, not a page swap:** clicking a section card expands it into the room (shared-element
+  /scale transition from the clicked card, `prefers-reduced-motion` respected) with an
+  always-visible one-click path back to the canvas. The section deep-dive experience LIVES
+  here — the `BMCSectionEditor` drawer is interim scaffolding that this phase retires (5.7).
 - 5.2 Left rail: `AgentIdentityCard` (callsign/avatar/status from agent_profiles + live
   agent_runs), `AgentSettingsSheet` (system_instructions editor w/ revisions, behavior
   sliders, model route, budget, danger zone), `SectionCanvasPanel` (live items, confidence
@@ -302,12 +313,23 @@ stage **5B** is the room chrome and may trail 6.
 - 5.8 Responsive behavior per spec 02 breakpoints; degraded-runtime banner.
 - 5.9 Tests: component tests for proposal approve/decline and schedule popover; a Playwright
   smoke (open room, send message, run action) against mock runtime.
-- 5.10 **(5A) Document ingestion:** upload a pitch deck / one-pager / strategy doc (PDF,
+- 5.10 **(5A) Document ingestion:** upload *any* founder document — pitch deck, business
+  plan, one-pager, or a plain text/markdown dump of a fleshed-out idea (PDF/DOCX/MD/TXT;
   Storage bucket + policies) → `onboarding_extract` job parses claims per section → items
   land as **owner-provided evidence** (source = the document, confidence earned via the
-  grounding wizard, never silently merged). This is the primary onboarding path for
-  early-stage companies whose public web footprint is too thin for the research pipeline —
-  the exact companies VCs and mentors bring. Deck-first, site-second for them.
+  grounding wizard, never silently merged). Extraction intent: "this is an early-stage
+  company's idea/deck/plan — transform it into their Business Model Canvas and set up the
+  agents to make the business better," not just data entry. **The Knowledge page is the
+  home for this**: upload → parse → distribute (canvas items + agent dossiers + playbook
+  context), with per-document status and what-came-from-where visibility. This is the
+  primary onboarding path for early-stage companies whose public web footprint is too thin
+  for the research pipeline — the exact companies VCs and mentors bring. Deck-first,
+  site-second for them.
+- 5.11 **(5A) Company branding:** during research, capture the company's logo (Firecrawl
+  scrape metadata / og:image / favicon fallback chain — degrade gracefully to the current
+  initial-letter mark) and store it on the company record. Display it beside the name in
+  the top-left company switcher, competitor chips/cards, compare mode, and share/export
+  artifacts. Cheap, and it makes every surface read as *their* company instead of a demo.
 
 **Acceptance criteria**
 - [ ] (5A) Dossiers viewable with citations; groundedness score visible; owner questions
@@ -357,6 +379,14 @@ actions; visual pass against spec 02 layout.
   side-by-side w/ Accept/Override (override recorded).
 - 6.8 Nav: War Room first sidebar item; "Ask Atlas" affordance in top bar; Realtime on
   insights/agenda/metric_snapshots/cascade_runs.
+- 6.8b **Atlas absorbs the Strategy Coach (owner decision 2026-07-04).** The floating
+  Strategy Coach popout on Playbooks is retired when Atlas lands — one strategist, not two.
+  The Playbooks page becomes the framework *library* (browse/configure); running a playbook
+  and discussing results happens with Atlas (War Room chat + the Playbooks tab in its right
+  rail, already specced in 6.3). Framework outputs render as **native visual boards** (spec
+  08 §7: SWOT quadrant, Porter forces diagram, Ansoff matrix, BCG grid — each framework gets
+  its layout, not a wall of text) and are exportable/shareable via 6.10. Do not extend the
+  floating coach meanwhile (spec 09 migration table already freezes it).
 - 6.9 Tests: DAG executor (parallel groups, dependency skip on failure, partial synthesis);
   delegation depth-1 rejection; approvals gate (unapproved payload never executes); map mode
   switching on fixtures.
@@ -397,7 +427,11 @@ the Map (no metric math client-side).
   no LLM), pattern library v1 (the 4 named patterns from spec 05 §5 + schema for adding more),
   cheap-model matching, Atlas narrative Insight Cards; "Atlas's Read" dashboard panel.
 - 7.5 Dashboard recomposition per spec 05 §8 (composites row, KPI rail, competitor strip,
-  operational row).
+  operational row). **Dashboard principle (owner feedback 2026-07-04):** every tile must
+  answer one of three questions — *what changed since I last looked · where am I losing ·
+  what should I do next*. System-vanity metrics (context freshness, evidence coverage, run
+  counts) demote to one slim operational strip; they describe the tool, not the business.
+  Reports shown on the dashboard open in place and carry their share/export actions.
 - 7.6 Model-scout: monthly OpenRouter catalog sweep job + `model_evals` harness (seed 10
   golden examples for `extract` and `classify`), route-change proposals via approvals;
   Settings cost panel (spend by agent × task_class × model, cost-per-insight).
