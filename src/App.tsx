@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 
 // Lazy-load all other route components for code splitting
 const Canvas = lazy(() => import("./pages/Canvas"));
+const DevOverlayPreview = lazy(() => import("./pages/DevOverlayPreview"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminFrameworks = lazy(() => import("./pages/admin/Frameworks"));
 const FrameworkEditor = lazy(() => import("./pages/admin/FrameworkEditor"));
@@ -60,6 +61,9 @@ const App = () => (
           {/* Public routes — no shell */}
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          {import.meta.env.DEV && (
+            <Route path="/dev/overlays" element={withSuspense(DevOverlayPreview)} />
+          )}
 
           {/* Authenticated routes — inside AppShell */}
           <Route element={<RequireAuth />}>

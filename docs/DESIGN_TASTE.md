@@ -48,6 +48,11 @@
 - Respect `prefers-reduced-motion` for anything beyond hover.
 - No `window.addEventListener('scroll')` — IntersectionObserver or CSS scroll-driven.
 
+**Overlays**
+- One overlay system: popover = glance, dialog = interrupt, FocusDrawer = read/work,
+  route = live-in. A drawer never opens another drawer. Named sizes only. Full contract:
+  `docs/specs/09_OVERLAY_SYSTEM.md`.
+
 **States & structure**
 - Every data view ships empty/loading/error states (honest empties — "no data yet,
   runs on <cadence>" — never fake charts; also spec 08 rule).
