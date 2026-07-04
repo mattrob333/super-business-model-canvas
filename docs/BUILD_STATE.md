@@ -142,6 +142,28 @@ Status: OPEN | RESOLVED (<how>)
 
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
 
+## OVERLAY SYSTEM — 2026-07-04 (reviewer, spec 09, PR #26)
+
+Live smoke test exposed stacked, inconsistent drawers (Business Overview sheet opening
+scrolled mid-document; "Refine with AI" spawning a second hand-rolled overlay UNDER the
+modal sheet). Full audit found four hand-rolled `fixed z-50` overlay components sharing
+the same defects: no portal/focus-trap/Escape/ARIA, inconsistent scroll locking,
+duplicated always-mounted mobile+desktop DOM, broken chat auto-scroll, hardcoded widths.
+
+**Decision (binding, spec 09):** four-tier taxonomy — popover = glance, dialog =
+interrupt, **FocusDrawer** = read/work (~70% viewport, standard chassis: header band /
+body / optional footer / optional AI rail), route = live-in. A drawer never opens
+another drawer; named sizes only (peek / reading / focus).
+
+**Shipped (PR #26):** `src/components/overlay/FocusDrawer.tsx` (Radix-based, autofocus
+suppressed, opens at top); `CompanyProfileDrawer` replacing the stacked
+BusinessOverviewSheet+Editor pair (view/edit modes + AI rail, one surface);
+BMCSectionEditor re-shelled onto FocusDrawer (897 -> 552 lines, duplicate DOM killed,
+auto-scroll fixed); ReportViewerDrawer patched (SheetTitle a11y, width clamp, single
+close); dead code deleted (BusinessOverview.tsx, StrategyDrawer.tsx); DEV-only
+`/dev/overlays` Playwright harness. Verified: 5 drawer states screenshotted at
+1440/390px, zero overflow, zero JS errors. **Lint ceiling drops 68 -> 65.**
+
 ## HARDENING PASS — 2026-07-03 (reviewer, PR #17)
 
 Production-readiness audit after the first live deploy, plus public-surface UX polish:
