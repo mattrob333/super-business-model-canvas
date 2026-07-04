@@ -622,11 +622,62 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          id: string
+          account_id: string
+          name: string
+          website_url: string | null
+          description: string | null
+          industry: string | null
+          is_competitor: boolean
+          metadata: Json
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          name: string
+          website_url?: string | null
+          description?: string | null
+          industry?: string | null
+          is_competitor?: boolean
+          metadata?: Json
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          name?: string
+          website_url?: string | null
+          description?: string | null
+          industry?: string | null
+          is_competitor?: boolean
+          metadata?: Json
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       canvas_section_versions: {
         Row: {
           id: string
           account_id: string
           business_context_version_id: string
+          competitor_id: string | null
           section_key: string
           section_title: string | null
           items: Json
@@ -642,6 +693,7 @@ export type Database = {
           id?: string
           account_id: string
           business_context_version_id: string
+          competitor_id?: string | null
           section_key: string
           section_title?: string | null
           items?: Json
@@ -657,6 +709,7 @@ export type Database = {
           id?: string
           account_id?: string
           business_context_version_id?: string
+          competitor_id?: string | null
           section_key?: string
           section_title?: string | null
           items?: Json
@@ -681,6 +734,13 @@ export type Database = {
             columns: ["business_context_version_id"]
             isOneToOne: false
             referencedRelation: "business_context_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_section_versions_competitor_id_fkey"
+            columns: ["competitor_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

@@ -44,6 +44,11 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
         return;
       }
 
+      if (job.kind === "competitor_research") {
+        await companyResearch.handleCompetitor(job);
+        return;
+      }
+
       if (job.kind === "feed_refresh") {
         await feedRefresh.handle(job);
         return;
