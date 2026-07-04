@@ -1,5 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 
+/**
+ * Narrow, documented escape hatch (reviewed under RF-4-10): the generated
+ * Database type is now large enough that some multi-filter queries against
+ * late-declared tables (e.g. `metric_snapshots`) trip TS2589 "type
+ * instantiation is excessively deep". Use the typed client by default; reach
+ * for this ONLY when tsc fails with TS2589, keep the row type explicit at the
+ * call site, and always filter by account_id — nothing here relaxes RLS.
+ */
 export interface QueryError {
   message: string;
 }

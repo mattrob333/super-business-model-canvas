@@ -99,6 +99,11 @@ const STATUS_CONFIG: Record<
     className: "bg-muted text-muted-foreground",
     icon: XCircle,
   },
+  superseded: {
+    label: "Superseded",
+    className: "bg-muted/50 text-muted-foreground",
+    icon: XCircle,
+  },
 };
 
 const GAP_TYPE_LABELS: Record<GapType, string> = {
