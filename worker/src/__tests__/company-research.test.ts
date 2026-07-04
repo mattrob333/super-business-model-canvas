@@ -136,6 +136,57 @@ describe("CompanyResearchHandler", () => {
     await dispatcher(makeCompanyJob());
     expect(client.updates.at(-1)).toMatchObject({ table: "agent_runs", values: { status: "completed" } });
   });
+
+  it("writes competitor-flagged canvas versions through the shared research pipeline", async () => {
+    const client = new CompanyResearchFakeClient();
+    const runner = new ScriptedRunner([
+      JSON.stringify({
+        claims: [{ section_key: "value_propositions", text: "RivalCo offers managed onboarding.", confidence: 0.78, evidence_index: 0 }],
+      }),
+      JSON.stringify({ status: "confirmed", reason: "The excerpt mentions managed onboarding." }),
+    ]);
+    const handler = new CompanyResearchHandler({ client: client.asSupabase(), runner, feedRunner: fixtureFeedRunner() });
+
+    await handler.handleCompetitor(makeCompetitorJob());
+
+    const competitorSelect = client.selects.find((select) => select.table === "companies");
+    expect(competitorSelect?.filters).toEqual(expect.arrayContaining([
+      ["account_id", "account-1"],
+      ["id", "competitor-1"],
+      ["is_competitor", true],
+    ]));
+    const canvasInsert = client.inserts.find((insert) => insert.table === "canvas_section_versions");
+    expect(canvasInsert?.value).toMatchObject({
+      account_id: "account-1",
+      business_context_version_id: "ctx-1",
+      competitor_id: "competitor-1",
+      section_key: "value_propositions",
+    });
+    expect(canvasInsert?.value.notes).toContain("competitor_research");
+    expect(runner.requests[0]?.prompt).toContain("RivalCo");
+    expect(client.updates.at(-1)).toMatchObject({
+      table: "agent_runs",
+      values: {
+        status: "completed",
+        output: expect.objectContaining({ competitor_id: "competitor-1" }),
+      },
+    });
+  });
+
+  it("dispatcher supports competitor_research jobs", async () => {
+    const client = new CompanyResearchFakeClient();
+    const dispatcher = createJobDispatcher({
+      client: client.asSupabase(),
+      runner: new ScriptedRunner([
+        JSON.stringify({ claims: [{ section_key: "channels", text: "RivalCo sells through partners.", confidence: 0.7, evidence_index: 0 }] }),
+        JSON.stringify({ status: "confirmed", reason: "Supported." }),
+      ]),
+      feedRunner: fixtureFeedRunner() as never,
+    });
+
+    await dispatcher(makeCompetitorJob());
+    expect(client.updates.at(-1)).toMatchObject({ table: "agent_runs", values: { status: "completed" } });
+  });
 });
 
 function makeCompanyJob(): AgentJob {
@@ -156,6 +207,15 @@ function makeCompanyJob(): AgentJob {
     run_after: new Date().toISOString(),
     last_error: null,
     created_at: new Date().toISOString(),
+  };
+}
+
+function makeCompetitorJob(): AgentJob {
+  return {
+    ...makeCompanyJob(),
+    id: "job-competitor-1",
+    kind: "competitor_research",
+    payload: { competitor_id: "competitor-1", business_context_version_id: "ctx-1" },
   };
 }
 
@@ -199,6 +259,7 @@ class ScriptedRunner implements AgentRunner {
 class CompanyResearchFakeClient {
   public inserts: Array<{ table: string; value: Record<string, unknown> }> = [];
   public updates: Array<{ table: string; values: Record<string, unknown>; filters: Array<[string, unknown]> }> = [];
+  public selects: Array<{ table: string; filters: Array<[string, unknown]> }> = [];
   private evidenceCounter = 0;
 
   asSupabase(): never {
@@ -209,9 +270,19 @@ class CompanyResearchFakeClient {
     return new CompanyResearchFakeQuery(this, table);
   }
 
-  selectOne(table: string): Record<string, unknown> | null {
+  selectOne(table: string, filters: Array<[string, unknown]> = []): Record<string, unknown> | null {
     if (table === "business_context_versions") {
-      return { id: "ctx-1", company_name: "Acme", industry: "SaaS", website_url: "https://acme.example" };
+      return { id: "ctx-1", company_name: "Acme", industry: "SaaS", website: "https://acme.example" };
+    }
+    if (table === "companies" && filters.some(([column, value]) => column === "account_id" && value === "account-1")) {
+      return {
+        id: "competitor-1",
+        name: "RivalCo",
+        website_url: "https://rival.example",
+        description: "Rival analytics suite.",
+        industry: "SaaS",
+        is_competitor: true,
+      };
     }
     return null;
   }
@@ -276,7 +347,8 @@ class CompanyResearchFakeQuery {
   }
 
   maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: null }> {
-    return Promise.resolve({ data: this.client.selectOne(this.table), error: null });
+    this.client.selects.push({ table: this.table, filters: [...this.filters] });
+    return Promise.resolve({ data: this.client.selectOne(this.table, this.filters), error: null });
   }
 
   single(): Promise<{ data: { id: string }; error: null }> {

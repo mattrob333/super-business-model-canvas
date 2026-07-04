@@ -108,6 +108,7 @@ const GAP_TYPE_LABELS: Record<GapType, string> = {
   outdated: "Outdated",
   contradictory: "Contradictory",
   assumption: "Assumption",
+  competitive: "Competitive",
 };
 
 export default function Gaps() {
