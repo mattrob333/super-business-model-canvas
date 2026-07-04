@@ -364,7 +364,10 @@ export class CompanyResearchHandler {
         })),
         notes: subject.canvasNotes,
         confidence: average(sectionClaims.map(earnedConfidence)),
-        freshness_status: "verified",
+        // Enum is (fresh|stale|outdated|unverified) - "fresh" is the verified-good
+        // state; verification timing lives in last_verified_at (latent Phase-3 bug:
+        // "verified" is not an enum value and failed every live research write).
+        freshness_status: "fresh",
         last_verified_at: new Date().toISOString(),
       });
       if (error) throw new Error(`Failed to write researched canvas section: ${error.message}`);
