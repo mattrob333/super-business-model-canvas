@@ -24,6 +24,8 @@ export interface CompetitorEntity {
 export interface CompetitorResearchState {
   /** companies.id when the competitor is persisted for this account */
   entityId?: string;
+  /** true when research has produced canvas versions for this competitor */
+  researched: boolean;
   /** latest competitor.threat_index snapshot value, if the gap engine has run */
   threatIndex?: number;
   status: "idle" | "starting" | "queued" | "error";
@@ -45,20 +47,28 @@ export function useCompetitorResearch(
   const { accountId } = useAccountId();
   const { user } = useAuth();
   const [entities, setEntities] = useState<CompetitorEntity[]>([]);
+  const [researchedIds, setResearchedIds] = useState<Set<string>>(new Set());
   const [threatByCompetitor, setThreatByCompetitor] = useState<Record<string, number>>({});
-  const [pending, setPending] = useState<Record<string, CompetitorResearchState>>({});
+  type PendingState = { status: CompetitorResearchState["status"]; error?: string; entityId?: string };
+  const [pending, setPending] = useState<Record<string, PendingState>>({});
   const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     if (!accountId) return;
     let cancelled = false;
     (async () => {
-      const [companiesRes, metricsRes] = await Promise.all([
+      const [companiesRes, versionsRes, metricsRes] = await Promise.all([
         supabase
           .from("companies")
           .select("id, name, website_url")
           .eq("account_id", accountId)
           .eq("is_competitor", true),
+        supabase
+          .from("canvas_section_versions")
+          .select("competitor_id")
+          .eq("account_id", accountId)
+          .not("competitor_id", "is", null)
+          .limit(500),
         supabaseUntyped
           .from<{ value: number | null; inputs: Record<string, unknown> | null; computed_at: string }>(
             "metric_snapshots",
@@ -72,6 +82,13 @@ export function useCompetitorResearch(
       if (cancelled) return;
       if (!companiesRes.error && companiesRes.data) {
         setEntities(companiesRes.data as CompetitorEntity[]);
+      }
+      if (!versionsRes.error && versionsRes.data) {
+        setResearchedIds(new Set(
+          versionsRes.data
+            .map((row) => row.competitor_id)
+            .filter((id): id is string => typeof id === "string"),
+        ));
       }
       if (!metricsRes.error && metricsRes.data) {
         const latest: Record<string, number> = {};
@@ -98,14 +115,16 @@ export function useCompetitorResearch(
         host ? hostOf(row.website_url) === host : row.name.toLowerCase() === candidate.name.toLowerCase(),
       );
       const local = pending[key];
+      const researched = Boolean(entity && researchedIds.has(entity.id));
       return {
         entityId: entity?.id,
+        researched,
         threatIndex: entity ? threatByCompetitor[entity.id] : undefined,
-        status: local?.status ?? (entity ? "queued" : "idle"),
+        status: local?.status ?? "idle",
         error: local?.error,
       };
     },
-    [entities, threatByCompetitor, pending],
+    [entities, researchedIds, threatByCompetitor, pending],
   );
 
   const startResearch = useCallback(
@@ -148,7 +167,38 @@ export function useCompetitorResearch(
           }
         }
 
-        // 2. Resolve the orchestrator profile (owner of cross-section research).
+        // 2. Ensure a business_context_version exists — the research job requires
+        // one (live failure 2026-07-04: accounts predating versioned context have
+        // none). Same ensure pattern as useCanvasSectionRun.
+        let contextVersionId: string;
+        const { data: existingContext } = await supabase
+          .from("business_context_versions")
+          .select("id")
+          .eq("account_id", accountId)
+          .order("version_number", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existingContext) {
+          contextVersionId = existingContext.id;
+        } else {
+          const { data: newContext, error: ctxError } = await supabase
+            .from("business_context_versions")
+            .insert({
+              account_id: accountId,
+              version_number: 1,
+              summary: "Initial business context",
+              data: {},
+              created_by: user?.id ?? null,
+            })
+            .select("id")
+            .single();
+          if (ctxError || !newContext) {
+            throw new Error(`Failed to create business context: ${ctxError?.message ?? "unknown"}`);
+          }
+          contextVersionId = newContext.id;
+        }
+
+        // 3. Resolve the orchestrator profile (owner of cross-section research).
         const { data: profiles, error: profileError } = await supabase
           .from("agent_profiles")
           .select("id, account_id")
@@ -161,7 +211,7 @@ export function useCompetitorResearch(
           throw new Error("No orchestrator agent profile found for this account.");
         }
 
-        // 3. Enqueue competitor_research; the worker chains gap_engine on completion.
+        // 4. Enqueue competitor_research; the worker chains gap_engine on completion.
         const runtime = getAgentRuntime(accountId);
         await runtime.startRun({
           agentProfileId: profile.id,
@@ -172,6 +222,7 @@ export function useCompetitorResearch(
           input: {
             competitor_id: entity.id,
             competitor_url: entity.website_url ?? candidate.website,
+            business_context_version_id: contextVersionId,
           },
         });
 

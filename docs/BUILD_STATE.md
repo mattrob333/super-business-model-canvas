@@ -198,6 +198,20 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-4-15 (HIGH, live smoke finding) — FIXED (2026-07-04, reviewer)
+**Problem:** first live "Research this competitor" click failed:
+`company_research requires a business context version`. Accounts created before the
+versioned-context system have no `business_context_versions` row; the research hook did
+not ensure one (unlike `useCanvasSectionRun`). Compounding UX bug: the card flipped to
+"Open canvas" merely because the `companies` entity existed, landing the user on an
+empty canvas with no way to retry.
+**Fix:** `useCompetitorResearch` now ensures a default `business_context_version`
+before enqueueing (same pattern as section runs) and passes its id in the job input;
+"Open canvas" now requires actual competitor canvas versions (researched state), with
+honest button states: Research → Starting → "Researching — takes a few minutes", and a
+"Re-run research" affordance when an entity exists without data (also the retry path
+after a failed run).
+
 ### Phase 4 review — RESOLVED: all findings fixed by the reviewer, phase APPROVED (2026-07-04)
 
 Every RF below is fixed in the reviewer-fix merge (PR #33), verified by full gates

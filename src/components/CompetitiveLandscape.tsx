@@ -105,7 +105,7 @@ export const CompetitiveLandscape = ({
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
 
-              {research.entityId ? (
+              {research.researched ? (
                 <Button asChild variant="outline" size="sm" className="mt-3 w-full">
                   <Link to={`/competitors/${research.entityId}/canvas`}>Open canvas</Link>
                 </Button>
@@ -114,7 +114,7 @@ export const CompetitiveLandscape = ({
                   variant="outline"
                   size="sm"
                   className="mt-3 w-full gap-1.5"
-                  disabled={!ready || research.status === "starting"}
+                  disabled={!ready || research.status === "starting" || research.status === "queued"}
                   onClick={() => startResearch(competitor)}
                 >
                   {research.status === "starting" ? (
@@ -122,10 +122,15 @@ export const CompetitiveLandscape = ({
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Starting research…
                     </>
+                  ) : research.status === "queued" ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Researching — takes a few minutes
+                    </>
                   ) : (
                     <>
                       <Radar className="h-3.5 w-3.5" />
-                      Research this competitor
+                      {research.entityId ? "Re-run research" : "Research this competitor"}
                     </>
                   )}
                 </Button>
