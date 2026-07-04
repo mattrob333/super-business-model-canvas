@@ -1,256 +1,742 @@
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import {
+  AlertCircle,
+  BadgeCheck,
+  BookOpen,
+  Building2,
+  CheckCircle2,
+  CircleHelp,
+  Clock3,
+  ExternalLink,
+  FileText,
+  ImageIcon,
+  Loader2,
+  MessageSquare,
+  RefreshCw,
+  ShieldCheck,
+  Upload,
+  XCircle,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Database,
-  Plus,
-  Filter,
-  FileText,
-  Link as LinkIcon,
-  Newspaper,
-  FileCheck,
-  MessageSquare,
-  Globe,
-  File,
-  Hand,
-  Bot,
-} from "lucide-react";
-import type { Database as DB } from "@/integrations/supabase/types";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { FocusDrawer } from "@/components/overlay/FocusDrawer";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database, Json } from "@/integrations/supabase/types";
+import { useAccountId } from "@/hooks/useAccountId";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { getAgentRuntime } from "@/lib/agent-runtime";
+import { cn } from "@/lib/utils";
 
-/**
- * Knowledge / Evidence page (/knowledge)
- *
- * Shows all evidence items collected by agents across the canvas. Evidence
- * links claims to sources (websites, filings, news, transcripts, etc.).
- *
- * Data source: `evidence_items` table (Phase 2 schema). Currently shows empty
- * state until agent runs start producing evidence.
- */
+type FounderDocument = Database["public"]["Tables"]["founder_documents"]["Row"];
+type AgentDocument = Database["public"]["Tables"]["agent_documents"]["Row"];
+type OwnerQuestion = Database["public"]["Tables"]["owner_questions"]["Row"];
+type EvidenceItem = Database["public"]["Tables"]["evidence_items"]["Row"];
+type AgentProfile = Pick<Database["public"]["Tables"]["agent_profiles"]["Row"], "id" | "agent_key" | "display_name" | "account_id">;
+type Company = Pick<Database["public"]["Tables"]["companies"]["Row"], "id" | "name" | "website_url" | "logo_url" | "logo_source">;
 
-type EvidenceSourceType = DB["public"]["Enums"]["evidence_source_type"];
+const STATUS_COPY: Record<FounderDocument["status"], { label: string; tone: string; icon: typeof Clock3 }> = {
+  uploaded: { label: "Uploaded", tone: "text-muted-foreground", icon: Clock3 },
+  parsing: { label: "Parsing", tone: "text-blue-600 dark:text-blue-300", icon: Loader2 },
+  needs_review: { label: "Needs review", tone: "text-amber-600 dark:text-amber-300", icon: AlertCircle },
+  distributed: { label: "Distributed", tone: "text-emerald-600 dark:text-emerald-300", icon: CheckCircle2 },
+  failed: { label: "Failed", tone: "text-destructive", icon: XCircle },
+};
 
-interface EvidenceItem {
-  id: string;
-  source_type: EvidenceSourceType;
-  source_name: string | null;
-  source_url: string | null;
-  source_date: string | null;
-  retrieved_at: string;
-  title: string;
-  excerpt: string | null;
-  created_by_agent_run_id: string | null;
-}
-
-const SOURCE_TYPE_CONFIG: Record<
-  EvidenceSourceType,
-  { label: string; icon: typeof Globe }
-> = {
-  website: { label: "Website", icon: Globe },
-  filing: { label: "Filing", icon: FileText },
-  news: { label: "News", icon: Newspaper },
-  transcript: { label: "Transcript", icon: FileCheck },
-  social: { label: "Social", icon: MessageSquare },
-  api: { label: "API", icon: Database },
-  document: { label: "Document", icon: File },
-  manual: { label: "Manual", icon: Hand },
+const DOC_KEY_LABELS: Record<string, string> = {
+  atlas_summary: "Atlas Summary",
+  positioning_narrative: "Positioning Narrative",
+  market_map: "Market Map",
+  customer_truths: "Customer Truths",
+  revenue_logic: "Revenue Logic",
 };
 
 export default function Knowledge() {
-  const [filterType, setFilterType] = useState<EvidenceSourceType | "all">(
-    "all",
-  );
+  const { accountId, loading: accountLoading } = useAccountId();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [documents, setDocuments] = useState<FounderDocument[]>([]);
+  const [dossiers, setDossiers] = useState<AgentDocument[]>([]);
+  const [questions, setQuestions] = useState<OwnerQuestion[]>([]);
+  const [evidenceById, setEvidenceById] = useState<Map<string, EvidenceItem>>(new Map());
+  const [profiles, setProfiles] = useState<AgentProfile[]>([]);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [selectedDossier, setSelectedDossier] = useState<AgentDocument | null>(null);
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
+  const [answerDraft, setAnswerDraft] = useState("");
+  const [manualLogoUrl, setManualLogoUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Placeholder: no evidence yet — populated when agent runs produce them
-  const evidenceItems: EvidenceItem[] = useMemo(() => [], []);
+  const openQuestions = questions.filter((question) => question.status === "open");
+  const distributedCount = documents.filter((document) => document.status === "distributed").length;
+  const failedCount = documents.filter((document) => document.status === "failed").length;
+  const groundedness = useMemo(() => computeGroundedness(documents), [documents]);
+  const selectedQuestion = questions.find((question) => question.id === selectedQuestionId) ?? null;
 
-  const filteredItems = useMemo(() => {
-    return evidenceItems.filter((e) => {
-      if (filterType !== "all" && e.source_type !== filterType) return false;
-      return true;
-    });
-  }, [evidenceItems, filterType]);
+  const loadEvidenceForDossiers = useCallback(async (nextDossiers: AgentDocument[]) => {
+    const ids = [...new Set(nextDossiers.flatMap((doc) => doc.evidence_ids))];
+    if (ids.length === 0) {
+      setEvidenceById(new Map());
+      return;
+    }
+    const { data, error } = await supabase
+      .from("evidence_items")
+      .select("*")
+      .in("id", ids);
+    if (error) throw error;
+    setEvidenceById(new Map((data ?? []).map((item) => [item.id, item])));
+  }, []);
 
-  const stats = useMemo(() => {
-    const byType = evidenceItems.reduce(
-      (acc, e) => {
-        acc[e.source_type] = (acc[e.source_type] ?? 0) + 1;
-        return acc;
-      },
-      {} as Record<EvidenceSourceType, number>,
+  const loadKnowledge = useCallback(async () => {
+    if (!accountId) return;
+    setLoading(true);
+    try {
+      const [documentsResult, dossiersResult, questionsResult, profilesResult, companiesResult] = await Promise.all([
+        supabase
+          .from("founder_documents")
+          .select("*")
+          .eq("account_id", accountId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("agent_documents")
+          .select("*")
+          .eq("account_id", accountId)
+          .order("updated_at", { ascending: false }),
+        supabase
+          .from("owner_questions")
+          .select("*")
+          .eq("account_id", accountId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("agent_profiles")
+          .select("id, agent_key, display_name, account_id")
+          .or(`account_id.eq.${accountId},account_id.is.null`)
+          .order("account_id", { ascending: false, nullsFirst: false }),
+        supabase
+          .from("companies")
+          .select("id, name, website_url, logo_url, logo_source")
+          .eq("account_id", accountId)
+          .eq("is_competitor", false)
+          .order("updated_at", { ascending: false })
+          .limit(1),
+      ]);
+
+      if (documentsResult.error) throw documentsResult.error;
+      if (dossiersResult.error) throw dossiersResult.error;
+      if (questionsResult.error) throw questionsResult.error;
+      if (profilesResult.error) throw profilesResult.error;
+      if (companiesResult.error) throw companiesResult.error;
+
+      const nextDossiers = dossiersResult.data ?? [];
+      const nextDocuments = documentsResult.data ?? [];
+      setDocuments(nextDocuments);
+      setDossiers(nextDossiers);
+      setQuestions(questionsResult.data ?? []);
+      setProfiles(profilesResult.data ?? []);
+      setCompany(companiesResult.data?.[0] ?? null);
+      setManualLogoUrl(companiesResult.data?.[0]?.logo_url ?? "");
+      await loadEvidenceForDossiers(nextDossiers);
+    } catch (error) {
+      toast({
+        title: "Knowledge failed to load",
+        description: error instanceof Error ? error.message : "Try refreshing the page.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [accountId, loadEvidenceForDossiers, toast]);
+
+  useEffect(() => {
+    if (!accountId) {
+      setLoading(!accountLoading);
+      return;
+    }
+    void loadKnowledge();
+  }, [accountId, accountLoading, loadKnowledge]);
+
+  async function handleFileUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !accountId || !user) return;
+
+    setUploading(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 120);
+      const path = `${accountId}/${Date.now()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("founder-documents")
+        .upload(path, file, { contentType: file.type || "application/octet-stream" });
+      if (uploadError) throw uploadError;
+
+      const { data: document, error: insertError } = await supabase
+        .from("founder_documents")
+        .insert({
+          account_id: accountId,
+          title: stripExtension(file.name),
+          file_name: file.name,
+          storage_bucket: "founder-documents",
+          storage_path: path,
+          content_type: file.type || "application/octet-stream",
+          file_size_bytes: file.size,
+          status: "uploaded",
+          uploaded_by: user.id,
+        })
+        .select("*")
+        .single();
+      if (insertError) throw insertError;
+
+      const profileId = pickOrchestratorProfile(profiles, accountId)?.id ?? profiles[0]?.id;
+      if (!profileId) throw new Error("No agent profile is available for document ingestion.");
+
+      const runtime = getAgentRuntime(accountId);
+      const run = await runtime.startRun({
+        accountId,
+        agentProfileId: profileId,
+        runType: "onboarding_extract",
+        triggerType: "manual",
+        triggeredBy: user.id,
+        input: { founder_document_id: document.id },
+      });
+
+      await supabase
+        .from("founder_documents")
+        .update({ agent_run_id: run.runId, status: "parsing" })
+        .eq("id", document.id)
+        .eq("account_id", accountId);
+
+      toast({ title: "Document queued", description: `${file.name} is being parsed and distributed.` });
+      await loadKnowledge();
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "The document was not queued.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function answerQuestion() {
+    if (!selectedQuestion || !accountId || !answerDraft.trim()) return;
+    const { error } = await supabase
+      .from("owner_questions")
+      .update({
+        status: "answered",
+        answer: answerDraft.trim(),
+        answered_at: new Date().toISOString(),
+      })
+      .eq("id", selectedQuestion.id)
+      .eq("account_id", accountId);
+    if (error) {
+      toast({ title: "Answer not saved", description: error.message, variant: "destructive" });
+      return;
+    }
+    setAnswerDraft("");
+    setSelectedQuestionId(null);
+    await loadKnowledge();
+  }
+
+  async function dismissQuestion(question: OwnerQuestion) {
+    if (!accountId) return;
+    const { error } = await supabase
+      .from("owner_questions")
+      .update({ status: "dismissed", dismissed_at: new Date().toISOString() })
+      .eq("id", question.id)
+      .eq("account_id", accountId);
+    if (error) {
+      toast({ title: "Question not dismissed", description: error.message, variant: "destructive" });
+      return;
+    }
+    await loadKnowledge();
+  }
+
+  async function saveLogo() {
+    if (!accountId || !company || !manualLogoUrl.trim()) return;
+    const { error } = await supabase
+      .from("companies")
+      .update({ logo_url: manualLogoUrl.trim(), logo_source: "manual" })
+      .eq("id", company.id)
+      .eq("account_id", accountId);
+    if (error) {
+      toast({ title: "Logo not saved", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Branding updated" });
+    await loadKnowledge();
+  }
+
+  async function refreshAll() {
+    setRefreshing(true);
+    await loadKnowledge();
+    setRefreshing(false);
+  }
+
+  if (accountLoading || loading) {
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center p-6">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading knowledge workspace
+        </div>
+      </main>
     );
-    return {
-      total: evidenceItems.length,
-      byType,
-      agentLinked: evidenceItems.filter((e) => e.created_by_agent_run_id).length,
-    };
-  }, [evidenceItems]);
+  }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* Page heading */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Knowledge Base
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Evidence items collected by agents — sources, filings, news, and
-            documents backing canvas claims.
+    <main className="min-w-0 space-y-6 p-4 sm:p-6">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Knowledge</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Ground your canvas in source material</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Upload founder documents, track parsing, answer agent questions, and inspect dossiers with visible provenance.
           </p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Evidence
-        </Button>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">
-                Total Evidence
-              </p>
-              <Database className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="text-2xl font-semibold mt-2">{stats.total}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">
-                Agent-Linked
-              </p>
-              <Bot className="h-4 w-4 text-primary" />
-            </div>
-            <p className="text-2xl font-semibold mt-2 text-primary">
-              {stats.agentLinked}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">
-                Source Types
-              </p>
-              <Filter className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <p className="text-2xl font-semibold mt-2">
-              {Object.keys(stats.byType).length}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Filter className="h-4 w-4" />
-          Filter:
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={refreshAll} disabled={refreshing}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button asChild size="sm" disabled={uploading || !accountId}>
+            <Label className="cursor-pointer">
+              {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              Upload document
+              <Input className="sr-only" type="file" accept=".pdf,.docx,.txt,.md,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileUpload} />
+            </Label>
+          </Button>
         </div>
-        <select
-          value={filterType}
-          onChange={(e) =>
-            setFilterType(e.target.value as EvidenceSourceType | "all")
-          }
-          className="h-8 rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="all">All Sources</option>
-          {Object.entries(SOURCE_TYPE_CONFIG).map(([key, cfg]) => (
-            <option key={key} value={key}>
-              {cfg.label}
-            </option>
-          ))}
-        </select>
+      </header>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1.2fr_0.8fr_1fr_0.8fr]">
+        <Metric label="Documents" value={documents.length.toString()} detail={`${distributedCount} distributed`} icon={FileText} />
+        <Metric label="Dossiers" value={dossiers.length.toString()} detail={`${dossiers.filter((doc) => doc.material_change).length} changed`} icon={BookOpen} />
+        <Metric label="Groundedness" value={`${groundedness}%`} detail="Owner-provided evidence coverage" icon={ShieldCheck} />
+        <Metric label="Questions" value={openQuestions.length.toString()} detail="Open owner prompts" icon={CircleHelp} />
+      </section>
+
+      <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+        <div className="min-w-0 space-y-6">
+          <DocumentPanel documents={documents} />
+          <DossierPanel
+            dossiers={dossiers}
+            profiles={profiles}
+            evidenceById={evidenceById}
+            onOpen={setSelectedDossier}
+          />
+        </div>
+        <div className="min-w-0 space-y-6">
+          <BrandPanel company={company} manualLogoUrl={manualLogoUrl} setManualLogoUrl={setManualLogoUrl} onSave={saveLogo} />
+          <QuestionsPanel
+            questions={openQuestions}
+            onAnswer={(question) => {
+              setSelectedQuestionId(question.id);
+              setAnswerDraft(question.answer ?? "");
+            }}
+            onDismiss={dismissQuestion}
+          />
+          <GroundingWizard documents={documents} dossiers={dossiers} questions={openQuestions} />
+        </div>
+      </section>
+
+      <DossierDrawer
+        dossier={selectedDossier}
+        profiles={profiles}
+        evidenceById={evidenceById}
+        onOpenChange={(open) => {
+          if (!open) setSelectedDossier(null);
+        }}
+      />
+
+      <FocusDrawer
+        open={Boolean(selectedQuestion)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedQuestionId(null);
+        }}
+        size="reading"
+        eyebrow="Owner question"
+        title={selectedQuestion?.question ?? "Owner question"}
+        subtitle={selectedQuestion?.why_needed ?? undefined}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setSelectedQuestionId(null)}>Cancel</Button>
+            <Button onClick={answerQuestion} disabled={!answerDraft.trim()}>Save answer</Button>
+          </div>
+        }
+        bodyClassName="p-4 sm:p-6"
+      >
+        <div className="space-y-4">
+          <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
+            {selectedQuestion?.why_needed}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="owner-answer">Answer</Label>
+            <Textarea
+              id="owner-answer"
+              value={answerDraft}
+              onChange={(event) => setAnswerDraft(event.target.value)}
+              rows={8}
+              placeholder="Add the founder truth the agent needs."
+            />
+          </div>
+        </div>
+      </FocusDrawer>
+    </main>
+  );
+}
+
+function Metric({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof FileText }) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
 
-      {/* Empty state */}
-      {filteredItems.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-              <Database className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium mb-2">No evidence collected</h3>
-            <p className="text-sm text-muted-foreground max-w-md mb-6">
-              Evidence items are gathered automatically by agents when they
-              analyze your canvas sections. Each claim links back to its source
-              — website, filing, news article, transcript, or document.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Evidence list */}
-      {filteredItems.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {filteredItems.map((item) => {
-            const typeCfg = SOURCE_TYPE_CONFIG[item.source_type];
+function DocumentPanel({ documents }: { documents: FounderDocument[] }) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader title="Document ingestion" detail="Upload, parse, distribute" />
+      {documents.length === 0 ? (
+        <EmptyState icon={Upload} title="No founder documents yet" detail="Upload a deck, plan, one-pager, TXT, or Markdown file to start grounding the canvas." />
+      ) : (
+        <div className="space-y-3">
+          {documents.map((document) => {
+            const status = STATUS_COPY[document.status];
+            const Icon = status.icon;
             return (
-              <Card key={item.id}>
+              <Card key={document.id} className="border-border/60 shadow-sm transition-shadow hover:shadow-md">
                 <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <typeCfg.icon className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="text-sm font-semibold">{item.title}</h3>
-                        <Badge variant="outline" className="text-xs">
-                          {typeCfg.label}
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-sm font-semibold">{document.title}</h3>
+                        <Badge variant="outline" className={cn("gap-1", status.tone)}>
+                          <Icon className={cn("h-3 w-3", document.status === "parsing" && "animate-spin")} />
+                          {status.label}
                         </Badge>
-                        {item.created_by_agent_run_id && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs gap-1"
-                          >
-                            <Bot className="h-2.5 w-2.5" />
-                            Agent
-                          </Badge>
-                        )}
                       </div>
-                      {item.excerpt && (
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                          {item.excerpt}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {item.source_name && (
-                          <span className="font-medium">
-                            {item.source_name}
-                          </span>
-                        )}
-                        {item.source_url && (
-                          <a
-                            href={item.source_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
-                          >
-                            <LinkIcon className="h-3 w-3" />
-                            Source
-                          </a>
-                        )}
-                        {item.source_date && (
-                          <span>Dated: {item.source_date}</span>
-                        )}
-                        <span>
-                          Retrieved:{" "}
-                          {new Date(item.retrieved_at).toLocaleDateString()}
-                        </span>
-                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {document.file_name ?? "Untitled source"} · {formatBytes(document.file_size_bytes)} · {formatDate(document.created_at)}
+                      </p>
                     </div>
+                    <Badge variant="secondary" className="w-fit">Owner-provided</Badge>
                   </div>
+                  {document.error && (
+                    <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                      {document.error}
+                    </p>
+                  )}
+                  {document.evidence_ids.length > 0 && (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Distributed into {document.evidence_ids.length} evidence-backed claims.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+    </section>
+  );
+}
+
+function DossierPanel({
+  dossiers,
+  profiles,
+  evidenceById,
+  onOpen,
+}: {
+  dossiers: AgentDocument[];
+  profiles: AgentProfile[];
+  evidenceById: Map<string, EvidenceItem>;
+  onOpen: (dossier: AgentDocument) => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader title="Agent dossiers" detail="Verified working memory" />
+      {dossiers.length === 0 ? (
+        <EmptyState icon={BookOpen} title="No dossiers yet" detail="Parsed founder material will create dossiers for the relevant section agents." />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {dossiers.map((dossier) => {
+            const evidence = dossier.evidence_ids.map((id) => evidenceById.get(id)).filter((item): item is EvidenceItem => Boolean(item));
+            return (
+              <Card key={dossier.id} className="border-border/60 shadow-sm transition-shadow hover:shadow-md">
+                <CardContent className="flex h-full flex-col p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold">{dossier.title || labelForDocKey(dossier.doc_key)}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{agentName(profiles, dossier.agent_profile_id)} · v{dossier.version}</p>
+                    </div>
+                    <Badge variant={dossier.material_change ? "default" : "outline"}>{dossier.material_change ? "Changed" : dossier.freshness_status}</Badge>
+                  </div>
+                  <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">{plainText(dossier.body_md)}</p>
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline" className="gap-1"><BadgeCheck className="h-3 w-3" />{evidence.length} citations</Badge>
+                    <Badge variant="outline">{claimSourceLabel(dossier.claim_sources)}</Badge>
+                  </div>
+                  <Button className="mt-4 w-fit" variant="outline" size="sm" onClick={() => onOpen(dossier)}>
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Open dossier
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BrandPanel({
+  company,
+  manualLogoUrl,
+  setManualLogoUrl,
+  onSave,
+}: {
+  company: Company | null;
+  manualLogoUrl: string;
+  setManualLogoUrl: (value: string) => void;
+  onSave: () => void;
+}) {
+  return (
+    <section className="rounded-lg border border-border/60 bg-card p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/60 bg-muted">
+          {company?.logo_url ? <img src={company.logo_url} alt="" className="h-full w-full object-contain" /> : <ImageIcon className="h-5 w-5 text-muted-foreground" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold">Company branding</h2>
+          <p className="mt-1 truncate text-xs text-muted-foreground">{company?.name ?? "No company profile yet"}</p>
+          {company?.logo_source && <Badge variant="outline" className="mt-2">{company.logo_source.replace(/_/g, " ")}</Badge>}
+        </div>
+      </div>
+      <div className="mt-4 space-y-2">
+        <Label htmlFor="logo-url">Logo URL</Label>
+        <div className="flex gap-2">
+          <Input id="logo-url" value={manualLogoUrl} onChange={(event) => setManualLogoUrl(event.target.value)} placeholder="https://..." disabled={!company} />
+          <Button variant="outline" onClick={onSave} disabled={!company || !manualLogoUrl.trim()}>Save</Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function QuestionsPanel({
+  questions,
+  onAnswer,
+  onDismiss,
+}: {
+  questions: OwnerQuestion[];
+  onAnswer: (question: OwnerQuestion) => void;
+  onDismiss: (question: OwnerQuestion) => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <SectionHeader title="Owner questions" detail="Max three open per agent" />
+      {questions.length === 0 ? (
+        <EmptyState icon={MessageSquare} title="No open questions" detail="Agents will ask only when they need a founder truth they cannot research." />
+      ) : (
+        <div className="space-y-3">
+          {questions.map((question) => (
+            <Card key={question.id} className="border-border/60 shadow-sm">
+              <CardContent className="p-4">
+                <h3 className="text-sm font-semibold">{question.question}</h3>
+                <p className="mt-2 text-xs text-muted-foreground">{question.why_needed}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => onAnswer(question)}>Answer</Button>
+                  <Button size="sm" variant="ghost" onClick={() => onDismiss(question)}>Dismiss</Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function GroundingWizard({
+  documents,
+  dossiers,
+  questions,
+}: {
+  documents: FounderDocument[];
+  dossiers: AgentDocument[];
+  questions: OwnerQuestion[];
+}) {
+  const hasUpload = documents.length > 0;
+  const hasDistributed = documents.some((document) => document.status === "distributed");
+  const hasDossiers = dossiers.length > 0;
+  const hasOpenQuestions = questions.length > 0;
+  const steps = [
+    { label: "Upload owner source", done: hasUpload },
+    { label: "Parse and distribute", done: hasDistributed },
+    { label: "Review dossiers", done: hasDossiers },
+    { label: "Resolve open questions", done: !hasOpenQuestions },
+  ];
+  const complete = steps.filter((step) => step.done).length;
+  return (
+    <section className="rounded-lg border border-border/60 bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">Grounding wizard</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Spec 08 path from founder evidence to trusted canvas.</p>
+        </div>
+        <ShieldCheck className="h-5 w-5 text-primary" />
+      </div>
+      <Progress value={(complete / steps.length) * 100} className="mt-4" />
+      <div className="mt-4 space-y-2">
+        {steps.map((step) => (
+          <div key={step.label} className="flex items-center gap-2 text-sm">
+            {step.done ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Clock3 className="h-4 w-4 text-muted-foreground" />}
+            <span className={step.done ? "text-foreground" : "text-muted-foreground"}>{step.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DossierDrawer({
+  dossier,
+  profiles,
+  evidenceById,
+  onOpenChange,
+}: {
+  dossier: AgentDocument | null;
+  profiles: AgentProfile[];
+  evidenceById: Map<string, EvidenceItem>;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const citations = dossier?.evidence_ids.map((id) => evidenceById.get(id)).filter((item): item is EvidenceItem => Boolean(item)) ?? [];
+  return (
+    <FocusDrawer
+      open={Boolean(dossier)}
+      onOpenChange={onOpenChange}
+      size="reading"
+      eyebrow={dossier ? agentName(profiles, dossier.agent_profile_id) : "Dossier"}
+      title={dossier?.title ?? "Dossier"}
+      subtitle={dossier ? `${labelForDocKey(dossier.doc_key)} · v${dossier.version}` : undefined}
+      bodyClassName="p-4 sm:p-6"
+    >
+      {dossier && (
+        <article className="space-y-6">
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{claimSourceLabel(dossier.claim_sources)}</Badge>
+            <Badge variant="outline">{dossier.freshness_status}</Badge>
+            {dossier.material_change && <Badge>Material change</Badge>}
+          </div>
+          <div className="whitespace-pre-wrap text-sm leading-6 text-foreground">{dossier.body_md}</div>
+          <section className="space-y-3 border-t border-border pt-4">
+            <h3 className="text-sm font-semibold">Citations</h3>
+            {citations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No citations attached to this dossier yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {citations.map((item) => (
+                  <div key={item.id} className="rounded-md border border-border/60 bg-muted/20 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-medium">{item.title}</p>
+                      {item.source_url && (
+                        <a className="shrink-0 text-muted-foreground hover:text-primary" href={item.source_url} target="_blank" rel="noreferrer" aria-label="Open source">
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
+                    {item.excerpt && <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.excerpt}</p>}
+                    <p className="mt-2 text-xs text-muted-foreground">{item.source_name ?? "Owner document"} · {formatDate(item.retrieved_at)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </article>
+      )}
+    </FocusDrawer>
+  );
+}
+
+function SectionHeader({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div>
+      <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+      <p className="text-xs text-muted-foreground">{detail}</p>
     </div>
   );
+}
+
+function EmptyState({ icon: Icon, title, detail }: { icon: typeof FileText; title: string; detail: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-card p-6 text-center">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+        <Icon className="h-5 w-5 text-muted-foreground" />
+      </div>
+      <h3 className="mt-3 text-sm font-semibold">{title}</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function pickOrchestratorProfile(profiles: AgentProfile[], accountId: string): AgentProfile | undefined {
+  return profiles.find((profile) => profile.agent_key === "orchestrator" && profile.account_id === accountId)
+    ?? profiles.find((profile) => profile.agent_key === "orchestrator")
+    ?? profiles.find((profile) => profile.account_id === accountId);
+}
+
+function agentName(profiles: AgentProfile[], id: string): string {
+  return profiles.find((profile) => profile.id === id)?.display_name ?? "Agent";
+}
+
+function labelForDocKey(key: string): string {
+  return DOC_KEY_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function claimSourceLabel(value: Json): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "Provenance unknown";
+  const source = (value as Record<string, unknown>).default;
+  return source === "owner_provided" ? "Owner-provided" : source === "researched" ? "Researched" : "Mixed provenance";
+}
+
+function computeGroundedness(documents: FounderDocument[]): number {
+  const total = documents.reduce((sum, document) => sum + Math.max(1, document.evidence_ids.length), 0);
+  if (total === 0) return 0;
+  const grounded = documents.reduce((sum, document) => sum + document.evidence_ids.length, 0);
+  return Math.round((grounded / total) * 100);
+}
+
+function stripExtension(name: string): string {
+  return name.replace(/\.[^.]+$/, "");
+}
+
+function plainText(markdown: string): string {
+  return markdown.replace(/[#*_`>-]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return "Not dated";
+  return new Date(value).toLocaleDateString();
+}
+
+function formatBytes(value: number | null): string {
+  if (!value) return "Unknown size";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
