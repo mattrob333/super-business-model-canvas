@@ -64,7 +64,7 @@ export class GapEngineHandler {
       }
     }
 
-    await this.writeGaps(job, gaps);
+    await this.writeGaps(job, competitors, gaps);
     await this.writeMetrics(job.account_id, competitors, gaps);
     await markJobRunCompleted(this.client, job, "Gap engine completed competitor comparison.", {
       competitors_analyzed: competitors.length,
@@ -96,7 +96,19 @@ export class GapEngineHandler {
     return (data ?? []) as CanvasVersionRow[];
   }
 
-  private async writeGaps(job: AgentJob, gaps: GapCandidate[]): Promise<void> {
+  private async writeGaps(job: AgentJob, competitors: CompanyRow[], gaps: GapCandidate[]): Promise<void> {
+    // Idempotency (RF-4-5): each run supersedes the prior open competitive gaps for the
+    // competitors it analyzed, so re-runs and mid-job retries never duplicate rows.
+    if (competitors.length > 0) {
+      const { error: supersedeError } = await this.client
+        .from("gaps")
+        .update({ status: "superseded", updated_at: new Date().toISOString() })
+        .eq("account_id", job.account_id)
+        .eq("gap_type", "competitive")
+        .in("competitor_id", competitors.map((competitor) => competitor.id))
+        .in("status", ["open", "acknowledged"]);
+      if (supersedeError) throw new Error(`Failed to supersede prior competitive gaps: ${supersedeError.message}`);
+    }
     if (gaps.length === 0) return;
     const rows = gaps.map((gap) => ({
       account_id: job.account_id,
@@ -149,6 +161,8 @@ export class GapEngineHandler {
 
       const sectionOverlap = sections.size / SECTION_KEYS.length;
       const pricingAggression = competitorGaps.some((gap) => gap.sectionKey === "revenue_streams") ? 1.25 : 1;
+      // Momentum is a v1 placeholder (baseline 100) until Phase 7 metric families compute
+      // real momentum; disclosed in inputs so consumers can tell placeholder from measured.
       const momentum = 100;
       const threatIndex = round2(momentum * Math.max(0.1, sectionOverlap) * pricingAggression);
       rows.push({
@@ -160,6 +174,7 @@ export class GapEngineHandler {
           competitor_id: competitor.id,
           formula_version: THREAT_FORMULA_VERSION,
           momentum,
+          momentum_source: "placeholder_baseline_v1",
           section_overlap: round2(sectionOverlap),
           pricing_aggression: pricingAggression,
           gap_count: competitorGaps.length,

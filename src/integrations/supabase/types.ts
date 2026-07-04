@@ -2209,7 +2209,7 @@ export type Database = {
       agent_run_status: "pending" | "running" | "completed" | "failed" | "cancelled" | "timeout"
       agent_run_trigger: "manual" | "scheduled" | "api" | "cascade" | "retry"
       gap_severity: "critical" | "high" | "medium" | "low"
-      gap_status: "open" | "acknowledged" | "in_progress" | "resolved" | "wont_fix"
+      gap_status: "open" | "acknowledged" | "in_progress" | "resolved" | "wont_fix" | "superseded"
       gap_type: "missing_data" | "low_confidence" | "no_evidence" | "outdated" | "contradictory" | "assumption" | "competitive"
       credential_status: "active" | "revoked" | "expired" | "untested"
       mcp_transport_type: "stdio" | "http" | "sse" | "websocket"
@@ -2361,7 +2361,7 @@ export const Constants = {
       agent_run_status: ["pending", "running", "completed", "failed", "cancelled", "timeout"],
       agent_run_trigger: ["manual", "scheduled", "api", "cascade", "retry"],
       gap_severity: ["critical", "high", "medium", "low"],
-      gap_status: ["open", "acknowledged", "in_progress", "resolved", "wont_fix"],
+      gap_status: ["open", "acknowledged", "in_progress", "resolved", "wont_fix", "superseded"],
       gap_type: ["missing_data", "low_confidence", "no_evidence", "outdated", "contradictory", "assumption", "competitive"],
       credential_status: ["active", "revoked", "expired", "untested"],
       mcp_transport_type: ["stdio", "http", "sse", "websocket"],

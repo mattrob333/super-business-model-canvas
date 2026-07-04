@@ -42,6 +42,7 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
         .from("canvas_section_versions")
         .select("id, section_key, section_title, items, notes, confidence, created_at")
         .eq("account_id", ctx.accountId)
+        .is("competitor_id", null)
         .eq("section_key", args.section_key)
         .order("created_at", { ascending: false })
         .limit(1);

@@ -356,6 +356,15 @@ with checks as (
 
   union all
 
+  select 'enum value exists: gap_status.superseded',
+         case when exists (
+           select 1 from pg_enum e
+           join pg_type t on t.oid = e.enumtypid
+           where t.typname = 'gap_status' and e.enumlabel = 'superseded'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
   select 'column exists: gaps.score',
          case when exists (
            select 1 from information_schema.columns

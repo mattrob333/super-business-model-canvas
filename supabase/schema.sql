@@ -55,7 +55,7 @@ do $$ begin create type public.agent_status as enum ('active', 'paused', 'draft'
 do $$ begin create type public.agent_run_status as enum ('pending', 'running', 'completed', 'failed', 'cancelled', 'timeout'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.agent_run_trigger as enum ('manual', 'scheduled', 'api', 'cascade', 'retry'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.gap_severity as enum ('critical', 'high', 'medium', 'low'); exception when duplicate_object then null; end $$;
-do $$ begin create type public.gap_status as enum ('open', 'acknowledged', 'in_progress', 'resolved', 'wont_fix'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.gap_status as enum ('open', 'acknowledged', 'in_progress', 'resolved', 'wont_fix', 'superseded'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.gap_type as enum ('missing_data', 'low_confidence', 'no_evidence', 'outdated', 'contradictory', 'assumption', 'competitive'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.credential_status as enum ('active', 'revoked', 'expired', 'untested'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.mcp_transport_type as enum ('stdio', 'http', 'sse', 'websocket'); exception when duplicate_object then null; end $$;

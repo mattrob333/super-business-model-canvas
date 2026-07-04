@@ -25,11 +25,24 @@ describe("GapEngineHandler", () => {
       affected_sections: ["value_propositions"],
       formula_version: "competitor_gap_v1",
     });
-    expect(gapRows[0].score).toBeGreaterThan(40);
+    // Exact-value determinism (RF-4-12): novelty(1.0) x confidence(0.9) x 100 = 90.
+    expect(gapRows[0].score).toBe(90);
+    expect(gapRows[0].severity).toBe("critical");
+    expect(gapRows[1].score).toBe(85);
     expect(gapRows[0].score_inputs).toMatchObject({
       formula_version: "competitor_gap_v1",
       best_overlap: 0,
     });
+
+    // Idempotency (RF-4-5): prior open competitive gaps for analyzed competitors superseded.
+    const supersede = client.updates.find((update) => update.table === "gaps");
+    expect(supersede?.values).toMatchObject({ status: "superseded" });
+    expect(supersede?.filters).toEqual(expect.arrayContaining([
+      ["account_id", "account-1"],
+      ["gap_type", "competitive"],
+      ["in:competitor_id", ["competitor-1"]],
+      ["in:status", ["open", "acknowledged"]],
+    ]));
 
     const metricRows = client.inserts.find((insert) => insert.table === "metric_snapshots")?.value as Array<Record<string, unknown>>;
     expect(metricRows).toEqual(expect.arrayContaining([
@@ -41,13 +54,18 @@ describe("GapEngineHandler", () => {
       expect.objectContaining({
         metric_key: "competitor.threat_index",
         label: "RivalCo",
+        // Exact formula pin (RF-4-12): 100 x max(0.1, 2/9) x 1.25 = 27.78.
+        value: 27.78,
         inputs: expect.objectContaining({
           competitor_id: "competitor-1",
           formula_version: "threat_index_v1",
+          momentum_source: "placeholder_baseline_v1",
           gap_count: 2,
         }),
       }),
     ]));
+    const sectionDelta = metricRows.find((row) => row.metric_key === "competitor.section_delta" && row.section_key === "value_propositions");
+    expect(sectionDelta?.value).toBe(90);
     expect(client.updates.at(-1)).toMatchObject({
       table: "agent_runs",
       values: {
@@ -55,6 +73,19 @@ describe("GapEngineHandler", () => {
         output: expect.objectContaining({ competitors_analyzed: 1, gaps_created: 2 }),
       },
     });
+  });
+
+  it("suppresses competitor items the own canvas already covers (overlap boundary)", async () => {
+    const client = new GapEngineFakeClient();
+    client.ownValueItemText = "Managed onboarding with implementation services";
+    const handler = new GapEngineHandler(client.asSupabase());
+
+    await handler.handle(makeGapJob());
+
+    const gapRows = client.inserts.find((insert) => insert.table === "gaps")?.value as Array<Record<string, unknown>>;
+    // Identical value-prop text -> overlap 1.0 >= 0.58 -> suppressed; only the revenue gap remains.
+    expect(gapRows).toHaveLength(1);
+    expect(gapRows[0].affected_sections).toEqual(["revenue_streams"]);
   });
 
   it("dispatcher supports gap_engine jobs", async () => {
@@ -93,6 +124,7 @@ class GapEngineFakeClient {
   public inserts: Array<{ table: string; value: Record<string, unknown> | Array<Record<string, unknown>> }> = [];
   public updates: Array<{ table: string; values: Record<string, unknown>; filters: Array<[string, unknown]> }> = [];
   public selects: Array<{ table: string; filters: Array<[string, unknown]> }> = [];
+  public ownValueItemText = "Self-serve analytics dashboards";
 
   asSupabase(): never {
     return this as never;
@@ -114,7 +146,7 @@ class GapEngineFakeClient {
           section_key: "value_propositions",
           confidence: 0.8,
           created_at: "2026-07-03T10:00:00Z",
-          items: [{ text: "Self-serve analytics dashboards", confidence: 0.8, evidence_ids: ["evidence-own"] }],
+          items: [{ text: this.ownValueItemText, confidence: 0.8, evidence_ids: ["evidence-own"] }],
         },
         {
           id: "rival-value",
@@ -165,6 +197,11 @@ class GapEngineFakeQuery {
 
   eq(column: string, value: unknown): this {
     this.filters.push([column, value]);
+    return this;
+  }
+
+  in(column: string, values: unknown[]): this {
+    this.filters.push([`in:${column}`, values]);
     return this;
   }
 

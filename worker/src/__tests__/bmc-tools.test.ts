@@ -27,6 +27,8 @@ describe("BMC MCP tools", () => {
       table: "canvas_section_versions",
       filters: [
         ["account_id", "account-1"],
+        // RF-4-2: own-canvas reads must never see competitor-linked versions.
+        ["is:competitor_id", null],
         ["section_key", "value_propositions"],
       ],
     });
@@ -161,6 +163,11 @@ class FakeQuery {
 
   eq(column: string, value: unknown): this {
     this.filters.push([column, value]);
+    return this;
+  }
+
+  is(column: string, value: unknown): this {
+    this.filters.push([`is:${column}`, value]);
     return this;
   }
 

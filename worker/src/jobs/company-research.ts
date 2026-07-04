@@ -24,7 +24,6 @@ interface BusinessContext {
   company_name: string | null;
   industry: string | null;
   website?: string | null;
-  website_url?: string | null;
 }
 
 interface CompanyEntity {
@@ -82,7 +81,7 @@ export class CompanyResearchHandler {
   async handle(job: AgentJob): Promise<void> {
     const payload = asRecord(job.payload);
     const context = await this.loadBusinessContext(job.account_id, payload);
-    const companyUrl = readString(payload.company_url ?? payload.companyUrl) ?? context.website_url ?? context.website;
+    const companyUrl = readString(payload.company_url ?? payload.companyUrl) ?? context.website;
     if (!companyUrl) throw new Error("company_research payload requires company_url or a business context website");
 
     await this.runResearch(job, {
@@ -159,6 +158,9 @@ export class CompanyResearchHandler {
     }
 
     await this.writeVerifiedClaims(job, subject, verified);
+    if (subject.runType === "competitor_research" && subject.competitorId) {
+      await this.enqueueGapEngine(job, subject.competitorId);
+    }
     await this.markRunCompleted(job, {
       run_type: subject.runType,
       company_url: subject.targetUrl,
@@ -171,6 +173,56 @@ export class CompanyResearchHandler {
       })),
       escalation_rate: escalated ? 1 : 0,
     });
+  }
+
+  /**
+   * RF-4-1: competitor research chains straight into the gap engine so a single
+   * user action ("Research this competitor") yields fresh gaps + Threat Index.
+   * Durable like every run: a pending agent_runs row backs the chained job.
+   * Failures here must not fail the (already successful) research job.
+   */
+  private async enqueueGapEngine(job: AgentJob, competitorId: string): Promise<void> {
+    try {
+      const payload = asRecord(job.payload);
+      let agentProfileId = readString(payload.agentProfileId ?? payload.agent_profile_id);
+      if (!agentProfileId && job.agent_run_id) {
+        const { data: parentRun } = await this.deps.client
+          .from("agent_runs")
+          .select("agent_profile_id")
+          .eq("id", job.agent_run_id)
+          .eq("account_id", job.account_id)
+          .maybeSingle();
+        agentProfileId = parentRun?.agent_profile_id ?? undefined;
+      }
+      if (!agentProfileId) throw new Error("no agent profile available for chained gap_engine run");
+      const nowIso = new Date().toISOString();
+      const { data: run, error: runError } = await this.deps.client
+        .from("agent_runs")
+        .insert({
+          account_id: job.account_id,
+          agent_profile_id: agentProfileId,
+          run_type: "gap_engine",
+          trigger_type: "cascade",
+          status: "pending",
+          input: { competitor_id: competitorId, chained_from_run_id: job.agent_run_id },
+          started_at: nowIso,
+        })
+        .select("id")
+        .single();
+      if (runError) throw new Error(runError.message);
+      const { error: jobError } = await this.deps.client.from("agent_jobs").insert({
+        account_id: job.account_id,
+        kind: "gap_engine",
+        payload: { competitor_id: competitorId, agentProfileId },
+        status: "queued",
+        agent_run_id: run.id,
+        run_after: nowIso,
+      });
+      if (jobError) throw new Error(jobError.message);
+    } catch (error) {
+      // Log-and-continue: the research result stands; gap refresh can be re-triggered.
+      console.error(`gap_engine chain enqueue failed for competitor ${competitorId}:`, error);
+    }
   }
 
   private async loadBusinessContext(accountId: string, payload: Record<string, unknown>): Promise<BusinessContext> {
