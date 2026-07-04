@@ -760,7 +760,7 @@ Website: ${comp.website || 'N/A'}
             )}
 
             {/* Company header */}
-            <header className="space-y-3 pt-1">
+            <header className="rounded-xl border border-border bg-card px-5 py-4 shadow-sm sm:px-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
                   <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
