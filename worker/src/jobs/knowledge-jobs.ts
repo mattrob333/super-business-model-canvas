@@ -9,6 +9,7 @@ import type { EvidenceCandidate, FeedRuntimeConfig } from "../feeds/types.js";
 import type { AgentJob } from "../queue/types.js";
 import { SECTION_AGENT_KEYS, SECTION_LABELS, isSectionKey, type SectionKey } from "../domain/sections.js";
 import { chooseModelRoute } from "./canvas-section-analysis.js";
+import { verifyClaimAgainstExcerpt, type VerificationStatus } from "./company-research.js";
 
 interface ModelRoute {
   account_id?: string | null;
@@ -106,38 +107,47 @@ export class KnowledgeJobHandler {
 
     const founderDocument = await this.loadFounderDocument(job.account_id, documentId);
     await this.updateFounderDocument(job.account_id, documentId, { status: "parsing", error: null });
-    const sourceText = await this.readFounderDocumentText(founderDocument, payload);
-    const routes = await this.loadModelRoutes(job.account_id, ["onboarding_extract"]);
-    const route = requiredRoute(routes, job.account_id, "onboarding_extract", "onboarding_extract");
-    const parsed = safeParseOnboardingExtract((await this.runnerForRoute(route).run({
-      model: route.model_name,
-      modelParams: route.params ?? undefined,
-      maxTurns: 16,
-      maxBudgetUsd: budgetForRoute(route),
-      prompt: onboardingPrompt(founderDocument, sourceText),
-      systemPrompt: "Extract owner-provided Business Model Canvas facts from founder documents. Do not invent missing facts.",
-      mcpServers: {},
-      allowedTools: [],
-    })).resultText);
+    try {
+      const sourceText = await this.readFounderDocumentText(founderDocument, payload);
+      const routes = await this.loadModelRoutes(job.account_id, ["onboarding_extract", "research_verify"]);
+      const route = requiredRoute(routes, job.account_id, "onboarding_extract", "onboarding_extract");
+      const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
+      const parsed = safeParseOnboardingExtract((await this.runnerForRoute(route).run({
+        model: route.model_name,
+        modelParams: route.params ?? undefined,
+        maxTurns: 16,
+        maxBudgetUsd: budgetForRoute(route),
+        prompt: onboardingPrompt(founderDocument, sourceText),
+        systemPrompt: "Extract owner-provided Business Model Canvas facts from founder documents. Do not invent missing facts.",
+        mcpServers: {},
+        allowedTools: [],
+      })).resultText);
 
-    const evidenceByExcerpt = await this.writeDocumentEvidence(job, founderDocument, parsed);
-    await this.writeOwnerCanvasVersions(job, founderDocument, parsed, evidenceByExcerpt);
-    const profiles = await this.loadAgentProfiles(job.account_id);
-    await this.writeDossiers(job, profiles, parsed.dossiers, founderDocument.id);
-    await this.writeOwnerQuestions(job, profiles, parsed.ownerQuestions);
-    await this.updateFounderDocument(job.account_id, documentId, {
-      status: "distributed",
-      extracted_text: sourceText,
-      section_claims: parsed,
-      evidence_ids: [...new Set(evidenceByExcerpt.values())],
-      error: null,
-    });
-    await this.markRunCompleted(job, "onboarding_extract completed", {
-      founder_document_id: documentId,
-      sections: Object.keys(parsed.sections).length,
-      dossiers: parsed.dossiers.length,
-      owner_questions: parsed.ownerQuestions.length,
-    });
+      const evidenceByExcerpt = await this.writeDocumentEvidence(job, founderDocument, parsed);
+      await this.writeOwnerCanvasVersions(job, founderDocument, parsed, evidenceByExcerpt, verifyRoute);
+      const profiles = await this.loadAgentProfiles(job.account_id);
+      await this.writeDossiers(job, profiles, parsed.dossiers, founderDocument.id);
+      await this.writeOwnerQuestions(job, profiles, parsed.ownerQuestions);
+      await this.updateFounderDocument(job.account_id, documentId, {
+        status: "distributed",
+        extracted_text: sourceText,
+        section_claims: parsed,
+        evidence_ids: [...new Set(evidenceByExcerpt.values())],
+        error: null,
+      });
+      await this.markRunCompleted(job, "onboarding_extract completed", {
+        founder_document_id: documentId,
+        sections: Object.keys(parsed.sections).length,
+        dossiers: parsed.dossiers.length,
+        owner_questions: parsed.ownerQuestions.length,
+      });
+    } catch (error) {
+      // RF-5A-5: a failed ingestion must not strand the document in 'parsing'.
+      const message = error instanceof Error ? error.message : String(error);
+      await this.updateFounderDocument(job.account_id, documentId, { status: "failed", error: message })
+        .catch((statusError) => console.error("Failed to mark founder document failed:", statusError));
+      throw error;
+    }
   }
 
   async handleDossierRefresh(job: AgentJob): Promise<void> {
@@ -149,8 +159,16 @@ export class KnowledgeJobHandler {
 
     const doc = await this.loadAgentDocument(job.account_id, agentProfileId, docKey);
     const evidence = await this.refreshWatchedSources(job.account_id, agentProfileId);
+    if (evidence.length === 0) {
+      // No new evidence: nothing to ground an update in — never rewrite on vibes.
+      await this.markRunCompleted(job, "Dossier refresh skipped: no new evidence from watched sources.", {
+        doc_key: docKey, version: doc.version, changed: false,
+      });
+      return;
+    }
     const evidenceIds = await this.writeEvidence(job, evidence);
-    const route = requiredRoute(await this.loadModelRoutes(job.account_id, ["dossier_refresh"]), job.account_id, "dossier_refresh", "dossier_refresh");
+    const routes = await this.loadModelRoutes(job.account_id, ["dossier_refresh", "research_verify"]);
+    const route = requiredRoute(routes, job.account_id, "dossier_refresh", "dossier_refresh");
     const update = safeParseDocUpdate((await this.runnerForRoute(route).run({
       model: route.model_name,
       modelParams: route.params ?? undefined,
@@ -162,8 +180,93 @@ export class KnowledgeJobHandler {
       allowedTools: [],
     })).resultText, doc, evidenceIds);
 
-    const result = await this.upsertAgentDocument(job, agentProfileId, docKey, update, null);
-    await this.markRunCompleted(job, "Dossier refresh completed", { doc_key: docKey, version: result.version, changed: result.changed });
+    // RF-5A-2: spec 08 §1.2 — verifier spot-checks new claims before version++.
+    const spotCheck = await this.spotCheckClaims(job, routes, update.bodyMd, doc.body_md, evidence);
+
+    const result = await this.upsertAgentDocument(job, agentProfileId, docKey, update, null, spotCheck);
+    if (result.changed && update.materialChange && docKey !== "atlas_summary") {
+      // RF-5A-3: material change → refresh the Atlas summary + post an insight.
+      await this.postMaterialChangeInsight(job, agentProfileId, docKey, update);
+      await this.enqueueSummaryUpdate(job, agentProfileId);
+    }
+    await this.markRunCompleted(job, "Dossier refresh completed", {
+      doc_key: docKey, version: result.version, changed: result.changed, spot_check: spotCheck,
+    });
+  }
+
+  /**
+   * Verifier spot-check (RF-5A-2): sample up to 3 claims that are NEW in the
+   * updated body and classify each against the collected evidence. A contradicted
+   * claim hard-fails the refresh — the old dossier stays authoritative.
+   */
+  private async spotCheckClaims(
+    job: AgentJob,
+    routes: ModelRoute[],
+    updatedBody: string,
+    previousBody: string,
+    evidence: EvidenceCandidate[],
+  ): Promise<{ checked: number; confirmed: number; unsupported: number }> {
+    const newClaims = extractClaimLines(updatedBody).filter((line) => !previousBody.includes(line)).slice(0, 3);
+    if (newClaims.length === 0) return { checked: 0, confirmed: 0, unsupported: 0 };
+    const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
+    const excerptBundle = evidence.map((item) => item.excerpt ?? item.title).filter(Boolean).join("\n\n").slice(0, 6000);
+    let confirmed = 0;
+    let unsupported = 0;
+    for (const claim of newClaims) {
+      const verdict = await verifyClaimAgainstExcerpt(this.runnerForRoute(verifyRoute), verifyRoute, claim, excerptBundle);
+      if (verdict.status === "contradicted") {
+        throw new Error(`dossier refresh spot-check found a contradicted claim: ${claim} (${verdict.reason})`);
+      }
+      if (verdict.status === "confirmed") confirmed += 1;
+      else unsupported += 1;
+    }
+    return { checked: newClaims.length, confirmed, unsupported };
+  }
+
+  private async postMaterialChangeInsight(job: AgentJob, agentProfileId: string, docKey: string, update: ParsedDocUpdate): Promise<void> {
+    const { error } = await this.deps.client.from("insights").insert({
+      account_id: job.account_id,
+      agent_profile_id: agentProfileId,
+      severity: "notable",
+      title: `Material change in dossier: ${docKey}`,
+      body: update.title,
+      tags: ["dossier", "material_change"],
+      evidence_ids: update.evidenceIds,
+      agent_run_id: job.agent_run_id,
+    });
+    if (error) console.error(`Failed to post material-change insight for ${docKey}: ${error.message}`);
+  }
+
+  /** Durable chained summary refresh (same pattern as the gap-engine chain). */
+  private async enqueueSummaryUpdate(job: AgentJob, agentProfileId: string): Promise<void> {
+    try {
+      const nowIso = new Date().toISOString();
+      const { data: run, error: runError } = await this.deps.client
+        .from("agent_runs")
+        .insert({
+          account_id: job.account_id,
+          agent_profile_id: agentProfileId,
+          run_type: "summary_update",
+          trigger_type: "cascade",
+          status: "pending",
+          input: { agent_profile_id: agentProfileId, chained_from_run_id: job.agent_run_id },
+          started_at: nowIso,
+        })
+        .select("id")
+        .single();
+      if (runError) throw new Error(runError.message);
+      const { error: jobError } = await this.deps.client.from("agent_jobs").insert({
+        account_id: job.account_id,
+        kind: "summary_update",
+        payload: { agent_profile_id: agentProfileId },
+        status: "queued",
+        agent_run_id: run.id,
+        run_after: nowIso,
+      });
+      if (jobError) throw new Error(jobError.message);
+    } catch (error) {
+      console.error("summary_update chain enqueue failed:", error);
+    }
   }
 
   async handleSummaryUpdate(job: AgentJob): Promise<void> {
@@ -173,8 +276,31 @@ export class KnowledgeJobHandler {
     await this.markRunRunning(job, "summary_update", { agent_profile_id: agentProfileId });
 
     const sourceDocs = await this.loadAgentDocuments(job.account_id, agentProfileId);
-    const route = requiredRoute(await this.loadModelRoutes(job.account_id, ["summary_update"]), job.account_id, "summary_update", "summary_update");
-    const update = safeParseDocUpdate((await this.runnerForRoute(route).run({
+    const routes = await this.loadModelRoutes(job.account_id, ["summary_update", "summary_update_escalated"]);
+    const fallbackEvidence = sourceDocs.flatMap((doc) => doc.evidence_ids);
+
+    // RF-5A-1: unparseable output is a HARD failure, never an empty overwrite.
+    // Spec 08 §8: budget tier first, escalate to mid on validation failure.
+    const budgetRoute = requiredRoute(routes, job.account_id, "summary_update", "summary_update");
+    let update = await this.runSummaryRoute(budgetRoute, sourceDocs, fallbackEvidence);
+    if (!update) {
+      const escalatedRoute = requiredRoute(routes, job.account_id, "summary_update_escalated", "summary_update_escalated");
+      update = await this.runSummaryRoute(escalatedRoute, sourceDocs, fallbackEvidence);
+    }
+    if (!update) {
+      throw new Error("summary_update produced unparseable output on both budget and escalated routes; refusing to overwrite atlas_summary");
+    }
+
+    const result = await this.upsertAgentDocument(job, agentProfileId, "atlas_summary", update, null);
+    await this.markRunCompleted(job, "Summary update completed", { doc_key: "atlas_summary", version: result.version, changed: result.changed });
+  }
+
+  private async runSummaryRoute(
+    route: ModelRoute,
+    sourceDocs: Array<AgentDocument & { doc_key: string; title: string }>,
+    fallbackEvidenceIds: string[],
+  ): Promise<ParsedDocUpdate | null> {
+    const result = await this.runnerForRoute(route).run({
       model: route.model_name,
       modelParams: route.params ?? undefined,
       maxTurns: 8,
@@ -183,15 +309,8 @@ export class KnowledgeJobHandler {
       systemPrompt: "Write the Atlas summary contract exactly. Max 500 tokens. Every bullet must be grounded in provided dossier text.",
       mcpServers: {},
       allowedTools: [],
-    })).resultText, {
-      id: "",
-      version: 0,
-      body_md: "",
-      evidence_ids: [],
-    }, sourceDocs.flatMap((doc) => doc.evidence_ids));
-
-    const result = await this.upsertAgentDocument(job, agentProfileId, "atlas_summary", update, null);
-    await this.markRunCompleted(job, "Summary update completed", { doc_key: "atlas_summary", version: result.version, changed: result.changed });
+    });
+    return safeParseDocUpdateStrict(result.resultText, fallbackEvidenceIds);
   }
 
   private async loadFounderDocument(accountId: string, documentId: string): Promise<FounderDocument> {
@@ -245,6 +364,11 @@ export class KnowledgeJobHandler {
     }
     const evidenceByExcerpt = new Map<string, string>();
     for (const excerpt of excerpts) {
+      const existingId = await this.findExistingEvidence(job.account_id, document.storage_path, excerpt);
+      if (existingId) {
+        evidenceByExcerpt.set(excerpt, existingId);
+        continue;
+      }
       const { data, error } = await this.deps.client.from("evidence_items").insert({
         account_id: job.account_id,
         source_type: "document",
@@ -266,22 +390,31 @@ export class KnowledgeJobHandler {
     document: FounderDocument,
     parsed: ParsedOnboardingExtract,
     evidenceByExcerpt: Map<string, string>,
+    verifyRoute: ModelRoute,
   ): Promise<void> {
     const contextId = readString(asRecord(job.payload).business_context_version_id ?? asRecord(job.payload).businessContextVersionId)
       ?? await this.latestBusinessContextId(job.account_id);
     for (const [sectionKey, items] of Object.entries(parsed.sections)) {
       if (!isSectionKey(sectionKey) || !items || items.length === 0) continue;
-      const evidenceItems = items.map((item) => {
+      // RF-5A-2: every owner claim passes the adversarial verifier against its
+      // own document excerpt before the version is stamped verified-fresh.
+      const evidenceItems: Array<Record<string, unknown>> = [];
+      for (const item of items) {
         const excerpt = item.evidenceExcerpt || item.text;
-        return {
+        const verdict: { status: VerificationStatus; reason: string } =
+          await verifyClaimAgainstExcerpt(this.runnerForRoute(verifyRoute), verifyRoute, item.text, excerpt);
+        const supported = verdict.status === "confirmed";
+        evidenceItems.push({
           text: item.text,
-          confidence: Math.min(item.confidence, 0.95),
+          confidence: supported ? Math.min(item.confidence, 0.95) : Math.min(item.confidence, 0.5),
           evidence_ids: [evidenceByExcerpt.get(excerpt)].filter((id): id is string => Boolean(id)),
           provenance: "owner_provided",
-          grounded: item.grounded,
-        };
-      });
-      const { score, inputs } = computeGroundedness(evidenceItems);
+          grounded: supported && item.grounded,
+          verification_status: verdict.status,
+          flags: supported ? [] : [verdict.status],
+        });
+      }
+      const { score, inputs } = computeGroundedness(evidenceItems as Array<{ grounded?: boolean; evidence_ids?: string[] }>);
       const { error } = await this.deps.client.from("canvas_section_versions").insert({
         account_id: job.account_id,
         business_context_version_id: contextId,
@@ -290,7 +423,7 @@ export class KnowledgeJobHandler {
         section_title: SECTION_LABELS[sectionKey],
         items: evidenceItems,
         notes: `Owner-provided from ${document.title}. Review before treating as researched fact.`,
-        confidence: average(evidenceItems.map((item) => item.confidence)),
+        confidence: average(evidenceItems.map((item) => item.confidence as number)),
         freshness_status: "fresh",
         last_verified_at: new Date().toISOString(),
         groundedness_score: score,
@@ -429,9 +562,27 @@ export class KnowledgeJobHandler {
     return evidence;
   }
 
+  /** Evidence dedup on (account, source_url, excerpt) — the Phase-3 discipline. */
+  private async findExistingEvidence(accountId: string, sourceUrl: string | null, excerpt: string): Promise<string | null> {
+    let query = this.deps.client
+      .from("evidence_items")
+      .select("id")
+      .eq("account_id", accountId)
+      .eq("excerpt", excerpt);
+    query = sourceUrl === null ? query.is("source_url", null) : query.eq("source_url", sourceUrl);
+    const { data, error } = await query.limit(1).maybeSingle();
+    if (error) return null;
+    return (data as { id: string } | null)?.id ?? null;
+  }
+
   private async writeEvidence(job: AgentJob, evidence: EvidenceCandidate[]): Promise<string[]> {
     const ids: string[] = [];
     for (const item of evidence) {
+      const existingId = await this.findExistingEvidence(job.account_id, item.sourceUrl ?? null, item.excerpt ?? item.title);
+      if (existingId) {
+        ids.push(existingId);
+        continue;
+      }
       const { data, error } = await this.deps.client.from("evidence_items").insert({
         account_id: job.account_id,
         title: item.title,
@@ -455,6 +606,7 @@ export class KnowledgeJobHandler {
     docKey: string,
     update: ParsedDocUpdate,
     founderDocumentId: string | null,
+    spotCheck?: { checked: number; confirmed: number; unsupported: number },
   ): Promise<{ version: number; changed: boolean }> {
     const { data: existing, error: existingError } = await this.deps.client
       .from("agent_documents")
@@ -479,7 +631,11 @@ export class KnowledgeJobHandler {
       last_refreshed_at: new Date().toISOString(),
       evidence_ids: update.evidenceIds,
       material_change: update.materialChange,
-      claim_sources: { default: "researched" },
+      // RF-5A-4: the current row's provenance must match its revision trail.
+      claim_sources: {
+        default: founderDocumentId ? "owner_provided" : "researched",
+        ...(spotCheck ? { spot_check: spotCheck } : {}),
+      },
       founder_document_id: founderDocumentId,
       agent_run_id: job.agent_run_id,
     };
@@ -608,14 +764,46 @@ function safeParseOnboardingExtract(text: string): ParsedOnboardingExtract {
   };
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** RF-5A-8: model-emitted evidence ids are only trusted when they are real UUIDs. */
+function validEvidenceIds(value: unknown, fallback: string[]): string[] {
+  const candidate = asStringArray(value).filter((id) => UUID_PATTERN.test(id));
+  return candidate.length > 0 ? candidate : fallback;
+}
+
 function safeParseDocUpdate(text: string, existing: AgentDocument, fallbackEvidenceIds: string[]): ParsedDocUpdate {
   const parsed = parseJsonObject(text);
   return {
     title: readString(parsed?.title) ?? "Atlas Summary",
     bodyMd: readString(parsed?.body_md ?? parsed?.bodyMd) ?? existing.body_md,
-    evidenceIds: asStringArray(parsed?.evidence_ids).length > 0 ? asStringArray(parsed?.evidence_ids) : fallbackEvidenceIds,
+    evidenceIds: validEvidenceIds(parsed?.evidence_ids, fallbackEvidenceIds),
     materialChange: parsed?.material_change === true,
   };
+}
+
+/**
+ * RF-5A-1: strict variant for atlas_summary — no fallback body. Returns null
+ * (caller escalates or hard-fails) instead of ever producing an empty doc.
+ */
+function safeParseDocUpdateStrict(text: string, fallbackEvidenceIds: string[]): ParsedDocUpdate | null {
+  const parsed = parseJsonObject(text);
+  const bodyMd = readString(parsed?.body_md ?? parsed?.bodyMd);
+  if (!parsed || !bodyMd) return null;
+  return {
+    title: readString(parsed.title) ?? "Atlas Summary",
+    bodyMd,
+    evidenceIds: validEvidenceIds(parsed.evidence_ids, fallbackEvidenceIds),
+    materialChange: parsed.material_change === true,
+  };
+}
+
+/** Bullet/numbered lines are the dossier's claims for spot-checking. */
+export function extractClaimLines(bodyMd: string): string[] {
+  return bodyMd
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "").trim())
+    .filter((line, index, lines) => line.length > 20 && lines.indexOf(line) === index && /^[-*+\d]/.test(bodyMd.split("\n")[index]?.trim() ?? ""));
 }
 
 function parseDossiers(value: unknown): ParsedDossier[] {
@@ -627,12 +815,13 @@ function parseDossiers(value: unknown): ParsedDossier[] {
     const title = readString(record.title);
     const bodyMd = readString(record.body_md ?? record.bodyMd);
     if (!agentKey || !docKey || !title || !bodyMd) return [];
+    if (docKey === "atlas_summary") return []; // contract doc: only summary_update writes it
     return [{
       agentKey,
       docKey,
       title,
       bodyMd,
-      evidenceIds: asStringArray(record.evidence_ids),
+      evidenceIds: validEvidenceIds(record.evidence_ids, []),
       materialChange: record.material_change === true,
     }];
   });
@@ -663,8 +852,13 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   }
 }
 
+const MAX_SOURCE_CHARS = 60_000;
+
 function onboardingPrompt(document: FounderDocument, sourceText: string): string {
-  return `Parse this founder document into owner-provided BMC facts. Return JSON only with sections, dossiers, and owner_questions. Document: ${document.title}\n\n${sourceText}`;
+  const truncated = sourceText.length > MAX_SOURCE_CHARS
+    ? `${sourceText.slice(0, MAX_SOURCE_CHARS)}\n\n[truncated at ${MAX_SOURCE_CHARS} characters]`
+    : sourceText;
+  return `Parse this founder document into owner-provided BMC facts. Return JSON only with sections, dossiers, and owner_questions. Document: ${document.title}\n\n${truncated}`;
 }
 
 function dossierPrompt(existingBody: string, evidence: EvidenceCandidate[]): string {
@@ -682,6 +876,8 @@ function evidencePrompt(evidence: EvidenceCandidate[]): string {
 function budgetForRoute(route: Pick<ModelRoute, "cost_per_1k_in" | "cost_per_1k_out">): number {
   const input = route.cost_per_1k_in ?? 0.002;
   const output = route.cost_per_1k_out ?? 0.01;
+  // $0.25 floor matches company-research: Claude Agent SDK session overhead
+  // exceeds tiny route-derived caps (live golden-set finding, PR #18).
   return Math.max(0.25, input * 8 + output * 4);
 }
 

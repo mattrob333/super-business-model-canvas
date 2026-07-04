@@ -1,57 +1,110 @@
 import { describe, expect, it } from "vitest";
 import type { AgentRunRequest, AgentRunResult, AgentRunner } from "../agent/runner.js";
-import { computeGroundedness, KnowledgeJobHandler } from "../jobs/knowledge-jobs.js";
+import { computeGroundedness, extractClaimLines, KnowledgeJobHandler } from "../jobs/knowledge-jobs.js";
 import type { AgentJob } from "../queue/types.js";
 
+const ONBOARDING_RESPONSE = JSON.stringify({
+  sections: [{
+    section_key: "value_propositions",
+    items: [{
+      text: "AI strategy workspace for seed-stage companies",
+      confidence: 0.99,
+      evidence_excerpt: "We sell an AI strategy workspace to seed-stage founders.",
+      grounded: true,
+    }],
+  }],
+  dossiers: [
+    {
+      agent_key: "agent_value_propositions",
+      doc_key: "positioning_narrative",
+      title: "Positioning Narrative",
+      body_md: "Owner says the product is an AI strategy workspace.",
+      material_change: true,
+    },
+    {
+      agent_key: "agent_value_propositions",
+      doc_key: "atlas_summary",
+      title: "Should be rejected",
+      body_md: "Onboarding must never write the contract doc.",
+    },
+  ],
+  owner_questions: [{
+    agent_key: "agent_value_propositions",
+    question: "Which customer segment is paying today?",
+    why_needed: "Positioning depends on the real buyer.",
+    doc_key: "positioning_narrative",
+  }],
+});
+
+/** Routes responses by prompt kind so verifier calls get verifier JSON. */
+class RoutingRunner implements AgentRunner {
+  public calls: string[] = [];
+  constructor(private readonly responses: {
+    main?: string | string[];
+    verify?: string;
+  }) {}
+
+  async run(request: AgentRunRequest): Promise<AgentRunResult> {
+    const isVerify = request.prompt.startsWith("Classify the claim");
+    this.calls.push(isVerify ? "verify" : "main");
+    let resultText: string;
+    if (isVerify) {
+      resultText = this.responses.verify ?? JSON.stringify({ status: "confirmed", reason: "matches excerpt" });
+    } else if (Array.isArray(this.responses.main)) {
+      const mains = this.calls.filter((kind) => kind === "main").length - 1;
+      resultText = this.responses.main[Math.min(mains, this.responses.main.length - 1)] ?? "";
+    } else {
+      resultText = this.responses.main ?? "";
+    }
+    return { resultText, sessionId: "session-1", costUsd: 0.01, tokensIn: 10, tokensOut: 20 };
+  }
+}
+
 describe("computeGroundedness", () => {
-  it("pins exact score values and empty boundary", () => {
+  it("pins exact score values and both boundary conditions", () => {
     expect(computeGroundedness([])).toEqual({
       score: 0,
       inputs: { formula: "groundedness_v1", grounded: 0, total: 0 },
     });
     expect(computeGroundedness([
-      { grounded: true, evidence_ids: ["e1"], provenance: "owner_provided" },
-      { grounded: true, evidence_ids: ["e2"], provenance: "owner_provided" },
-      { grounded: false, evidence_ids: ["e3"], provenance: "owner_provided" },
+      { grounded: true, evidence_ids: ["e1"] },
+      { grounded: true, evidence_ids: ["e2"] },
+      { grounded: false, evidence_ids: ["e3"] },
     ])).toEqual({
       score: 0.6667,
       inputs: { formula: "groundedness_v1", grounded: 2, total: 3 },
     });
+    // grounded flag without evidence must NOT count (second formula condition)
+    expect(computeGroundedness([
+      { grounded: true, evidence_ids: [] },
+      { grounded: true, evidence_ids: ["e1"] },
+    ])).toEqual({
+      score: 0.5,
+      inputs: { formula: "groundedness_v1", grounded: 1, total: 2 },
+    });
+  });
+});
+
+describe("extractClaimLines", () => {
+  it("pulls bullet and numbered claims, dedupes, skips short lines", () => {
+    const body = "# Title\n- Competitor launched usage-based pricing this quarter\n- short\n1. Hiring shifted toward enterprise sales in Q2 postings\n- Competitor launched usage-based pricing this quarter\nplain prose line that is long enough but not a bullet";
+    expect(extractClaimLines(body)).toEqual([
+      "Competitor launched usage-based pricing this quarter",
+      "Hiring shifted toward enterprise sales in Q2 postings",
+    ]);
   });
 });
 
 describe("KnowledgeJobHandler", () => {
-  it("onboarding_extract writes owner-provided evidence and fresh canvas versions", async () => {
+  it("onboarding_extract verifies owner claims, caps confidence, and writes provenance", async () => {
     const client = new FakeClient();
-    const handler = new KnowledgeJobHandler({
-      client: client.asSupabase(),
-      runner: new FixtureRunner(JSON.stringify({
-        sections: [{
-          section_key: "value_propositions",
-          items: [{
-            text: "AI strategy workspace for seed-stage companies",
-            confidence: 0.91,
-            evidence_excerpt: "We sell an AI strategy workspace to seed-stage founders.",
-            grounded: true,
-          }],
-        }],
-        dossiers: [{
-          agent_key: "agent_value_propositions",
-          doc_key: "positioning_narrative",
-          title: "Positioning Narrative",
-          body_md: "Owner says the product is an AI strategy workspace.",
-          material_change: true,
-        }],
-        owner_questions: [{
-          agent_key: "agent_value_propositions",
-          question: "Which customer segment is paying today?",
-          why_needed: "Positioning depends on the real buyer.",
-          doc_key: "positioning_narrative",
-        }],
-      })),
-    });
+    const runner = new RoutingRunner({ main: ONBOARDING_RESPONSE });
+    const handler = new KnowledgeJobHandler({ client: client.asSupabase(), runner });
 
     await handler.handleOnboardingExtract(makeJob());
+
+    // the verifier ran (RF-5A-2)
+    expect(runner.calls).toContain("verify");
 
     const canvasInsert = client.inserts.find((insert) => insert.table === "canvas_section_versions");
     expect(canvasInsert?.values).toMatchObject({
@@ -64,50 +117,189 @@ describe("KnowledgeJobHandler", () => {
     expect(canvasInsert?.values).toHaveProperty("last_verified_at");
     expect(canvasInsert?.values.items).toEqual([{
       text: "AI strategy workspace for seed-stage companies",
-      confidence: 0.91,
+      confidence: 0.95, // 0.99 capped (RF-5A-7 coverage of the 0.95 cap)
       evidence_ids: ["evidence-1"],
       provenance: "owner_provided",
       grounded: true,
+      verification_status: "confirmed",
+      flags: [],
     }]);
 
-    expect(client.inserts.find((insert) => insert.table === "evidence_items")?.values).toMatchObject({
-      account_id: "account-1",
-      source_type: "document",
-      metadata: { founder_document_id: "doc-1", provenance: "owner_provided" },
-    });
-    expect(client.inserts.find((insert) => insert.table === "owner_questions")?.values).toMatchObject({
-      account_id: "account-1",
-      status: "open",
-      question: "Which customer segment is paying today?",
-    });
-    expect(client.upserts.find((upsert) => upsert.table === "agent_documents")?.values).toMatchObject({
-      account_id: "account-1",
+    // provenance on the CURRENT dossier row matches the revision (RF-5A-4)
+    const dossierUpsert = client.upserts.find((upsert) => upsert.table === "agent_documents");
+    expect(dossierUpsert?.values).toMatchObject({
       doc_key: "positioning_narrative",
-      freshness_status: "fresh",
-      material_change: true,
+      claim_sources: { default: "owner_provided" },
     });
+    // atlas_summary doc_key from the model is rejected (RF-5A-8)
+    expect(client.upserts.filter((upsert) => upsert.values.doc_key === "atlas_summary")).toHaveLength(0);
+
     expect(client.updates.filter((update) => update.table === "agent_runs").at(-1)?.values).toMatchObject({
       status: "completed",
     });
   });
+
+  it("onboarding_extract caps unsupported claims at 0.5 and drops grounded flag", async () => {
+    const client = new FakeClient();
+    const runner = new RoutingRunner({
+      main: ONBOARDING_RESPONSE,
+      verify: JSON.stringify({ status: "unsupported", reason: "excerpt does not state this" }),
+    });
+    const handler = new KnowledgeJobHandler({ client: client.asSupabase(), runner });
+
+    await handler.handleOnboardingExtract(makeJob());
+
+    const canvasInsert = client.inserts.find((insert) => insert.table === "canvas_section_versions");
+    expect(canvasInsert?.values.items).toEqual([expect.objectContaining({
+      confidence: 0.5,
+      grounded: false,
+      verification_status: "unsupported",
+      flags: ["unsupported"],
+    })]);
+    expect(canvasInsert?.values).toMatchObject({ groundedness_score: 0 });
+  });
+
+  it("onboarding_extract marks the founder document failed on error (RF-5A-5)", async () => {
+    const client = new FakeClient();
+    const runner = new RoutingRunner({ main: "not json at all" });
+    // Unparseable extraction yields no sections/dossiers/questions — that's a
+    // completed-but-empty run, so force a later failure instead via missing route.
+    client.overrides.model_routes = [];
+    const handler = new KnowledgeJobHandler({ client: client.asSupabase(), runner });
+
+    await expect(handler.handleOnboardingExtract(makeJob())).rejects.toThrow(/No model route/);
+
+    const statusUpdates = client.updates.filter((update) => update.table === "founder_documents");
+    expect(statusUpdates.at(-1)?.values).toMatchObject({ status: "failed" });
+    expect(statusUpdates.at(-1)?.values.error).toMatch(/No model route/);
+  });
+
+  it("summary_update hard-fails when both budget and escalated output are unparseable (RF-5A-1)", async () => {
+    const client = new FakeClient();
+    const runner = new RoutingRunner({ main: ["definitely not json", "still not json"] });
+    const handler = new KnowledgeJobHandler({ client: client.asSupabase(), runner });
+
+    await expect(handler.handleSummaryUpdate(makeJob({ kind: "summary_update", payload: { agent_profile_id: "agent-vp" } })))
+      .rejects.toThrow(/refusing to overwrite atlas_summary/);
+
+    // nothing was written — the standing summary is untouched
+    expect(client.upserts.filter((upsert) => upsert.table === "agent_documents")).toHaveLength(0);
+    // both tiers were attempted (budget then escalated)
+    expect(runner.calls.filter((kind) => kind === "main")).toHaveLength(2);
+  });
+
+  it("summary_update escalates budget->mid and writes on the second attempt", async () => {
+    const client = new FakeClient();
+    const runner = new RoutingRunner({
+      main: [
+        "garbled budget output",
+        JSON.stringify({ title: "Atlas Summary", body_md: "## Position\n- grounded bullet", material_change: true }),
+      ],
+    });
+    const handler = new KnowledgeJobHandler({ client: client.asSupabase(), runner });
+
+    await handler.handleSummaryUpdate(makeJob({ kind: "summary_update", payload: { agent_profile_id: "agent-vp" } }));
+
+    const upsert = client.upserts.find((entry) => entry.table === "agent_documents");
+    expect(upsert?.values).toMatchObject({ doc_key: "atlas_summary", body_md: "## Position\n- grounded bullet" });
+  });
+
+  it("dossier_refresh skips without new evidence and never calls the LLM", async () => {
+    const client = new FakeClient();
+    client.overrides.watched_sources = [];
+    client.overrides.agent_documents = { id: "doc-a", version: 3, body_md: "- old claim line", evidence_ids: [] };
+    const runner = new RoutingRunner({ main: "should never be called" });
+    const handler = new KnowledgeJobHandler({ client: client.asSupabase(), runner });
+
+    await handler.handleDossierRefresh(makeJob({
+      kind: "dossier_refresh",
+      payload: { agent_profile_id: "agent-vp", doc_key: "positioning_narrative" },
+    }));
+
+    expect(runner.calls).toHaveLength(0);
+    expect(client.upserts).toHaveLength(0);
+    expect(client.updates.filter((update) => update.table === "agent_runs").at(-1)?.values).toMatchObject({
+      status: "completed",
+    });
+  });
+
+  it("dossier_refresh hard-fails when the spot-check finds a contradicted claim (RF-5A-2)", async () => {
+    const client = new FakeClient();
+    client.overrides.watched_sources = [{ id: "ws-1", kind: "url", target: "https://rival.example/pricing", label: "Rival pricing" }];
+    client.overrides.agent_documents = { id: "doc-a", version: 3, body_md: "- old claim line", evidence_ids: [] };
+    const runner = new RoutingRunner({
+      main: JSON.stringify({ title: "Doc", body_md: "- Rival cut enterprise prices by forty percent this week", material_change: true }),
+      verify: JSON.stringify({ status: "contradicted", reason: "the excerpt says prices increased" }),
+    });
+    const handler = new KnowledgeJobHandler({
+      client: client.asSupabase(),
+      runner,
+      feedRunner: {
+        async refresh() {
+          return {
+            health: "ok",
+            payload: {},
+            evidence: [{ title: "Rival pricing page", excerpt: "Rival increased enterprise prices.", sourceType: "website" }],
+            metrics: [],
+          };
+        },
+      } as never,
+    });
+
+    await expect(handler.handleDossierRefresh(makeJob({
+      kind: "dossier_refresh",
+      payload: { agent_profile_id: "agent-vp", doc_key: "positioning_narrative" },
+    }))).rejects.toThrow(/contradicted claim/);
+
+    expect(client.upserts).toHaveLength(0);
+  });
+
+  it("dossier_refresh material change cascades: insight posted + summary_update enqueued (RF-5A-3)", async () => {
+    const client = new FakeClient();
+    client.overrides.watched_sources = [{ id: "ws-1", kind: "url", target: "https://rival.example", label: "Rival" }];
+    client.overrides.agent_documents = { id: "doc-a", version: 3, body_md: "- old claim line", evidence_ids: [] };
+    const runner = new RoutingRunner({
+      main: JSON.stringify({ title: "Doc", body_md: "- Rival pivoted to usage-based pricing across all tiers", material_change: true }),
+      verify: JSON.stringify({ status: "confirmed", reason: "excerpt states the pivot" }),
+    });
+    const handler = new KnowledgeJobHandler({
+      client: client.asSupabase(),
+      runner,
+      feedRunner: {
+        async refresh() {
+          return {
+            health: "ok",
+            payload: {},
+            evidence: [{ title: "Rival pricing", excerpt: "Rival pivoted to usage-based pricing across all tiers.", sourceType: "website" }],
+            metrics: [],
+          };
+        },
+      } as never,
+    });
+
+    await handler.handleDossierRefresh(makeJob({
+      kind: "dossier_refresh",
+      payload: { agent_profile_id: "agent-vp", doc_key: "positioning_narrative" },
+    }));
+
+    expect(client.inserts.find((insert) => insert.table === "insights")?.values).toMatchObject({
+      account_id: "account-1",
+      severity: "notable",
+      tags: ["dossier", "material_change"],
+    });
+    expect(client.inserts.find((insert) => insert.table === "agent_jobs")?.values).toMatchObject({
+      kind: "summary_update",
+      status: "queued",
+    });
+    const upsert = client.upserts.find((entry) => entry.table === "agent_documents");
+    expect(upsert?.values.claim_sources).toMatchObject({
+      default: "researched",
+      spot_check: { checked: 1, confirmed: 1, unsupported: 0 },
+    });
+  });
 });
 
-class FixtureRunner implements AgentRunner {
-  constructor(private readonly resultText: string) {}
-
-  async run(_request: AgentRunRequest): Promise<AgentRunResult> {
-    void _request;
-    return {
-      resultText: this.resultText,
-      sessionId: "session-1",
-      costUsd: 0.01,
-      tokensIn: 10,
-      tokensOut: 20,
-    };
-  }
-}
-
-function makeJob(): AgentJob {
+function makeJob(over: Partial<AgentJob> = {}): AgentJob {
   return {
     id: "job-1",
     account_id: "account-1",
@@ -125,13 +317,23 @@ function makeJob(): AgentJob {
     run_after: new Date().toISOString(),
     last_error: null,
     created_at: new Date().toISOString(),
+    ...over,
   };
 }
+
+const DEFAULT_ROUTES = [
+  { account_id: null, route_key: "onboarding_extract", task_class: "onboarding_extract", provider: "anthropic", model_name: "claude-sonnet-5", params: {}, cost_per_1k_in: 0.002, cost_per_1k_out: 0.01 },
+  { account_id: null, route_key: "research_verify", task_class: "research_verify", provider: "anthropic", model_name: "claude-sonnet-5", params: {}, cost_per_1k_in: 0.002, cost_per_1k_out: 0.01 },
+  { account_id: null, route_key: "dossier_refresh", task_class: "dossier_refresh", provider: "anthropic", model_name: "claude-sonnet-5", params: {}, cost_per_1k_in: 0.002, cost_per_1k_out: 0.01 },
+  { account_id: null, route_key: "summary_update", task_class: "summary_update", provider: "anthropic", model_name: "claude-haiku-4-5-20251001", params: {}, cost_per_1k_in: 0.001, cost_per_1k_out: 0.005 },
+  { account_id: null, route_key: "summary_update_escalated", task_class: "summary_update_escalated", provider: "anthropic", model_name: "claude-sonnet-5", params: {}, cost_per_1k_in: 0.002, cost_per_1k_out: 0.01 },
+];
 
 class FakeClient {
   public inserts: Array<{ table: string; values: Record<string, unknown> }> = [];
   public upserts: Array<{ table: string; values: Record<string, unknown> }> = [];
   public updates: Array<{ table: string; values: Record<string, unknown>; filters: Array<[string, unknown]> }> = [];
+  public overrides: Record<string, unknown> = {};
 
   asSupabase(): never {
     return this as never;
@@ -175,6 +377,16 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null; count?: num
 
   eq(column: string, value: unknown): this {
     this.filters.push([column, value]);
+    return this;
+  }
+
+  is(column: string, value: unknown): this {
+    this.filters.push([`is:${column}`, value]);
+    return this;
+  }
+
+  neq(column: string, value: unknown): this {
+    this.filters.push([`neq:${column}`, value]);
     return this;
   }
 
@@ -227,6 +439,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null; count?: num
   }
 
   private resolveSelect(): unknown {
+    if (this.table in this.client.overrides) return this.client.overrides[this.table];
     if (this.table === "founder_documents") {
       return {
         id: "doc-1",
@@ -239,25 +452,16 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null; count?: num
         extracted_text: null,
       };
     }
-    if (this.table === "model_routes") {
-      return [{
-        account_id: null,
-        route_key: "onboarding_extract",
-        task_class: "onboarding_extract",
-        provider: "anthropic",
-        model_name: "claude-sonnet-5",
-        params: {},
-        cost_per_1k_in: 0.002,
-        cost_per_1k_out: 0.01,
-      }];
-    }
+    if (this.table === "model_routes") return DEFAULT_ROUTES;
     if (this.table === "business_context_versions") return { id: "context-1" };
     if (this.table === "agent_profiles") {
       return [
         { id: "agent-vp", agent_key: "agent_value_propositions", display_name: "Forge" },
       ];
     }
+    if (this.table === "evidence_items") return null;
     if (this.table === "agent_documents") return null;
+    if (this.table === "watched_sources") return [];
     return null;
   }
 }

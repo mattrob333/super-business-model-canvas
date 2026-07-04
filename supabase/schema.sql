@@ -2776,7 +2776,9 @@ values
   (null, 'dossier_refresh', 'Dossier Refresh (mid)', 'anthropic', 'claude-sonnet-5',
    '{"temperature":0.3,"max_tokens":5000}'::jsonb, false, 'dossier_refresh', 0.002, 0.01, 'human'),
   (null, 'summary_update', 'Atlas Summary Update (budget)', 'openrouter', 'anthropic/claude-haiku-4.5',
-   '{"temperature":0.2,"max_tokens":1800}'::jsonb, false, 'summary_update', 0.001, 0.005, 'human')
+   '{"temperature":0.2,"max_tokens":1800}'::jsonb, false, 'summary_update', 0.001, 0.005, 'human'),
+  (null, 'summary_update_escalated', 'Atlas Summary Update (escalated, mid)', 'anthropic', 'claude-sonnet-5',
+   '{"temperature":0.2,"max_tokens":1800}'::jsonb, false, 'summary_update_escalated', 0.002, 0.01, 'human')
 on conflict (route_key) where account_id is null do update set
   label = excluded.label,
   provider = excluded.provider,
