@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
-import { BusinessOverview } from "@/components/BusinessOverview";
+import { BusinessOverviewSheet } from "@/components/BusinessOverviewSheet";
 import { EnterpriseBusinessModelCanvas } from "@/components/canvas/EnterpriseBusinessModelCanvas";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
@@ -762,13 +762,35 @@ Website: ${comp.website || 'N/A'}
             {/* Company header */}
             <header className="space-y-3 pt-1">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
                     {analysisData.company?.name || "Unknown Company"}
                   </h1>
                   <p className="text-sm font-medium text-primary md:text-base">
                     {analysisData.company?.industry || "Unknown industry"}
                   </p>
+                  <BusinessOverviewSheet
+                    data={{
+                      name: analysisData.company?.name || "Unknown Company",
+                      industry: analysisData.company?.industry || "Unknown",
+                      description:
+                        analysisData.company?.description ||
+                        "No description available",
+                      productsServices: Array.isArray(
+                        analysisData.company?.productsServices,
+                      )
+                        ? analysisData.company.productsServices
+                        : [],
+                      keyExecutives: Array.isArray(
+                        analysisData.company?.keyExecutives,
+                      )
+                        ? analysisData.company.keyExecutives
+                        : [],
+                      website: analysisData.company?.website || "",
+                      notes: analysisData.company?.notes,
+                    }}
+                    onUpdate={handleBusinessOverviewUpdate}
+                  />
                 </div>
                 {searchCollapsed && (
                   <Button
@@ -785,29 +807,6 @@ Website: ${comp.website || 'N/A'}
                   </Button>
                 )}
               </div>
-              <BusinessOverview
-                hideHeader
-                data={{
-                  name: analysisData.company?.name || "Unknown Company",
-                  industry: analysisData.company?.industry || "Unknown",
-                  description:
-                    analysisData.company?.description ||
-                    "No description available",
-                  productsServices: Array.isArray(
-                    analysisData.company?.productsServices,
-                  )
-                    ? analysisData.company.productsServices
-                    : [],
-                  keyExecutives: Array.isArray(
-                    analysisData.company?.keyExecutives,
-                  )
-                    ? analysisData.company.keyExecutives
-                    : [],
-                  website: analysisData.company?.website || "",
-                  notes: analysisData.company?.notes,
-                }}
-                onUpdate={handleBusinessOverviewUpdate}
-              />
             </header>
 
             <section className="relative w-full">
