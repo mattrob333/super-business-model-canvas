@@ -16,8 +16,9 @@
    integration branch Matt designates. Small, reviewable commits with conventional messages
    (`feat(worker): …`, `fix(migrations): …`). Never push to `main`.
 3. **Quality gates — every commit:** `npx tsc -p tsconfig.app.json --noEmit` clean ·
-   `npm run build` green · `npm run lint` error count **≤ 69** (the frozen baseline; do not
-   "fix" pre-existing lint errors unless a work order says so — it bloats diffs).
+   `npm run build` green · `npm run lint` problem count **≤ 65** (the ratcheting ceiling —
+   lowered from 69 → 68 → 65 by dead-code deletion; it only goes down. Do not "fix"
+   pre-existing lint errors inside feature diffs — it bloats them).
    Worker code (Phase 2+): its own `tsc` + tests green.
 4. **Update `BUILD_STATE.md` as you work** — check off tasks, log decisions in the phase log,
    move the phase to `AWAITING REVIEW` when acceptance criteria pass. This file is the
@@ -42,6 +43,13 @@
 10. **Guardrails are law** (from spec 04 §7): every run durable in `agent_runs` · evidence-or-
     low-confidence on canvas writes · outward actions only through `approvals` · depth-1
     delegation · section agents never write outside their section · budgets enforced.
+11. **UI is built to house rules.** `docs/DESIGN_TASTE.md` and spec 09 are binding for every
+    screen: all drawers on `FocusDrawer` (named sizes only; a drawer never opens another
+    drawer), honest empty/loading/error states, both themes, zero overflow at 390px.
+12. **The demo path never regresses.** The 10-minute wow — paste URL → cited canvas →
+    competitor gaps → a brief worth forwarding — is the product for advisors. Every phase
+    review re-runs it end-to-end on staging; a phase that makes it slower, uglier, or more
+    confusing does not pass, whatever else it shipped. (North Star: `docs/NORTH_STAR.md`.)
 
 ### Key existing code you must not break
 
@@ -52,6 +60,9 @@
 | Auth | `src/hooks/useAuth.tsx`, `RequireAuth` in `App.tsx`, JWT+membership pattern in `agent-run` |
 | Loop tick | `supabase/functions/scheduled-loop-tick` + `migrations/20260702090000_schedule_loop_tick.sql` |
 | Provider key encryption | `supabase/functions/manage-provider-key` (AES-GCM; `CREDENTIALS_ENCRYPTION_KEY`) |
+| Overlay system | `src/components/overlay/FocusDrawer.tsx` (spec 09 — every drawer builds on it) |
+| Grok provider fallback | `supabase/functions/_shared/grok-client.ts` (xAI direct or OpenRouter; guard with `hasGrokProvider()`) |
+| CI/CD | `.github/workflows/deploy.yml` (auto) + `ops.yml` (manual secrets/functions/golden-set) |
 
 ---
 
@@ -255,12 +266,18 @@ accounts (must be forbidden); confirm competitor canvases can't pollute primary 
 
 ---
 
-### PHASE 5 — Section agent workspaces (L) — *spec 02, the full room*
+### PHASE 5 — Knowledge stack, grounding & section workspaces (L)
 
-**Objective:** the nine full-screen rooms, exactly per spec 02.
-**Required pre-reading:** spec 08 (knowledge stack) — Phase 5 also delivers `agent_documents`
-+ revisions, `watched_sources`, `owner_questions`, the dossier viewer, `dossier_refresh`/
-`summary_update` jobs, the groundedness score, and the grounding wizard (spec 08 §§1, 3, 4, 9).
+**Ships in two ordered stages.** Stage **5A** is the accuracy moat and blocks Phase 6;
+stage **5B** is the room chrome and may trail 6.
+- **5A — Knowledge stack & grounding (spec 08 §§1, 3, 4, 9):** `agent_documents` + revisions,
+  `watched_sources`, `owner_questions`, the dossier viewer (on `FocusDrawer`, `reading` size),
+  `dossier_refresh`/`summary_update` jobs, the groundedness score, the grounding wizard, and
+  **document ingestion** (work order 5.10). This is what makes agents accurate about *this*
+  company instead of eloquent about a generic one — the advisor test lives or dies here.
+- **5B — The nine full-screen rooms, exactly per spec 02** (work orders 5.1–5.9).
+
+**Required pre-reading:** spec 08 for 5A; spec 02 + spec 09 + DESIGN_TASTE for 5B.
 
 **Work orders**
 - 5.1 Route `/workspace/:sectionKey` outside AppShell content column; `WorkspaceTopBar` with
@@ -285,8 +302,19 @@ accounts (must be forbidden); confirm competitor canvases can't pollute primary 
 - 5.8 Responsive behavior per spec 02 breakpoints; degraded-runtime banner.
 - 5.9 Tests: component tests for proposal approve/decline and schedule popover; a Playwright
   smoke (open room, send message, run action) against mock runtime.
+- 5.10 **(5A) Document ingestion:** upload a pitch deck / one-pager / strategy doc (PDF,
+  Storage bucket + policies) → `onboarding_extract` job parses claims per section → items
+  land as **owner-provided evidence** (source = the document, confidence earned via the
+  grounding wizard, never silently merged). This is the primary onboarding path for
+  early-stage companies whose public web footprint is too thin for the research pipeline —
+  the exact companies VCs and mentors bring. Deck-first, site-second for them.
 
 **Acceptance criteria**
+- [ ] (5A) Dossiers viewable with citations; groundedness score visible; owner questions
+  surface researched-or-elicited items only (never invented); grounding wizard replaces a
+  generic item with a confirmed real name end-to-end
+- [ ] (5A) A pitch-deck upload on a fixture company produces owner-sourced canvas items
+  distinguishable from web-researched ones
 - [ ] All nine rooms reachable from canvas + switcher, each with correct agent identity
 - [ ] Chat round-trip works through worker (staging) and mock (dev)
 - [ ] Instructions edit creates a revision; restore works
@@ -332,12 +360,18 @@ actions; visual pass against spec 02 layout.
 - 6.9 Tests: DAG executor (parallel groups, dependency skip on failure, partial synthesis);
   delegation depth-1 rejection; approvals gate (unapproved payload never executes); map mode
   switching on fixtures.
+- 6.10 **Shareable brief.** Every generated brief/board-pack gets: (a) polished PDF export
+  (already 6.5) and (b) a tokenized **read-only share link** (no login required, revocable,
+  account-scoped RLS via a share-token table — never expose service-role paths). The brief
+  an advisor forwards to a founder or partner IS the growth loop; it must look like the
+  best document that founder receives that week (DESIGN_TASTE applies to exports too).
 
 **Acceptance criteria**
 - [ ] Full loop demo on staging: seeded critical insight → Atlas triage → cascade fires →
   delegations visible in both rooms → brief card + agenda item + approval produced
 - [ ] Map renders all four modes from snapshots; collapsing persists
-- [ ] Board Pack cascade → PDF export works
+- [ ] Board Pack cascade → PDF export works; share link renders the brief read-only without
+  auth and dies when revoked (cross-account access must be impossible)
 - [ ] Depth-1 + approvals-gate tests green; all gates green
 
 **Reviewer checklist:** run the full-loop demo personally; attempt an unapproved outreach
@@ -386,11 +420,17 @@ loops' budget settings.
 
 ---
 
-### PHASE 8 — Hardening & commercial (M, deliberately last)
+### PHASE 8 — The advisor & portfolio experience (L) — *the wedge buyer's phase*
 
-Per ROADMAP Phase 7–8: digest emails, multi-company AccountSwitcher, billing, roles, onboarding
-flow, editor (Plate), paid feed upgrades. **Not specced for the AI team yet — stop at Phase 7
-and await direction.**
+The North Star buyer is an advisor running many companies, and this phase is where the
+product becomes *theirs*: multi-company workspaces with a real AccountSwitcher, a portfolio
+dashboard (one row per company: health, threat, top gap, last brief), weekly digest emails,
+and the onboarding flow tuned so URL-or-deck → cited canvas → first gap report lands inside
+10 minutes. Billing (Stripe), roles/RLS enforcement beyond owner, SOC2-track basics, editor
+(Plate), and paid feed upgrades follow as **Phase 9**. **Neither is specced for the AI team
+yet — stop at Phase 7 and await direction.** (If design-partner feedback demands it, the
+owner may pull Phase 8 forward ahead of Phase 7 — treat the order of 7 and 8 as an open
+product decision, not doctrine.)
 
 ---
 
@@ -400,7 +440,9 @@ When a phase hits `AWAITING REVIEW`:
 1. Reviewer re-runs all quality gates + the phase's test suite from a clean checkout.
 2. Reviewer walks the acceptance criteria one by one against *code and running behavior*, not
    BUILD_STATE claims.
-3. Reviewer runs the phase's **Reviewer checklist** (adversarial by design).
+3. Reviewer runs the phase's **Reviewer checklist** (adversarial by design), plus two
+   standing checks every phase: the **10-minute demo path** end-to-end on staging (Part I
+   rule 12), and a UTF-8/mojibake grep over touched docs.
 4. Findings land in `BUILD_STATE.md → REVIEW FINDINGS` as `RF-<phase>-<n>` items with severity
    (BLOCKER / HIGH / MEDIUM / LOW). BLOCKER/HIGH must be fixed and re-reviewed before the phase
    closes; MEDIUM within the next phase; LOW logged.
@@ -409,10 +451,12 @@ When a phase hits `AWAITING REVIEW`:
 ## PART IV — Dependency map
 
 ```
-P0 ──▶ P1 ──▶ P2 ──▶ P3 ──▶ P4 ──▶ P6 ──▶ P7 ──▶ P8
-                │            ▲
-                └──▶ P5 ─────┘   (P5 needs P2 threads/jobs; P6 needs P4 gaps/metrics + P5 components)
+P0 ──▶ P1 ──▶ P2 ──▶ P3 ──▶ P4 ──▶ P5A ──▶ P6 ──▶ P7 ──▶ P8 ──▶ P9
+                                    │              ▲
+                                    └──▶ P5B ──────┘
 ```
 
-P3 and P5 can run concurrently by separate agent teams **only if** both teams treat Phase-1
-migrations as frozen; any schema change mid-phase goes through a BLOCKER entry.
+P5A (knowledge stack) blocks P6 (Atlas reads the summaries P5A produces). P5B (rooms) may
+run concurrently with P6 by separate agent teams **only if** both treat P5A's schema as
+frozen; any schema change mid-phase goes through a BLOCKER entry. The owner may reorder
+P7/P8 on design-partner signal.

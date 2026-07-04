@@ -1,6 +1,6 @@
 # Super BMC — Incoming Agent Handoff
 
-**Last updated:** July 3, 2026 · **Repo:** github.com/mattrob333/super-business-model-canvas
+**Last updated:** July 4, 2026 · **Repo:** github.com/mattrob333/super-business-model-canvas
 **You are:** the build agent taking over execution from BUILD_PLAN Phase 4 onward.
 **Owner:** Matt (mroberson333@gmail.com) — a reviewer agent audits each phase behind you
 (see Review protocol below).
@@ -14,40 +14,51 @@ execution, not re-planning.
 
 | Done | What |
 |---|---|
-| ✅ | Product vision, architecture decision, 8 specs, phased build plan (all in `docs/`) |
+| ✅ | Product vision + North Star, architecture decision, 10 specs, phased build plan (all in `docs/`) |
 | ✅ | July-2 bug-fix sweep, SaaS landing page, app light-mode grid treatment — merged |
+| ✅ | **Production hosting live** — superbmc.com on Fly.io (`super-bmc-web` + `super-bmc-worker`); push to `main` auto-deploys both via GitHub Actions (`deploy.yml`); secrets sync + edge-function deploys via the manual Ops workflow. Full runbook: `DEPLOY.md` |
+| ✅ | **FocusDrawer overlay system** (spec 09, binding) + `docs/DESIGN_TASTE.md` house rules — all new UI builds on these |
 | ✅ | **Phase 0** (baseline verification) — APPROVED |
 | ✅ | **Phase 1** (data model wave 1) — APPROVED: 12 new tables + RLS + seeds (10 agent callsigns, 7 cascades, task-class model routes), schema mirror, verify-schema assertions |
 | ✅ | **Phase 2** (agent worker service) — APPROVED: `worker/` Node service on the Claude Agent SDK; durable `agent_jobs` queue (SKIP LOCKED claim + backoff + reaper); account-scoped in-process MCP tools; enqueue mode in `agent-run`; guardrail hooks |
 | ✅ | **Phase 3** (research engine & evidence) — APPROVED with reviewer fixes (PR #13): feed registry + TTL cache (6 wave-1 fetchers), `company_research` pipeline (budget extract → escalation ladder → adversarial verifier, never downgraded), evidence-cited canvas writes, evidence popovers on the canvas, weekly staleness sweep, verifier golden set (fixture + live modes) |
-| ⬜ | **Phase 4 — competitor canvases & gap engine. This is your first assignment.** |
-| ⬜ | Phases 5–7 per `docs/BUILD_PLAN.md`; Phase 8 held for owner direction |
+| 🔶 | **Phase 4 — competitor canvases & gap engine: built, AWAITING REVIEW** on `build/phase-4-competitors` |
+| ⬜ | Phases 5–7 per `docs/BUILD_PLAN.md`; Phase 8 (advisor/portfolio experience) held for owner direction |
 
-**Deploys are operator tasks (Matt's)** — see the OPERATOR QUEUE in `docs/BUILD_STATE.md`
-for what's outstanding (edge functions, worker service, API keys, one live migration).
-Never fake or assume a deploy happened. Live-DB migrations may be applied via the Supabase
-MCP (project `mehhuxzamnpxnkbrslls`) as prior phases did — log it in BUILD_STATE when you do.
+**Deploys are automated now:** merging to `main` auto-deploys web + worker (GitHub Actions
+`deploy.yml`); edge functions and secret sync run via the manual Ops workflow (owner-triggered).
+See `DEPLOY.md`. What remains operator-only: GitHub/Fly/Supabase secrets, DNS, dashboard
+settings — queue those in BUILD_STATE's OPERATOR QUEUE and never fake their completion.
+Live-DB migrations may be applied via the Supabase MCP (project `mehhuxzamnpxnkbrslls`) as
+prior phases did — log it in BUILD_STATE when you do.
 
 ## 2. Read these, in this order, before writing code
 
-1. `docs/BUILD_PLAN.md` — **Part I ground rules are binding.** Then your phase's work orders.
-2. `docs/BUILD_STATE.md` — live status board; you must keep it truthful as you work.
-3. `docs/specs/00_OVERVIEW.md` → specs 01–07 (skim all; deep-read the ones your phase cites).
-   Phase 4 cites spec 05 §7 (gap engine) — and reuses the Phase 3 research pipeline wholesale.
-4. Working with the Claude Agent SDK (any phase touching `worker/`):
+1. `docs/NORTH_STAR.md` — the vision bar every ambiguous decision resolves against.
+2. `docs/BUILD_PLAN.md` — **Part I ground rules are binding.** Then your phase's work orders.
+3. `docs/BUILD_STATE.md` — live status board; you must keep it truthful as you work.
+4. `docs/specs/00_OVERVIEW.md` → specs 01–09 (skim all; deep-read the ones your phase cites).
+   Phase 5 requires spec 08 (knowledge stack + grounding); Phase 6 requires spec 08 §§5–7.
+5. **Any phase with UI work:** `docs/DESIGN_TASTE.md` (house rules) and
+   `docs/specs/09_OVERLAY_SYSTEM.md` (FocusDrawer) are binding. No hand-rolled overlays,
+   no per-callsite drawer widths, a drawer never opens another drawer.
+6. Working with the Claude Agent SDK (any phase touching `worker/`):
    `docs/specs/07_CLAUDE_AGENT_SDK_INTEGRATION.md` is **required pre-reading**. Do not guess
    SDK APIs.
-5. Context (skim): `docs/VISION.md`, `docs/AGENT_RUNTIME_DECISION.md`, `docs/ROADMAP.md`,
-   `docs/DEVLOG.md` (bottom-up history including every bug already fixed — don't re-fix).
+7. Context (skim): `docs/VISION.md`, `docs/AGENT_RUNTIME_DECISION.md`, `docs/ROADMAP.md`
+   (historical — BUILD_PLAN supersedes it), `docs/DEVLOG.md` (bottom-up history including
+   every bug already fixed — don't re-fix), `DEPLOY.md` (how production works).
 
 ## 3. Non-negotiable working rules (compressed from BUILD_PLAN Part I)
 
 - **One phase at a time.** Branch `build/phase-<n>-<slug>` from `main`. Small conventional
   commits. PR to `main` only after the phase review is APPROVED.
 - **Gates on every commit:** `npx tsc -p tsconfig.app.json --noEmit` clean ·
-  `npm run build` green · `npm run lint` **problem count ≤ 68** (frozen baseline — do not
-  "fix" pre-existing lint, do not add to it). Worker code: `cd worker && npm run typecheck
-  && npm test && npm run build && npm run lint` all clean.
+  `npm run build` green · `npm run lint` **problem count ≤ 65** (the ratcheting ceiling — it
+  only goes down; do not "fix" pre-existing lint in feature diffs, do not add to it. When
+  dead-code deletion lowers the count, the new count becomes the ceiling — update this file
+  and BUILD_PLAN when it moves). Worker code: `cd worker && npm run typecheck && npm test
+  && npm run build && npm run lint` all clean.
 - **No fake completeness.** Partial work is reported as partial in BUILD_STATE. A test that
   reimplements the logic it claims to test counts as fake completeness (this exact pattern
   was caught in the Phase 3 review — RF-3-8). The reviewer diffs claims against code and
@@ -104,8 +115,11 @@ scrutiny.
   `canvas_section_versions` + hydrated `evidence_items`; the canvas prefers versioned items
   and falls back to legacy analysis strings. Competitor canvases (your phase) should follow
   the same pattern.
-- **Lint baseline is exactly 68 problems (49 errors / 19 warnings)** — pre-existing
+- **Lint ceiling is exactly 65 problems (47 errors / 18 warnings)** — pre-existing
   `no-explicit-any` noise, deliberately frozen. Never increase; decreases lower the ceiling.
+- **UTF-8 discipline:** mojibake (`â€"` etc.) has regressed twice (RF-3-3, and
+  `docs/BUILD_STATE.md` on main as of July 4). Write docs with a tool that preserves UTF-8;
+  reviewer greps for it.
 - **Env:** frontend `.env` holds only `VITE_*` values (`VITE_SUPABASE_URL`,
   `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_AGENT_RUNTIME_ENDPOINT`, `VITE_RUNTIME_MODE`).
   Server keys live in Supabase Edge Function secrets; worker keys in `worker/.env` /
@@ -118,13 +132,19 @@ scrutiny.
 
 ```
 docs/
+  NORTH_STAR.md          ← the vision bar (advisor test · evidence test · taste test)
   BUILD_PLAN.md          ← your work orders (Part I rules + Phases 0–8)
   BUILD_STATE.md         ← live tracker you maintain (status, blockers, operator queue, RFs)
+  DESIGN_TASTE.md        ← binding UI house rules
   VISION / AGENT_RUNTIME_DECISION / ROADMAP / DEVLOG
-  specs/00–07            ← product + technical specs (07 = Agent SDK how-to)
+  specs/00–09            ← product + technical specs (07 = Agent SDK how-to,
+                            08 = knowledge/strategy engine, 09 = overlay system)
+.github/workflows/       ← deploy.yml (auto on main: web+worker) · ops.yml (manual:
+                            secrets sync, edge functions, live golden set)
 src/                     ← React 18 + Vite + shadcn SPA (gates target this)
   hooks/useCanvasEvidence.ts   ← canvas versions + evidence hydration
   components/canvas/           ← BMC grid, section cards, evidence popovers
+  components/overlay/FocusDrawer.tsx ← THE drawer (spec 09) — build all drawers on it
 supabase/
   schema.sql             ← full mirror, provably identical to migrations
   migrations/            ← Phase 1 wave + queue locking + feeds/cache + routes + staleness
@@ -139,16 +159,20 @@ worker/                  ← Node + Claude Agent SDK service (queue loop, jobs, 
 .hermes/                 ← retired historical build-loop records (never resume)
 ```
 
-## 7. Your first assignment: Phase 4 — Competitor canvases & gap engine
+## 7. Current assignment status
 
-Work orders 4.1–4.7 in `docs/BUILD_PLAN.md` (spec 05 §7). Summary: competitor entities per
-account with linked canvas versions; `competitor_research` job kind that runs the **existing
-Phase-3 pipeline** against competitors (same verifier discipline, competitor-flagged canvas
-versions); the gap engine comparing own canvas vs competitor canvases into scored `gaps`;
-Threat Index metric; competitor drill-down/compare UI (click a competitor → their BMC
-breakdown). Reuse, don't re-implement: `FeedRunner`, `verifyClaimAgainstExcerpt`, the
-escalation ladder, and `useCanvasEvidence` are all built and reviewed. Practical advice from
-Phases 2–3: split work orders across sessions (schema → job → engine → UI) and hand off
+**Phase 4** (competitor canvases & gap engine, work orders 4.1–4.7) is built on
+`build/phase-4-competitors` and **AWAITING REVIEW** — do not start Phase 5 until the review
+closes and the phase is APPROVED. When review findings (`RF-4-n`) arrive in BUILD_STATE,
+BLOCKER/HIGH items are your immediate queue.
+
+**Next after approval: Phase 5**, in two stages per BUILD_PLAN — **5A (knowledge stack &
+grounding: spec 08)** ships before **5B (the nine workspace rooms: spec 02)**. 5A is the
+accuracy moat (dossiers, watched sources, owner questions, grounding wizard, document
+ingestion); 5B is the room chrome. Phase 6 may begin once 5A is approved even if 5B is in
+flight. Reuse, don't re-implement: `FeedRunner`, `verifyClaimAgainstExcerpt`, the escalation
+ladder, `useCanvasEvidence`, and `FocusDrawer` are all built and reviewed. Practical advice
+from Phases 2–4: split work orders across sessions (schema → job → engine → UI) and hand off
 through BUILD_STATE between them.
 
 ## 8. Housekeeping notes for the owner (Matt) — not agent tasks
