@@ -13,7 +13,7 @@ export function CanvasGridFrame({ children, className }: CanvasGridFrameProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-muted/25 p-3 sm:p-4",
+        "rounded-xl border-2 border-border bg-card shadow-sm p-3 sm:p-4",
         className,
       )}
     >
