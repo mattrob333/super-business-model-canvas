@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
-import { BusinessOverviewSheet } from "@/components/BusinessOverviewSheet";
+import { BusinessOverview } from "@/components/BusinessOverview";
 import { EnterpriseBusinessModelCanvas } from "@/components/canvas/EnterpriseBusinessModelCanvas";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
@@ -177,9 +177,9 @@ const Analysis = () => {
           description: "Business model canvas generated successfully",
         });
         
-        // Scroll to results after a brief delay
+        // Land at the top: company header + full canvas are the payoff
         setTimeout(() => {
-          resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }, 300);
       }
     } catch (error: any) {
@@ -760,16 +760,33 @@ Website: ${comp.website || 'N/A'}
             )}
 
             {/* Company header */}
-            <header className="space-y-1.5 pt-1">
+            <header className="space-y-3 pt-1">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1.5">
-                  <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+                <div className="space-y-0.5">
+                  <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
                     {analysisData.company?.name || "Unknown Company"}
                   </h1>
-                  <p className="text-base font-medium text-primary md:text-lg">
+                  <p className="text-sm font-medium text-primary md:text-base">
                     {analysisData.company?.industry || "Unknown industry"}
                   </p>
-                  <BusinessOverviewSheet
+                </div>
+                {searchCollapsed && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSearchCollapsed(false);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="shrink-0 gap-1.5"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    New analysis
+                  </Button>
+                )}
+              </div>
+              <BusinessOverview
+                hideHeader
                 data={{
                   name: analysisData.company?.name || "Unknown Company",
                   industry: analysisData.company?.industry || "Unknown",
@@ -791,22 +808,6 @@ Website: ${comp.website || 'N/A'}
                 }}
                 onUpdate={handleBusinessOverviewUpdate}
               />
-                </div>
-                {searchCollapsed && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSearchCollapsed(false);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="shrink-0 gap-1.5"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    New analysis
-                  </Button>
-                )}
-              </div>
             </header>
 
             <section className="relative w-full">
