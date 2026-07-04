@@ -1,8 +1,10 @@
 # Super BMC — Build Roadmap
 
-> Written: July 2, 2026. Phased plan from current state to the product described in `docs/VISION.md`,
-> on the architecture chosen in `docs/AGENT_RUNTIME_DECISION.md`.
-> Current-state inventory and this session's fixes: `docs/DEVLOG.md`.
+> Written: July 2, 2026. **Historical context — superseded by `BUILD_PLAN.md`**, which
+> carries the live phase definitions, and `NORTH_STAR.md`, which carries the bar. Kept
+> because the narrative here explains *why* the phases exist. Phase-1 items below (deploy,
+> secrets, cron, hosting off Lovable) all shipped by July 3 — see BUILD_STATE.
+> Architecture: `docs/AGENT_RUNTIME_DECISION.md`. History: `docs/DEVLOG.md`.
 
 Each phase ships something usable on its own. Order matters — later phases assume earlier ones.
 
