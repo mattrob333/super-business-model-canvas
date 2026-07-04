@@ -13,7 +13,7 @@
 | 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
 | 3 | Research engine & evidence | **APPROVED** | `build/phase-3-research` (merged with reviewer fixes, PR #13) | 2026-07-03 |
 | 4 | Competitor canvases & gap engine | **APPROVED** (merged with reviewer fixes — RF-4-1..14 all resolved, see REVIEW FINDINGS) | `build/phase-4-competitors` + reviewer-fix merge | 2026-07-04 |
-| 5 | Section agent workspaces | NOT STARTED | — | — |
+| 5 | Knowledge stack, grounding & section workspaces | IN PROGRESS (5A schema slice) | `build/phase-5-knowledge` | 2026-07-04 |
 | 6 | War Room & orchestration | NOT STARTED | — | — |
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | — | — |
 | 8 | Hardening & commercial | HELD (await direction) | — | — |
@@ -1098,8 +1098,53 @@ cd worker && npm run build            -> exit 0
 cd worker && npm run lint             -> exit 0
 ```
 
-### Phase 5 — Section agent workspaces
-Tasks: 5.1 ☐ · 5.2 ☐ · 5.3 ☐ · 5.4 ☐ · 5.5 ☐ · 5.6 ☐ · 5.7 ☐ · 5.8 ☐ · 5.9 ☐
+### Phase 5 - Knowledge stack, grounding & section workspaces
+5A tasks: schema [x] - jobs [ ] - ingestion [ ] - UI/wizard [ ] - live walkthrough [ ]
+5B tasks: 5.1 [ ] - 5.2 [ ] - 5.3 [ ] - 5.4 [ ] - 5.5 [ ] - 5.6 [ ] - 5.7 [ ] - 5.8 [ ] - 5.9 [ ]
+5A additions from BUILD_PLAN: 5.10 [schema only] - 5.11 [schema only]
+
+**2026-07-04 - Phase 5A schema slice started on `build/phase-5-knowledge`.**
+
+- Orientation complete: read HANDOFF.md including binding section 8 review lessons,
+  BUILD_STATE review findings/resolution log, NORTH_STAR.md, BUILD_PLAN Part I and
+  Phase 5, spec 08 sections 1/3/4/9, spec 09 FocusDrawer, DESIGN_TASTE.md, and spec 07
+  before touching schema or worker code.
+- Added migration `20260704150000_phase_5a_knowledge_stack.sql` for 5A data foundations:
+  `watched_sources`, `founder_documents`, `agent_documents`, `agent_document_revisions`,
+  `owner_questions`, groundedness columns on `canvas_section_versions`, company logo fields
+  on `companies`, and the private `founder-documents` storage bucket with account-folder
+  storage policies.
+- RLS: every new public table has account-scoped policies. `agent_document_revisions`
+  inherits access through `agent_documents`. Storage objects are scoped by the first folder
+  segment matching an account id in `account_members`.
+- Invariants: owner questions are researched-or-elicited only by design, and max 3 open
+  questions per agent is enforced by trigger `enforce_owner_question_open_limit`.
+  Groundedness lives on canvas section versions as `groundedness_score` plus auditable
+  `groundedness_inputs`.
+- Mirrored the schema into `supabase/schema.sql`, updated generated Supabase types by hand,
+  and extended `scripts/verify-schema.sql` with Phase 5A assertions.
+- Tooling note: the Supabase CLI is not installed in this environment, so the migration file
+  was created manually using the repo's existing timestamp convention instead of
+  `supabase migration new`. No live migration has been applied yet in this slice.
+- Live DB note: two Supabase MCP `apply_migration` attempts failed before any migration
+  record or table was created because the SQL was manually pasted incorrectly into the MCP
+  call (`when_duplicate_object`). Verification after the failures returned
+  `migration_recorded = false`, `watched_sources_exists = false`, and
+  `watch_added_by_exists = false`. The checked-in migration file and schema mirror use the
+  correct `exception when duplicate_object` syntax. Live migration remains unapplied.
+- Honest scope: no `dossier_refresh`, `summary_update`, or document extraction worker code
+  is complete yet; no dossier UI or grounding wizard is complete yet.
+
+**Gate results for schema slice commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 65 problems (47 errors, 18 warnings), within frozen <=65 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 41 passed, 2 skipped (SQL integration + live golden env-gated)
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
 
 ### Phase 6 — War Room & orchestration
 Tasks: 6.1 ☐ · 6.2 ☐ · 6.3 ☐ · 6.4 ☐ · 6.5 ☐ · 6.6 ☐ · 6.7 ☐ · 6.8 ☐ · 6.9 ☐

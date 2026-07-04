@@ -388,6 +388,106 @@ with checks as (
              and indexdef like '%competitor_id%'
          ) then 'PASS' else 'FAIL' end
 
+  union all
+
+  -- ---- 12. Phase 5A knowledge stack ----
+  select 'table exists: watched_sources',
+         case when to_regclass('public.watched_sources') is not null then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'table exists: founder_documents',
+         case when to_regclass('public.founder_documents') is not null then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'table exists: agent_documents',
+         case when to_regclass('public.agent_documents') is not null then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'table exists: agent_document_revisions',
+         case when to_regclass('public.agent_document_revisions') is not null then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'table exists: owner_questions',
+         case when to_regclass('public.owner_questions') is not null then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'rls enabled: Phase 5A account-scoped tables',
+         case when (
+           select count(*) from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public'
+             and c.relname in ('watched_sources', 'founder_documents', 'agent_documents', 'agent_document_revisions', 'owner_questions')
+             and c.relrowsecurity
+         ) = 5 then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'trigger exists: enforce_owner_question_open_limit',
+         case when exists (
+           select 1 from pg_trigger
+           where tgname = 'enforce_owner_question_open_limit'
+             and tgrelid = 'public.owner_questions'::regclass
+             and not tgisinternal
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'column exists: canvas_section_versions.groundedness_score',
+         case when exists (
+           select 1 from information_schema.columns
+           where table_schema = 'public' and table_name = 'canvas_section_versions' and column_name = 'groundedness_score'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'column exists: canvas_section_versions.groundedness_inputs',
+         case when exists (
+           select 1 from information_schema.columns
+           where table_schema = 'public' and table_name = 'canvas_section_versions' and column_name = 'groundedness_inputs'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'column exists: companies.logo_url',
+         case when exists (
+           select 1 from information_schema.columns
+           where table_schema = 'public' and table_name = 'companies' and column_name = 'logo_url'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'enum type exists: owner_question_status',
+         case when exists (select 1 from pg_type where typname = 'owner_question_status' and typtype = 'e')
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'storage bucket exists: founder-documents',
+         case when exists (
+           select 1 from storage.buckets
+           where id = 'founder-documents' and public = false
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'storage policies exist: founder documents',
+         case when (
+           select count(*) from pg_policies
+           where schemaname = 'storage'
+             and tablename = 'objects'
+             and policyname in (
+               'founder_documents_storage_select',
+               'founder_documents_storage_insert',
+               'founder_documents_storage_update',
+               'founder_documents_storage_delete'
+             )
+         ) = 4 then 'PASS' else 'FAIL' end
+
 )
 select check_name, status from checks order by
   case status when 'FAIL' then 0 else 1 end,  -- surface failures first
