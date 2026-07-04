@@ -81,6 +81,12 @@ Status: OPEN | RESOLVED (<how>)
   --dockerfile worker/Dockerfile`. After the worker is healthy, deploy the edge functions above
   and only then switch frontend/staging `VITE_RUNTIME_MODE=enqueue`.
 
+- **DNS CUTOVER COMPLETE (2026-07-03, owner):** superbmc.com moved off Lovable to Fly.
+  Namecheap Advanced DNS: A/AAAA on `@` and `www` pointing to `super-bmc-web`'s Fly
+  IPs. Both Fly certificates (`superbmc.com`, `www.superbmc.com`) show Issued. The
+  hosting migration (PR #14) is now fully complete end to end: apps, secrets, worker,
+  edge functions, live golden-set pass, and the domain itself. Remaining owner task:
+  disconnect the domain from the old Lovable project (cosmetic, not blocking).
 - **LIVE GOLDEN SET PASSED (2026-07-03 22:05 UTC, Ops run 28685290194):** the verifier
   golden set ran against the real research_verify model and classified >= 9/10 claims
   (vitest green at commit `b157207`, 26s). First attempt failed with
