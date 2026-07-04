@@ -19,6 +19,7 @@ const Playbooks = lazy(() => import("./pages/Playbooks"));
 const FrameworkDetail = lazy(() => import("./pages/FrameworkDetail"));
 const ReportViewer = lazy(() => import("./pages/ReportViewer"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const CompetitorCanvas = lazy(() => import("./pages/CompetitorCanvas"));
 const Gaps = lazy(() => import("./pages/Gaps"));
 const Knowledge = lazy(() => import("./pages/Knowledge"));
 const Agents = lazy(() => import("./pages/Agents"));
@@ -65,6 +66,7 @@ const App = () => (
           <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route path="/dashboard" element={withSuspense(Dashboard)} />
+            <Route path="/competitors/:competitorId/canvas" element={withSuspense(CompetitorCanvas)} />
             <Route path="/canvas" element={withSuspense(Canvas)} />
             <Route path="/gaps" element={withSuspense(Gaps)} />
             <Route path="/knowledge" element={withSuspense(Knowledge)} />

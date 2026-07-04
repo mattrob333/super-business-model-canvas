@@ -1,7 +1,9 @@
 import { ExternalLink, MessageCircle, Building2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 interface Competitor {
+  id?: string;
   name: string;
   description: string;
   website: string;
@@ -85,6 +87,13 @@ export const CompetitiveLandscape = ({
               Visit website
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
+            {competitor.id && (
+              <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+                <Link to={`/competitors/${competitor.id}/canvas`}>
+                  Open canvas
+                </Link>
+              </Button>
+            )}
           </article>
         ))}
       </div>

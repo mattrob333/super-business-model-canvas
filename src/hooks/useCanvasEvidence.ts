@@ -45,6 +45,7 @@ export function useCanvasEvidence(): {
           .from("canvas_section_versions")
           .select("section_key, items, freshness_status, created_at")
           .eq("account_id", accountId)
+          .is("competitor_id", null)
           .order("created_at", { ascending: false })
           .limit(200);
         if (error || !versions) return;

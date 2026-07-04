@@ -12,7 +12,7 @@
 | 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
 | 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
 | 3 | Research engine & evidence | **APPROVED** | `build/phase-3-research` (merged with reviewer fixes, PR #13) | 2026-07-03 |
-| 4 | Competitor canvases & gap engine | IN PROGRESS | `build/phase-4-competitors` | 2026-07-03 |
+| 4 | Competitor canvases & gap engine | AWAITING REVIEW | `build/phase-4-competitors` | 2026-07-04 |
 | 5 | Section agent workspaces | NOT STARTED | â€” | â€” |
 | 6 | War Room & orchestration | NOT STARTED | â€” | â€” |
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | â€” | â€” |
@@ -818,7 +818,40 @@ npm run lint                    -> 68 problems (49 errors, 19 warnings), within 
 ```
 
 ### Phase 4 - Competitor canvases & gap engine
-Tasks: 4.1 [x] - 4.2 [x] - 4.3 [x] - 4.4 [ ] - 4.5 [ ] - 4.6 [ ] - 4.7 [ ]
+Tasks: 4.1 [x] - 4.2 [x] - 4.3 [x] - 4.4 [x] - 4.5 [x] - 4.6 [x] - 4.7 [x]
+
+**2026-07-04 - Slice 3 UI complete; Phase 4 awaiting review.**
+
+- **4.4-4.5 visible gap/threat surfaces:** Dashboard now shows a Competitor Watch strip from
+  `metric_snapshots` rows keyed by `competitor.threat_index`, linking each competitor to its
+  drill-down canvas. The legacy Competitive Landscape component can link competitor cards to
+  those canvases when a persisted competitor id is available.
+- **4.6 competitor drill-down/compare:** added `/competitors/:competitorId/canvas`, loading the
+  account-scoped competitor, latest competitor-linked canvas section versions, hydrated evidence,
+  and Threat Index/section-delta metrics. The page supports a side-by-side compare mode against
+  the user's own canvas and keeps own-canvas evidence queries filtered to
+  `competitor_id is null` so competitor versions cannot replace first-party canvas content.
+- **4.7 evidence + action plumbing:** competitor canvas items show confidence, evidence counts,
+  source excerpts, and source links. The Explore action creates a section-agent
+  `workspace_threads` row and a proposal `workspace_messages` row for adapting the competitor
+  idea. Empty states are explicit for missing research, missing own-canvas sections, and missing
+  competitors.
+- **Design/test notes:** UI uses the established light grid page canvas, white cards with
+  `border-border/60`, subtle shadows, responsive grids, and break-word guards for long names,
+  URLs, excerpts, and item text. There is no dedicated frontend unit-test harness in the repo, so
+  verification for the UI slice is through TypeScript/build/lint gates plus worker regression
+  tests for the backend data path.
+
+**Final Phase 4 gate results before review:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 68 problems (49 errors, 19 warnings), within frozen <=68 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 40 passed, 2 skipped (SQL integration + live golden env-gated)
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
 
 **2026-07-03 - Slice 1 complete: work orders 4.1-4.2.**
 
