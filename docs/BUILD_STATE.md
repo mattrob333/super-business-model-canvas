@@ -54,11 +54,13 @@ Status: OPEN | RESOLVED (<how>)
 
 ## OPERATOR QUEUE (needs Matt)
 
-- **From Phase 4 close (2026-07-04):** two follow-ups after the merge auto-deploys web+worker:
-  (1) apply live migration `20260704120000_gap_superseded_status.sql` (Supabase MCP or SQL
-  editor — one `alter type` statement); (2) run Ops → `deploy-edge-functions` so the updated
-  `agent-run` allowlist (`competitor_research`, `gap_engine`) is live. Until both run,
-  the new Research button will enqueue but jobs will be refused by the edge function.
+- **Phase 4 close follow-ups: DONE (2026-07-04, reviewer via Supabase MCP).** Live migration
+  `gap_superseded_status` applied (recorded in supabase_migrations; verified
+  `gap_status.superseded` exists). `agent-run` redeployed as version 6 with the updated
+  allowlist (`competitor_research`, `gap_engine`) — deployed via MCP with an inline empty
+  import map; the next Ops `deploy-edge-functions` run will harmlessly overwrite with the
+  CI import map (same source). Deploy workflow run 22 (web+worker) completed green. The
+  full competitor chain is live end to end.
 
 - **From July 2 session (pre-Phase-0):** deploy updated edge functions; set
   `CREDENTIALS_ENCRYPTION_KEY`; Vault service key + run cron migration; set `VITE_*` build
