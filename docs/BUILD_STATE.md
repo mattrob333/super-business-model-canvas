@@ -12,7 +12,7 @@
 | 1 | Data model wave 1 | **APPROVED** | `build/phase-1-migrations` (merged, PR #4, `281ce5b`) | 2026-07-02 |
 | 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
 | 3 | Research engine & evidence | **APPROVED** | `build/phase-3-research` (merged with reviewer fixes, PR #13) | 2026-07-03 |
-| 4 | Competitor canvases & gap engine | NOT STARTED | â€” | â€” |
+| 4 | Competitor canvases & gap engine | **IN PROGRESS** (reviewed 2026-07-04 at `bfa1986`; RF-4-1..14 issued, 1 BLOCKER + 5 HIGH — see REVIEW FINDINGS) | `build/phase-4-competitors` | 2026-07-04 |
 | 5 | Section agent workspaces | NOT STARTED | â€” | â€” |
 | 6 | War Room & orchestration | NOT STARTED | â€” | â€” |
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | â€” | â€” |
@@ -189,6 +189,87 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 - **Gates:** root tsc exit 0, build green, lint 68 (frozen ceiling), worker untouched.
 
 ## REVIEW FINDINGS
+
+### Phase 4 review (2026-07-04, reviewer) — verdict: back to IN PROGRESS
+
+Reviewed `build/phase-4-competitors` at `bfa1986` (clean checkout; all gates green — root
+tsc/build clean, lint 68 = the branch-point ceiling, worker typecheck/tests/build/lint clean,
+40 tests passing). Backend slices 4.1–4.2 are solid and honestly built: schema mirror is
+column-for-column consistent (migrations = schema.sql = types.ts = verify-schema.sql, RLS ×4
+policies), the Phase-3 pipeline was reused rather than cloned, account scoping is correct
+throughout, formula versions are stored, the dashboard reads `metric_snapshots` (no client
+recompute), and `useCanvasEvidence` correctly gained `.is("competitor_id", null)`. Commended:
+the quiet fix of a latent Phase-3 bug (`business_context_versions.website_url` select — the
+column is `website`; the old select would have errored on live runs). BLOCKER/HIGH below
+must be fixed and re-reviewed before the phase closes; MEDIUM due next phase; LOW logged.
+
+- **RF-4-1 (BLOCKER): the feature is unreachable end-to-end.** Nothing creates `companies`
+  rows and nothing enqueues `competitor_research` or `gap_engine` — no UI action, no cascade,
+  no scheduled loop (grep `competitor_research` in `src/` returns nothing). The landscape's
+  "Open canvas" link is gated on `competitor.id`, but its only caller passes AI-analysis
+  `similarCompanies` which never have ids — the link is dead code. Work order 4.5 ("run
+  competitor research" action + Threat Index on landscape) is missing, yet checked `[x]`.
+  Required: an add-competitor + run-research path (Competitive Landscape cards should offer
+  "Research this competitor" → create `companies` row → enqueue `competitor_research` →
+  enqueue `gap_engine` on completion), and Threat Index shown on the landscape.
+- **RF-4-2 (HIGH): `read_canvas` tool contaminates section agents with competitor data.**
+  `worker/src/tools/bmc-tools.ts` `read_canvas` takes the latest `canvas_section_versions`
+  row without `is("competitor_id", null)`. After any competitor research run, a section
+  agent "reading its own canvas" can receive the competitor's items. Same check needed in
+  any other own-canvas read path in the worker (staleness sweep should also be audited for
+  competitor-row handling — decide + document whether competitor versions age out).
+- **RF-4-3 (HIGH): compare mode lacks the required win/lose scoring** (BUILD_PLAN 4.4:
+  "side-by-side per section with win/lose scoring"). `CompetitorCanvas.tsx` renders the two
+  columns but no per-section verdict; the `competitor.section_delta` metric is fetched and
+  only used as a count tile.
+- **RF-4-4 (HIGH): borrow-idea violates the spec and sprays threads.** Each click inserts a
+  brand-new `workspace_threads` row instead of posting the proposal to the target section's
+  default thread; `created_by` unset; no `section_key` linkage a Phase-5 workspace can rely
+  on; no cross-account test (reviewer checklist item).
+- **RF-4-5 (HIGH): gap engine is not idempotent.** Straight inserts into `gaps` and
+  `metric_snapshots`: any re-run or mid-job retry duplicates every gap row and inflates
+  metrics (`gaps` insert succeeds → metrics insert throws → retry doubles gaps). Required:
+  supersede/close prior open competitive gaps per (account, competitor) on each run, or
+  upsert on a stable key; make the write order retry-safe.
+- **RF-4-6 (HIGH): fabricated state on the drill-down.** `CompetitorCanvas.tsx` hardcodes
+  `MetricCard label="Freshness" value="Verified"` while the hook fetches real per-section
+  `freshness_status` and discards it. Violates the DESIGN_TASTE honesty rule. Render the
+  real value or drop the tile.
+- **RF-4-7 (MEDIUM): Threat Index momentum is a hardcoded `100`** — the formula degenerates
+  to `100 × section_overlap × pricing_aggression`, identical for any two competitors with
+  equal coverage; no momentum metric is computed anywhere, but 4.3 is checked `[x]`
+  ("Momentum + Threat Index computation"). Acceptable as a disclosed v1 only: document the
+  placeholder in BUILD_STATE + `inputs`, emit it honestly, and leave momentum to Phase 7
+  metric families — or compute it.
+- **RF-4-8 (MEDIUM): metric reads are window-and-filter-client-side.** The drill-down pulls
+  the latest 100 `metric_snapshots` account-wide then filters by `inputs->competitor_id`
+  (a busy account pushes this competitor out of the window → tiles silently read 0), and the
+  section-delta tile counts every historical snapshot (3 runs → "27" instead of 9). The
+  Dashboard Competitor Watch fetches `limit(12)` then dedupes — one frequently re-scored
+  competitor evicts the rest. Filter server-side and take latest per (metric, competitor,
+  section).
+- **RF-4-9 (MEDIUM): all query errors swallowed in `useCompetitorCanvasEvidence`** — network
+  or RLS failures render as the "no competitor found" empty state or silently missing
+  evidence. DESIGN_TASTE requires a distinct error state.
+- **RF-4-10 (MEDIUM): delete `src/lib/supabase-untyped.ts`.** All three tables it wraps
+  (`metric_snapshots`, `workspace_threads`, `workspace_messages`) are already in the
+  generated types; the bypass removes compile-time safety and invites unscoped queries.
+- **RF-4-11 (MEDIUM): BUILD_STATE truthfulness.** The Slice-3 entry renumbers work orders
+  (calls the dashboard strip "4.4–4.5", the drill-down "4.6") and checks 4.3/4.4/4.5/4.7
+  `[x]` despite the gaps above. Restate the checkbox row against BUILD_PLAN numbering with
+  honest PARTIAL markers.
+- **RF-4-12 (LOW): test gaps.** No exact-value assertions on gap score or Threat Index
+  (score only `> 40`, index value never asserted — a `+` for `×` regression passes); the
+  0.58 overlap-suppression boundary untested; no cross-account borrow test; no drill-down
+  render test. The fake-client style itself is fine (real handler under test).
+- **RF-4-13 (LOW): UI nits.** React keys/busy-keys collide on duplicate item text within a
+  section; borrow's agent-profile lookup `.or(account, null).limit(1)` has nondeterministic
+  precedence (order account rows first); the own-canvas evidence fan-out runs even with
+  compare mode off.
+- **RF-4-14 (LOW): housekeeping.** Dead `website_url` optional field left on
+  `BusinessContext`; the Phase-3 `website` bug fix is unrecorded in BUILD_STATE (record it);
+  pre-existing mojibake in this file is NOT from this branch (branch even fixed one header)
+  — full re-encode scheduled post-merge by the reviewer.
 
 ### Phase 2 - RF-2-4 (MEDIUM) - FIXED pending re-review (2026-07-02)
 **Problem:** Reviewer found model-route resolution for section analysis was nondeterministic:
