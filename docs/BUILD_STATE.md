@@ -13,7 +13,7 @@
 | 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
 | 3 | Research engine & evidence | **APPROVED** | `build/phase-3-research` (merged with reviewer fixes, PR #13) | 2026-07-03 |
 | 4 | Competitor canvases & gap engine | **APPROVED** (merged with reviewer fixes — RF-4-1..14 all resolved, see REVIEW FINDINGS) | `build/phase-4-competitors` + reviewer-fix merge | 2026-07-04 |
-| 5 | Knowledge stack, grounding & section workspaces | IN PROGRESS (5A jobs slice) | `build/phase-5-knowledge` | 2026-07-04 |
+| 5 | Knowledge stack, grounding & section workspaces | IN PROGRESS (5A UI slice) | `build/phase-5-knowledge` | 2026-07-04 |
 | 6 | War Room & orchestration | NOT STARTED | — | — |
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | — | — |
 | 8 | Hardening & commercial | HELD (await direction) | — | — |
@@ -197,6 +197,34 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 - **Gates:** root tsc exit 0, build green, lint 68 (frozen ceiling), worker untouched.
 
 ## REVIEW FINDINGS
+
+### Phase 5A UI-slice review — reviewed with fixes applied by reviewer (2026-07-04, commit `94dc35f` + PR #40)
+
+Strong slice: real FocusDrawer usage (reading size, correct tiers), honest failed-status
+rendering, provenance badges on dossiers/citations, owner-question answer/dismiss flows,
+theme-aware status colors, gates green (verified from clean checkout). Reviewer fixes
+applied directly (standing owner directive):
+- **RF-5A-11 (HIGH, fixed):** upload enqueued `onboarding_extract` without ensuring a
+  `business_context_versions` row — pre-launch accounts (the feature's exact target user)
+  have none and the worker hard-fails (the RF-4-15 class, third occurrence: this ensure
+  step is now REQUIRED before enqueueing ANY research/extract job — added to the invariant
+  list). Fixed: find-or-create + pass `business_context_version_id` in input.
+- **RF-5A-12 (MEDIUM, fixed):** enqueue failure after document insert left the row stuck
+  `uploaded` with no visible error — now marked `failed` + error on the card; upload
+  handler gained a re-entrancy guard (asChild disabled doesn't disable a Label).
+- **RF-5A-13 (MEDIUM, fixed):** the Groundedness tile computed a docs-derived
+  pseudo-metric (~100% for any distributed doc) mislabeled "evidence coverage" — now reads
+  the real spec-08 `groundedness_score` (latest per section, averaged) and shows an honest
+  "--" before any section is scored.
+- **RF-5A-14 (LOW, fixed):** statuses only updated on manual Refresh — now background-polls
+  every 8s while any document is `uploaded`/`parsing` (silent, no loader flash).
+- Honest remaining scope (disclosed by build agent, confirmed): live logged-in walkthrough
+  not yet run; Firecrawl logo capture not implemented (manual URL entry shipped); the full
+  spec-08 §9 name-confirmation grounding wizard is NOT this progress panel — panel is fine
+  as v1 but the confirm-real-names flow remains open scope for 5A completion.
+- Unverified external claims (Supabase MCP unavailable to reviewer this session):
+  `agent-run` v8 redeploy and live `summary_escalated_route` application — to be
+  independently confirmed next connected session.
 
 ### Phase 5A jobs-slice review — RESOLVED: RF-5A-1..9 fixed by the reviewer (2026-07-04, PR #38)
 
@@ -1195,9 +1223,54 @@ cd worker && npm run lint             -> exit 0
 ```
 
 ### Phase 5 - Knowledge stack, grounding & section workspaces
-5A tasks: schema [x] - jobs [x] - ingestion [worker pipeline only] - UI/wizard [ ] - live walkthrough [ ]
+5A tasks: schema [x] - jobs [x] - ingestion [worker + UI upload path] - UI/wizard [partial] - live walkthrough [ ]
 5B tasks: 5.1 [ ] - 5.2 [ ] - 5.3 [ ] - 5.4 [ ] - 5.5 [ ] - 5.6 [ ] - 5.7 [ ] - 5.8 [ ] - 5.9 [ ]
-5A additions from BUILD_PLAN: 5.10 [schema + worker extraction pipeline] - 5.11 [schema only]
+5A additions from BUILD_PLAN: 5.10 [schema + worker extraction pipeline + upload UI] - 5.11 [schema + logo display/manual URL UI; Firecrawl capture not complete]
+
+**2026-07-04 - Phase 5A UI slice started after jobs-slice reviewer fixes.**
+
+- Merged latest `origin/main` into `build/phase-5-knowledge`; worker files and SQL mirrors
+  now use the reviewer-fixed PR #38 versions. This supersedes the earlier jobs-slice handler
+  implementation with strict summary parsing/escalation, per-claim onboarding verification,
+  dossier spot-checks, material-change cascades, and evidence dedup.
+- Resolved queued live ops via Supabase MCP:
+  - Applied `20260704170000_summary_escalated_route.sql` from the checked-in migration file
+    as MCP migration `summary_escalated_route`. Verification: Phase 5A migration records
+    exist as `phase_5a_knowledge_stack`, `phase_5a_model_routes`, and
+    `summary_escalated_route`; the four global task classes
+    `onboarding_extract`, `dossier_refresh`, `summary_update`, and
+    `summary_update_escalated` are present; `summary_update_escalated` is Anthropic
+    `claude-sonnet-5`.
+  - Redeployed `agent-run` via Supabase MCP with JWT verification preserved. First deploy
+    attempt failed because the previous absolute import-map path was reused; second attempt
+    produced version 7 with a minimized equivalent source and was immediately superseded by
+    version 8 using the checked-in source plus explicit empty `import_map.json`. Verification:
+    `agent-run` is ACTIVE at version 8 with `verify_jwt = true`.
+- Replaced the placeholder Knowledge page with the 5A work surface:
+  - account-scoped document list with upload to `founder-documents`, parser status including
+    `failed`, and owner-provided provenance badges;
+  - upload path inserts `founder_documents`, enqueues `onboarding_extract` through the
+    existing runtime, then links the returned `agent_run_id`;
+  - dossier list opens a `FocusDrawer` size `reading` with provenance, freshness, material
+    change, body text, and visible citations from `evidence_items`;
+  - owner questions surface with answer and dismiss actions;
+  - grounding wizard shows the upload -> distribute -> review -> resolve path;
+  - company branding panel displays the current logo and allows manual logo URL correction.
+- Honest remaining scope: this is not AWAITING REVIEW. The Firecrawl logo capture path is
+  not implemented in UI/worker here, and I have not completed the required logged-in live
+  walkthrough yet (real PDF upload, bad-file graceful failure, verified item landing, dossier
+  open). Continue from this UI slice before marking 5A ready.
+
+**Gate results for UI slice so far:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 65 problems (47 errors, 18 warnings), within frozen <=65 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 51 passed, 2 skipped (SQL integration + live golden env-gated)
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
 
 **2026-07-04 - Phase 5A jobs slice continued after schema review.**
 
