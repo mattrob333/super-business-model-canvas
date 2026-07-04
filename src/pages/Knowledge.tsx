@@ -77,7 +77,7 @@ export default function Knowledge() {
   const openQuestions = questions.filter((question) => question.status === "open");
   const distributedCount = documents.filter((document) => document.status === "distributed").length;
   const failedCount = documents.filter((document) => document.status === "failed").length;
-  const groundedness = useMemo(() => computeGroundedness(documents), [documents]);
+  const [canvasGroundedness, setCanvasGroundedness] = useState<number | null>(null);
   const selectedQuestion = questions.find((question) => question.id === selectedQuestionId) ?? null;
 
   const loadEvidenceForDossiers = useCallback(async (nextDossiers: AgentDocument[]) => {
@@ -94,11 +94,11 @@ export default function Knowledge() {
     setEvidenceById(new Map((data ?? []).map((item) => [item.id, item])));
   }, []);
 
-  const loadKnowledge = useCallback(async () => {
+  const loadKnowledge = useCallback(async (options?: { background?: boolean }) => {
     if (!accountId) return;
-    setLoading(true);
+    if (!options?.background) setLoading(true);
     try {
-      const [documentsResult, dossiersResult, questionsResult, profilesResult, companiesResult] = await Promise.all([
+      const [documentsResult, dossiersResult, questionsResult, profilesResult, companiesResult, groundednessResult] = await Promise.all([
         supabase
           .from("founder_documents")
           .select("*")
@@ -126,6 +126,14 @@ export default function Knowledge() {
           .eq("is_competitor", false)
           .order("updated_at", { ascending: false })
           .limit(1),
+        supabase
+          .from("canvas_section_versions")
+          .select("section_key, groundedness_score, created_at")
+          .eq("account_id", accountId)
+          .is("competitor_id", null)
+          .not("groundedness_score", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(100),
       ]);
 
       if (documentsResult.error) throw documentsResult.error;
@@ -142,6 +150,18 @@ export default function Knowledge() {
       setProfiles(profilesResult.data ?? []);
       setCompany(companiesResult.data?.[0] ?? null);
       setManualLogoUrl(companiesResult.data?.[0]?.logo_url ?? "");
+      // Real groundedness (spec 08): average of the latest scored version per section.
+      const latestBySection = new Map<string, number>();
+      for (const row of groundednessResult.error ? [] : groundednessResult.data ?? []) {
+        if (typeof row.groundedness_score === "number" && !latestBySection.has(row.section_key)) {
+          latestBySection.set(row.section_key, row.groundedness_score);
+        }
+      }
+      setCanvasGroundedness(
+        latestBySection.size === 0
+          ? null
+          : Math.round(([...latestBySection.values()].reduce((sum, value) => sum + value, 0) / latestBySection.size) * 100),
+      );
       await loadEvidenceForDossiers(nextDossiers);
     } catch (error) {
       toast({
@@ -162,12 +182,25 @@ export default function Knowledge() {
     void loadKnowledge();
   }, [accountId, accountLoading, loadKnowledge]);
 
+  // Live status: poll while any document is still moving through the pipeline.
+  const hasActiveDocuments = documents.some(
+    (document) => document.status === "uploaded" || document.status === "parsing",
+  );
+  useEffect(() => {
+    if (!accountId || !hasActiveDocuments) return;
+    const interval = window.setInterval(() => {
+      void loadKnowledge({ background: true });
+    }, 8000);
+    return () => window.clearInterval(interval);
+  }, [accountId, hasActiveDocuments, loadKnowledge]);
+
   async function handleFileUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file || !accountId || !user) return;
+    if (!file || !accountId || !user || uploading) return;
 
     setUploading(true);
+    let createdDocumentId: string | null = null;
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 120);
       const path = `${accountId}/${Date.now()}-${safeName}`;
@@ -192,9 +225,40 @@ export default function Knowledge() {
         .select("*")
         .single();
       if (insertError) throw insertError;
+      createdDocumentId = document.id;
 
       const profileId = pickOrchestratorProfile(profiles, accountId)?.id ?? profiles[0]?.id;
       if (!profileId) throw new Error("No agent profile is available for document ingestion.");
+
+      // Pre-launch accounts have no business_context_versions row yet, and the
+      // extract job requires one (the RF-4-15 failure class) — ensure it here.
+      let contextVersionId: string;
+      const { data: existingContext } = await supabase
+        .from("business_context_versions")
+        .select("id")
+        .eq("account_id", accountId)
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existingContext) {
+        contextVersionId = existingContext.id;
+      } else {
+        const { data: newContext, error: ctxError } = await supabase
+          .from("business_context_versions")
+          .insert({
+            account_id: accountId,
+            version_number: 1,
+            summary: `Initial business context from ${file.name}`,
+            data: {},
+            created_by: user.id,
+          })
+          .select("id")
+          .single();
+        if (ctxError || !newContext) {
+          throw new Error(`Failed to create business context: ${ctxError?.message ?? "unknown"}`);
+        }
+        contextVersionId = newContext.id;
+      }
 
       const runtime = getAgentRuntime(accountId);
       const run = await runtime.startRun({
@@ -203,7 +267,10 @@ export default function Knowledge() {
         runType: "onboarding_extract",
         triggerType: "manual",
         triggeredBy: user.id,
-        input: { founder_document_id: document.id },
+        input: {
+          founder_document_id: document.id,
+          business_context_version_id: contextVersionId,
+        },
       });
 
       await supabase
@@ -215,11 +282,17 @@ export default function Knowledge() {
       toast({ title: "Document queued", description: `${file.name} is being parsed and distributed.` });
       await loadKnowledge();
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "The document was not queued.",
-        variant: "destructive",
-      });
+      const message = error instanceof Error ? error.message : "The document was not queued.";
+      if (createdDocumentId) {
+        // Leave a visible failure on the card instead of a stuck 'uploaded' row.
+        await supabase
+          .from("founder_documents")
+          .update({ status: "failed", error: message })
+          .eq("id", createdDocumentId)
+          .eq("account_id", accountId);
+        await loadKnowledge();
+      }
+      toast({ title: "Upload failed", description: message, variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -319,7 +392,7 @@ export default function Knowledge() {
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1.2fr_0.8fr_1fr_0.8fr]">
         <Metric label="Documents" value={documents.length.toString()} detail={`${distributedCount} distributed`} icon={FileText} />
         <Metric label="Dossiers" value={dossiers.length.toString()} detail={`${dossiers.filter((doc) => doc.material_change).length} changed`} icon={BookOpen} />
-        <Metric label="Groundedness" value={`${groundedness}%`} detail="Owner-provided evidence coverage" icon={ShieldCheck} />
+        <Metric label="Groundedness" value={canvasGroundedness === null ? "--" : `${canvasGroundedness}%`} detail={canvasGroundedness === null ? "No scored canvas sections yet" : "Grounded share of scored sections"} icon={ShieldCheck} />
         <Metric label="Questions" value={openQuestions.length.toString()} detail="Open owner prompts" icon={CircleHelp} />
       </section>
 
@@ -712,13 +785,6 @@ function claimSourceLabel(value: Json): string {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "Provenance unknown";
   const source = (value as Record<string, unknown>).default;
   return source === "owner_provided" ? "Owner-provided" : source === "researched" ? "Researched" : "Mixed provenance";
-}
-
-function computeGroundedness(documents: FounderDocument[]): number {
-  const total = documents.reduce((sum, document) => sum + Math.max(1, document.evidence_ids.length), 0);
-  if (total === 0) return 0;
-  const grounded = documents.reduce((sum, document) => sum + document.evidence_ids.length, 0);
-  return Math.round((grounded / total) * 100);
 }
 
 function stripExtension(name: string): string {

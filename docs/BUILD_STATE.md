@@ -198,6 +198,34 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase 5A UI-slice review — reviewed with fixes applied by reviewer (2026-07-04, commit `94dc35f` + PR #40)
+
+Strong slice: real FocusDrawer usage (reading size, correct tiers), honest failed-status
+rendering, provenance badges on dossiers/citations, owner-question answer/dismiss flows,
+theme-aware status colors, gates green (verified from clean checkout). Reviewer fixes
+applied directly (standing owner directive):
+- **RF-5A-11 (HIGH, fixed):** upload enqueued `onboarding_extract` without ensuring a
+  `business_context_versions` row — pre-launch accounts (the feature's exact target user)
+  have none and the worker hard-fails (the RF-4-15 class, third occurrence: this ensure
+  step is now REQUIRED before enqueueing ANY research/extract job — added to the invariant
+  list). Fixed: find-or-create + pass `business_context_version_id` in input.
+- **RF-5A-12 (MEDIUM, fixed):** enqueue failure after document insert left the row stuck
+  `uploaded` with no visible error — now marked `failed` + error on the card; upload
+  handler gained a re-entrancy guard (asChild disabled doesn't disable a Label).
+- **RF-5A-13 (MEDIUM, fixed):** the Groundedness tile computed a docs-derived
+  pseudo-metric (~100% for any distributed doc) mislabeled "evidence coverage" — now reads
+  the real spec-08 `groundedness_score` (latest per section, averaged) and shows an honest
+  "--" before any section is scored.
+- **RF-5A-14 (LOW, fixed):** statuses only updated on manual Refresh — now background-polls
+  every 8s while any document is `uploaded`/`parsing` (silent, no loader flash).
+- Honest remaining scope (disclosed by build agent, confirmed): live logged-in walkthrough
+  not yet run; Firecrawl logo capture not implemented (manual URL entry shipped); the full
+  spec-08 §9 name-confirmation grounding wizard is NOT this progress panel — panel is fine
+  as v1 but the confirm-real-names flow remains open scope for 5A completion.
+- Unverified external claims (Supabase MCP unavailable to reviewer this session):
+  `agent-run` v8 redeploy and live `summary_escalated_route` application — to be
+  independently confirmed next connected session.
+
 ### Phase 5A jobs-slice review — RESOLVED: RF-5A-1..9 fixed by the reviewer (2026-07-04, PR #38)
 
 All findings below fixed on main (worker suite now 51 tests):
