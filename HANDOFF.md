@@ -162,12 +162,12 @@ worker/                  ← Node + Claude Agent SDK service (queue loop, jobs, 
 
 ## 7. Current assignment status
 
-**Phase 4** (competitor canvases & gap engine, work orders 4.1–4.7) is built on
-`build/phase-4-competitors` and **AWAITING REVIEW** — do not start Phase 5 until the review
-closes and the phase is APPROVED. When review findings (`RF-4-n`) arrive in BUILD_STATE,
-BLOCKER/HIGH items are your immediate queue.
+**Phase 4 is APPROVED and merged** (2026-07-04; RF-4-1..14 all resolved by a reviewer-fix
+merge — read the resolution log in BUILD_STATE → REVIEW FINDINGS before touching competitor
+code; it records invariants you must keep, e.g. own-canvas reads always filter
+`competitor_id is null`, the gap engine must stay idempotent via `superseded`).
 
-**Next after approval: Phase 5**, in two stages per BUILD_PLAN — **5A (knowledge stack &
+**Your assignment: Phase 5**, in two stages per BUILD_PLAN — **5A (knowledge stack &
 grounding: spec 08)** ships before **5B (the nine workspace rooms: spec 02)**. 5A is the
 accuracy moat (dossiers, watched sources, owner questions, grounding wizard, document
 ingestion); 5B is the room chrome. Phase 6 may begin once 5A is approved even if 5B is in
@@ -176,7 +176,36 @@ ladder, `useCanvasEvidence`, and `FocusDrawer` are all built and reviewed. Pract
 from Phases 2–4: split work orders across sessions (schema → job → engine → UI) and hand off
 through BUILD_STATE between them.
 
-## 8. Housekeeping notes for the owner (Matt) — not agent tasks
+## 8. Lessons from the Phase 3–4 reviews (binding process corrections)
+
+The same failure classes have now been caught twice. Internalize these — the reviewer
+checks them every phase:
+
+1. **"Done" means user-reachable.** Phase 4 shipped a working engine with no way for any
+   user to trigger it (no entity creation, no enqueue action) and marked the phase
+   complete. Before setting AWAITING REVIEW, walk the feature as a logged-in user on the
+   running app: entry point → job → result on screen. If a step needs a button that
+   doesn't exist, the work order is not done.
+2. **Checkbox truthfulness beats optics.** Partial is a fine status; a hedged sentence
+   ("can link when an id is available") covering a missing feature is treated as fake
+   completeness, same as RF-3-8. Never renumber work orders in the log — BUILD_PLAN's
+   numbering is canonical.
+3. **Formulas get exact-value tests.** `score > 40` catches nothing; pin the number
+   (score 90, threat 27.78) and test the branch boundaries (the 0.58 overlap gate). A
+   placeholder input (momentum=100) is acceptable ONLY when disclosed in the data
+   (`momentum_source`) and in BUILD_STATE.
+4. **Every re-runnable job needs an idempotency story.** Straight inserts duplicate on
+   retry/re-run. Supersede, upsert, or dedupe — and say which in the log.
+5. **State every filter on shared tables.** `canvas_section_versions` now carries both
+   own and competitor rows; every own-canvas reader filters `competitor_id is null`.
+   When you add a discriminator column, sweep ALL existing readers the same commit.
+6. **Read windows must survive scale.** "Latest 100 account-wide, filter client-side"
+   silently breaks with real data volume. Filter server-side, dedupe latest-per-key.
+7. **The typed client is the default.** `src/lib/supabase-untyped.ts` is a documented
+   escape hatch for TS2589 only — never for convenience, and always with an explicit row
+   type + account_id filter.
+
+## 9. Housekeeping notes for the owner (Matt) — not agent tasks
 
 - OPERATOR QUEUE in `docs/BUILD_STATE.md` is the single list (deploys, secrets, keys, the
   one pending live migration, live golden-set run).

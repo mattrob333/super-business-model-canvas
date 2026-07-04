@@ -55,8 +55,8 @@ do $$ begin create type public.agent_status as enum ('active', 'paused', 'draft'
 do $$ begin create type public.agent_run_status as enum ('pending', 'running', 'completed', 'failed', 'cancelled', 'timeout'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.agent_run_trigger as enum ('manual', 'scheduled', 'api', 'cascade', 'retry'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.gap_severity as enum ('critical', 'high', 'medium', 'low'); exception when duplicate_object then null; end $$;
-do $$ begin create type public.gap_status as enum ('open', 'acknowledged', 'in_progress', 'resolved', 'wont_fix'); exception when duplicate_object then null; end $$;
-do $$ begin create type public.gap_type as enum ('missing_data', 'low_confidence', 'no_evidence', 'outdated', 'contradictory', 'assumption'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.gap_status as enum ('open', 'acknowledged', 'in_progress', 'resolved', 'wont_fix', 'superseded'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.gap_type as enum ('missing_data', 'low_confidence', 'no_evidence', 'outdated', 'contradictory', 'assumption', 'competitive'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.credential_status as enum ('active', 'revoked', 'expired', 'untested'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.mcp_transport_type as enum ('stdio', 'http', 'sse', 'websocket'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.mcp_server_status as enum ('connected', 'disconnected', 'error', 'untested'); exception when duplicate_object then null; end $$;
@@ -186,10 +186,25 @@ create table if not exists public.business_context_versions (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.companies (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  name text not null,
+  website_url text,
+  description text,
+  industry text,
+  is_competitor boolean not null default true,
+  metadata jsonb not null default '{}'::jsonb,
+  created_by uuid,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.canvas_section_versions (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null references public.accounts(id) on delete cascade,
   business_context_version_id uuid not null references public.business_context_versions(id) on delete cascade,
+  competitor_id uuid references public.companies(id) on delete cascade,
   section_key text not null,
   section_title text,
   items jsonb not null default '[]'::jsonb,
@@ -220,10 +235,14 @@ create table if not exists public.evidence_items (
 create table if not exists public.gaps (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null references public.accounts(id) on delete cascade,
+  competitor_id uuid references public.companies(id) on delete cascade,
   title text not null,
   description text,
   gap_type public.gap_type not null default 'missing_data',
   severity public.gap_severity not null default 'medium',
+  score numeric(6,2),
+  score_inputs jsonb not null default '{}'::jsonb,
+  formula_version text,
   impact text,
   effort text,
   confidence numeric(3,2),
@@ -533,11 +552,15 @@ exception when duplicate_object then null; end $$;
 create index if not exists idx_account_members_account on public.account_members(account_id);
 create index if not exists idx_account_members_user on public.account_members(user_id);
 create index if not exists idx_bcv_account on public.business_context_versions(account_id);
+create index if not exists idx_companies_account_competitor on public.companies(account_id, is_competitor, name);
 create index if not exists idx_csv_account on public.canvas_section_versions(account_id);
 create index if not exists idx_csv_context on public.canvas_section_versions(business_context_version_id);
 create index if not exists idx_csv_section_key on public.canvas_section_versions(section_key);
 create index if not exists idx_evidence_account on public.evidence_items(account_id);
 create index if not exists idx_gaps_account on public.gaps(account_id);
+create index if not exists idx_gaps_competitor
+  on public.gaps(account_id, competitor_id, status, created_at desc)
+  where competitor_id is not null;
 create index if not exists idx_gaps_status on public.gaps(status);
 create index if not exists idx_agent_profiles_account on public.agent_profiles(account_id);
 create index if not exists idx_agent_profiles_key on public.agent_profiles(agent_key);
@@ -563,10 +586,16 @@ create index if not exists idx_agent_skills_account on public.agent_skills(accou
 create index if not exists idx_agent_skills_agent on public.agent_skills(agent_profile_id);
 create index if not exists idx_agent_skills_framework on public.agent_skills(framework_id);
 create index if not exists idx_leads_email on public.leads(email);
+create unique index if not exists idx_companies_account_website
+  on public.companies(account_id, lower(website_url))
+  where website_url is not null;
 
 -- Composite indexes for hot read paths
 create index if not exists idx_csv_latest_per_section
   on public.canvas_section_versions(account_id, section_key, created_at desc);
+create index if not exists idx_csv_competitor_latest
+  on public.canvas_section_versions(account_id, competitor_id, section_key, created_at desc)
+  where competitor_id is not null;
 create index if not exists idx_agent_runs_feed
   on public.agent_runs(account_id, created_at desc);
 
@@ -692,6 +721,7 @@ alter table public.accounts                     enable row level security;
 alter table public.account_members              enable row level security;
 alter table public.saved_analyses              enable row level security;
 alter table public.business_context_versions    enable row level security;
+alter table public.companies                    enable row level security;
 alter table public.canvas_section_versions      enable row level security;
 alter table public.evidence_items               enable row level security;
 alter table public.gaps                         enable row level security;
@@ -796,7 +826,7 @@ do $$
 declare t text;
 begin
   for t in select unnest(array[
-    'business_context_versions', 'canvas_section_versions',
+    'business_context_versions', 'companies', 'canvas_section_versions',
     'evidence_items', 'gaps', 'agent_runs', 'scheduled_loops', 'agent_skills'
   ]) loop
     execute format('drop policy if exists "%s_select_account" on public.%I', t, t);

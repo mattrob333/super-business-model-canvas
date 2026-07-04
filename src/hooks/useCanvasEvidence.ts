@@ -21,16 +21,17 @@ export type CanvasEvidenceBySection = Partial<
  * Sections without version rows are simply absent from the result; the canvas
  * falls back to the legacy analysis strings for those.
  */
-export function useCanvasEvidence(): {
+export function useCanvasEvidence(options?: { enabled?: boolean }): {
   itemsBySection: CanvasEvidenceBySection;
   loading: boolean;
 } {
+  const enabled = options?.enabled ?? true;
   const { accountId } = useAccountId();
   const [itemsBySection, setItemsBySection] = useState<CanvasEvidenceBySection>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!accountId) {
+    if (!accountId || !enabled) {
       setItemsBySection({});
       setLoading(false);
       return;
@@ -45,6 +46,7 @@ export function useCanvasEvidence(): {
           .from("canvas_section_versions")
           .select("section_key, items, freshness_status, created_at")
           .eq("account_id", accountId)
+          .is("competitor_id", null)
           .order("created_at", { ascending: false })
           .limit(200);
         if (error || !versions) return;
@@ -96,7 +98,7 @@ export function useCanvasEvidence(): {
     return () => {
       cancelled = true;
     };
-  }, [accountId]);
+  }, [accountId, enabled]);
 
   return { itemsBySection, loading };
 }

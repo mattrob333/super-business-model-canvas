@@ -27,6 +27,8 @@ describe("BMC MCP tools", () => {
       table: "canvas_section_versions",
       filters: [
         ["account_id", "account-1"],
+        // RF-4-2: own-canvas reads must never see competitor-linked versions.
+        ["is:competitor_id", null],
         ["section_key", "value_propositions"],
       ],
     });
@@ -58,8 +60,20 @@ describe("BMC MCP tools", () => {
       insert: { account_id: "account-1", agent_profile_id: "profile-1", agent_run_id: "run-1" },
     });
 
-    await expect(tools.read_competitor_canvas.handler({ competitor_id: "competitor-1" }))
-      .resolves.toMatchObject({ structuredContent: { items: [] } });
+    await expect(tools.read_competitor_canvas.handler({ competitor_id: "11111111-1111-4111-8111-111111111111" }))
+      .resolves.toMatchObject({
+        structuredContent: {
+          competitor_id: "11111111-1111-4111-8111-111111111111",
+          rows: [],
+        },
+      });
+    expect(client.operations.at(-1)).toMatchObject({
+      table: "canvas_section_versions",
+      filters: [
+        ["account_id", "account-1"],
+        ["competitor_id", "11111111-1111-4111-8111-111111111111"],
+      ],
+    });
     await expect(tools.search_web.handler({ query: "Acme pricing" }))
       .resolves.toMatchObject({ structuredContent: { degraded: false, health: "ok" } });
     await expect(tools.firecrawl_scrape.handler({ url: "https://example.com" }))
@@ -152,6 +166,11 @@ class FakeQuery {
     return this;
   }
 
+  is(column: string, value: unknown): this {
+    this.filters.push([`is:${column}`, value]);
+    return this;
+  }
+
   order(): this {
     return this;
   }
@@ -171,6 +190,7 @@ class FakeQuery {
   }
 
   then(resolve: (value: { data: Array<Record<string, unknown>>; error: null }) => void): void {
+    this.client.operations.push({ table: this.table, filters: [...this.filters] });
     resolve({ data: [], error: null });
   }
 }
