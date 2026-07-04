@@ -56,7 +56,7 @@ do $$ begin create type public.agent_run_status as enum ('pending', 'running', '
 do $$ begin create type public.agent_run_trigger as enum ('manual', 'scheduled', 'api', 'cascade', 'retry'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.gap_severity as enum ('critical', 'high', 'medium', 'low'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.gap_status as enum ('open', 'acknowledged', 'in_progress', 'resolved', 'wont_fix'); exception when duplicate_object then null; end $$;
-do $$ begin create type public.gap_type as enum ('missing_data', 'low_confidence', 'no_evidence', 'outdated', 'contradictory', 'assumption'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.gap_type as enum ('missing_data', 'low_confidence', 'no_evidence', 'outdated', 'contradictory', 'assumption', 'competitive'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.credential_status as enum ('active', 'revoked', 'expired', 'untested'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.mcp_transport_type as enum ('stdio', 'http', 'sse', 'websocket'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.mcp_server_status as enum ('connected', 'disconnected', 'error', 'untested'); exception when duplicate_object then null; end $$;
@@ -235,10 +235,14 @@ create table if not exists public.evidence_items (
 create table if not exists public.gaps (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null references public.accounts(id) on delete cascade,
+  competitor_id uuid references public.companies(id) on delete cascade,
   title text not null,
   description text,
   gap_type public.gap_type not null default 'missing_data',
   severity public.gap_severity not null default 'medium',
+  score numeric(6,2),
+  score_inputs jsonb not null default '{}'::jsonb,
+  formula_version text,
   impact text,
   effort text,
   confidence numeric(3,2),
@@ -554,6 +558,9 @@ create index if not exists idx_csv_context on public.canvas_section_versions(bus
 create index if not exists idx_csv_section_key on public.canvas_section_versions(section_key);
 create index if not exists idx_evidence_account on public.evidence_items(account_id);
 create index if not exists idx_gaps_account on public.gaps(account_id);
+create index if not exists idx_gaps_competitor
+  on public.gaps(account_id, competitor_id, status, created_at desc)
+  where competitor_id is not null;
 create index if not exists idx_gaps_status on public.gaps(status);
 create index if not exists idx_agent_profiles_account on public.agent_profiles(account_id);
 create index if not exists idx_agent_profiles_key on public.agent_profiles(agent_key);

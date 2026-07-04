@@ -818,7 +818,7 @@ npm run lint                    -> 68 problems (49 errors, 19 warnings), within 
 ```
 
 ### Phase 4 - Competitor canvases & gap engine
-Tasks: 4.1 [x] - 4.2 [x] - 4.3 [ ] - 4.4 [ ] - 4.5 [ ] - 4.6 [ ] - 4.7 [ ]
+Tasks: 4.1 [x] - 4.2 [x] - 4.3 [x] - 4.4 [ ] - 4.5 [ ] - 4.6 [ ] - 4.7 [ ]
 
 **2026-07-03 - Slice 1 complete: work orders 4.1-4.2.**
 
@@ -857,6 +857,39 @@ npm run build                         -> green
 npm run lint                          -> 68 problems (49 errors, 19 warnings), within frozen <=68 ceiling
 cd worker && npm run typecheck        -> exit 0
 cd worker && npm test                 -> 38 passed, 2 skipped (SQL integration + live golden env-gated)
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
+
+**2026-07-03 - Slice 2 backend complete: work order 4.3.**
+
+- **4.3 gap engine job:** added non-LLM `gap_engine` worker job that compares latest own
+  canvas section versions against latest competitor canvas versions, writes competitor-linked
+  `gaps` rows with deterministic `competitor_gap_v1` scores, and emits `metric_snapshots` for
+  `competitor.section_delta` plus `competitor.threat_index` with formula inputs stored for
+  audit. The job calls `markJobRunCompleted` because it is a non-LLM handler.
+- **Schema:** added migration `20260704100000_competitor_gap_engine.sql` with
+  `gap_type = competitive`, `gaps.competitor_id`, `score`, `score_inputs`, `formula_version`,
+  and `idx_gaps_competitor`. Mirrored into `schema.sql`, Supabase types, and
+  `scripts/verify-schema.sql`.
+- **Worker/edge routing:** added `gap_engine` to the worker dispatcher and `agent-run` enqueue
+  allowlist. Tests cover deterministic gap scoring, account-scoped competitor loading,
+  Threat Index metric inputs, run completion, and dispatcher routing.
+- **Live DB:** applied migration `20260704100000_competitor_gap_engine.sql` to Supabase project
+  `mehhuxzamnpxnkbrslls` via MCP as `competitor_gap_engine` (recorded version
+  `20260704035103`). Verification returned `competitive_gap_type_exists = true`,
+  `gaps_competitor_id_exists = true`, `gaps_score_exists = true`,
+  `gaps_score_inputs_exists = true`, and `gaps_competitor_index_exists = true`.
+- **Honest scope note:** UI portions of 4.4-4.5 (drill-down compare, landscape links, visible
+  Threat Index surfaces) remain open for the next slice alongside 4.6-4.7.
+
+**Full gate results before Slice 2 commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 68 problems (49 errors, 19 warnings), within frozen <=68 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 40 passed, 2 skipped (SQL integration + live golden env-gated)
 cd worker && npm run build            -> exit 0
 cd worker && npm run lint             -> exit 0
 ```

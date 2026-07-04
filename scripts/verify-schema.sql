@@ -336,6 +336,49 @@ with checks as (
              and indexdef like '%competitor_id%'
          ) then 'PASS' else 'FAIL' end
 
+  union all
+
+  -- ---- 11. Phase 4.3 competitor gap engine ----
+  select 'column exists: gaps.competitor_id',
+         case when exists (
+           select 1 from information_schema.columns
+           where table_schema = 'public' and table_name = 'gaps' and column_name = 'competitor_id'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'enum value exists: gap_type.competitive',
+         case when exists (
+           select 1 from pg_enum e
+           join pg_type t on t.oid = e.enumtypid
+           where t.typname = 'gap_type' and e.enumlabel = 'competitive'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'column exists: gaps.score',
+         case when exists (
+           select 1 from information_schema.columns
+           where table_schema = 'public' and table_name = 'gaps' and column_name = 'score'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'column exists: gaps.score_inputs',
+         case when exists (
+           select 1 from information_schema.columns
+           where table_schema = 'public' and table_name = 'gaps' and column_name = 'score_inputs'
+         ) then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'index exists: idx_gaps_competitor',
+         case when exists (
+           select 1 from pg_indexes
+           where schemaname = 'public' and indexname = 'idx_gaps_competitor'
+             and indexdef like '%competitor_id%'
+         ) then 'PASS' else 'FAIL' end
+
 )
 select check_name, status from checks order by
   case status when 'FAIL' then 0 else 1 end,  -- surface failures first

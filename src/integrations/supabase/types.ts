@@ -917,10 +917,14 @@ export type Database = {
         Row: {
           id: string
           account_id: string
+          competitor_id: string | null
           title: string
           description: string | null
           gap_type: Database["public"]["Enums"]["gap_type"]
           severity: Database["public"]["Enums"]["gap_severity"]
+          score: number | null
+          score_inputs: Json
+          formula_version: string | null
           impact: string | null
           effort: string | null
           confidence: number | null
@@ -935,10 +939,14 @@ export type Database = {
         Insert: {
           id?: string
           account_id: string
+          competitor_id?: string | null
           title: string
           description?: string | null
           gap_type?: Database["public"]["Enums"]["gap_type"]
           severity?: Database["public"]["Enums"]["gap_severity"]
+          score?: number | null
+          score_inputs?: Json
+          formula_version?: string | null
           impact?: string | null
           effort?: string | null
           confidence?: number | null
@@ -953,10 +961,14 @@ export type Database = {
         Update: {
           id?: string
           account_id?: string
+          competitor_id?: string | null
           title?: string
           description?: string | null
           gap_type?: Database["public"]["Enums"]["gap_type"]
           severity?: Database["public"]["Enums"]["gap_severity"]
+          score?: number | null
+          score_inputs?: Json
+          formula_version?: string | null
           impact?: string | null
           effort?: string | null
           confidence?: number | null
@@ -974,6 +986,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gaps_competitor_id_fkey"
+            columns: ["competitor_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -2191,7 +2210,7 @@ export type Database = {
       agent_run_trigger: "manual" | "scheduled" | "api" | "cascade" | "retry"
       gap_severity: "critical" | "high" | "medium" | "low"
       gap_status: "open" | "acknowledged" | "in_progress" | "resolved" | "wont_fix"
-      gap_type: "missing_data" | "low_confidence" | "no_evidence" | "outdated" | "contradictory" | "assumption"
+      gap_type: "missing_data" | "low_confidence" | "no_evidence" | "outdated" | "contradictory" | "assumption" | "competitive"
       credential_status: "active" | "revoked" | "expired" | "untested"
       mcp_transport_type: "stdio" | "http" | "sse" | "websocket"
       mcp_server_status: "connected" | "disconnected" | "error" | "untested"
@@ -2343,7 +2362,7 @@ export const Constants = {
       agent_run_trigger: ["manual", "scheduled", "api", "cascade", "retry"],
       gap_severity: ["critical", "high", "medium", "low"],
       gap_status: ["open", "acknowledged", "in_progress", "resolved", "wont_fix"],
-      gap_type: ["missing_data", "low_confidence", "no_evidence", "outdated", "contradictory", "assumption"],
+      gap_type: ["missing_data", "low_confidence", "no_evidence", "outdated", "contradictory", "assumption", "competitive"],
       credential_status: ["active", "revoked", "expired", "untested"],
       mcp_transport_type: ["stdio", "http", "sse", "websocket"],
       mcp_server_status: ["connected", "disconnected", "error", "untested"],
