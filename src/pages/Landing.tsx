@@ -10,6 +10,7 @@ import {
   ClipboardList,
   FileSearch,
   FileText,
+  FileUp,
   Handshake,
   Lock,
   Radar,
@@ -59,8 +60,8 @@ const bottomCanvasBlocks = [
 
 const howItWorks = [
   {
-    title: "Drop in a URL",
-    body: "Our research engine scrapes your public footprint - site, pricing, reviews, news - and drafts all nine sections of your Business Model Canvas, every claim linked to its source.",
+    title: "Drop in a URL - or a deck",
+    body: "Our research engine reads your public footprint - site, pricing, reviews, news - or your pitch deck if you're pre-launch, and drafts all nine sections of your canvas with every claim linked to its source.",
   },
   {
     title: "Meet your team",
@@ -150,6 +151,11 @@ const faqs = [
   {
     question: "Do I need to connect my internal data?",
     answer: "No. Super BMC works from public data - yours and your competitors'. Private-data integrations are on the roadmap.",
+  },
+  {
+    question: "We're pre-launch - there's nothing to scrape yet. Can we still use it?",
+    answer:
+      "Yes - that's exactly who the deck upload is for. Drop in your pitch deck, business plan, or even a written-out idea, and the agents structure it into your Business Model Canvas. Everything from your documents is labeled owner-provided, so you always know which claims came from you and which came from market research.",
   },
   {
     question: "What does it cost?",
@@ -269,6 +275,86 @@ function MiniCanvas() {
           {bottomCanvasBlocks.map((block) => (
             <CanvasBlock key={block.label} {...block} />
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeckToCanvasVisual() {
+  const filledCells = [
+    { label: "Value", owner: true },
+    { label: "Segments", owner: true },
+    { label: "Revenue", owner: true },
+    { label: "Channels", owner: false },
+    { label: "Partners", owner: true },
+    { label: "Activities", owner: false },
+    { label: "Resources", owner: true },
+    { label: "Relations", owner: false },
+    { label: "Costs", owner: true },
+  ];
+
+  return (
+    <div className="relative mx-auto w-full max-w-md" aria-hidden="true">
+      <div className="flex flex-col items-center gap-5">
+        {/* The deck */}
+        <div className="relative h-44 w-40 shrink-0">
+          <div className="absolute left-4 top-4 h-36 w-32 -rotate-6 rounded-lg border border-border/70 bg-white shadow-sm" />
+          <div className="absolute left-2 top-2 h-36 w-32 -rotate-3 rounded-lg border border-border/70 bg-white shadow-sm" />
+          <div className="absolute left-0 top-0 flex h-36 w-32 flex-col rounded-lg border border-border bg-white p-3 shadow-md">
+            <span className="inline-flex w-fit items-center rounded bg-primary px-1.5 py-0.5 text-[9px] font-semibold text-primary-foreground">
+              PITCH DECK
+            </span>
+            <div className="mt-3 h-2 w-5/6 rounded-full bg-foreground/70" />
+            <div className="mt-2 h-1.5 w-full rounded-full bg-muted" />
+            <div className="mt-1.5 h-1.5 w-4/5 rounded-full bg-muted" />
+            <div className="mt-1.5 h-1.5 w-full rounded-full bg-muted" />
+            <div className="mt-auto flex items-end gap-1">
+              <div className="h-5 w-2.5 rounded-sm bg-primary/25" />
+              <div className="h-8 w-2.5 rounded-sm bg-primary/40" />
+              <div className="h-11 w-2.5 rounded-sm bg-primary/60" />
+            </div>
+          </div>
+        </div>
+
+        {/* The handoff */}
+        <div className="flex shrink-0 rotate-90 items-center">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/30 bg-white text-primary shadow-sm">
+            <ArrowRight className="h-4 w-4" />
+          </span>
+        </div>
+
+        {/* The canvas */}
+        <div className="w-full rounded-lg border border-border bg-white p-3 shadow-md">
+          <div className="mb-2 flex items-center justify-between px-0.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Business Model Canvas
+            </p>
+            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+              From your deck
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {filledCells.map((cell) => (
+              <div key={cell.label} className="rounded-md border border-border/60 bg-white p-2">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="truncate text-[9px] font-semibold text-foreground">{cell.label}</p>
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${cell.owner ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                </div>
+                <div className="mt-1.5 h-1 rounded-full bg-muted" />
+                <div className="mt-1 h-1 w-3/4 rounded-full bg-muted" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-3 px-0.5 text-[9px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Owner-provided
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" /> Researched
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -440,6 +526,65 @@ const Landing = () => {
                   <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">{step.body}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="deck-to-canvas" className="bg-white">
+          <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6 lg:py-28">
+            <div className="overflow-hidden rounded-xl border-2 border-primary/20 bg-primary/[0.03] shadow-sm">
+              <div className="grid gap-10 p-8 sm:p-12 lg:grid-cols-2 lg:items-center lg:gap-14">
+                <div>
+                  <p className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-widest text-primary">
+                    <FileUp className="h-3.5 w-3.5" />
+                    For pre-launch startups
+                  </p>
+                  <h2 className="mt-5 text-3xl font-semibold tracking-tight md:text-4xl">
+                    No website yet? Bring your deck.
+                  </h2>
+                  <p className="mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
+                    Your pitch deck already holds your business model. Upload it and the agents turn
+                    it into a working canvas - before you have anything to scrape.
+                  </p>
+                  <ul className="mt-8 space-y-4">
+                    {[
+                      {
+                        title: "Any founder document works",
+                        body: "Pitch deck, business plan, one-pager, or a plain text dump of the idea in your head.",
+                      },
+                      {
+                        title: "Your words become the canvas",
+                        body: "Agents extract every claim, map it to the right section, and verify it against your own document.",
+                      },
+                      {
+                        title: "Your input stays labeled yours",
+                        body: "Owner-provided facts are marked apart from researched ones - the canvas never blurs what you said with what the market says.",
+                      },
+                    ].map((item) => (
+                      <li key={item.title} className="flex gap-3">
+                        <Check className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-9">
+                    <Button asChild size="lg" className="gap-2">
+                      <Link to="/auth?mode=signup">
+                        Start free analysis
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Deck upload is rolling out to early-access workspaces now.
+                    </p>
+                  </div>
+                </div>
+
+                <DeckToCanvasVisual />
+              </div>
             </div>
           </div>
         </section>
