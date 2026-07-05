@@ -5,6 +5,7 @@ import { Copy, Download, Save, RefreshCw, X, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { copyHtmlToClipboard, exportReportToPdf } from "@/lib/report-export";
+import { salvageReportHtml } from "@/lib/report-content";
 import { BASE_REPORT_STYLES } from "@/data/report-templates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -68,8 +69,10 @@ export function ReportViewerDrawer({
     }
 
     if (data) {
-      setReportHtml(data.report_content);
-      setOriginalHtml(data.original_content || data.report_content);
+      // Salvage legacy rows where raw/escaped JSON was stored instead of a
+      // rendered report — display formatted, never raw JSON.
+      setReportHtml(salvageReportHtml(data.report_content));
+      setOriginalHtml(salvageReportHtml(data.original_content || data.report_content));
       setIsEdited(data.is_edited || false);
       setFrameworkTitle(data.frameworks?.title || "Strategic Report");
       setCustomCss(data.frameworks?.custom_css || "");

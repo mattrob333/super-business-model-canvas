@@ -131,6 +131,11 @@ export const CompetitiveLandscape = ({
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Researching — takes a few minutes
                     </>
+                  ) : research.status === "error" ? (
+                    <>
+                      <Radar className="h-3.5 w-3.5" />
+                      Retry research
+                    </>
                   ) : (
                     <>
                       <Radar className="h-3.5 w-3.5" />

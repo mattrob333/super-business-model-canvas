@@ -4,6 +4,7 @@ import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useAuth } from "@/hooks/useAuth";
 import { getAgentRuntime } from "@/lib/agent-runtime";
+import type { AgentRunStatus } from "@/lib/agent-runtime";
 
 /**
  * RF-4-1: the user-reachable entry point for competitor research.
@@ -13,6 +14,12 @@ import { getAgentRuntime } from "@/lib/agent-runtime";
  * exposes its latest Threat Index, and can kick off the full chain:
  * create entity -> enqueue `competitor_research` (the worker chains `gap_engine`
  * on completion).
+ *
+ * Run state is derived from the durable agent_runs record — not just local
+ * session state — so an in-flight run survives page reloads and a worker-side
+ * failure surfaces on the card instead of spinning forever (live bug
+ * 2026-07-05: a failed competitor crawl showed "Researching…" indefinitely).
+ * While any run is active the hook polls until it reaches a terminal status.
  */
 
 export interface CompetitorEntity {
@@ -35,6 +42,26 @@ export interface CompetitorResearchState {
   error?: string;
 }
 
+interface CompetitorRunSnapshot {
+  id: string;
+  status: AgentRunStatus;
+  error: string | null;
+  createdAt: string;
+}
+
+type PendingState = {
+  status: CompetitorResearchState["status"];
+  error?: string;
+  entityId?: string;
+  /** agent_runs.id returned by startRun — lets DB state take over precisely */
+  runId?: string;
+};
+
+const RUN_POLL_INTERVAL_MS = 5_000;
+
+const ACTIVE_RUN_STATUSES: AgentRunStatus[] = ["pending", "running"];
+const FAILED_RUN_STATUSES: AgentRunStatus[] = ["failed", "timeout", "cancelled"];
+
 function hostOf(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
@@ -52,15 +79,21 @@ export function useCompetitorResearch(
   const [entities, setEntities] = useState<CompetitorEntity[]>([]);
   const [researchedIds, setResearchedIds] = useState<Set<string>>(new Set());
   const [threatByCompetitor, setThreatByCompetitor] = useState<Record<string, number>>({});
-  type PendingState = { status: CompetitorResearchState["status"]; error?: string; entityId?: string };
+  /** latest competitor_research run per companies.id, newest first from agent_runs */
+  const [latestRuns, setLatestRuns] = useState<Record<string, CompetitorRunSnapshot>>({});
   const [pending, setPending] = useState<Record<string, PendingState>>({});
   const [refreshTick, setRefreshTick] = useState(0);
+
+  const hasLocalInFlight = Object.values(pending).some(
+    (state) => state.status === "starting" || state.status === "queued",
+  );
 
   useEffect(() => {
     if (!accountId) return;
     let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
     (async () => {
-      const [companiesRes, versionsRes, metricsRes] = await Promise.all([
+      const [companiesRes, versionsRes, metricsRes, runsRes] = await Promise.all([
         supabase
           .from("companies")
           .select("id, name, website_url, logo_url")
@@ -80,6 +113,13 @@ export function useCompetitorResearch(
           .eq("account_id", accountId)
           .eq("metric_key", "competitor.threat_index")
           .order("computed_at", { ascending: false })
+          .limit(100),
+        supabase
+          .from("agent_runs")
+          .select("id, status, error, input, created_at")
+          .eq("account_id", accountId)
+          .eq("run_type", "competitor_research")
+          .order("created_at", { ascending: false })
           .limit(100),
       ]);
       if (cancelled) return;
@@ -104,11 +144,44 @@ export function useCompetitorResearch(
         }
         setThreatByCompetitor(latest);
       }
+      let anyRunActive = false;
+      if (!runsRes.error && runsRes.data) {
+        const latest: Record<string, CompetitorRunSnapshot> = {};
+        const fetchedRunIds = new Set<string>();
+        for (const row of runsRes.data) {
+          fetchedRunIds.add(row.id);
+          const input = (row.input ?? {}) as Record<string, unknown>;
+          const competitorId = typeof input.competitor_id === "string" ? input.competitor_id : null;
+          if (!competitorId || competitorId in latest) continue;
+          latest[competitorId] = {
+            id: row.id,
+            status: row.status,
+            error: row.error,
+            createdAt: row.created_at,
+          };
+        }
+        setLatestRuns(latest);
+        // Once agent_runs reflects an enqueued run, the local bridge state is
+        // redundant — drop it so polling stops when the run itself settles.
+        setPending((prev) => {
+          const entries = Object.entries(prev).filter(
+            ([, state]) => !(state.status === "queued" && state.runId && fetchedRunIds.has(state.runId)),
+          );
+          return entries.length === Object.keys(prev).length ? prev : Object.fromEntries(entries);
+        });
+        anyRunActive = Object.values(latest).some((run) => ACTIVE_RUN_STATUSES.includes(run.status));
+      }
+      // Keep polling while anything is in flight — DB-side runs or a local
+      // enqueue the runs query hasn't caught up with yet.
+      if (anyRunActive || hasLocalInFlight) {
+        pollTimer = setTimeout(() => setRefreshTick((tick) => tick + 1), RUN_POLL_INTERVAL_MS);
+      }
     })();
     return () => {
       cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
     };
-  }, [accountId, refreshTick]);
+  }, [accountId, refreshTick, hasLocalInFlight]);
 
   const stateFor = useCallback(
     (candidate: { name: string; website: string }): CompetitorResearchState => {
@@ -118,17 +191,37 @@ export function useCompetitorResearch(
         host ? hostOf(row.website_url) === host : row.name.toLowerCase() === candidate.name.toLowerCase(),
       );
       const local = pending[key];
+      const dbRun = entity ? latestRuns[entity.id] : undefined;
       const researched = Boolean(entity && researchedIds.has(entity.id));
+
+      // Resolve status: a mid-flight enqueue wins; then the durable run record;
+      // a just-enqueued local state holds only until the runs query sees its run.
+      let status: CompetitorResearchState["status"] = "idle";
+      let error: string | undefined;
+      if (local?.status === "starting") {
+        status = "starting";
+      } else if (local?.status === "error") {
+        status = "error";
+        error = local.error;
+      } else if (dbRun && ACTIVE_RUN_STATUSES.includes(dbRun.status)) {
+        status = "queued";
+      } else if (local?.status === "queued" && dbRun?.id !== local.runId) {
+        status = "queued";
+      } else if (dbRun && FAILED_RUN_STATUSES.includes(dbRun.status)) {
+        status = "error";
+        error = dbRun.error ?? `Research ${dbRun.status}. Try again.`;
+      }
+
       return {
         entityId: entity?.id,
         logoUrl: entity?.logo_url ?? null,
         researched,
         threatIndex: entity ? threatByCompetitor[entity.id] : undefined,
-        status: local?.status ?? "idle",
-        error: local?.error,
+        status,
+        error,
       };
     },
-    [entities, researchedIds, threatByCompetitor, pending],
+    [entities, researchedIds, threatByCompetitor, pending, latestRuns],
   );
 
   const startResearch = useCallback(
@@ -217,7 +310,7 @@ export function useCompetitorResearch(
 
         // 4. Enqueue competitor_research; the worker chains gap_engine on completion.
         const runtime = getAgentRuntime(accountId);
-        await runtime.startRun({
+        const { runId } = await runtime.startRun({
           agentProfileId: profile.id,
           accountId,
           runType: "competitor_research",
@@ -230,7 +323,7 @@ export function useCompetitorResearch(
           },
         });
 
-        setPending((prev) => ({ ...prev, [key]: { status: "queued", entityId: entity?.id } }));
+        setPending((prev) => ({ ...prev, [key]: { status: "queued", entityId: entity?.id, runId } }));
         setRefreshTick((tick) => tick + 1);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to start competitor research";

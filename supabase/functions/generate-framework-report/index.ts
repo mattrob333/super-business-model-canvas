@@ -223,13 +223,15 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
               
               analysisData = JSON.parse(jsonContent);
               console.log('✅ Successfully parsed JSON, keys:', Object.keys(analysisData));
-              
-              // Validate that we have the expected structure
-              if (analysisData.analysis || analysisData.financial || analysisData.customer) {
+
+              // Any non-empty object is workable: the per-framework normalizer
+              // maps variant shapes, and the structured fallback renders the
+              // rest. Requiring specific keys here threw on legitimate output.
+              if (analysisData && typeof analysisData === 'object' && Object.keys(analysisData).length > 0) {
                 console.log('✅ JSON structure validated');
                 break;
               } else {
-                throw new Error('JSON parsed but missing expected keys (analysis, financial, customer)');
+                throw new Error('JSON parsed but empty — expected a structured analysis object');
               }
             } catch (jsonError) {
               parseAttempts++;
@@ -252,20 +254,19 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
                 }
                 
                 const errorMsg = jsonError instanceof Error ? jsonError.message : 'Unknown error';
+                console.error(`Unparseable as JSON (${errorMsg}) — rendering the response as a prose report instead of failing`);
 
-                if (isLikelyHtml(reportContent)) {
-                  console.log('Using AI HTML response directly');
-                  reportContent = proseFallbackReport(
-                    framework.title,
-                    companyName,
-                    strategic_goal,
-                    reportContent,
-                  );
-                  usedDirectHtml = true;
-                  break;
-                }
-
-                throw new Error(`Failed to parse AI response as valid JSON after ${maxAttempts} attempts: ${errorMsg}`);
+                // We still have model text — HTML renders directly, prose gets
+                // wrapped, and JSON-ish content renders structured. Failing the
+                // whole request here served the user nothing.
+                reportContent = proseFallbackReport(
+                  framework.title,
+                  companyName,
+                  strategic_goal,
+                  reportContent,
+                );
+                usedDirectHtml = true;
+                break;
               }
               
               // Wait a bit before retry (not necessary but good practice)
@@ -317,22 +318,16 @@ ${needsJsonOutput ? `- IMPORTANT: Return ONLY valid JSON in your response, no ma
           stack: templateError.stack,
         } : { message: String(templateError), stack: undefined };
         console.error('Error details:', errorDetails);
-        
-        // Create a user-friendly error report with the raw AI response
-        reportContent = `<div class="framework-report">
-          <h1>${framework.title}</h1>
-          <h2>${companyName}</h2>
-          <div class="error-notice" style="background: #fee; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #fcc;">
-            <strong>⚠️ Report Generation Error</strong>
-            <p>The AI generated content but it could not be properly formatted.</p>
-            <details style="margin-top: 8px;">
-              <summary style="cursor: pointer; font-weight: 600;">Technical Details</summary>
-              <p style="font-size: 12px; color: #666; margin-top: 8px;">Error: ${errorDetails.message}</p>
-              <p style="font-size: 11px; color: #888; margin-top: 4px; font-family: monospace; max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 8px; border-radius: 4px;">${reportContent.substring(0, 2000)}</p>
-            </details>
-            <p style="margin-top: 12px; font-size: 14px;">Please try generating the report again. If the issue persists, contact support.</p>
-          </div>
-        </div>`;
+
+        // We still have the raw model response — render it as a professional
+        // report (structured when it's JSON) instead of an error box that
+        // dumps unescaped raw content at the user.
+        reportContent = proseFallbackReport(
+          framework.title,
+          companyName,
+          strategic_goal,
+          rawAiResponse,
+        );
       }
     }
 

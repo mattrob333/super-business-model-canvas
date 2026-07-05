@@ -2,8 +2,21 @@ import { degraded, type FeedFetcher, type FeedRuntimeConfig } from "./types.js";
 
 type FetchLike = typeof fetch;
 
+/**
+ * Feed requests hit arbitrary third-party endpoints; a hung request would
+ * otherwise pin the job forever (the queue heartbeat keeps a stuck handler
+ * alive), leaving its agent run "running" with no terminal state. Live
+ * incident 2026-07-05: a competitor crawl never finished.
+ */
+const DEFAULT_FETCH_TIMEOUT_MS = 120_000;
+
+function withTimeout(fetcher: FetchLike, timeoutMs: number): FetchLike {
+  return ((input: Parameters<FetchLike>[0], init?: Parameters<FetchLike>[1]) =>
+    fetcher(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(timeoutMs) })) as FetchLike;
+}
+
 export function createFeedFetchers(config: FeedRuntimeConfig = {}): Map<string, FeedFetcher> {
-  const fetcher = config.fetch ?? fetch;
+  const fetcher = withTimeout(config.fetch ?? fetch, config.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS);
   const fetchers: FeedFetcher[] = [
     firecrawlScrapeFetcher(config, fetcher),
     grokLiveSearchFetcher(config, fetcher),
