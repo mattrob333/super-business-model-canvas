@@ -198,6 +198,31 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Spec 10 slice 1: skill catalog + skill_run pipeline + pricing_teardown (2026-07-04, reviewer-as-builder, PR #45)
+
+- **Schema:** `skill_catalog` (global registry, all 27 spec-10 skills seeded; only
+  `yield.pricing_teardown` has `implemented=true` — the flag is the UI's source of
+  truth, no fake catalog) + `skill_artifacts` (account RLS select; service-role writes;
+  markdown body + typed JSON payload + evidence links + reproducibility inputs) +
+  `skill_run` mid-tier model route. Migration `20260704210000_skill_catalog.sql`,
+  schema mirror, verify-schema (routes count 6; catalog seed + artifacts RLS checks).
+- **Worker:** `skill_run` job kind → `SkillRunHandler` registry. Flagship
+  `yield.pricing_teardown`: crawls each competitor's /pricing (FeedRunner; honest
+  fallback to the cached research homepage crawl), evidence rows deduped, mid-tier
+  model normalizes a pricing matrix (competitor ids validated — hallucinated rows
+  dropped) + recommendation memo + scenarios, **verifier spot-checks up to 3 matrix
+  rows against their own excerpts — a contradiction hard-fails the run**, artifact
+  written with spot-check stats in payload. Unimplemented skill_keys fail loudly.
+  Dispatcher + agent-run allowlist wired. Tests: parse validation (incl. hallucinated
+  competitor rejection), artifact write with evidence links, contradicted spot-check
+  hard-fail, unimplemented rejection (worker suite 59).
+- **Deliberately deferred to 5B (disclosed):** UI surfacing (ActionsPanel per spec 02
+  reads `skill_catalog` where implemented; artifacts viewer) and frontend types for the
+  two new tables (no frontend consumers yet; the generated type's TS2589 horizon makes
+  additions unreachable anyway — UI will use the documented escape hatch).
+- **Operator/live queue:** apply `20260704210000_skill_catalog.sql` live; redeploy
+  `agent-run` (allowlist gained `skill_run`).
+
 ### Phase 5A: agent-proposed grounding suggestions (2026-07-04, reviewer-as-builder, PR #43)
 
 Closes spec 08 §3a — the wizard's proactive half:
