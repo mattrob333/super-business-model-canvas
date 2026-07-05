@@ -4,6 +4,7 @@ import { CompanyResearchHandler } from "./company-research.js";
 import { FeedRefreshHandler } from "./feed-refresh.js";
 import { GapEngineHandler } from "./gap-engine.js";
 import { KnowledgeJobHandler } from "./knowledge-jobs.js";
+import { SkillRunHandler } from "./skill-run.js";
 import { StalenessSweepHandler } from "./staleness-sweep.js";
 import { WorkspaceChatHandler } from "./workspace-chat.js";
 import type { AgentTaskLimits } from "../agent/limits.js";
@@ -29,6 +30,7 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
   const feedRefresh = new FeedRefreshHandler(options);
   const gapEngine = new GapEngineHandler(options.client);
   const knowledgeJobs = new KnowledgeJobHandler(options);
+  const skillRun = new SkillRunHandler(options);
   const stalenessSweep = new StalenessSweepHandler(options);
 
   return async (job: AgentJob): Promise<void> => {
@@ -80,6 +82,11 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
 
       if (job.kind === "onboarding_extract") {
         await knowledgeJobs.handleOnboardingExtract(job);
+        return;
+      }
+
+      if (job.kind === "skill_run") {
+        await skillRun.handle(job);
         return;
       }
 

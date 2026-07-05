@@ -494,8 +494,23 @@ with checks as (
          case when (
            select count(distinct task_class) from public.model_routes
            where account_id is null
-             and task_class in ('onboarding_extract', 'dossier_refresh', 'summary_update', 'summary_update_escalated', 'grounding_suggest')
-         ) = 5 then 'PASS' else 'FAIL' end
+             and task_class in ('onboarding_extract', 'dossier_refresh', 'summary_update', 'summary_update_escalated', 'grounding_suggest', 'skill_run')
+         ) = 6 then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'skill catalog seeded: 27 skills, pricing_teardown implemented',
+         case when (select count(*) from public.skill_catalog) >= 27
+           and exists (select 1 from public.skill_catalog where skill_key = 'yield.pricing_teardown' and implemented = true)
+         then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'table exists with RLS: skill_artifacts',
+         case when exists (
+           select 1 from pg_tables pt join pg_class c on c.relname = pt.tablename
+           where pt.schemaname = 'public' and pt.tablename = 'skill_artifacts' and c.relrowsecurity = true
+         ) then 'PASS' else 'FAIL' end
 
   union all
 
