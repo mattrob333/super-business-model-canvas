@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { FocusDrawer } from "@/components/overlay/FocusDrawer";
+import { GroundingWizardDrawer } from "@/components/knowledge/GroundingWizardDrawer";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { useAccountId } from "@/hooks/useAccountId";
@@ -70,6 +71,7 @@ export default function Knowledge() {
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [answerDraft, setAnswerDraft] = useState("");
   const [manualLogoUrl, setManualLogoUrl] = useState("");
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -416,9 +418,22 @@ export default function Knowledge() {
             }}
             onDismiss={dismissQuestion}
           />
-          <GroundingWizard documents={documents} dossiers={dossiers} questions={openQuestions} />
+          <GroundingWizard
+            documents={documents}
+            dossiers={dossiers}
+            questions={openQuestions}
+            groundedness={canvasGroundedness}
+            onLaunch={() => setWizardOpen(true)}
+          />
         </div>
       </section>
+
+      <GroundingWizardDrawer
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        accountId={accountId}
+        onGrounded={() => void loadKnowledge({ background: true })}
+      />
 
       <DossierDrawer
         dossier={selectedDossier}
@@ -649,10 +664,14 @@ function GroundingWizard({
   documents,
   dossiers,
   questions,
+  groundedness,
+  onLaunch,
 }: {
   documents: FounderDocument[];
   dossiers: AgentDocument[];
   questions: OwnerQuestion[];
+  groundedness: number | null;
+  onLaunch: () => void;
 }) {
   const hasUpload = documents.length > 0;
   const hasDistributed = documents.some((document) => document.status === "distributed");
@@ -663,6 +682,7 @@ function GroundingWizard({
     { label: "Parse and distribute", done: hasDistributed },
     { label: "Review dossiers", done: hasDossiers },
     { label: "Resolve open questions", done: !hasOpenQuestions },
+    { label: "Confirm real names", done: groundedness === 100 },
   ];
   const complete = steps.filter((step) => step.done).length;
   return (
@@ -683,6 +703,10 @@ function GroundingWizard({
           </div>
         ))}
       </div>
+      <Button className="mt-4 w-full" size="sm" onClick={onLaunch}>
+        <ShieldCheck className="mr-2 h-4 w-4" />
+        Ground your canvas
+      </Button>
     </section>
   );
 }

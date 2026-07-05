@@ -377,3 +377,22 @@ function route(routeKey: string, taskClass: string, modelName: string, provider 
     cost_per_1k_out: 0.005,
   };
 }
+
+describe("extractLogoFromPayload", () => {
+  it("prefers og:image, resolves relative URLs, falls back to favicon then /favicon.ico", async () => {
+    const { extractLogoFromPayload } = await import("../jobs/company-research.js");
+    expect(extractLogoFromPayload(
+      { data: { metadata: { ogImage: "/brand/og.png", favicon: "/icon.svg" } } },
+      "https://rival.example/pricing",
+    )).toEqual({ url: "https://rival.example/brand/og.png", source: "og_image" });
+    expect(extractLogoFromPayload(
+      { data: { metadata: { favicon: "https://cdn.rival.example/icon.svg" } } },
+      "https://rival.example",
+    )).toEqual({ url: "https://cdn.rival.example/icon.svg", source: "favicon" });
+    expect(extractLogoFromPayload({}, "https://rival.example/about")).toEqual({
+      url: "https://rival.example/favicon.ico",
+      source: "fallback",
+    });
+    expect(extractLogoFromPayload({}, "not a url")).toBeNull();
+  });
+});
