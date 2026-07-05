@@ -154,8 +154,6 @@ export function GroundingWizardDrawer({
     setEditing(false);
   }, [currentItem?.text]);
 
-  const remaining = queue.length - cursor;
-
   const attest = useCallback(async () => {
     if (!accountId || !current || !currentSection || !currentItem || saving) return;
     const finalText = (editing ? draft : currentItem.text).trim();

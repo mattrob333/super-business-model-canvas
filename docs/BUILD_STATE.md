@@ -198,6 +198,30 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase 5A completion slice (2026-07-04, reviewer-as-builder, PR #41)
+
+Built directly by the reviewer (owner directive while the build agent is offline):
+- **5.11 logo capture (worker):** `extractLogoFromPayload` (og:image → favicon →
+  /favicon.ico fallback, relative URLs resolved; unit-tested) runs inside every
+  company/competitor research crawl and writes `logo_url`/`logo_source` to the matching
+  `companies` row — never overwriting `manual` logos. Best-effort: capture failures log,
+  never fail research.
+- **Logo display:** landscape competitor cards and the competitor drill-down header render
+  captured logos (initial-icon fallback preserved); Knowledge brand panel already did.
+- **Grounding wizard (spec 08 §3):** new `GroundingWizardDrawer` on FocusDrawer (reading) —
+  walks every ungrounded item on the latest own-canvas versions, per item:
+  Confirm as accurate / Name it (replace generic wording with the real name) / Skip.
+  Each attestation writes an owner-attestation evidence row + a new canvas section version
+  with the item upgraded (grounded, owner_attested provenance, confidence ≥0.9) and a
+  recomputed `groundedness_score`. Skippable/resumable (queue recomputed from live data).
+  Launch button + "Confirm real names" step added to the Knowledge grounding panel.
+- Honest remaining 5A scope: logged-in live walkthrough on the deployed app (owner or
+  build agent); agent-PROPOSED grounding candidates with evidence (spec 08 §3a — needs a
+  `grounding_suggest` job) — current wizard covers the owner-attest path only;
+  independent verification of the build agent's v8/migration claims (Supabase MCP still
+  down for the reviewer).
+- Gates: root tsc/build/lint 65 (ceiling); worker 52 tests green.
+
 ### Phase 5A UI-slice review — reviewed with fixes applied by reviewer (2026-07-04, commit `94dc35f` + PR #40)
 
 Strong slice: real FocusDrawer usage (reading size, correct tiers), honest failed-status
