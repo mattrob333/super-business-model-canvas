@@ -198,6 +198,17 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Spec 10 slice 2: skill catalog surfaced on the Dashboard (2026-07-04, reviewer-as-builder, PR #48)
+
+First 5B UI increment: `SkillCatalogPanel` on the Dashboard — reads `skill_catalog`
+(implemented flags gate the Run button; unimplemented skills read honestly as "roll out
+with the agent workspaces"), runs a skill via the standard runtime enqueue (orchestrator
+profile, ensure-context invariant respected), and shelves the latest `skill_artifacts`
+with a FocusDrawer reading view (evidence-source count in the subtitle). Both tables via
+the documented untyped escape hatch (TS2589 horizon). Full per-room ActionsPanel still
+lands with 5B rooms per spec 02. Panel renders nothing until the catalog migration is
+applied live (honest absence, not an empty shell).
+
 ### Spec 10 slice 1: skill catalog + skill_run pipeline + pricing_teardown (2026-07-04, reviewer-as-builder, PR #45)
 
 - **Schema:** `skill_catalog` (global registry, all 27 spec-10 skills seeded; only
