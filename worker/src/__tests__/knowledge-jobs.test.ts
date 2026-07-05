@@ -204,6 +204,57 @@ describe("KnowledgeJobHandler", () => {
     expect(upsert?.values).toMatchObject({ doc_key: "atlas_summary", body_md: "## Position\n- grounded bullet" });
   });
 
+
+  it("grounding_suggest writes only verifier-confirmed candidates (spec 08 §3a)", async () => {
+    const client = new FakeClient();
+    const runner = new RoutingRunner({
+      main: JSON.stringify({
+        suggestions: [
+          { item_index: 0, suggested_text: "AWS and Snowflake", rationale: "Named in the stack excerpt", evidence_index: 0 },
+        ],
+      }),
+      verify: JSON.stringify({ status: "confirmed", reason: "excerpt names AWS and Snowflake" }),
+    });
+    const handler = new KnowledgeJobHandler({ client: client.asSupabase(), runner });
+
+    await handler.handleGroundingSuggest(makeJob({ kind: "grounding_suggest", payload: {} }));
+
+    const upsert = client.upserts.find((entry) => entry.table === "grounding_suggestions");
+    expect(upsert?.values).toMatchObject({
+      account_id: "account-1",
+      section_key: "key_resources",
+      item_text: "Cloud infrastructure providers",
+      suggested_text: "AWS and Snowflake",
+      evidence_id: "11111111-1111-4111-8111-111111111111",
+      status: "open",
+    });
+    expect(client.updates.filter((update) => update.table === "agent_runs").at(-1)?.values).toMatchObject({
+      status: "completed",
+      output: expect.objectContaining({ suggested: 1, rejected_by_verifier: 0 }),
+    });
+  });
+
+  it("grounding_suggest drops candidates the verifier refutes", async () => {
+    const client = new FakeClient();
+    const runner = new RoutingRunner({
+      main: JSON.stringify({
+        suggestions: [
+          { item_index: 0, suggested_text: "Google Cloud Platform", evidence_index: 0 },
+        ],
+      }),
+      verify: JSON.stringify({ status: "unsupported", reason: "excerpt names AWS, not GCP" }),
+    });
+    const handler = new KnowledgeJobHandler({ client: client.asSupabase(), runner });
+
+    await handler.handleGroundingSuggest(makeJob({ kind: "grounding_suggest", payload: {} }));
+
+    expect(client.upserts.filter((entry) => entry.table === "grounding_suggestions")).toHaveLength(0);
+    expect(client.updates.filter((update) => update.table === "agent_runs").at(-1)?.values).toMatchObject({
+      status: "completed",
+      output: expect.objectContaining({ suggested: 0, rejected_by_verifier: 1 }),
+    });
+  });
+
   it("dossier_refresh skips without new evidence and never calls the LLM", async () => {
     const client = new FakeClient();
     client.overrides.watched_sources = [];
@@ -327,6 +378,7 @@ const DEFAULT_ROUTES = [
   { account_id: null, route_key: "dossier_refresh", task_class: "dossier_refresh", provider: "anthropic", model_name: "claude-sonnet-5", params: {}, cost_per_1k_in: 0.002, cost_per_1k_out: 0.01 },
   { account_id: null, route_key: "summary_update", task_class: "summary_update", provider: "anthropic", model_name: "claude-haiku-4-5-20251001", params: {}, cost_per_1k_in: 0.001, cost_per_1k_out: 0.005 },
   { account_id: null, route_key: "summary_update_escalated", task_class: "summary_update_escalated", provider: "anthropic", model_name: "claude-sonnet-5", params: {}, cost_per_1k_in: 0.002, cost_per_1k_out: 0.01 },
+  { account_id: null, route_key: "grounding_suggest", task_class: "grounding_suggest", provider: "anthropic", model_name: "claude-haiku-4-5-20251001", params: {}, cost_per_1k_in: 0.001, cost_per_1k_out: 0.005 },
 ];
 
 class FakeClient {
@@ -385,6 +437,11 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null; count?: num
     return this;
   }
 
+  not(column: string, operator: string, value: unknown): this {
+    this.filters.push([`not:${column}:${operator}`, value]);
+    return this;
+  }
+
   neq(column: string, value: unknown): this {
     this.filters.push([`neq:${column}`, value]);
     return this;
@@ -425,6 +482,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null; count?: num
     onfulfilled?: ((value: { data: unknown; error: null; count?: number }) => TResult1 | PromiseLike<TResult1>) | null,
   ): PromiseLike<TResult1 | TResult2> {
     if (this.operation === "insert") this.client.inserts.push({ table: this.table, values: this.values });
+    if (this.operation === "upsert") this.client.upserts.push({ table: this.table, values: this.values });
     if (this.operation === "update") this.client.updates.push({ table: this.table, values: this.values, filters: this.filters });
     const response = this.countMode
       ? { data: null, error: null as null, count: 0 }
@@ -459,7 +517,21 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null; count?: num
         { id: "agent-vp", agent_key: "agent_value_propositions", display_name: "Forge" },
       ];
     }
-    if (this.table === "evidence_items") return null;
+    if (this.table === "evidence_items") {
+      return [
+        { id: "11111111-1111-4111-8111-111111111111", excerpt: "Our stack runs on AWS and Snowflake for warehousing." },
+      ];
+    }
+    if (this.table === "canvas_section_versions") {
+      return [{
+        section_key: "key_resources",
+        created_at: "2026-07-04T10:00:00Z",
+        items: [
+          { text: "Cloud infrastructure providers", confidence: 0.6, evidence_ids: [], grounded: false },
+          { text: "AI strategy workspace for seed-stage companies", confidence: 0.95, evidence_ids: ["e"], grounded: true },
+        ],
+      }];
+    }
     if (this.table === "agent_documents") return null;
     if (this.table === "watched_sources") return [];
     return null;

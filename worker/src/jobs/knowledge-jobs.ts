@@ -75,6 +75,20 @@ interface ParsedOnboardingExtract {
   ownerQuestions: ParsedOwnerQuestion[];
 }
 
+interface UngroundedItem {
+  sectionKey: SectionKey;
+  text: string;
+}
+
+interface GroundingCandidate {
+  sectionKey: SectionKey;
+  itemText: string;
+  suggestedText: string;
+  rationale?: string;
+  evidenceId: string;
+  evidenceExcerpt: string;
+}
+
 interface ParsedDocUpdate {
   title: string;
   bodyMd: string;
@@ -135,6 +149,7 @@ export class KnowledgeJobHandler {
         evidence_ids: [...new Set(evidenceByExcerpt.values())],
         error: null,
       });
+      await this.enqueueGroundingSuggest(job);
       await this.markRunCompleted(job, "onboarding_extract completed", {
         founder_document_id: documentId,
         sections: Object.keys(parsed.sections).length,
@@ -237,6 +252,41 @@ export class KnowledgeJobHandler {
     if (error) console.error(`Failed to post material-change insight for ${docKey}: ${error.message}`);
   }
 
+  /** Chain the grounding-suggestion pass after ingestion (spec 08 §3a). */
+  private async enqueueGroundingSuggest(job: AgentJob): Promise<void> {
+    try {
+      const payload = asRecord(job.payload);
+      const agentProfileId = readString(payload.agentProfileId ?? payload.agent_profile_id);
+      if (!agentProfileId) return;
+      const nowIso = new Date().toISOString();
+      const { data: run, error: runError } = await this.deps.client
+        .from("agent_runs")
+        .insert({
+          account_id: job.account_id,
+          agent_profile_id: agentProfileId,
+          run_type: "grounding_suggest",
+          trigger_type: "cascade",
+          status: "pending",
+          input: { chained_from_run_id: job.agent_run_id },
+          started_at: nowIso,
+        })
+        .select("id")
+        .single();
+      if (runError) throw new Error(runError.message);
+      const { error: jobError } = await this.deps.client.from("agent_jobs").insert({
+        account_id: job.account_id,
+        kind: "grounding_suggest",
+        payload: { agentProfileId },
+        status: "queued",
+        agent_run_id: run.id,
+        run_after: nowIso,
+      });
+      if (jobError) throw new Error(jobError.message);
+    } catch (error) {
+      console.error("grounding_suggest chain enqueue failed:", error);
+    }
+  }
+
   /** Durable chained summary refresh (same pattern as the gap-engine chain). */
   private async enqueueSummaryUpdate(job: AgentJob, agentProfileId: string): Promise<void> {
     try {
@@ -311,6 +361,116 @@ export class KnowledgeJobHandler {
       allowedTools: [],
     });
     return safeParseDocUpdateStrict(result.resultText, fallbackEvidenceIds);
+  }
+
+  /**
+   * Spec 08 §3a: propose named candidates for ungrounded canvas items, each
+   * backed by an existing evidence excerpt and gated by the adversarial
+   * verifier — only confirmed candidates are written for the owner to review
+   * in the grounding wizard.
+   */
+  async handleGroundingSuggest(job: AgentJob): Promise<void> {
+    await this.markRunRunning(job, "grounding_suggest", {});
+
+    const ungrounded = await this.loadUngroundedItems(job.account_id);
+    if (ungrounded.length === 0) {
+      await this.markRunCompleted(job, "Grounding suggestions skipped: every item is grounded.", { suggested: 0 });
+      return;
+    }
+    const evidence = await this.loadRecentEvidence(job.account_id);
+    if (evidence.length === 0) {
+      await this.markRunCompleted(job, "Grounding suggestions skipped: no evidence to ground against.", { suggested: 0 });
+      return;
+    }
+
+    const routes = await this.loadModelRoutes(job.account_id, ["grounding_suggest", "research_verify"]);
+    const route = requiredRoute(routes, job.account_id, "grounding_suggest", "grounding_suggest");
+    const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
+    const result = await this.runnerForRoute(route).run({
+      model: route.model_name,
+      modelParams: route.params ?? undefined,
+      maxTurns: 8,
+      maxBudgetUsd: budgetForRoute(route),
+      prompt: groundingSuggestPrompt(ungrounded, evidence),
+      systemPrompt: "Propose the specific real-world name behind each generic Business Model Canvas item, ONLY when an evidence excerpt supports it. Never invent names.",
+      mcpServers: {},
+      allowedTools: [],
+    });
+
+    const candidates = parseGroundingSuggestions(result.resultText, ungrounded, evidence);
+    let written = 0;
+    let rejected = 0;
+    for (const candidate of candidates) {
+      const verdict = await verifyClaimAgainstExcerpt(
+        this.runnerForRoute(verifyRoute),
+        verifyRoute,
+        `The real name behind "${candidate.itemText}" is: ${candidate.suggestedText}`,
+        candidate.evidenceExcerpt,
+      );
+      if (verdict.status !== "confirmed") {
+        rejected += 1;
+        continue;
+      }
+      const { error } = await this.deps.client
+        .from("grounding_suggestions")
+        .upsert({
+          account_id: job.account_id,
+          section_key: candidate.sectionKey,
+          item_text: candidate.itemText,
+          suggested_text: candidate.suggestedText,
+          rationale: candidate.rationale ?? verdict.reason,
+          evidence_id: candidate.evidenceId,
+          status: "open",
+          created_by_agent_run_id: job.agent_run_id,
+        }, { onConflict: "account_id,section_key,item_text,suggested_text", ignoreDuplicates: true });
+      if (error) throw new Error(`Failed to write grounding suggestion: ${error.message}`);
+      written += 1;
+    }
+
+    await this.markRunCompleted(job, "Grounding suggestions completed", {
+      candidates: candidates.length,
+      suggested: written,
+      rejected_by_verifier: rejected,
+    });
+  }
+
+  private async loadUngroundedItems(accountId: string): Promise<UngroundedItem[]> {
+    const { data, error } = await this.deps.client
+      .from("canvas_section_versions")
+      .select("section_key, items, created_at")
+      .eq("account_id", accountId)
+      .is("competitor_id", null)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(`Failed to load canvas versions: ${error.message}`);
+    const seenSections = new Set<string>();
+    const ungrounded: UngroundedItem[] = [];
+    for (const row of data ?? []) {
+      if (!isSectionKey(row.section_key) || seenSections.has(row.section_key)) continue;
+      seenSections.add(row.section_key);
+      if (!Array.isArray(row.items)) continue;
+      for (const entry of row.items) {
+        const record = asRecord(entry);
+        const text = readString(record.text) ?? (typeof entry === "string" ? entry : undefined);
+        if (!text) continue;
+        const grounded = record.grounded === true && Array.isArray(record.evidence_ids) && record.evidence_ids.length > 0;
+        if (!grounded) ungrounded.push({ sectionKey: row.section_key, text });
+      }
+    }
+    return ungrounded.slice(0, 24);
+  }
+
+  private async loadRecentEvidence(accountId: string): Promise<Array<{ id: string; excerpt: string }>> {
+    const { data, error } = await this.deps.client
+      .from("evidence_items")
+      .select("id, excerpt")
+      .eq("account_id", accountId)
+      .not("excerpt", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) throw new Error(`Failed to load evidence: ${error.message}`);
+    return (data ?? [])
+      .filter((row): row is { id: string; excerpt: string } => typeof row.excerpt === "string" && row.excerpt.length > 0);
   }
 
   private async loadFounderDocument(accountId: string, documentId: string): Promise<FounderDocument> {
@@ -892,4 +1052,37 @@ function average(values: number[]): number | null {
 
 function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function groundingSuggestPrompt(items: UngroundedItem[], evidence: Array<{ id: string; excerpt: string }>): string {
+  const itemLines = items.map((item, index) => `[${index}] (${item.sectionKey}) ${item.text}`).join("\n");
+  const evidenceLines = evidence.map((entry, index) => `[${index}] ${entry.excerpt.slice(0, 500)}`).join("\n\n");
+  return `For each generic canvas item below, propose the specific real name ONLY if an evidence excerpt names it. Return JSON only: {"suggestions":[{"item_index":0,"suggested_text":"...","rationale":"...","evidence_index":0}]}. Omit items with no supporting evidence.\n\nItems:\n${itemLines}\n\nEvidence excerpts:\n${evidenceLines}`;
+}
+
+export function parseGroundingSuggestions(
+  text: string,
+  items: UngroundedItem[],
+  evidence: Array<{ id: string; excerpt: string }>,
+): GroundingCandidate[] {
+  const parsed = parseJsonObject(text);
+  if (!parsed || !Array.isArray(parsed.suggestions)) return [];
+  return parsed.suggestions.flatMap((entry) => {
+    const record = asRecord(entry);
+    const itemIndex = typeof record.item_index === "number" ? Math.floor(record.item_index) : -1;
+    const evidenceIndex = typeof record.evidence_index === "number" ? Math.floor(record.evidence_index) : -1;
+    const suggestedText = readString(record.suggested_text);
+    const item = items[itemIndex];
+    const evidenceRow = evidence[evidenceIndex];
+    if (!item || !evidenceRow || !suggestedText) return [];
+    if (suggestedText.trim().toLowerCase() === item.text.trim().toLowerCase()) return [];
+    return [{
+      sectionKey: item.sectionKey,
+      itemText: item.text,
+      suggestedText: suggestedText.trim(),
+      rationale: readString(record.rationale),
+      evidenceId: evidenceRow.id,
+      evidenceExcerpt: evidenceRow.excerpt,
+    }];
+  });
 }

@@ -25,6 +25,7 @@ export interface SingleResponse<T> {
 export interface UntypedQuery<T> extends PromiseLike<QueryResponse<T>> {
   select(columns?: string, options?: Record<string, unknown>): UntypedQuery<T>;
   insert(value: unknown): UntypedQuery<T>;
+  update(value: unknown): UntypedQuery<T>;
   eq(column: string, value: unknown): UntypedQuery<T>;
   contains(column: string, value: Record<string, unknown>): UntypedQuery<T>;
   is(column: string, value: unknown): UntypedQuery<T>;
