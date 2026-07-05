@@ -138,8 +138,9 @@ docs/
   BUILD_STATE.md         ← live tracker you maintain (status, blockers, operator queue, RFs)
   DESIGN_TASTE.md        ← binding UI house rules
   VISION / AGENT_RUNTIME_DECISION / ROADMAP / DEVLOG
-  specs/00–09            ← product + technical specs (07 = Agent SDK how-to,
-                            08 = knowledge/strategy engine, 09 = overlay system)
+  specs/00–10            ← product + technical specs (07 = Agent SDK how-to,
+                            08 = knowledge/strategy engine, 09 = overlay system,
+                            10 = skill catalog + Atlas doctrine)
 .github/workflows/       ← deploy.yml (auto on main: web+worker) · ops.yml (manual:
                             secrets sync, edge functions, live golden set)
 src/                     ← React 18 + Vite + shadcn SPA (gates target this)
