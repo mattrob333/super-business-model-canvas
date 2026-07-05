@@ -1380,6 +1380,39 @@ cd worker && npm run lint             -> exit 0
 5B tasks: 5.1 [ ] - 5.2 [ ] - 5.3 [ ] - 5.4 [ ] - 5.5 [ ] - 5.6 [ ] - 5.7 [ ] - 5.8 [ ] - 5.9 [ ]
 5A additions from BUILD_PLAN: 5.10 [schema + worker extraction pipeline + upload UI] - 5.11 [schema + logo display/manual URL UI; Firecrawl capture not complete]
 
+**2026-07-05 - Live Supabase catch-up + 5B slice 2 started on `build/phase-5b-slice-2`.**
+
+- Pulled `main` from `281ce5b` to `551ad57` before starting. Live Supabase project
+  `mehhuxzamnpxnkbrslls` already had `phase_5a_knowledge_stack`, `phase_5a_model_routes`,
+  and `summary_escalated_route` recorded. Applied the two missing checked-in migrations:
+  `grounding_suggestions` and `skill_catalog`.
+- Verification: `scripts/verify-schema.sql` initially surfaced one stale assertion
+  (`model_routes` exactly 10 task classes) after the Phase 5 route additions. Patched the
+  verifier to require at least the original 10, while the Phase 5A route assertion remains
+  exact. Live sanity query after applying migrations returned `global_task_class_count = 16`,
+  `phase_5a_route_count = 6`, `skill_catalog_count = 27`, `pricing_teardown_implemented = true`,
+  `grounding_suggestions_exists = true`, and `skill_artifacts_exists = true`.
+- Redeployed live edge functions from the checked-in source with JWT verification preserved:
+  `agent-run` is ACTIVE version 9 and `generate-framework-report` is ACTIVE version 6. Retrieved
+  deployed `agent-run` source and confirmed the worker allowlist includes both
+  `grounding_suggest` and `skill_run`.
+- Built 5B slice 2 UI: proposal cards in `WorkspaceThread` now expose Approve / Edit / Decline.
+  Approve explicitly writes a new own-section `canvas_section_versions` row with
+  `competitor_id = null`, after ensuring a `business_context_versions` row; approve/decline
+  decisions are recorded durably on the message content. Edit preloads the proposal into the
+  composer for human revision and does not write to the canvas.
+- Added room-scoped `WorkspaceActionsPanel` above the existing run queue. It reads
+  `skill_catalog` for the room agent, gates Run by `implemented`, shows unimplemented skills as
+  Coming, and enqueues `skill_run` with the same business-context invariant. Schedule popover and
+  Atlas trigger controls intentionally remain absent for this slice.
+- Gates: `npx tsc -p tsconfig.app.json --noEmit` exit 0; `npm run build` green; `npm run lint`
+  reports 65 problems (47 errors, 18 warnings), within the frozen <=65 ceiling; `worker npm run
+  typecheck` exit 0; `worker npm test` 59 passed / 2 skipped; `worker npm run build` exit 0;
+  `worker npm run lint` exit 0. First worker gate attempt failed before `npm install` because
+  `worker/node_modules` was missing `vitest`; reran successfully after installing from lockfile.
+- Not yet live-smoked through a logged-in browser session in this pass: Dashboard skill run,
+  workspace chat reply, and Porter report rendering still need owner/session verification.
+
 **2026-07-04 - Phase 5A UI slice started after jobs-slice reviewer fixes.**
 
 - Merged latest `origin/main` into `build/phase-5-knowledge`; worker files and SQL mirrors

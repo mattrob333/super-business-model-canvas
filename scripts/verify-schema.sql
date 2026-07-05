@@ -131,11 +131,11 @@ with checks as (
 
   union all
 
-  select 'seed: model_routes has 10 task_class default rows',
+  select 'seed: model_routes has at least 10 task_class default rows',
          case when (
            select count(distinct task_class) from public.model_routes
            where account_id is null and task_class is not null
-         ) = 10 then 'PASS' else 'FAIL' end
+         ) >= 10 then 'PASS' else 'FAIL' end
 
   union all
 
