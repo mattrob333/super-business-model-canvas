@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChevronDown, Lightbulb, Loader2, MessageSquarePlus, Send, WifiOff } from "lucide-react";
+import { CheckCircle2, ChevronDown, Lightbulb, Loader2, MessageSquarePlus, Pencil, Send, WifiOff, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import type { Json } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/client";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { getAgentRuntime } from "@/lib/agent-runtime";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
@@ -57,6 +60,7 @@ export function WorkspaceThread({
   sectionKey: CanvasSectionKey;
 }) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const entry = AGENT_ROSTER[sectionKey];
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -69,6 +73,7 @@ export function WorkspaceThread({
   const [runtimeOffline, setRuntimeOffline] = useState(false);
   const [newThreadTitle, setNewThreadTitle] = useState("");
   const [threadPopoverOpen, setThreadPopoverOpen] = useState(false);
+  const [decidingMessageId, setDecidingMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -228,6 +233,122 @@ export function WorkspaceThread({
     setThreadPopoverOpen(false);
   }, [accountId, agentProfileId, newThreadTitle, user]);
 
+  const ensureBusinessContext = useCallback(async (): Promise<string> => {
+    const { data: existingContext } = await supabase
+      .from("business_context_versions")
+      .select("id")
+      .eq("account_id", accountId)
+      .order("version_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingContext?.id) return existingContext.id;
+
+    const { data: created, error } = await supabase
+      .from("business_context_versions")
+      .insert({
+        account_id: accountId,
+        version_number: 1,
+        summary: "Initial business context",
+        data: {},
+        created_by: user?.id ?? null,
+      })
+      .select("id")
+      .single();
+    if (error || !created) throw new Error(error?.message ?? "Failed to create business context");
+    return created.id;
+  }, [accountId, user]);
+
+  const recordProposalDecision = useCallback(async (
+    message: MessageRow,
+    decision: "approved" | "declined",
+    extras: Record<string, unknown> = {},
+  ) => {
+    const { error } = await supabaseUntyped
+      .from("workspace_messages")
+      .update({
+        content: {
+          ...message.content,
+          decision,
+          decided_at: new Date().toISOString(),
+          decided_by: user?.id ?? null,
+          ...extras,
+        },
+      })
+      .eq("id", message.id);
+    if (error) throw new Error(error.message);
+    if (activeThreadId) await loadMessages(activeThreadId);
+  }, [activeThreadId, loadMessages, user]);
+
+  const approveProposal = useCallback(async (message: MessageRow) => {
+    if (decidingMessageId) return;
+    const proposalText =
+      typeof message.content?.idea === "string"
+        ? message.content.idea
+        : typeof message.content?.text === "string"
+          ? message.content.text
+          : "";
+    if (!proposalText.trim()) {
+      toast({ title: "Proposal is empty", description: "There is nothing to approve yet.", variant: "destructive" });
+      return;
+    }
+    setDecidingMessageId(message.id);
+    try {
+      const contextVersionId = await ensureBusinessContext();
+      const { error: versionError } = await supabase.from("canvas_section_versions").insert({
+        account_id: accountId,
+        business_context_version_id: contextVersionId,
+        competitor_id: null,
+        section_key: sectionKey,
+        section_title: CANVAS_SECTION_LABELS[sectionKey],
+        items: [proposalText.trim()] as unknown as Json,
+        notes: "Approved from an agent workspace proposal.",
+        confidence: typeof message.content?.confidence === "number" ? message.content.confidence : null,
+        freshness_status: "fresh",
+        last_verified_at: new Date().toISOString(),
+        created_by_agent_profile_id: agentProfileId,
+        created_by: user?.id ?? null,
+      });
+      if (versionError) throw versionError;
+      await recordProposalDecision(message, "approved", { approved_section_key: sectionKey });
+      toast({ title: "Proposal approved", description: `Added to ${CANVAS_SECTION_LABELS[sectionKey]}.` });
+    } catch (error) {
+      toast({
+        title: "Could not approve proposal",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDecidingMessageId(null);
+    }
+  }, [accountId, agentProfileId, decidingMessageId, ensureBusinessContext, recordProposalDecision, sectionKey, toast, user]);
+
+  const declineProposal = useCallback(async (message: MessageRow) => {
+    if (decidingMessageId) return;
+    setDecidingMessageId(message.id);
+    try {
+      await recordProposalDecision(message, "declined");
+      toast({ title: "Proposal declined", description: "Decision recorded on the thread." });
+    } catch (error) {
+      toast({
+        title: "Could not decline proposal",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDecidingMessageId(null);
+    }
+  }, [decidingMessageId, recordProposalDecision, toast]);
+
+  const editProposal = useCallback((message: MessageRow) => {
+    const proposalText =
+      typeof message.content?.idea === "string"
+        ? message.content.idea
+        : typeof message.content?.text === "string"
+          ? message.content.text
+          : "";
+    setDraft(`Revise this proposal for ${CANVAS_SECTION_LABELS[sectionKey]}:\n\n${proposalText}`);
+  }, [sectionKey]);
+
   const activeThread = threads.find((thread) => thread.id === activeThreadId);
 
   return (
@@ -304,7 +425,15 @@ export function WorkspaceThread({
         ) : (
           <div className="mx-auto max-w-2xl space-y-3">
             {messages.map((message) => (
-              <MessageCard key={message.id} message={message} sectionKey={sectionKey} />
+              <MessageCard
+                key={message.id}
+                message={message}
+                sectionKey={sectionKey}
+                deciding={decidingMessageId === message.id}
+                onApprove={() => void approveProposal(message)}
+                onDecline={() => void declineProposal(message)}
+                onEdit={() => editProposal(message)}
+              />
             ))}
             {awaitingReply && (
               <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
@@ -397,7 +526,21 @@ function EmptyThread({
   );
 }
 
-function MessageCard({ message, sectionKey }: { message: MessageRow; sectionKey: CanvasSectionKey }) {
+function MessageCard({
+  message,
+  sectionKey,
+  deciding,
+  onApprove,
+  onDecline,
+  onEdit,
+}: {
+  message: MessageRow;
+  sectionKey: CanvasSectionKey;
+  deciding: boolean;
+  onApprove: () => void;
+  onDecline: () => void;
+  onEdit: () => void;
+}) {
   const entry = AGENT_ROSTER[sectionKey];
   const Icon = entry.icon;
   const text = typeof message.content?.text === "string" ? message.content.text : null;
@@ -405,12 +548,36 @@ function MessageCard({ message, sectionKey }: { message: MessageRow; sectionKey:
   if (message.kind === "proposal") {
     const idea = typeof message.content?.idea === "string" ? message.content.idea : null;
     const competitor = typeof message.content?.competitor_name === "string" ? message.content.competitor_name : null;
+    const decision = typeof message.content?.decision === "string" ? message.content.decision : null;
     return (
       <div className="rounded-lg border border-primary/25 bg-primary/5 p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-          Proposal{competitor ? ` · borrowed from ${competitor}` : ""}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+            Proposal{competitor ? ` · borrowed from ${competitor}` : ""}
+          </p>
+          {decision && (
+            <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-medium capitalize text-muted-foreground">
+              {decision}
+            </span>
+          )}
+        </div>
         <p className="mt-1 text-sm leading-relaxed">{idea ?? text ?? "Proposal"}</p>
+        {!decision && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" className="h-8 gap-1.5" disabled={deciding} onClick={onApprove}>
+              {deciding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              Approve
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 gap-1.5" disabled={deciding} onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-muted-foreground" disabled={deciding} onClick={onDecline}>
+              <XCircle className="h-3.5 w-3.5" />
+              Decline
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
