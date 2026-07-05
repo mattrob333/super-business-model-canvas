@@ -422,7 +422,7 @@ serve(async (req) => {
       if (runError) throw new Error(`Failed to create queued agent run: ${runError.message}`);
 
       // Worker-dispatched kinds; anything else falls back to section analysis.
-      const workerJobKinds = ['workspace_chat', 'company_research', 'competitor_research', 'feed_refresh', 'gap_engine', 'dossier_refresh', 'summary_update', 'onboarding_extract', 'staleness_sweep'];
+      const workerJobKinds = ['workspace_chat', 'company_research', 'competitor_research', 'feed_refresh', 'gap_engine', 'dossier_refresh', 'summary_update', 'onboarding_extract', 'grounding_suggest', 'staleness_sweep'];
       const jobKind = workerJobKinds.includes(runType) ? runType : 'canvas_section_analysis';
       const { error: jobError } = await adminClient.from('agent_jobs').insert({
         account_id: accountId,

@@ -198,6 +198,32 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase 5A: agent-proposed grounding suggestions (2026-07-04, reviewer-as-builder, PR #43)
+
+Closes spec 08 §3a — the wizard's proactive half:
+- **Schema:** `grounding_suggestions` (unique per account/section/item/candidate; RLS:
+  members read + resolve, INSERT is service-role only by design — agents propose, owners
+  decide) + `grounding_suggest` budget model route. Migration
+  `20260704190000_grounding_suggestions.sql` + schema mirror + types + verify-schema
+  (routes count now 5; table+RLS check).
+- **Worker:** `grounding_suggest` job — loads up to 24 ungrounded own-canvas items + 30
+  recent evidence excerpts, budget model proposes named candidates tied to a specific
+  excerpt, and **every candidate passes the adversarial verifier** before writing
+  (unsupported → dropped, counted in run output as `rejected_by_verifier`). Chained
+  automatically after `onboarding_extract`. Dispatcher + agent-run allowlist wired.
+  Tests: confirmed candidate written, refuted candidate dropped (worker suite 54).
+- **Wizard:** open suggestions surface on their matching item as an "Agent suggestion"
+  card — Use this name (attests with the suggested text, links the supporting evidence,
+  marks accepted) or dismiss. Both resolve durably.
+- **Incident, owned by reviewer:** PR #41's conflict resolution committed 7 unresolved
+  merge markers in `Knowledge.tsx` to main — build broke, the deploy for `64a2934`
+  failed, production stayed on the prior release. Repaired in PR #42. Process
+  correction now binding: full gates re-run after EVERY conflict resolution before
+  push/merge.
+- **Operator/live queue:** apply `20260704190000_grounding_suggestions.sql` live;
+  redeploy `agent-run` (allowlist gained `grounding_suggest`). Both one-minute MCP
+  actions next connected session.
+
 ### Phase 5A completion slice (2026-07-04, reviewer-as-builder, PR #41)
 
 Built directly by the reviewer (owner directive while the build agent is offline):

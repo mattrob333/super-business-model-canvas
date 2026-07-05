@@ -73,6 +73,11 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
         return;
       }
 
+      if (job.kind === "grounding_suggest") {
+        await knowledgeJobs.handleGroundingSuggest(job);
+        return;
+      }
+
       if (job.kind === "onboarding_extract") {
         await knowledgeJobs.handleOnboardingExtract(job);
         return;

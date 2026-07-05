@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BadgeCheck, Loader2, PenLine, SkipForward } from "lucide-react";
+import { BadgeCheck, Lightbulb, Loader2, PenLine, SkipForward, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,19 @@ import { Label } from "@/components/ui/label";
 import { FocusDrawer } from "@/components/overlay/FocusDrawer";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
+// grounding_suggestions is beyond the generated Database type's TS2589 depth
+// horizon (see src/lib/supabase-untyped.ts) — explicit row type + escape hatch.
+import { supabaseUntyped } from "@/lib/supabase-untyped";
+
+interface GroundingSuggestion {
+  id: string;
+  section_key: string;
+  item_text: string;
+  suggested_text: string;
+  rationale: string | null;
+  evidence_id: string | null;
+  status: "open" | "accepted" | "dismissed";
+}
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -94,23 +107,39 @@ export function GroundingWizardDrawer({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [attested, setAttested] = useState(0);
+  const [suggestions, setSuggestions] = useState<GroundingSuggestion[]>([]);
 
   const current = queue[cursor];
   const currentSection = current ? sections.get(current.sectionKey) : undefined;
   const currentItem = currentSection?.items[current?.itemIndex ?? -1];
+  const currentSuggestion = current && currentItem
+    ? suggestions.find(
+        (entry) => entry.section_key === current.sectionKey && entry.item_text === currentItem.text,
+      ) ?? null
+    : null;
 
   const loadQueue = useCallback(async () => {
     if (!accountId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("canvas_section_versions")
-        .select("id, section_key, items, business_context_version_id, created_at")
-        .eq("account_id", accountId)
-        .is("competitor_id", null)
-        .order("created_at", { ascending: false })
-        .limit(200);
+      const [{ data, error }, suggestionsRes] = await Promise.all([
+        supabase
+          .from("canvas_section_versions")
+          .select("id, section_key, items, business_context_version_id, created_at")
+          .eq("account_id", accountId)
+          .is("competitor_id", null)
+          .order("created_at", { ascending: false })
+          .limit(200),
+        supabaseUntyped
+          .from<GroundingSuggestion>("grounding_suggestions")
+          .select("id, section_key, item_text, suggested_text, rationale, evidence_id, status")
+          .eq("account_id", accountId)
+          .eq("status", "open")
+          .order("created_at", { ascending: false })
+          .limit(100),
+      ]);
       if (error) throw error;
+      setSuggestions(suggestionsRes.error ? [] : suggestionsRes.data ?? []);
       const latest = new Map<CanvasSectionKey, SectionState>();
       for (const row of data ?? []) {
         const key = row.section_key as CanvasSectionKey;
@@ -154,9 +183,9 @@ export function GroundingWizardDrawer({
     setEditing(false);
   }, [currentItem?.text]);
 
-  const attest = useCallback(async () => {
+  const attest = useCallback(async (suggestion?: GroundingSuggestion) => {
     if (!accountId || !current || !currentSection || !currentItem || saving) return;
-    const finalText = (editing ? draft : currentItem.text).trim();
+    const finalText = (suggestion?.suggested_text ?? (editing ? draft : currentItem.text)).trim();
     if (!finalText) return;
     setSaving(true);
     try {
@@ -195,7 +224,11 @@ export function GroundingWizardDrawer({
               ...item,
               text: finalText,
               confidence: Math.max(item.confidence ?? 0.6, 0.9),
-              evidence_ids: [...new Set([...item.evidence_ids, evidence.id])],
+              evidence_ids: [...new Set([
+                ...item.evidence_ids,
+                evidence.id,
+                ...(suggestion?.evidence_id ? [suggestion.evidence_id] : []),
+              ])],
               grounded: true,
               provenance: "owner_attested",
               verification_status: "confirmed",
@@ -226,6 +259,14 @@ export function GroundingWizardDrawer({
         next.set(current.sectionKey, { ...currentSection, items: nextItems });
         return next;
       });
+      if (suggestion) {
+        await supabaseUntyped
+          .from("grounding_suggestions")
+          .update({ status: "accepted", resolved_at: new Date().toISOString() })
+          .eq("id", suggestion.id)
+          .eq("account_id", accountId);
+        setSuggestions((prev) => prev.filter((entry) => entry.id !== suggestion.id));
+      }
       setAttested((count) => count + 1);
       setCursor((index) => index + 1);
       onGrounded?.();
@@ -239,6 +280,16 @@ export function GroundingWizardDrawer({
       setSaving(false);
     }
   }, [accountId, current, currentSection, currentItem, saving, editing, draft, user, onGrounded, toast]);
+
+  const dismissSuggestion = useCallback(async (suggestion: GroundingSuggestion) => {
+    if (!accountId) return;
+    await supabaseUntyped
+      .from("grounding_suggestions")
+      .update({ status: "dismissed", resolved_at: new Date().toISOString() })
+      .eq("id", suggestion.id)
+      .eq("account_id", accountId);
+    setSuggestions((prev) => prev.filter((entry) => entry.id !== suggestion.id));
+  }, [accountId]);
 
   const done = !loading && (queue.length === 0 || cursor >= queue.length);
   const progressLabel = useMemo(() => {
@@ -291,6 +342,32 @@ export function GroundingWizardDrawer({
           <div className="rounded-lg border border-border bg-muted/30 p-4">
             <p className="text-sm leading-relaxed text-foreground">{currentItem.text}</p>
           </div>
+          {currentSuggestion && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary">
+                  <Lightbulb className="h-3.5 w-3.5" />
+                  Agent suggestion
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void dismissSuggestion(currentSuggestion)}
+                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="Dismiss suggestion"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <p className="mt-2 text-sm font-medium text-foreground">{currentSuggestion.suggested_text}</p>
+              {currentSuggestion.rationale && (
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{currentSuggestion.rationale}</p>
+              )}
+              <Button size="sm" className="mt-3 gap-1.5" disabled={saving} onClick={() => void attest(currentSuggestion)}>
+                <BadgeCheck className="h-3.5 w-3.5" />
+                Use this name
+              </Button>
+            </div>
+          )}
           {editing ? (
             <div className="space-y-2">
               <Label htmlFor="grounding-name">The real name</Label>
@@ -309,7 +386,7 @@ export function GroundingWizardDrawer({
             </p>
           )}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={attest} disabled={saving || (editing && !draft.trim())} className="gap-1.5">
+            <Button onClick={() => void attest()} disabled={saving || (editing && !draft.trim())} className="gap-1.5">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />}
               {editing ? "Save real name" : "Confirm as accurate"}
             </Button>
