@@ -2447,6 +2447,66 @@ export type Database = {
           },
         ]
       }
+      grounding_suggestions: {
+        Row: {
+          id: string
+          account_id: string
+          section_key: string
+          item_text: string
+          suggested_text: string
+          rationale: string | null
+          evidence_id: string | null
+          status: Database["public"]["Enums"]["grounding_suggestion_status"]
+          resolved_at: string | null
+          created_by_agent_run_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          section_key: string
+          item_text: string
+          suggested_text: string
+          rationale?: string | null
+          evidence_id?: string | null
+          status?: Database["public"]["Enums"]["grounding_suggestion_status"]
+          resolved_at?: string | null
+          created_by_agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          section_key?: string
+          item_text?: string
+          suggested_text?: string
+          rationale?: string | null
+          evidence_id?: string | null
+          status?: Database["public"]["Enums"]["grounding_suggestion_status"]
+          resolved_at?: string | null
+          created_by_agent_run_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grounding_suggestions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grounding_suggestions_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       metric_snapshots: {
         Row: {
           id: string
@@ -2583,6 +2643,7 @@ export type Database = {
       agent_run_trigger: "manual" | "scheduled" | "api" | "cascade" | "retry"
       gap_severity: "critical" | "high" | "medium" | "low"
       gap_status: "open" | "acknowledged" | "in_progress" | "resolved" | "wont_fix" | "superseded"
+      grounding_suggestion_status: "open" | "accepted" | "dismissed"
       gap_type: "missing_data" | "low_confidence" | "no_evidence" | "outdated" | "contradictory" | "assumption" | "competitive"
       credential_status: "active" | "revoked" | "expired" | "untested"
       mcp_transport_type: "stdio" | "http" | "sse" | "websocket"
@@ -2743,6 +2804,7 @@ export const Constants = {
       agent_run_trigger: ["manual", "scheduled", "api", "cascade", "retry"],
       gap_severity: ["critical", "high", "medium", "low"],
       gap_status: ["open", "acknowledged", "in_progress", "resolved", "wont_fix", "superseded"],
+      grounding_suggestion_status: ["open", "accepted", "dismissed"],
       gap_type: ["missing_data", "low_confidence", "no_evidence", "outdated", "contradictory", "assumption", "competitive"],
       credential_status: ["active", "revoked", "expired", "untested"],
       mcp_transport_type: ["stdio", "http", "sse", "websocket"],

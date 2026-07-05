@@ -494,8 +494,18 @@ with checks as (
          case when (
            select count(distinct task_class) from public.model_routes
            where account_id is null
-             and task_class in ('onboarding_extract', 'dossier_refresh', 'summary_update', 'summary_update_escalated')
-         ) = 4 then 'PASS' else 'FAIL' end
+             and task_class in ('onboarding_extract', 'dossier_refresh', 'summary_update', 'summary_update_escalated', 'grounding_suggest')
+         ) = 5 then 'PASS' else 'FAIL' end
+
+  union all
+
+  select 'table exists with RLS: grounding_suggestions',
+         case when exists (
+           select 1 from pg_tables pt
+           join pg_class c on c.relname = pt.tablename
+           where pt.schemaname = 'public' and pt.tablename = 'grounding_suggestions'
+             and c.relrowsecurity = true
+         ) then 'PASS' else 'FAIL' end
 
 )
 select check_name, status from checks order by
