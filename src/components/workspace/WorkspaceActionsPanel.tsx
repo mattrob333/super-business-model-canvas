@@ -92,7 +92,7 @@ export function WorkspaceActionsPanel({
       });
       toast({
         title: `${skill.title} queued`,
-        description: "The artifact appears on the shelf when the run completes.",
+        description: "Track it in the run queue below — the artifact lands on the Dashboard shelf when it completes.",
       });
     } catch (error) {
       toast({

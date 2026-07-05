@@ -198,6 +198,35 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### 5B slice 2 review — RESOLVED: RF-5B2-1 fixed by the reviewer (2026-07-05)
+
+Codex's `build/phase-5b-slice-2` (commit `5deb2b7`: proposal Approve/Edit/Decline in
+`WorkspaceThread`, room-scoped `WorkspaceActionsPanel`, live Supabase catch-up) reviewed
+and merged with one blocker fixed:
+
+- **RF-5B2-1 (BLOCKER, fixed by reviewer):** Approve inserted a new
+  `canvas_section_versions` row whose `items` contained ONLY the proposal text. Every
+  reader takes the latest version per section, so approving a proposal would collapse the
+  live canvas section to a single item (and, when only legacy analysis items existed,
+  flip the section to a one-item versioned view). Fix: approve now loads the current
+  latest own-section version (legacy analysis strings as fallback — same order as the
+  canvas page), appends the proposal text with a case-insensitive dedup, and writes the
+  merged list. Everything else about the write was correct: `competitor_id = null`,
+  ensured business context, audit fields, decision recorded durably on the message.
+- **RF-5B2-2 (LOW, fixed by reviewer):** skill-run toast promised "the shelf", which
+  lives on the Dashboard, not in the room — copy now points at the room's run queue and
+  names the Dashboard shelf.
+- **Reviewed and accepted:** the `verify-schema.sql` relaxation (exact 10 → floor ≥10
+  global task classes) is the correct direction — the checked-in migrations legitimately
+  grew the route set to 16 and the Phase 5A exact assertion remains; skill runs enqueued
+  under the ROOM agent's profile (not the orchestrator) is a deliberate improvement —
+  the worker resolves routes by route_key regardless, and the run lands in that room's
+  run queue; `skill_catalog.agent_key` filter values verified against the seed
+  (profile-style keys, correct). Codex's live claims (migrations applied, `agent-run` v9
+  with both new kinds, `generate-framework-report` v6, sanity counts) are consistent
+  with the checked-in files but remain MCP-unverified; the three logged-in smoke tests
+  (Dashboard skill run, workspace chat reply, Porter render) are still owed.
+
 ### 5B: the workspace room chassis (spec 02 slice 1) (2026-07-05, reviewer-as-builder, PR #50)
 
 First real room per spec 02 — `/workspace/:sectionKey` renders full-screen outside the

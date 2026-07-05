@@ -13,7 +13,8 @@ import { getAgentRuntime } from "@/lib/agent-runtime";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
-import { CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
+import { CANVAS_SECTION_LABELS, LEGACY_SECTION_KEYS } from "@/components/canvas/section-types";
+import { getActiveAnalysis } from "@/lib/active-analysis";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
 
 /**
@@ -294,13 +295,46 @@ export function WorkspaceThread({
     setDecidingMessageId(message.id);
     try {
       const contextVersionId = await ensureBusinessContext();
+
+      // A new version REPLACES the section for every reader (latest-per-section
+      // semantics) — approving must append to the current items, never reduce
+      // the section to the proposal alone. Same fallback order as the canvas:
+      // latest version first, else the legacy analysis strings.
+      const { data: latestVersion } = await supabase
+        .from("canvas_section_versions")
+        .select("items")
+        .eq("account_id", accountId)
+        .eq("section_key", sectionKey)
+        .is("competitor_id", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      let existingItems: unknown[] = Array.isArray(latestVersion?.items) ? latestVersion.items : [];
+      if (existingItems.length === 0) {
+        const legacy = getActiveAnalysis()?.data?.[LEGACY_SECTION_KEYS[sectionKey]];
+        if (Array.isArray(legacy)) {
+          existingItems = legacy.filter((item) => typeof item === "string" && item.length > 0);
+        }
+      }
+      const itemText = (item: unknown): string =>
+        typeof item === "string"
+          ? item
+          : typeof (item as { text?: unknown })?.text === "string"
+            ? ((item as { text: string }).text)
+            : "";
+      const newText = proposalText.trim();
+      const alreadyPresent = existingItems.some(
+        (item) => itemText(item).trim().toLowerCase() === newText.toLowerCase(),
+      );
+      const mergedItems = alreadyPresent ? existingItems : [...existingItems, newText];
+
       const { error: versionError } = await supabase.from("canvas_section_versions").insert({
         account_id: accountId,
         business_context_version_id: contextVersionId,
         competitor_id: null,
         section_key: sectionKey,
         section_title: CANVAS_SECTION_LABELS[sectionKey],
-        items: [proposalText.trim()] as unknown as Json,
+        items: mergedItems as unknown as Json,
         notes: "Approved from an agent workspace proposal.",
         confidence: typeof message.content?.confidence === "number" ? message.content.confidence : null,
         freshness_status: "fresh",
