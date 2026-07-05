@@ -198,7 +198,7 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
-### 5B slice 3: the workspace room chassis (2026-07-05, reviewer-as-builder)
+### 5B: the workspace room chassis (spec 02 slice 1) (2026-07-05, reviewer-as-builder, PR #50)
 
 First real room per spec 02 — `/workspace/:sectionKey` renders full-screen outside the
 AppShell: slim `WorkspaceTopBar` (back-to-canvas + Rooms switcher listing all nine agents,
