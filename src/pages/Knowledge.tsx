@@ -25,6 +25,10 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { FocusDrawer } from "@/components/overlay/FocusDrawer";
+<<<<<<< HEAD
+import { GroundingWizardDrawer } from "@/components/knowledge/GroundingWizardDrawer";
+=======
+>>>>>>> origin/main
 import { supabase } from "@/integrations/supabase/client";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { useAccountId } from "@/hooks/useAccountId";
@@ -70,6 +74,10 @@ export default function Knowledge() {
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const [answerDraft, setAnswerDraft] = useState("");
   const [manualLogoUrl, setManualLogoUrl] = useState("");
+<<<<<<< HEAD
+  const [wizardOpen, setWizardOpen] = useState(false);
+=======
+>>>>>>> origin/main
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -416,10 +424,30 @@ export default function Knowledge() {
             }}
             onDismiss={dismissQuestion}
           />
+<<<<<<< HEAD
+          <GroundingWizard
+            documents={documents}
+            dossiers={dossiers}
+            questions={openQuestions}
+            groundedness={canvasGroundedness}
+            onLaunch={() => setWizardOpen(true)}
+          />
+        </div>
+      </section>
+
+      <GroundingWizardDrawer
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        accountId={accountId}
+        onGrounded={() => void loadKnowledge({ background: true })}
+      />
+
+=======
           <GroundingWizard documents={documents} dossiers={dossiers} questions={openQuestions} />
         </div>
       </section>
 
+>>>>>>> origin/main
       <DossierDrawer
         dossier={selectedDossier}
         profiles={profiles}
@@ -649,10 +677,20 @@ function GroundingWizard({
   documents,
   dossiers,
   questions,
+<<<<<<< HEAD
+  groundedness,
+  onLaunch,
+=======
+>>>>>>> origin/main
 }: {
   documents: FounderDocument[];
   dossiers: AgentDocument[];
   questions: OwnerQuestion[];
+<<<<<<< HEAD
+  groundedness: number | null;
+  onLaunch: () => void;
+=======
+>>>>>>> origin/main
 }) {
   const hasUpload = documents.length > 0;
   const hasDistributed = documents.some((document) => document.status === "distributed");
@@ -663,6 +701,10 @@ function GroundingWizard({
     { label: "Parse and distribute", done: hasDistributed },
     { label: "Review dossiers", done: hasDossiers },
     { label: "Resolve open questions", done: !hasOpenQuestions },
+<<<<<<< HEAD
+    { label: "Confirm real names", done: groundedness === 100 },
+=======
+>>>>>>> origin/main
   ];
   const complete = steps.filter((step) => step.done).length;
   return (
@@ -683,6 +725,13 @@ function GroundingWizard({
           </div>
         ))}
       </div>
+<<<<<<< HEAD
+      <Button className="mt-4 w-full" size="sm" onClick={onLaunch}>
+        <ShieldCheck className="mr-2 h-4 w-4" />
+        Ground your canvas
+      </Button>
+=======
+>>>>>>> origin/main
     </section>
   );
 }

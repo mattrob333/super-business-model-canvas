@@ -19,11 +19,14 @@ export interface CompetitorEntity {
   id: string;
   name: string;
   website_url: string | null;
+  logo_url: string | null;
 }
 
 export interface CompetitorResearchState {
   /** companies.id when the competitor is persisted for this account */
   entityId?: string;
+  /** captured or manually set logo, when available */
+  logoUrl?: string | null;
   /** true when research has produced canvas versions for this competitor */
   researched: boolean;
   /** latest competitor.threat_index snapshot value, if the gap engine has run */
@@ -60,7 +63,7 @@ export function useCompetitorResearch(
       const [companiesRes, versionsRes, metricsRes] = await Promise.all([
         supabase
           .from("companies")
-          .select("id, name, website_url")
+          .select("id, name, website_url, logo_url")
           .eq("account_id", accountId)
           .eq("is_competitor", true),
         supabase
@@ -118,6 +121,7 @@ export function useCompetitorResearch(
       const researched = Boolean(entity && researchedIds.has(entity.id));
       return {
         entityId: entity?.id,
+        logoUrl: entity?.logo_url ?? null,
         researched,
         threatIndex: entity ? threatByCompetitor[entity.id] : undefined,
         status: local?.status ?? "idle",
@@ -149,13 +153,13 @@ export function useCompetitorResearch(
               is_competitor: true,
               created_by: user?.id ?? null,
             })
-            .select("id, name, website_url")
+            .select("id, name, website_url, logo_url")
             .single();
           if (insertError) {
             // Unique-violation race: another tab created it — re-read.
             const { data: existing } = await supabase
               .from("companies")
-              .select("id, name, website_url")
+              .select("id, name, website_url, logo_url")
               .eq("account_id", accountId)
               .eq("is_competitor", true);
             entity = (existing ?? []).find((row) => hostOf(row.website_url) === host) as

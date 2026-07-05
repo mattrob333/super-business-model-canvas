@@ -132,6 +132,9 @@ export class CompanyResearchHandler {
     });
     if (feedResult.health !== "ok") throw new Error(`${subject.runType} crawl failed: ${feedResult.error ?? feedResult.health}`);
 
+    // 5.11: capture company branding from the crawl (never clobbers a manual logo).
+    await this.captureCompanyLogo(job, subject, feedResult.payload);
+
     const evidenceIds = await this.writeEvidence(job, feedResult.evidence);
     const routes = await this.loadModelRoutes(job.account_id);
     const extractRoute = requiredRoute(routes, job.account_id, "extract", "extract");
@@ -173,6 +176,30 @@ export class CompanyResearchHandler {
       })),
       escalation_rate: escalated ? 1 : 0,
     });
+  }
+
+  /**
+   * 5.11: pull a logo from the Firecrawl scrape metadata (og:image -> favicon ->
+   * /favicon.ico fallback) and store it on the matching companies row. Manual
+   * logos are owner truth and are never overwritten. Best-effort: failures log.
+   */
+  private async captureCompanyLogo(job: AgentJob, subject: ResearchSubject, payload: Record<string, unknown>): Promise<void> {
+    try {
+      const logo = extractLogoFromPayload(payload, subject.targetUrl);
+      if (!logo) return;
+      let query = this.deps.client
+        .from("companies")
+        .update({ logo_url: logo.url, logo_source: logo.source })
+        .eq("account_id", job.account_id)
+        .neq("logo_source", "manual");
+      query = subject.competitorId
+        ? query.eq("id", subject.competitorId)
+        : query.eq("is_competitor", false);
+      const { error } = await query;
+      if (error) throw new Error(error.message);
+    } catch (error) {
+      console.error(`logo capture failed for ${subject.targetName}:`, error);
+    }
   }
 
   /**
@@ -548,4 +575,38 @@ function budgetForRoute(route: Pick<ModelRoute, "cost_per_1k_in" | "cost_per_1k_
 
 function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+export type LogoSource = "firecrawl_metadata" | "og_image" | "favicon" | "fallback";
+
+/**
+ * Resolve a display logo from a Firecrawl scrape payload. Prefers og:image,
+ * then the page favicon, then the conventional /favicon.ico for the host.
+ * Relative URLs resolve against the scraped page URL. Pure and unit-tested.
+ */
+export function extractLogoFromPayload(
+  payload: Record<string, unknown>,
+  pageUrl: string,
+): { url: string; source: LogoSource } | null {
+  const data = asRecord(payload.data);
+  const metadata = asRecord(data.metadata ?? payload.metadata);
+  const resolve = (value: unknown): string | null => {
+    const raw = typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+    if (!raw) return null;
+    try {
+      return new URL(raw, pageUrl).toString();
+    } catch {
+      return null;
+    }
+  };
+  const ogImage = resolve(metadata.ogImage ?? metadata["og:image"]);
+  if (ogImage) return { url: ogImage, source: "og_image" };
+  const favicon = resolve(metadata.favicon);
+  if (favicon) return { url: favicon, source: "favicon" };
+  try {
+    const host = new URL(pageUrl);
+    return { url: `${host.protocol}//${host.host}/favicon.ico`, source: "fallback" };
+  } catch {
+    return null;
+  }
 }

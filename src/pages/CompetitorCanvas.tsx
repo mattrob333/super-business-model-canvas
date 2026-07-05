@@ -164,11 +164,18 @@ export default function CompetitorCanvas() {
               Dashboard
             </Link>
           </Button>
-          <div>
+          <div className="flex items-start gap-3">
+            {competitor.logo_url && (
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-card shadow-sm">
+                <img src={competitor.logo_url} alt="" className="h-full w-full object-contain" />
+              </div>
+            )}
+            <div>
             <h1 className="break-words text-2xl font-semibold tracking-tight">{competitor.name}</h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               Competitor Business Model Canvas with evidence-linked items and gap-engine comparison.
             </p>
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
