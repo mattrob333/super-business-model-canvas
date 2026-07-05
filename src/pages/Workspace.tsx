@@ -14,6 +14,7 @@ import {
 import { AGENT_ROSTER } from "@/lib/agent-roster";
 import { AgentIdentityCard, type AgentRunSnapshot } from "@/components/workspace/AgentIdentityCard";
 import { SectionCanvasPanel } from "@/components/workspace/SectionCanvasPanel";
+import { WorkspaceActionsPanel } from "@/components/workspace/WorkspaceActionsPanel";
 import { WorkspaceRunQueue } from "@/components/workspace/WorkspaceRunQueue";
 import { WorkspaceThread } from "@/components/workspace/WorkspaceThread";
 import { WorkspaceTopBar } from "@/components/workspace/WorkspaceTopBar";
@@ -125,8 +126,13 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
             />
           </main>
 
-          {/* Right rail — run queue (actions tabs arrive with the next slice) */}
+          {/* Right rail — room actions + run queue */}
           <aside className="space-y-4 lg:col-span-3 lg:overflow-y-auto lg:pl-1">
+            <WorkspaceActionsPanel
+              accountId={accountId}
+              agentProfileId={profile.id}
+              agentKey={entry.agentKey}
+            />
             <WorkspaceRunQueue
               accountId={accountId}
               agentProfileId={profile.id}
