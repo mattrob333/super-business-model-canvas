@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, RotateCcw, Plus, Trash2, Save, Copy, Check } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowRight, Send, Sparkles, RotateCcw, Plus, Trash2, Save, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +13,8 @@ import { FocusDrawer } from "@/components/overlay/FocusDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { getAccessToken, readGrokSseStream } from "@/lib/supabase-auth";
+import { CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
+import { AGENT_ROSTER } from "@/lib/agent-roster";
 
 const SECTION_DESCRIPTIONS: Record<string, string> = {
   "Value Propositions": "Define why customers choose your business. Update or add new statements that describe what makes your offer unique.",
@@ -295,6 +298,14 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
 
   const quickQuestions = SECTION_QUICK_QUESTIONS[section.title];
 
+  // The editor receives the section label; resolve it back to the canvas key
+  // to link the matching agent room (spec 02 two-tier entry).
+  const workspaceSectionKey = (Object.entries(CANVAS_SECTION_LABELS)
+    .find(([, label]) => label === section.title)?.[0] ?? null) as keyof typeof AGENT_ROSTER | null;
+  const workspaceEntry = workspaceSectionKey
+    ? { sectionKey: workspaceSectionKey, ...AGENT_ROSTER[workspaceSectionKey] }
+    : null;
+
   return (
     <FocusDrawer
       open={open}
@@ -461,6 +472,31 @@ Make them specific, measurable, achievable, relevant, and time-bound. No additio
       }}
     >
       <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6 sm:px-6">
+        {/* Spec 02 entry point: quick edits stay here; deep work moves to the
+            agent's full-screen room. */}
+        {workspaceEntry && (
+          <Link
+            to={`/workspace/${workspaceEntry.sectionKey}`}
+            onClick={() => onOpenChange(false)}
+            className={`flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary/35`}
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${workspaceEntry.avatarClass}`}>
+                <workspaceEntry.icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">
+                  Open {workspaceEntry.callsign}&rsquo;s workspace
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  Persistent threads, evidence-cited answers, the real {workspaceEntry.callsign} agent
+                </span>
+              </span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
+          </Link>
+        )}
+
         {/* Content items */}
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">Current {section.title}</p>
