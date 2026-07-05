@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Download, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { isLikelyHtml, salvageReportHtml } from "@/lib/report-content";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 interface Report {
@@ -139,12 +140,22 @@ const ReportViewer = () => {
             </div>
           </div>
 
-          {/* Report Content */}
-          <div className="prose prose-slate dark:prose-invert max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {report.report_content}
-            </ReactMarkdown>
-          </div>
+          {/* Report Content — generated reports are stored as HTML; older or
+              malformed rows (raw JSON) are salvaged into formatted HTML.
+              Markdown rendering remains only for plain-prose content. */}
+          {(() => {
+            const content = salvageReportHtml(report.report_content);
+            return isLikelyHtml(content) ? (
+              <div
+                className="prose prose-slate dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: content }}
+              />
+            ) : (
+              <div className="prose prose-slate dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              </div>
+            );
+          })()}
         </Card>
       </div>
     </div>

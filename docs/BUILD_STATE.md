@@ -198,6 +198,47 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-2 + RF-LIVE-3 (HIGH, mobile live-test findings) — FIXED (2026-07-05, reviewer-as-builder)
+
+**RF-LIVE-2 — competitor research "never finished" (American Airlines).** Two stacked
+defects. (a) UI: `useCompetitorResearch` kept run state only in local session memory —
+it never read the durable `agent_runs` record, so a worker-side failure left the card
+spinning "Researching — takes a few minutes" forever (and a page reload forgot the run
+entirely). The worker DOES mark the run `failed` with the error (dispatcher
+`markAgentRunFailed`), the UI just never looked. (b) Worker: outbound feed fetches
+(Firecrawl et al.) had **no timeout**; because the queue heartbeat keeps a stuck handler
+alive indefinitely, a hung crawl (aa.com sits behind aggressive bot protection) pins the
+job with the run stuck `running` — genuinely "never finished".
+**Fix:** the hook now derives status from the latest `agent_runs` row per competitor
+(pending/running → queued, failed/timeout/cancelled → error with the run's error text),
+polls every 5s while anything is in flight, survives reloads, and prunes its local
+bridge state once the DB reflects the enqueued run (poll stops when the run settles);
+the landscape card gets a "Retry research" state. Worker: all feed fetches abort via
+`AbortSignal.timeout` (120s default, `fetchTimeoutMs` configurable) so a hung crawl
+fails → retries → surfaces instead of hanging. Answer to the owner's question recorded:
+competitor research runs the exact same pipeline as company research, one job at a time;
+the gap engine chains AFTER completion and cannot slow the research itself.
+
+**RF-LIVE-3 — Porter Five Forces returned raw JSON, not a professional report.**
+`generate-framework-report` had three raw-JSON leak paths: the thin-report and
+template-error fallbacks dumped the raw model response (JSON) into the report body; the
+JSON validation gate required `analysis|financial|customer` keys and threw on legitimate
+variant shapes; and the error box embedded unescaped raw content. Additionally
+`ReportViewer.tsx` rendered stored HTML through ReactMarkdown (mangling every report on
+that page).
+**Fix:** new structured JSON→HTML renderer (`jsonToReportHtml`) — keys become section
+headings, string arrays become lists, arrays of objects become cards — used by every
+fallback path, so no path can emit raw JSON; Porter normalization broadened (snake_case
+keys, top-level/`fiveForces` arrays, named-key shapes at root or under `analysis`);
+unparseable-but-present model text renders as a prose report instead of failing the
+request. Client mirror `src/lib/report-content.ts` (`salvageReportHtml`) formats
+already-stored bad rows at render time in both ReportViewerDrawer and ReportViewer —
+this fixes the owner's existing broken report as soon as the web deploy lands, before
+the edge-function redeploy. Edge/client renderers are duplicated by necessity (Deno
+can't share app modules) — keep in sync, noted in both files.
+**Operator/live queue:** run Ops → `deploy-edge-functions` so the generate-framework-report
+fix is live (client salvage covers the gap until then).
+
 ### Spec 10 slice 2: skill catalog surfaced on the Dashboard (2026-07-04, reviewer-as-builder, PR #48)
 
 First 5B UI increment: `SkillCatalogPanel` on the Dashboard — reads `skill_catalog`

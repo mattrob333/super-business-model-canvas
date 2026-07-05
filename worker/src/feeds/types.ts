@@ -49,6 +49,8 @@ export interface FeedRuntimeConfig {
   googleTrendsApiKey?: string;
   githubToken?: string;
   fetch?: typeof fetch;
+  /** Abort outbound feed requests after this many ms (default 120s). */
+  fetchTimeoutMs?: number;
 }
 
 export function degraded(feedKey: string, reason: string): FeedRunResult {
