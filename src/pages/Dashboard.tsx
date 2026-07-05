@@ -9,6 +9,7 @@ import { StrategicHealthPanel } from "@/components/dashboard/StrategicHealthPane
 import { useActiveAnalysis } from "@/hooks/useActiveAnalysis";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
+import { SkillCatalogPanel } from "@/components/skills/SkillCatalogPanel";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useAuth } from "@/hooks/useAuth";
 import type { Database } from "@/integrations/supabase/types";
@@ -453,6 +454,9 @@ const Dashboard = () => {
           openGaps={openGapSeverities.length}
         />
       </div>
+
+      {/* Agent skills — spec 10 catalog (first 5B increment) */}
+      <SkillCatalogPanel />
 
       {/* Bottom row — Recent Reports */}
       <Card>
