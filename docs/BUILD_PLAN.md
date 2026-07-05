@@ -284,7 +284,7 @@ stage **5B** is the room chrome and may trail 6.
   company instead of eloquent about a generic one — the advisor test lives or dies here.
 - **5B — The nine full-screen rooms, exactly per spec 02** (work orders 5.1–5.9).
 
-**Required pre-reading:** spec 08 for 5A; spec 02 + spec 09 + DESIGN_TASTE for 5B.
+**Required pre-reading:** spec 08 for 5A; spec 02 + spec 09 + spec 10 (skill catalog — 5B seeds `agent_skills` and ships the first `skill_run` skills) + DESIGN_TASTE for 5B.
 
 **Work orders**
 - 5.1 Route `/workspace/:sectionKey` outside AppShell content column; `WorkspaceTopBar` with
@@ -352,7 +352,7 @@ actions; visual pass against spec 02 layout.
 
 ---
 
-### PHASE 6 — The War Room & orchestration (L) — *spec 03 + 04, the marquee; spec 08 §§5–7 required pre-reading (Atlas context stack, Goals & Guardrails, playbook contracts + framework_outputs + native renderers, Theory of Constraints loop + strategy_state, onboarding_deep_research cascade)*
+### PHASE 6 — The War Room & orchestration (L) — *spec 03 + 04, the marquee; spec 08 §§5–7 + spec 10 (synergy plays + Atlas doctrine) required pre-reading (Atlas context stack, Goals & Guardrails, playbook contracts + framework_outputs + native renderers, Theory of Constraints loop + strategy_state, onboarding_deep_research cascade)*
 
 **Objective:** Atlas's room, delegation, cascades, agenda, approvals — the full loop.
 
