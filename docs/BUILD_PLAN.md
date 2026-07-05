@@ -395,6 +395,12 @@ actions; visual pass against spec 02 layout.
   account-scoped RLS via a share-token table — never expose service-role paths). The brief
   an advisor forwards to a founder or partner IS the growth loop; it must look like the
   best document that founder receives that week (DESIGN_TASTE applies to exports too).
+- 6.11 **Document Studio (spec 10 §3b, owner brief 2026-07-04):** Atlas assembles
+  business plan, pitch-deck outline, investor one-pager, and a data-room starter pack
+  from existing verified artifacts + captured branding (letterhead from
+  `companies.logo_url`/`brand_assets`). Compose-only: never fresh unverified claims;
+  missing inputs become honest gaps + owner questions. Outputs are skill_artifacts →
+  PDF + share link (6.10). Optional provenance appendix (every claim's source).
 
 **Acceptance criteria**
 - [ ] Full loop demo on staging: seeded critical insight → Atlas triage → cascade fires →

@@ -119,6 +119,32 @@ plays are **cascades** (spec 04) composing section skills, ending in an Atlas sy
 Each play's output is an **Atlas brief** (spec 03): the finding, the evidence chain,
 the recommended move, and what he'd watch to know if it's working.
 
+## 3b. The Document Studio (Atlas workflow — owner brief 2026-07-04)
+
+The system already holds everything a startup's paperwork is made of: verified canvas,
+dossiers, competitor matrices, gap register, pricing analysis, owner-attested truths,
+and the company's captured branding (logo pipeline, 5.11). The Document Studio is the
+Atlas workflow that assembles it into the documents a company actually needs:
+
+| Document | Assembled from |
+|---|---|
+| **Business plan** | canvas (all nine) + dossiers + market sizing + unit economics frame |
+| **Pitch deck** (outline + speaker notes; slide-ready markdown v1, native slides later) | positioning brief + segments + pricing + moat audit + traction/owner inputs |
+| **Investor prospectus / one-pager** | Atlas summary + differentiators + gap-informed risks (honest risk section is a FEATURE — evidence-cited risks build trust) |
+| **Data-room starter pack** | competitor landscape, market analysis, pricing teardown, risk register — each an existing artifact, bundled |
+
+Rules: each document is a **composition of existing verified artifacts** — the studio
+never generates fresh unverified claims; where a required input is missing it inserts
+an honest gap ("needs owner input: churn rate") and files an owner question. Branding:
+letterhead/cover from `companies.logo_url` + brand_assets (owner-editable). Outputs are
+`skill_artifacts` (kind per document) → exportable PDF + revocable share link (6.10
+machinery). Provenance appendix optional: every claim's source, one click away — the
+signature move no template tool can copy.
+
+Phasing: **Phase 6** work order 6.11 (after Atlas summaries + share links exist, which
+the studio depends on). Not before — a document studio built on ungrounded data would
+be a very pretty way to embarrass a founder in front of an investor.
+
 ## 4. Artifact contract (all skills)
 
 Every artifact is a `generated_reports` row: `kind='skill_artifact'`, `skill_key`,
