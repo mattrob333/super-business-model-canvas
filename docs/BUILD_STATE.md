@@ -198,6 +198,32 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### 5B slice 3: the workspace room chassis (2026-07-05, reviewer-as-builder)
+
+First real room per spec 02 — `/workspace/:sectionKey` renders full-screen outside the
+AppShell: slim `WorkspaceTopBar` (back-to-canvas + Rooms switcher listing all nine agents,
+War Room shown as the disabled tenth stop), left rail with `AgentIdentityCard` (roster
+callsign/role/accent + live status from the agent's latest run: active/idle/needs-attention)
+and `SectionCanvasPanel` (live items with confidence dots, freshness desaturation, evidence
+popovers; falls back to legacy analysis strings exactly like the canvas page), center
+`WorkspaceThread` (persistent `workspace_threads`/`workspace_messages`, thread switcher +
+create, human/agent/proposal message cards — borrowed competitor ideas render as proposal
+cards — markdown agent replies, composer with Enter-to-send), right rail `WorkspaceRunQueue`
+(live agent_runs for the agent, polls while active). Chat sends run through the REAL
+`workspace_chat` worker job (already in the live allowlist): insert user message → enqueue →
+poll the durable run → agent reply appears; failures surface inline, runtime-unreachable
+shows the spec'd degraded banner. New `src/lib/agent-roster.ts` mirrors the seeded spec 01
+roster (callsigns, roles, lucide icons for the avatar motifs, literal Tailwind accents).
+Entry points: canvas section drawer gains an "Open ⟨Agent⟩'s workspace" card (drawer chat
+demotion itself is work order 5.7, later).
+**Honest scope — deferred to later 5B slices:** instrument strip (2a), actions panel tabs +
+schedule popover (5.5), proposal approve/decline cards (5.4), agent settings sheet, context
+sources panel (1c), slash commands, Realtime (polling for now), first-visit agent intro job
+(5.6 — the empty state shows honest prompt suggestions, no fake agent message), shared-element
+entry transition, drawer demotion (5.7), Playwright smoke (5.9).
+**Gates:** root tsc exit 0, build green, lint 65 = frozen ceiling (0 errors in new files);
+worker untouched.
+
 ### RF-LIVE-2 + RF-LIVE-3 (HIGH, mobile live-test findings) — FIXED (2026-07-05, reviewer-as-builder)
 
 **RF-LIVE-2 — competitor research "never finished" (American Airlines).** Two stacked

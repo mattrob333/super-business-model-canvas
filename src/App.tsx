@@ -27,6 +27,7 @@ const Agents = lazy(() => import("./pages/Agents"));
 const AgentDetail = lazy(() => import("./pages/AgentDetail"));
 const Activity = lazy(() => import("./pages/Activity"));
 const Settings = lazy(() => import("./pages/Settings"));
+const Workspace = lazy(() => import("./pages/Workspace"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -68,6 +69,8 @@ const App = () => (
 
           {/* Authenticated routes — inside AppShell */}
           <Route element={<RequireAuth />}>
+          {/* Full-screen agent rooms render outside the shell (spec 02) */}
+          <Route path="/workspace/:sectionKey" element={withSuspense(Workspace)} />
           <Route element={<AppShell />}>
             <Route path="/dashboard" element={withSuspense(Dashboard)} />
             <Route path="/competitors/:competitorId/canvas" element={withSuspense(CompetitorCanvas)} />
