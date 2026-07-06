@@ -110,6 +110,8 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
           {/* Left rail — identity + the section's live canvas */}
           <aside className="space-y-4 lg:col-span-3 lg:overflow-y-auto lg:pr-1">
             <AgentIdentityCard
+              accountId={accountId}
+              agentProfileId={profile.id}
               sectionKey={sectionKey}
               description={profile.description}
               latestRun={latestRun}
