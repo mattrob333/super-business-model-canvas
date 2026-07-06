@@ -1430,6 +1430,28 @@ cd worker && npm run lint             -> exit 0
 5B tasks: 5.1 [ ] - 5.2 [ ] - 5.3 [ ] - 5.4 [ ] - 5.5 [ ] - 5.6 [ ] - 5.7 [ ] - 5.8 [ ] - 5.9 [ ]
 5A additions from BUILD_PLAN: 5.10 [schema + worker extraction pipeline + upload UI] - 5.11 [schema + logo display/manual URL UI; Firecrawl capture not complete]
 
+**2026-07-05 evening - 5B slice 3 complete on `build/phase-5b-slice-3`.**
+
+- Read the resolved `RF-5B2-1` note before touching workspace/canvas code. No canvas-version
+  write paths were added in this slice.
+- Retired the section drawer AI chat rail per work order 5.7. `BMCSectionEditor` remains the
+  quick edit surface with item editing, strategic-goal notes, save, and the "Open
+  <Agent>'s workspace" route card as the primary agent CTA. The `bmc-chat` edge function is
+  untouched because Analysis-page chat still uses it.
+- Added `AgentSettingsSheet` behind a quiet settings button on `AgentIdentityCard`:
+  system-instructions editor, behavior sliders (`proactivity`, `risk`, `verbosity`,
+  `evidence_bar`), model-route selector, last-10 revision list, restore per revision, and
+  persistent "changes take effect on the next run" copy. Saves update `agent_profiles` and write
+  `agent_profile_revisions`; revision pruning keeps the latest 10.
+- Extended the local `supabaseUntyped` helper interface with `delete()` and `range()` for
+  typed-safe access to late-declared tables that trip the generated client horizon.
+- Gates: `npx tsc -p tsconfig.app.json --noEmit` exit 0; `npm run build` green; `npm run lint`
+  reports 64 problems (46 errors, 18 warnings), within the frozen <=65 ceiling; `worker npm run
+  typecheck` exit 0; `worker npm test` 62 passed / 2 skipped; `worker npm run build` exit 0;
+  `worker npm run lint` exit 0.
+- Logged-in smoke still not completed in this pass: Dashboard Pricing Teardown retry, Yield room
+  chat reply, and Porter render need an authenticated owner browser session after deploy.
+
 **2026-07-05 - Live Supabase catch-up + 5B slice 2 started on `build/phase-5b-slice-2`.**
 
 - Pulled `main` from `281ce5b` to `551ad57` before starting. Live Supabase project
