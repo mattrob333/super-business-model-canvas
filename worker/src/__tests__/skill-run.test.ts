@@ -4,7 +4,9 @@ import {
   parseAvatarArtifact,
   parseChannelEconomicsArtifact,
   parseChannelGapArtifact,
+  parseDifferentiatorArtifact,
   parsePricingArtifact,
+  parseProofGapArtifact,
   parseSegmentExpansionArtifact,
   runModelStep,
   SkillRunHandler,
@@ -71,8 +73,10 @@ describe("runModelStep", () => {
 
 class SkillRunner implements AgentRunner {
   private mainIndex = 0;
+  public requests: AgentRunRequest[] = [];
   constructor(private readonly main: string | string[], private readonly verify: string) {}
   async run(request: AgentRunRequest): Promise<AgentRunResult> {
+    this.requests.push(request);
     const isVerify = request.prompt.startsWith("Classify the claim");
     const resultText = Array.isArray(this.main) ? this.main[Math.min(this.mainIndex, this.main.length - 1)] : this.main;
     if (!isVerify && Array.isArray(this.main)) this.mainIndex += 1;
@@ -175,6 +179,96 @@ describe("SkillRunHandler", () => {
   });
 });
 
+describe("forge skills (Phase F)", () => {
+  it("differentiator_audit classifies claims, spot-checks non-unique verdicts, and never sees the previous company's rows", async () => {
+    const client = new FakeClient();
+    const runner = new SkillRunner(differentiatorOutput(), JSON.stringify({ status: "confirmed", reason: "competitor text matches" }));
+    const handler = new SkillRunHandler({ client: client.asSupabase(), runner, feedRunner: { async refresh() { throw new Error("no feeds in this skill"); } } as never });
+    await handler.handle(makeJob({ payload: { skill_key: "forge.differentiator_audit" } }));
+
+    // Company scoping: the newer ctx-0 trap row must never reach the prompt.
+    const mainPrompt = runner.requests[0]?.prompt ?? "";
+    expect(mainPrompt).toContain("Only platform with evidence-cited canvases");
+    expect(mainPrompt).not.toContain("Stale old-company differentiator");
+
+    const artifact = client.inserts.find((entry) => entry.table === "skill_artifacts");
+    expect(artifact?.values).toMatchObject({
+      account_id: "account-1",
+      business_context_version_id: "ctx-1",
+      skill_key: "forge.differentiator_audit",
+    });
+    const rows = (artifact?.values.payload as { rows: Array<Record<string, unknown>> }).rows;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ verdict: "unique", competitor: null });
+    expect(rows[1]).toMatchObject({ verdict: "contested", competitor: "RivalCo" });
+    // Artifact -> context wiring: the owning agent gets a summary note.
+    const note = client.inserts.find((entry) => entry.table === "context_sources");
+    expect(note?.values).toMatchObject({ agent_profile_id: "profile-1", type: "note" });
+    expect((note?.values.config as Record<string, unknown>).source).toBe("skill_artifact");
+  });
+
+  it("differentiator_audit fails honestly without competitor VP research", async () => {
+    const client = new FakeClient();
+    client.competitorRows = client.competitorRows.filter((row) => row.section_key !== "value_propositions");
+    const runner = new SkillRunner(differentiatorOutput(), "{}");
+    const handler = new SkillRunHandler({ client: client.asSupabase(), runner, feedRunner: { async refresh() { throw new Error("x"); } } as never });
+    await expect(handler.handle(makeJob({ payload: { skill_key: "forge.differentiator_audit" } })))
+      .rejects.toThrow(/competitor Value Propositions research/);
+  });
+
+  it("proof_gap_scan flags evidence-free and assumption items, writes register rows stamped to the active company, and supersedes prior rows", async () => {
+    const client = new FakeClient();
+    const runner = new SkillRunner(proofGapOutput(), "{}");
+    const handler = new SkillRunHandler({ client: client.asSupabase(), runner, feedRunner: { async refresh() { throw new Error("x"); } } as never });
+    await handler.handle(makeJob({ payload: { skill_key: "forge.proof_gap_scan" } }));
+
+    // Deterministic detection: only the assumption-labeled, evidence-free item.
+    const gapInsert = client.inserts.find((entry) => entry.table === "gaps");
+    const gapRows = gapInsert?.values as unknown as Array<Record<string, unknown>>;
+    expect(gapRows).toHaveLength(1);
+    expect(gapRows[0]).toMatchObject({
+      account_id: "account-1",
+      business_context_version_id: "ctx-1",
+      gap_type: "missing_data",
+      affected_sections: ["value_propositions"],
+    });
+    expect(String(gapRows[0].title)).toMatch(/^Proof gap: Assumption: fastest onboarding/);
+    // Idempotency: prior open proof gaps superseded before the insert.
+    const supersede = client.updates.find((update) => update.table === "gaps");
+    expect(supersede?.values).toMatchObject({ status: "superseded" });
+
+    const artifact = client.inserts.find((entry) => entry.table === "skill_artifacts");
+    expect(artifact?.values).toMatchObject({ skill_key: "forge.proof_gap_scan", business_context_version_id: "ctx-1" });
+    expect((artifact?.values.payload as Record<string, unknown>).detection).toBe("deterministic");
+  });
+
+  it("proof_gap_scan writes an honest no-gaps artifact without a model call when every claim carries evidence", async () => {
+    const client = new FakeClient();
+    client.ownRows = client.ownRows.map((row) =>
+      row.section_key === "value_propositions" && row.business_context_version_id === "ctx-1"
+        ? { ...row, items: [{ text: "Only platform with evidence-cited canvases", evidence_ids: ["ev-own-vp"] }] }
+        : row,
+    );
+    const runner = new SkillRunner("model should never be called", "{}");
+    const handler = new SkillRunHandler({ client: client.asSupabase(), runner, feedRunner: { async refresh() { throw new Error("x"); } } as never });
+    await handler.handle(makeJob({ payload: { skill_key: "forge.proof_gap_scan" } }));
+
+    expect(runner.requests).toHaveLength(0);
+    expect(client.inserts.filter((entry) => entry.table === "gaps")).toHaveLength(0);
+    const artifact = client.inserts.find((entry) => entry.table === "skill_artifacts");
+    expect(String(artifact?.values.title)).toContain("no gaps");
+  });
+
+  it("proof_gap_scan rejects a model reply that drops a detected gap", async () => {
+    const client = new FakeClient();
+    const runner = new SkillRunner(JSON.stringify({ gaps: [], body_md: "## Proof plan" }), "{}");
+    const handler = new SkillRunHandler({ client: client.asSupabase(), runner, feedRunner: { async refresh() { throw new Error("x"); } } as never });
+    await expect(handler.handle(makeJob({ payload: { skill_key: "forge.proof_gap_scan" } })))
+      .rejects.toThrow(/unparseable output/);
+    expect(client.inserts.filter((entry) => entry.table === "skill_artifacts")).toHaveLength(0);
+  });
+});
+
 describe("new skill artifact parsers", () => {
   it("parse typed outputs and reject empty payloads", () => {
     expect(parseAvatarArtifact(avatarOutput(), ["Seed-stage SaaS founders"])?.cards).toHaveLength(1);
@@ -182,6 +276,28 @@ describe("new skill artifact parsers", () => {
     expect(parseChannelGapArtifact(channelGapOutput())?.gaps).toHaveLength(1);
     expect(parseChannelEconomicsArtifact(channelEconomicsOutput())?.channels[0]?.cac_posture).toBe("unknown — not published");
     expect(parseAvatarArtifact(JSON.stringify({ cards: [] }), ["x"])).toBeNull();
+  });
+
+  it("parseDifferentiatorArtifact rejects invented claims and unnamed contests", () => {
+    const allowed = ["Only platform with evidence-cited canvases", "Assumption: fastest onboarding in the category"];
+    const parsed = parseDifferentiatorArtifact(differentiatorOutput(), allowed);
+    expect(parsed?.rows).toHaveLength(2);
+    // A claim the canvas never made is dropped, not shipped.
+    expect(parseDifferentiatorArtifact(JSON.stringify({
+      rows: [{ claim: "Invented claim", verdict: "unique", competitor: null, competitor_evidence: "", basis: "b" }],
+      body_md: "x",
+    }), allowed)).toBeNull();
+    // "contested" without a named competitor is an unsupported assertion.
+    expect(parseDifferentiatorArtifact(JSON.stringify({
+      rows: [{ claim: allowed[0], verdict: "contested", competitor: null, competitor_evidence: "", basis: "b" }],
+      body_md: "x",
+    }), allowed)).toBeNull();
+  });
+
+  it("parseProofGapArtifact requires a suggestion for every detected gap", () => {
+    const detected = [{ claim: "Assumption: fastest onboarding in the category", reason: "assumption" as const }];
+    expect(parseProofGapArtifact(proofGapOutput(), detected)?.gaps).toHaveLength(1);
+    expect(parseProofGapArtifact(JSON.stringify({ gaps: [], body_md: "x" }), detected)).toBeNull();
   });
 });
 
@@ -227,38 +343,80 @@ function makeJob(over: Partial<AgentJob> = {}): AgentJob {
 class FakeClient {
   public inserts: Array<{ table: string; values: Record<string, unknown> }> = [];
   public updates: Array<{ table: string; values: Record<string, unknown> }> = [];
+  // Two company eras on one account: ctx-1 (Acme) is active; ctx-0 belongs to
+  // the previously analyzed company and must never reach a skill.
+  public contexts: Array<Record<string, unknown>> = [
+    { id: "ctx-1", company_name: "Acme Robotics", website: null, created_at: "2026-07-03T00:00:00Z" },
+    { id: "ctx-0", company_name: "Old Ventures", website: "https://old.example", created_at: "2026-06-01T00:00:00Z" },
+  ];
   public ownRows: Array<Record<string, unknown>> = [{
     section_key: "customer_segments",
+    business_context_version_id: "ctx-1",
     competitor_id: null,
     items: [{ text: "Seed-stage SaaS founders", evidence_ids: ["ev-own-segment"] }],
     created_at: "2026-07-04",
   }, {
     section_key: "channels",
+    business_context_version_id: "ctx-1",
     competitor_id: null,
     items: [{ text: "Founder-led outbound", evidence_ids: ["ev-own-channel"] }],
     created_at: "2026-07-04",
   }, {
+    section_key: "revenue_streams",
+    business_context_version_id: "ctx-1",
+    competitor_id: null,
+    items: ["Subscription revenue"],
+    created_at: "2026-07-04",
+  }, {
+    section_key: "value_propositions",
+    business_context_version_id: "ctx-1",
+    competitor_id: null,
+    items: [
+      { text: "Only platform with evidence-cited canvases", evidence_ids: ["ev-own-vp"] },
+      { text: "Assumption: fastest onboarding in the category", evidence_ids: [] },
+    ],
+    created_at: "2026-07-04",
+  }, {
+    // Cross-company trap: NEWER than the ctx-1 row — without company scoping
+    // latest-per-section would feed the old company's claim into the skill.
+    section_key: "value_propositions",
+    business_context_version_id: "ctx-0",
+    competitor_id: null,
+    items: [{ text: "Stale old-company differentiator", evidence_ids: [] }],
+    created_at: "2026-07-05",
+  }, {
     section_key: "key_resources",
+    business_context_version_id: "ctx-1",
     competitor_id: null,
     items: [{ text: "AI workflow engine", evidence_ids: [] }],
     created_at: "2026-07-04",
   }, {
     section_key: "key_activities",
+    business_context_version_id: "ctx-1",
     competitor_id: null,
     items: [{ text: "Concierge onboarding", evidence_ids: [] }],
     created_at: "2026-07-04",
   }];
   public competitorRows: Array<Record<string, unknown>> = [{
     section_key: "customer_segments",
+    business_context_version_id: "ctx-1",
     competitor_id: "comp-1",
     companies: { name: "RivalCo" },
     items: [{ text: "RivalCo serves enterprise innovation teams.", evidence_ids: ["ev-competitor-1"] }],
     created_at: "2026-07-04",
   }, {
     section_key: "channels",
+    business_context_version_id: "ctx-1",
     competitor_id: "comp-1",
     companies: { name: "RivalCo" },
     items: [{ text: "RivalCo distributes through integration marketplaces and partner webinars.", evidence_ids: ["ev-competitor-1"] }],
+    created_at: "2026-07-04",
+  }, {
+    section_key: "value_propositions",
+    business_context_version_id: "ctx-1",
+    competitor_id: "comp-1",
+    companies: { name: "RivalCo" },
+    items: [{ text: "RivalCo offers evidence-cited strategy canvases.", evidence_ids: ["ev-competitor-vp"] }],
     created_at: "2026-07-04",
   }];
   asSupabase(): never { return this as never; }
@@ -275,7 +433,8 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
   update(values: Record<string, unknown>): this { this.operation = "update"; this.values = values; return this; }
   eq(column: string, value: unknown): this { this.filters.push({ op: "eq", column, value }); return this; }
   is(column: string, value: unknown): this { this.filters.push({ op: "is", column, value }); return this; }
-  in(): this { return this; }
+  in(column: string, value: unknown): this { this.filters.push({ op: "in", column, value }); return this; }
+  like(column: string, value: unknown): this { this.filters.push({ op: "like", column, value }); return this; }
   or(): this { return this; }
   not(column: string, op: string, value: unknown): this { this.filters.push({ op: `not:${op}`, column, value }); return this; }
   order(): this { return this; }
@@ -294,12 +453,19 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null }> {
   }
   private resolveSelect(): unknown {
     if (this.table === "companies") return [{ id: "comp-1", name: "RivalCo", website_url: "https://rival.example" }];
+    if (this.table === "business_context_versions") return this.client.contexts;
+    if (this.table === "agent_profiles") return [{ id: "profile-1", account_id: "account-1" }];
+    if (this.table === "context_sources") return [];
     if (this.table === "canvas_section_versions") {
       const section = this.filters.find((filter) => filter.column === "section_key")?.value;
       const wantsCompetitor = this.filters.some((filter) => filter.op === "not:is" && filter.column === "competitor_id");
-      if (section === "revenue_streams") return [{ items: ["Subscription revenue"], created_at: "2026-07-04" }];
-      const rows = wantsCompetitor ? this.client.competitorRows : this.client.ownRows;
-      return rows.filter((row) => !section || row.section_key === section);
+      const contextIds = this.filters.find((filter) => filter.op === "in" && filter.column === "business_context_version_id")?.value as string[] | undefined;
+      let rows = wantsCompetitor ? this.client.competitorRows : this.client.ownRows;
+      if (section) rows = rows.filter((row) => row.section_key === section);
+      // Honor company scoping the way postgrest would — the trap rows from
+      // the previous company era must actually be filtered by the query.
+      if (contextIds) rows = rows.filter((row) => contextIds.includes(row.business_context_version_id as string));
+      return rows;
     }
     if (this.table === "model_routes") {
       return [
@@ -351,6 +517,36 @@ function channelGapOutput(): string {
       recommendation: "Pilot one marketplace listing.",
     }],
     body_md: "## Channel gaps\nMarketplace presence is the sharpest gap.",
+  });
+}
+
+function differentiatorOutput(): string {
+  return JSON.stringify({
+    rows: [{
+      claim: "Only platform with evidence-cited canvases",
+      verdict: "unique",
+      competitor: null,
+      competitor_evidence: "",
+      basis: "No competitor text mentions evidence citations.",
+    }, {
+      claim: "Assumption: fastest onboarding in the category",
+      verdict: "contested",
+      competitor: "RivalCo",
+      competitor_evidence: "RivalCo offers evidence-cited strategy canvases.",
+      basis: "RivalCo claims a comparable capability.",
+    }],
+    body_md: "## Differentiation read\nEvidence citations are the wedge.",
+  });
+}
+
+function proofGapOutput(): string {
+  return JSON.stringify({
+    gaps: [{
+      claim: "Assumption: fastest onboarding in the category",
+      suggested_source: "Onboarding time metric from the product database",
+      how_to_get_it: "Export median time-to-first-canvas for the last 20 signups.",
+    }],
+    body_md: "## Proof plan\nOne metric closes the only open gap.",
   });
 }
 

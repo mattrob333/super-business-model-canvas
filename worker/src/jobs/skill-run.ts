@@ -47,6 +47,8 @@ interface CanvasItemSource {
 
 interface SkillArtifactWrite {
   skillKey: string;
+  /** Owning section agent — the artifact summary lands in this agent's context sources. */
+  agentKey: string;
   title: string;
   bodyMd: string;
   payload: Record<string, unknown>;
@@ -100,6 +102,14 @@ export class SkillRunHandler {
     }
     if (skillKey === "relay.channel_economics") {
       await this.runChannelEconomics(job, scope);
+      return;
+    }
+    if (skillKey === "forge.differentiator_audit") {
+      await this.runDifferentiatorAudit(job, scope);
+      return;
+    }
+    if (skillKey === "forge.proof_gap_scan") {
+      await this.runProofGapScan(job, scope);
       return;
     }
     throw new Error(`skill ${skillKey} is not implemented in the worker (catalog implemented flag must stay false)`);
@@ -190,23 +200,20 @@ export class SkillRunHandler {
       if (verdict.status === "confirmed") confirmed += 1;
     }
 
-    const { error } = await this.deps.client.from("skill_artifacts").insert({
-      account_id: job.account_id,
-      business_context_version_id: scope.activeContextId,
-      skill_key: "yield.pricing_teardown",
+    await this.writeSkillArtifact(job, scope, {
+      skillKey: "yield.pricing_teardown",
+      agentKey: "agent_revenue_streams",
       title: `Pricing teardown — ${sources.length} competitor${sources.length === 1 ? "" : "s"}`,
-      body_md: artifact.bodyMd,
+      bodyMd: artifact.bodyMd,
       payload: {
         matrix: artifact.matrix,
         your_position: artifact.yourPosition,
         scenarios: artifact.scenarios,
         spot_check: { checked: checks.length, confirmed },
       },
-      evidence_ids: sources.map((source) => source.evidenceId),
+      evidenceIds: sources.map((source) => source.evidenceId),
       inputs: { competitors: sources.map((source) => ({ id: source.competitorId, pricing_url: source.pricingUrl })) },
-      agent_run_id: job.agent_run_id,
     });
-    if (error) throw new Error(`Failed to write skill artifact: ${error.message}`);
 
     await this.markRunCompleted(job, "Pricing teardown completed", {
       skill_key: "yield.pricing_teardown",
@@ -264,6 +271,7 @@ export class SkillRunHandler {
 
     await this.writeSkillArtifact(job, scope, {
       skillKey: "compass.avatar_refinement",
+      agentKey: "agent_customer_segments",
       title: `Avatar refinement - ${artifact.cards.length} segment${artifact.cards.length === 1 ? "" : "s"}`,
       bodyMd: artifact.bodyMd,
       payload: { cards: artifact.cards, messaging_hooks: artifact.messagingHooks, spot_check: checked },
@@ -310,6 +318,7 @@ export class SkillRunHandler {
 
     await this.writeSkillArtifact(job, scope, {
       skillKey: "compass.segment_expansion",
+      agentKey: "agent_customer_segments",
       title: `Segment expansion scan - ${artifact.opportunities.length} opportunities`,
       bodyMd: artifact.bodyMd,
       payload: { opportunities: artifact.opportunities, spot_check: checked },
@@ -357,6 +366,7 @@ export class SkillRunHandler {
 
     await this.writeSkillArtifact(job, scope, {
       skillKey: "relay.channel_gap_scan",
+      agentKey: "agent_channels",
       title: `Channel gap scan - ${artifact.gaps.length} ranked channels`,
       bodyMd: artifact.bodyMd,
       payload: { gaps: artifact.gaps, spot_check: checked },
@@ -401,6 +411,7 @@ export class SkillRunHandler {
 
     await this.writeSkillArtifact(job, scope, {
       skillKey: "relay.channel_economics",
+      agentKey: "agent_channels",
       title: `Channel economics - ${artifact.channels.length} channel${artifact.channels.length === 1 ? "" : "s"}`,
       bodyMd: artifact.bodyMd,
       payload: { channels: artifact.channels, unknown_note: "unknown — not published", spot_check: checked },
@@ -412,6 +423,167 @@ export class SkillRunHandler {
       channels: artifact.channels.length,
       spot_check_confirmed: checked.confirmed,
     });
+  }
+
+  /**
+   * forge.differentiator_audit — classify each own Value Propositions claim
+   * against every researched competitor's claims: unique / contested (naming
+   * the competitor) / table stakes. Non-unique verdicts are spot-checked
+   * against the named competitor's own canvas text.
+   */
+  private async runDifferentiatorAudit(job: AgentJob, scope: CompanyScope): Promise<void> {
+    const ownClaims = await this.loadOwnSectionItems(job.account_id, "value_propositions", scope);
+    const competitorClaims = await this.loadCompetitorSectionItems(job.account_id, "value_propositions", scope);
+    if (ownClaims.length === 0) throw new Error("differentiator_audit requires our Value Propositions canvas items first");
+    if (competitorClaims.length === 0) throw new Error("differentiator_audit requires competitor Value Propositions research first");
+
+    const routes = await this.loadModelRoutes(job.account_id, ["skill_run", "research_verify"]);
+    const route = requiredRoute(routes, job.account_id, "skill_run", "skill_run");
+    const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
+    const modelResult = await runModelStep(
+      `differentiator_audit artifact (${route.provider}/${route.model_name})`,
+      () => this.runnerForRoute(route).run({
+        model: route.model_name,
+        modelParams: route.params ?? undefined,
+        maxTurns: 12,
+        maxBudgetUsd: budgetForRoute(route),
+        prompt: differentiatorAuditPrompt(ownClaims, competitorClaims),
+        systemPrompt: "You judge differentiation strictly from the provided canvas claims. A claim is contested only when a NAMED competitor's provided text supports it. Return JSON only.",
+        mcpServers: {},
+        allowedTools: [],
+      }),
+    );
+    const artifact = parseDifferentiatorArtifact(modelResult.resultText, ownClaims.map((item) => item.text));
+    if (!artifact) throw new Error("differentiator_audit produced unparseable output; refusing to write an artifact");
+
+    // Only non-unique verdicts assert something about a competitor — those
+    // are the checkable claims. An all-unique audit has nothing to spot-check.
+    const checks = artifact.rows
+      .filter((row) => row.verdict !== "unique" && row.competitor)
+      .map((row) => ({
+        claim: `${row.competitor} also claims: ${row.competitor_evidence}`,
+        excerpt: competitorExcerpt(competitorClaims, row.competitor ?? ""),
+      }));
+    const checked = checks.length > 0
+      ? await this.verifyArtifactClaims(job, verifyRoute, checks.slice(0, 4), "differentiator_audit")
+      : { checked: 0, confirmed: 0 };
+
+    const contested = artifact.rows.filter((row) => row.verdict === "contested").length;
+    await this.writeSkillArtifact(job, scope, {
+      skillKey: "forge.differentiator_audit",
+      agentKey: "agent_value_propositions",
+      title: `Differentiator audit — ${artifact.rows.length} claims, ${contested} contested`,
+      bodyMd: artifact.bodyMd,
+      payload: { rows: artifact.rows, spot_check: checked },
+      evidenceIds: unique(competitorClaims.flatMap((item) => item.evidenceIds)),
+      inputs: { sections: ["value_propositions"], competitor_items: competitorClaims.length },
+    });
+    await this.markRunCompleted(job, "Differentiator audit completed", {
+      skill_key: "forge.differentiator_audit",
+      claims: artifact.rows.length,
+      contested,
+      spot_check_confirmed: checked.confirmed,
+    });
+  }
+
+  /**
+   * forge.proof_gap_scan — pure database analysis: a Value Propositions item
+   * with no linked evidence or an "Assumption:" label is a proof gap. The
+   * detection is deterministic (nothing for a verifier to check against);
+   * the model only writes the per-gap evidence-sourcing suggestions. Each gap
+   * also lands on the Gap Register, superseding this skill's prior open rows
+   * so re-runs never duplicate.
+   */
+  private async runProofGapScan(job: AgentJob, scope: CompanyScope): Promise<void> {
+    const ownClaims = await this.loadOwnSectionItems(job.account_id, "value_propositions", scope);
+    if (ownClaims.length === 0) throw new Error("proof_gap_scan requires our Value Propositions canvas items first");
+
+    const detected = ownClaims.flatMap((item) => {
+      const assumption = ASSUMPTION_PREFIX.test(item.text);
+      if (!assumption && item.evidenceIds.length > 0) return [];
+      return [{ claim: item.text, reason: assumption ? ("assumption" as const) : ("no_evidence" as const) }];
+    });
+
+    if (detected.length === 0) {
+      await this.writeSkillArtifact(job, scope, {
+        skillKey: "forge.proof_gap_scan",
+        agentKey: "agent_value_propositions",
+        title: "Proof gap scan — no gaps: every claim carries evidence",
+        bodyMd: `## Proof gap scan\n\nAll ${ownClaims.length} Value Propositions items carry linked evidence and none is labeled as an assumption. Nothing to prove right now — re-run after the section changes.`,
+        payload: { gaps: [], detection: "deterministic", claims_scanned: ownClaims.length },
+        evidenceIds: unique(ownClaims.flatMap((item) => item.evidenceIds)),
+        inputs: { sections: ["value_propositions"], claims_scanned: ownClaims.length },
+      });
+      await this.markRunCompleted(job, "Proof gap scan completed — no gaps", {
+        skill_key: "forge.proof_gap_scan",
+        gaps: 0,
+        claims_scanned: ownClaims.length,
+      });
+      return;
+    }
+
+    const routes = await this.loadModelRoutes(job.account_id, ["skill_run"]);
+    const route = requiredRoute(routes, job.account_id, "skill_run", "skill_run");
+    const modelResult = await runModelStep(
+      `proof_gap_scan suggestions (${route.provider}/${route.model_name})`,
+      () => this.runnerForRoute(route).run({
+        model: route.model_name,
+        modelParams: route.params ?? undefined,
+        maxTurns: 12,
+        maxBudgetUsd: budgetForRoute(route),
+        prompt: proofGapScanPrompt(detected),
+        systemPrompt: "You suggest ONE concrete, obtainable evidence source per unproven claim (a page to crawl, an owner document, a metric, a customer quote). Return JSON only.",
+        mcpServers: {},
+        allowedTools: [],
+      }),
+    );
+    const artifact = parseProofGapArtifact(modelResult.resultText, detected);
+    if (!artifact) throw new Error("proof_gap_scan produced unparseable output; refusing to write an artifact");
+
+    await this.writeProofGaps(job, scope, artifact.gaps);
+    await this.writeSkillArtifact(job, scope, {
+      skillKey: "forge.proof_gap_scan",
+      agentKey: "agent_value_propositions",
+      title: `Proof gap scan — ${artifact.gaps.length} unproven claim${artifact.gaps.length === 1 ? "" : "s"}`,
+      bodyMd: artifact.bodyMd,
+      payload: { gaps: artifact.gaps, detection: "deterministic", claims_scanned: ownClaims.length },
+      evidenceIds: [],
+      inputs: { sections: ["value_propositions"], claims_scanned: ownClaims.length },
+    });
+    await this.markRunCompleted(job, "Proof gap scan completed", {
+      skill_key: "forge.proof_gap_scan",
+      gaps: artifact.gaps.length,
+      claims_scanned: ownClaims.length,
+    });
+  }
+
+  /** Re-runs supersede this skill's prior open register rows, then write fresh ones. */
+  private async writeProofGaps(job: AgentJob, scope: CompanyScope, gaps: ProofGapRow[]): Promise<void> {
+    const { error: supersedeError } = await this.deps.client
+      .from("gaps")
+      .update({ status: "superseded", updated_at: new Date().toISOString() })
+      .eq("account_id", job.account_id)
+      .eq("gap_type", "missing_data")
+      .like("title", "Proof gap:%")
+      .in("business_context_version_id", scope.contextIds)
+      .in("status", ["open", "acknowledged"]);
+    if (supersedeError) throw new Error(`Failed to supersede prior proof gaps: ${supersedeError.message}`);
+
+    const rows = gaps.map((gap) => ({
+      account_id: job.account_id,
+      business_context_version_id: scope.activeContextId,
+      title: `Proof gap: ${truncateText(gap.claim, 90)}`,
+      description: gap.reason === "assumption"
+        ? "This item is labeled as an assumption — it has never been verified against evidence."
+        : "This item has no linked evidence behind it.",
+      gap_type: "missing_data",
+      severity: "medium",
+      affected_sections: ["value_propositions"],
+      recommended_action: `${gap.suggested_source} — ${gap.how_to_get_it}`,
+      created_by_agent_run_id: job.agent_run_id,
+    }));
+    const { error } = await this.deps.client.from("gaps").insert(rows);
+    if (error) throw new Error(`Failed to write proof gaps to the register: ${error.message}`);
   }
 
   private async loadCompetitors(accountId: string, scope: CompanyScope): Promise<Array<{ id: string; name: string; website_url: string | null }>> {
@@ -543,6 +715,66 @@ export class SkillRunHandler {
       agent_run_id: job.agent_run_id,
     });
     if (error) throw new Error(`Failed to write skill artifact: ${error.message}`);
+    // Finished work compounds: the owning agent's next chat turn should
+    // already know this artifact exists. Best-effort — the artifact (the
+    // contract) is written; a failed note must not fail the run.
+    try {
+      await this.syncArtifactContextNote(job, artifact);
+    } catch (noteError) {
+      console.error(`artifact context note failed for ${artifact.skillKey}:`, noteError);
+    }
+  }
+
+  /**
+   * Phase F item 3: mirror the artifact into the owning section agent's
+   * context sources as a summary note (config.source = "skill_artifact").
+   * Keeps only the 5 newest artifact-sourced notes per profile; user-created
+   * sources are never touched.
+   */
+  private async syncArtifactContextNote(job: AgentJob, artifact: SkillArtifactWrite): Promise<void> {
+    const { data: profiles, error: profileError } = await this.deps.client
+      .from("agent_profiles")
+      .select("id, account_id")
+      .eq("agent_key", artifact.agentKey)
+      .or(`account_id.eq.${job.account_id},account_id.is.null`)
+      .order("account_id", { ascending: false, nullsFirst: false })
+      .limit(1);
+    if (profileError) throw new Error(profileError.message);
+    const profileId = (profiles?.[0] as { id: string } | undefined)?.id;
+    if (!profileId) return;
+
+    const { error: insertError } = await this.deps.client.from("context_sources").insert({
+      account_id: job.account_id,
+      agent_profile_id: profileId,
+      type: "note",
+      name: truncateText(`Artifact: ${artifact.title}`, 120),
+      config: {
+        text: truncateText(artifact.bodyMd, 1200),
+        source: "skill_artifact",
+        skill_key: artifact.skillKey,
+      },
+      enabled: true,
+    });
+    if (insertError) throw new Error(insertError.message);
+
+    const { data: notes, error: listError } = await this.deps.client
+      .from("context_sources")
+      .select("id, created_at")
+      .eq("account_id", job.account_id)
+      .eq("agent_profile_id", profileId)
+      .eq("type", "note")
+      .eq("config->>source", "skill_artifact")
+      .order("created_at", { ascending: false });
+    if (listError) throw new Error(listError.message);
+    const stale = ((notes ?? []) as Array<{ id: string }>).slice(5).map((note) => note.id);
+    if (stale.length > 0) {
+      const { error: deleteError } = await this.deps.client
+        .from("context_sources")
+        .delete()
+        .eq("account_id", job.account_id)
+        .in("id", stale);
+      if (deleteError) throw new Error(deleteError.message);
+    }
   }
 
   private async verifyArtifactClaims(
@@ -674,6 +906,31 @@ interface ChannelEconomicsArtifact {
   }>;
 }
 
+interface DifferentiatorRow {
+  claim: string;
+  verdict: "unique" | "contested" | "table_stakes";
+  competitor: string | null;
+  competitor_evidence: string;
+  basis: string;
+}
+
+interface DifferentiatorArtifact {
+  bodyMd: string;
+  rows: DifferentiatorRow[];
+}
+
+interface ProofGapRow {
+  claim: string;
+  reason: "assumption" | "no_evidence";
+  suggested_source: string;
+  how_to_get_it: string;
+}
+
+interface ProofGapArtifact {
+  bodyMd: string;
+  gaps: ProofGapRow[];
+}
+
 function pricingTeardownPrompt(sources: CompetitorPricingSource[], ownItems: string[]): string {
   const sourceBlock = sources
     .map((source, index) => `[${index}] ${source.name} (id=${source.competitorId})\n${source.excerpt.slice(0, 2500)}`)
@@ -731,6 +988,29 @@ ${formatItems(ownChannels)}
 
 Competitor channels:
 ${formatItems(competitorChannels)}`;
+}
+
+function differentiatorAuditPrompt(ownClaims: CanvasItemSource[], competitorClaims: CanvasItemSource[]): string {
+  return `Classify EVERY one of our Value Propositions claims against the competitor claims below:
+- "unique": no competitor's provided text supports the same value.
+- "contested": a NAMED competitor's provided text claims substantially the same value — set "competitor" to that name and quote the supporting phrase in "competitor_evidence".
+- "table_stakes": most competitors claim it; treat it as a category baseline, name the clearest example.
+Return JSON only:
+{"rows":[{"claim":"<verbatim one of our claims>","verdict":"unique|contested|table_stakes","competitor":"name or null","competitor_evidence":"short phrase from that competitor's text, empty for unique","basis":"one-sentence reasoning"}],"body_md":"## Differentiation read\\n..."}
+
+Our Value Propositions claims (classify each, verbatim):
+${formatItems(ownClaims)}
+
+Competitor Value Propositions claims:
+${formatItems(competitorClaims)}`;
+}
+
+function proofGapScanPrompt(detected: Array<{ claim: string; reason: "assumption" | "no_evidence" }>): string {
+  return `For each unproven Value Propositions claim below, suggest ONE concrete evidence source and how to obtain it. Return JSON only:
+{"gaps":[{"claim":"<verbatim claim from the list>","suggested_source":"e.g. customer case study page, pricing page, usage metric, founder document","how_to_get_it":"one imperative sentence"}],"body_md":"## Proof plan\\n..."}
+
+Unproven claims:
+${detected.map((entry) => `- ${entry.claim} (${entry.reason === "assumption" ? "labeled as an assumption" : "no linked evidence"})`).join("\n")}`;
 }
 
 function channelEconomicsPrompt(ownChannels: CanvasItemSource[], competitorChannels: CanvasItemSource[]): string {
@@ -874,6 +1154,61 @@ export function parseChannelGapArtifact(text: string): ChannelGapArtifact | null
   return gaps.length > 0 && bodyMd ? { bodyMd, gaps } : null;
 }
 
+export function parseDifferentiatorArtifact(text: string, allowedClaims: string[]): DifferentiatorArtifact | null {
+  const parsed = parseJsonObject(text);
+  if (!parsed) return null;
+  const allowed = new Set(allowedClaims);
+  const rows: DifferentiatorRow[] = Array.isArray(parsed.rows)
+    ? parsed.rows.flatMap((entry) => {
+        const row = asRecord(entry);
+        const claim = readString(row.claim);
+        const verdict = readString(row.verdict);
+        const basis = readString(row.basis);
+        // Claims must be OUR claims verbatim — the model may not invent items.
+        if (!claim || !basis || !allowed.has(claim)) return [];
+        if (verdict !== "unique" && verdict !== "contested" && verdict !== "table_stakes") return [];
+        const competitor = readString(row.competitor) ?? null;
+        const competitorEvidence = readString(row.competitor_evidence) ?? "";
+        // A non-unique verdict without a named competitor is an unsupported
+        // assertion — refuse the row rather than ship a vague "someone".
+        if (verdict !== "unique" && (!competitor || !competitorEvidence)) return [];
+        return [{
+          claim,
+          verdict,
+          competitor: verdict === "unique" ? null : competitor,
+          competitor_evidence: verdict === "unique" ? "" : competitorEvidence,
+          basis,
+        }];
+      })
+    : [];
+  const bodyMd = readString(parsed.body_md);
+  return rows.length > 0 && bodyMd ? { bodyMd, rows } : null;
+}
+
+export function parseProofGapArtifact(
+  text: string,
+  detected: Array<{ claim: string; reason: "assumption" | "no_evidence" }>,
+): ProofGapArtifact | null {
+  const parsed = parseJsonObject(text);
+  if (!parsed) return null;
+  const reasonByClaim = new Map(detected.map((entry) => [entry.claim, entry.reason]));
+  const gaps: ProofGapRow[] = Array.isArray(parsed.gaps)
+    ? parsed.gaps.flatMap((entry) => {
+        const row = asRecord(entry);
+        const claim = readString(row.claim);
+        const suggestedSource = readString(row.suggested_source);
+        const howToGetIt = readString(row.how_to_get_it);
+        const reason = claim ? reasonByClaim.get(claim) : undefined;
+        if (!claim || !suggestedSource || !howToGetIt || !reason) return [];
+        return [{ claim, reason, suggested_source: suggestedSource, how_to_get_it: howToGetIt }];
+      })
+    : [];
+  const bodyMd = readString(parsed.body_md);
+  // Every deterministically detected gap must come back with a suggestion —
+  // a partial answer would silently drop register rows.
+  return gaps.length === detected.length && bodyMd ? { bodyMd, gaps } : null;
+}
+
 export function parseChannelEconomicsArtifact(text: string): ChannelEconomicsArtifact | null {
   const parsed = parseJsonObject(text);
   if (!parsed) return null;
@@ -990,6 +1325,13 @@ function competitorExcerpt(items: CanvasItemSource[], competitor: string): strin
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
+}
+
+// Mirror of src/lib/assumption.ts — the "Assumption:" prefix is data.
+const ASSUMPTION_PREFIX = /^assumption[:\-–—]/i;
+
+function truncateText(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
 function slug(value: string): string {
