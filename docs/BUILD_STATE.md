@@ -285,6 +285,47 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Owner round 6b — black-screen navigation fixed (stale lazy chunks), sanity pass (2026-07-06)
+
+Owner report: clicking Atlas's directive or the canvas drawer's "Open full
+workspace" opened a black screen.
+
+- **Root cause:** every page is a React.lazy chunk and deploys rename them.
+  Five deploys shipped today; a tab opened before a deploy requests chunk
+  files that no longer exist, the dynamic import rejects, and with NO error
+  boundary React unmounts the whole tree — a silent black page. The
+  workspace route is the most-hit victim because its chunk loads on first
+  navigation.
+- **Fix 1 — auto-recovery:** `src/main.tsx` listens for Vite's
+  `vite:preloadError` and reloads once to pick up the new build
+  (time-guarded: max one auto-reload per 30s, so a reload that doesn't fix
+  it surfaces instead of loop-reloading).
+- **Fix 2 — AppErrorBoundary:** top-level boundary with an honest recovery
+  screen (inline styles so it works even if CSS broke) + a Reload button.
+  Nothing renders as a black void again; real crashes now show their message.
+- **Sanity pass:** built app smoke-tested via headless chromium against
+  `vite preview` — /, /auth, and /workspace/:key (unauthenticated redirect)
+  all boot with a clean console; module graph healthy, confirming the black
+  screens were stale-chunk, not a code crash. Competitor-card
+  "Retry research: company_research requires a business context" text is the
+  surfaced error of an old failed run — the enqueue path now resolves the
+  active company's context via company scope, so Retry starts clean and the
+  stale text clears on the next run.
+- **Codex handoff written:** docs/HANDOFF_NEXT_BUILD.md Phase F — Forge
+  skills (differentiator_audit, proof_gap_scan) + artifact→context-source
+  wiring, with company-scoping law, test-fixture requirements and gates.
+
+**Gate results for the round-6b commit:**
+```
+npx tsc --noEmit                      -> exit 0
+npm run build                         -> exit 0
+npm run lint                          -> 65 problems (frozen ceiling, unchanged)
+worker untouched this commit          -> suite last green at 100 passed / 2 skipped
+UTF-8 touched-file decode             -> exit 0
+headless smoke (/, /auth, /workspace) -> clean console, correct redirects
+```
+
+
 ### Owner round 6 — company scoping (cross-pollination fix), new brand lockup, real search (2026-07-06)
 
 Owner bug: a fresh Salesforce canvas still surfaced Tier 4 Intelligence's briefing,
