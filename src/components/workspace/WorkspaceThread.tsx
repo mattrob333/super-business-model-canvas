@@ -507,7 +507,7 @@ export function WorkspaceThread({
             onPick={(prompt) => setDraft(prompt)}
           />
         ) : (
-          <div className="mx-auto max-w-3xl space-y-3">
+          <div className="space-y-3">
             {messages.map((message) => (
               <MessageCard
                 key={message.id}

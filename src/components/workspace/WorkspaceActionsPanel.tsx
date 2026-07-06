@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Play, Wrench } from "lucide-react";
+import { FileText, Loader2, Play, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { FocusDrawer } from "@/components/overlay/FocusDrawer";
+import { ArtifactDocument } from "@/components/skills/ArtifactDocument";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { getAgentRuntime } from "@/lib/agent-runtime";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,6 +19,25 @@ interface CatalogSkill {
   sort_order: number;
 }
 
+interface SkillArtifact {
+  id: string;
+  skill_key: string;
+  title: string;
+  body_md: string;
+  payload: Json;
+  evidence_ids: string[];
+  created_at: string;
+}
+
+/** New artifacts land while the user is in the room — keep the shelf live. */
+const ARTIFACT_REFRESH_MS = 30_000;
+
+/**
+ * Spec 10 ActionsPanel, studio edition: the top half runs this agent's
+ * signature skills; the bottom half is the output shelf — every artifact the
+ * agent has produced, opening in the spec 11 paper document. The work
+ * product stays in the room instead of hiding on the Dashboard.
+ */
 export function WorkspaceActionsPanel({
   accountId,
   agentProfileId,
@@ -28,6 +50,8 @@ export function WorkspaceActionsPanel({
   const { user } = useAuth();
   const { toast } = useToast();
   const [skills, setSkills] = useState<CatalogSkill[]>([]);
+  const [artifacts, setArtifacts] = useState<SkillArtifact[]>([]);
+  const [openArtifact, setOpenArtifact] = useState<SkillArtifact | null>(null);
   const [loading, setLoading] = useState(true);
   const [runningKey, setRunningKey] = useState<string | null>(null);
 
@@ -48,6 +72,28 @@ export function WorkspaceActionsPanel({
       cancelled = true;
     };
   }, [agentKey]);
+
+  const loadArtifacts = useCallback(async (skillKeys: string[]) => {
+    if (skillKeys.length === 0) {
+      setArtifacts([]);
+      return;
+    }
+    const { data, error } = await supabaseUntyped
+      .from<SkillArtifact>("skill_artifacts")
+      .select("id, skill_key, title, body_md, payload, evidence_ids, created_at")
+      .eq("account_id", accountId)
+      .in("skill_key", skillKeys)
+      .order("created_at", { ascending: false })
+      .limit(8);
+    setArtifacts(error ? [] : data ?? []);
+  }, [accountId]);
+
+  useEffect(() => {
+    const skillKeys = skills.map((skill) => skill.skill_key);
+    void loadArtifacts(skillKeys);
+    const timer = setInterval(() => void loadArtifacts(skillKeys), ARTIFACT_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [skills, loadArtifacts]);
 
   const ensureBusinessContext = useCallback(async (): Promise<string> => {
     const { data: existingContext } = await supabase
@@ -92,7 +138,7 @@ export function WorkspaceActionsPanel({
       });
       toast({
         title: `${skill.title} queued`,
-        description: "Track it in the run queue below — the artifact lands on the Dashboard shelf when it completes.",
+        description: "Takes a few minutes. The finished document appears on the shelf below.",
       });
     } catch (error) {
       toast({
@@ -110,9 +156,12 @@ export function WorkspaceActionsPanel({
       <div className="flex items-center gap-2">
         <Wrench className="h-4 w-4 text-primary" />
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Actions
+          Studio
         </h2>
       </div>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        Run a signature workflow — the finished document lands on the shelf below.
+      </p>
 
       {loading ? (
         <div className="flex justify-center py-4">
@@ -153,6 +202,46 @@ export function WorkspaceActionsPanel({
           ))}
         </ul>
       )}
+
+      {artifacts.length > 0 && (
+        <div className="mt-4 border-t border-border/60 pt-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Shelf
+          </h3>
+          <div className="mt-2 space-y-1.5">
+            {artifacts.map((artifact) => (
+              <button
+                key={artifact.id}
+                type="button"
+                onClick={() => setOpenArtifact(artifact)}
+                className="flex w-full items-center justify-between gap-2 rounded-md border border-border/60 px-2.5 py-2 text-left transition-colors hover:border-primary/35 hover:bg-muted/40"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="truncate text-xs font-medium">{artifact.title}</span>
+                </span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  {new Date(artifact.created_at).toLocaleDateString()}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <FocusDrawer
+        open={Boolean(openArtifact)}
+        onOpenChange={(open) => {
+          if (!open) setOpenArtifact(null);
+        }}
+        size="reading"
+        eyebrow="Skill artifact"
+        title={openArtifact?.title ?? "Artifact"}
+        subtitle={openArtifact ? `${openArtifact.skill_key} · ${openArtifact.evidence_ids.length} evidence sources` : undefined}
+        bodyClassName="p-4 sm:p-6"
+      >
+        {openArtifact && <ArtifactDocument artifact={openArtifact} />}
+      </FocusDrawer>
     </section>
   );
 }

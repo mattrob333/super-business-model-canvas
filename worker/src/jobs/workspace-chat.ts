@@ -122,7 +122,7 @@ export class WorkspaceChatHandler {
       }),
     });
 
-    const assistantText = result.resultText.trim();
+    const assistantText = stripLeadingToolEcho(result.resultText.trim());
     const { error: messageError } = await this.deps.client.from("workspace_messages").insert({
       thread_id: thread.id,
       role: "agent",
@@ -290,7 +290,7 @@ function buildChatSystemPrompt(
   const sourceBlock = formatContextSources(contextSources);
   return `${base}
 
-You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data beyond what is below instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied.
+You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data beyond what is below instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied. Never paste raw JSON, tool output, or code blocks of data into a reply — always translate findings into plain language.
 
 Data-gap protocol: when the canvas, company brief, and context sources do not hold enough information to answer well, never guess or pad a generic answer. Say plainly that the information is not there yet, then coach the user through closing the gap: (1) name the specific missing information, (2) tell them exactly how to get it — a metric to pull from their books or analytics, a document to upload as a context source, a number to add to this section's Strategic Goals, a question to ask a customer or vendor — and (3) explain what having it unlocks strategically for their business. Treat every data gap as the next step in building their strategy, not a dead end.${formatCompanyBrief(brief)}${formatCanvasSnapshot(sectionLabel, canvas)}${sourceBlock}`;
 }
@@ -330,6 +330,57 @@ function normalizeCanvasItems(value: unknown): string[] {
 
 function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
+/**
+ * Models sometimes open a reply by echoing a tool result as a JSON object
+ * (fenced or bare) before the actual answer — it rendered as a wall of raw
+ * JSON in the thread (owner finding 2026-07-06). Strip a leading JSON block
+ * only when real prose follows; a reply that IS just JSON passes through so
+ * we never swallow a whole message.
+ */
+export function stripLeadingToolEcho(text: string): string {
+  const fenced = text.match(/^```[a-z]*\s*\n([\s\S]*?)\n```\s*/);
+  if (fenced && parsesAsJsonObject(fenced[1])) {
+    const rest = text.slice(fenced[0].length).trim();
+    if (rest.length >= 40) return rest;
+  }
+  if (text.startsWith("{")) {
+    const prefixLength = balancedJsonPrefixLength(text);
+    if (prefixLength > 0 && parsesAsJsonObject(text.slice(0, prefixLength))) {
+      const rest = text.slice(prefixLength).trim();
+      if (rest.length >= 40) return rest;
+    }
+  }
+  return text;
+}
+
+function parsesAsJsonObject(candidate: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(candidate);
+    return typeof parsed === "object" && parsed !== null;
+  } catch {
+    return false;
+  }
+}
+
+function balancedJsonPrefixLength(text: string): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (escaped) { escaped = false; continue; }
+    if (char === "\\") { escaped = true; continue; }
+    if (char === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return 0;
 }
 
 function formatContextSources(sources: ContextSource[]): string {

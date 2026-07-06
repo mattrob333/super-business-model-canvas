@@ -14,6 +14,7 @@ import {
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarNavContent } from "./SidebarNav";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { useAuth } from "@/hooks/useAuth";
 import { getUserDisplayName, getUserInitials } from "@/lib/user-display";
 import { clearActiveWorkspaceName } from "@/lib/active-workspace";
@@ -58,11 +59,9 @@ export function TopBar() {
         </SheetContent>
       </Sheet>
 
-      {/* Left: breadcrumb / page title area */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
-        <span className="font-medium text-foreground truncate">
-          Super BMC Enterprise
-        </span>
+      {/* Left: brand */}
+      <div className="flex min-w-0 items-center gap-2">
+        <BrandMark iconClassName="h-5" wordmarkClassName="text-xs" />
       </div>
 
       {/* Center: global search */}
