@@ -13,6 +13,7 @@ import {
 } from "@/components/canvas/section-types";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
 import { AgentIdentityCard, type AgentRunSnapshot } from "@/components/workspace/AgentIdentityCard";
+import { ContextSourcesPanel } from "@/components/workspace/ContextSourcesPanel";
 import { SectionCanvasPanel } from "@/components/workspace/SectionCanvasPanel";
 import { WorkspaceActionsPanel } from "@/components/workspace/WorkspaceActionsPanel";
 import { WorkspaceRunQueue } from "@/components/workspace/WorkspaceRunQueue";
@@ -117,6 +118,7 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
               latestRun={latestRun}
             />
             <SectionCanvasPanel sectionKey={sectionKey} items={items} loading={canvasLoading} />
+            <ContextSourcesPanel accountId={accountId} agentProfileId={profile.id} />
           </aside>
 
           {/* Center — the collaboration thread */}

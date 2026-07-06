@@ -2608,6 +2608,26 @@ on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'context-files',
+  'context-files',
+  false,
+  52428800,
+  array[
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/markdown',
+    'text/plain',
+    'text/csv',
+    'application/json'
+  ]
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
 create index if not exists idx_watched_sources_account_agent on public.watched_sources(account_id, agent_profile_id, enabled);
 create index if not exists idx_watched_sources_health on public.watched_sources(account_id, health, last_checked_at);
 create index if not exists idx_founder_documents_account_status on public.founder_documents(account_id, status, created_at desc);
@@ -2752,6 +2772,62 @@ create policy "founder_documents_storage_delete" on storage.objects
   for delete to authenticated
   using (
     bucket_id = 'founder-documents'
+    and exists (
+      select 1 from public.account_members am
+      where am.user_id = auth.uid()
+        and am.account_id::text = (storage.foldername(name))[1]
+    )
+  );
+
+drop policy if exists "context_files_storage_select" on storage.objects;
+create policy "context_files_storage_select" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'context-files'
+    and exists (
+      select 1 from public.account_members am
+      where am.user_id = auth.uid()
+        and am.account_id::text = (storage.foldername(name))[1]
+    )
+  );
+
+drop policy if exists "context_files_storage_insert" on storage.objects;
+create policy "context_files_storage_insert" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'context-files'
+    and exists (
+      select 1 from public.account_members am
+      where am.user_id = auth.uid()
+        and am.account_id::text = (storage.foldername(name))[1]
+    )
+  );
+
+drop policy if exists "context_files_storage_update" on storage.objects;
+create policy "context_files_storage_update" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'context-files'
+    and exists (
+      select 1 from public.account_members am
+      where am.user_id = auth.uid()
+        and am.account_id::text = (storage.foldername(name))[1]
+    )
+  )
+  with check (
+    bucket_id = 'context-files'
+    and exists (
+      select 1 from public.account_members am
+      where am.user_id = auth.uid()
+        and am.account_id::text = (storage.foldername(name))[1]
+    )
+  );
+
+drop policy if exists "context_files_storage_delete" on storage.objects;
+create policy "context_files_storage_delete" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'context-files'
     and exists (
       select 1 from public.account_members am
       where am.user_id = auth.uid()
