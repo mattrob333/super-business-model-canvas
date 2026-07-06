@@ -285,6 +285,19 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase E.1 review (Codex build/phase-e1-document-delivery, 9168bfc) — APPROVED, no findings (2026-07-06)
+
+- Documents that travel: /artifacts/:id full-page paper view, explicit share/revoke
+  (artifact_shares: RLS, >=32-char token check constraint, unique active share,
+  explicit grants per the Supabase data-API change), shared-artifact edge function
+  (service-role confined, revoked filter, display-only fields), /share/:token public
+  page with product footer, brand letterhead (logo + accounts.brand_color) on
+  documents including shared, Settings color picker with select-back verify, print
+  CSS isolation. Skipping /reports/:id alias accepted (separate report model).
+  Merge note: kept the size="focus" artifact width through the panel conflict.
+  Gates re-verified (worker 89 passed; root tsc/build/lint 64<=65).
+
+
 ### Phase C.1 review (Codex build/phase-c1-canvas-bridge, 98d3fb4) — APPROVED, no findings (2026-07-06)
 
 - Versioned-canvas bridge (canvas-version-bridge.ts): account-scoped inserts,
@@ -2158,6 +2171,45 @@ cd worker && npm run typecheck        -> exit 0
 cd worker && npm test                 -> 89 passed, 2 skipped
 cd worker && npm run build            -> exit 0
 cd worker && npm run lint             -> exit 0
+```
+
+**2026-07-06 - Phase E.1 document delivery on `build/phase-e1-document-delivery`.**
+
+- Added `/artifacts/:id` as the authenticated full-page artifact view. It fetches
+  `skill_artifacts` by `id` plus the active `account_id`, renders the existing
+  `ArtifactDocument` at document width, and shows an honest not-found state for
+  missing or cross-account artifacts.
+- Added explicit share links with migration `20260706161646_phase_e1_document_delivery.sql`:
+  `artifact_shares` is account-scoped, member-managed, RLS-enabled, token-unique,
+  and tokens must be at least 32 characters. The migration also adds explicit
+  authenticated grants for the new table in light of Supabase's current Data API
+  default-grant change.
+- Added public Edge Function `shared-artifact`: token lookup uses the service role
+  server-side, rejects revoked/missing tokens, and returns only the public document
+  fields plus letterhead brand metadata. It does not expose account ids or evidence ids.
+- Added `/share/:token` as the public read-only paper document page with the
+  "Made with Super Business Model Canvas" footer.
+- Added brand letterhead support to `ArtifactDocument`: own-company logo plus
+  `accounts.brand_color` accent rule, with Settings > General exposing a minimal
+  color picker and select-back-verified update.
+- Shelf rows and artifact preview drawers now include an explicit "Open full page"
+  action. The existing report routes use a separate playbook report model, so the
+  optional `/reports/:id` alias was skipped as non-trivial.
+- Print CSS now isolates `.artifact-print-root` so artifact/share pages print the
+  document sheet without app chrome.
+- Honest scope: no automatic share creation; shares are created only by explicit
+  user action from the artifact page.
+
+**Gate results for Phase E.1 commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 64 problems (46 errors, 18 warnings), within frozen <=65 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 89 passed, 2 skipped
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+UTF-8 touched-file decode             -> exit 0
 ```
 
 ### Phase 6 — War Room & orchestration
