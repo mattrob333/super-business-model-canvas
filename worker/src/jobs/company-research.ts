@@ -298,8 +298,16 @@ export class CompanyResearchHandler {
       modelParams: route.params ?? undefined,
       maxTurns: 12,
       maxBudgetUsd: budgetForRoute(route),
-      prompt: `Extract Business Model Canvas claims for ${targetName} from these source excerpts. Return JSON only: {"claims":[{"section_key":"value_propositions","text":"...","confidence":0.7,"evidence_index":0}]}.\n\n${evidencePrompt(evidence)}`,
-      systemPrompt: "You extract concise, source-grounded Business Model Canvas claims. Do not invent claims.",
+      prompt: `Extract Business Model Canvas claims for ${targetName} from these source excerpts. Return JSON only: {"claims":[{"section_key":"value_propositions","text":"...","confidence":0.7,"evidence_index":0}]}.
+
+Claim-writing rules (binding):
+- REWRITE every claim as one clean, standalone business statement in plain language (max ~18 words) — e.g. "Sells live venture-funding data dashboards to VC and PE investors".
+- NEVER copy website navigation, menu labels, headings run together, or marketing taglines verbatim. Raw spans like "CompaniesProfiles of notable..." or "Market Maps, Geo Maps & Lists" are extraction failures, not claims.
+- One idea per claim; at most 5 claims per section; skip a section entirely rather than pad it with weak or duplicate claims.
+- The claim must still be fully supported by its cited excerpt — distill, don't embellish.
+
+${evidencePrompt(evidence)}`,
+      systemPrompt: "You extract concise, source-grounded Business Model Canvas claims, rewritten into clean analyst language. Never copy raw page text as a claim. Do not invent claims.",
       mcpServers: {},
       allowedTools: [],
     });
