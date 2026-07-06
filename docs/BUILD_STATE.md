@@ -326,11 +326,14 @@ multiple companies per account and no discriminator.
 - **Regression traps in tests:** atlas-briefing and workspace-chat fixtures carry a
   second company's rows (newer created_at where it hurts most) with assertions
   that they never reach prompts/coverage; worker suite now 100 passed / 2 skipped.
-- **New brand lockup (owner logo files):** `BrandOutlineIcon` (stroked nine-block
-  glyph) + `BrandLogo` (SUPER orange wide-tracked over BMC — deep navy `#0e142a`
-  in light, white in dark) mounted in the sidebar's top-left h-14 row; the company
-  switcher moved down one step; the old BrandMark removed from TopBar. Landing and
-  favicon untouched.
+- **New brand lockup (owner logo files):** the owner's actual PNG files ship
+  verbatim as `src/assets/superbmc-logo-{light,dark}.png` (navy-BMC file in light
+  mode, white-BMC file in dark), trimmed of transparent margins only, swapped by
+  `dark:` classes in the sidebar's top-left h-14 row; the company switcher moved
+  down one step; the old BrandMark removed from TopBar. Owner correction applied:
+  a first pass recreated the lockup as SVG/text — rejected ("you're not going to
+  go rogue and try to make your own"); the recreation components were deleted.
+  Landing and favicon untouched.
 - **Search bar answered + made real:** the TopBar search input was decorative (no
   state, no handler). Replaced with `GlobalSearch` — a Cmd/Ctrl+K command palette
   over saved companies (opens via the My Analyses pointer flow, agents follow via
