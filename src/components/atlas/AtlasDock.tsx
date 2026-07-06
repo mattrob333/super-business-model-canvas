@@ -334,11 +334,7 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
         ref={asideRef}
         tabIndex={-1}
         className={cn(
-<<<<<<< HEAD
           "fixed inset-y-0 right-0 z-40 flex w-[min(94vw,420px)] xl:w-[460px] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
-=======
-          "fixed inset-y-0 right-0 z-40 flex w-[min(94vw,400px)] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
->>>>>>> origin/main
           open ? "translate-x-0" : "invisible translate-x-full",
         )}
         aria-hidden={!open}
