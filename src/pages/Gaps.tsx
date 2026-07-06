@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { CANVAS_SECTION_LABELS, type CanvasSectionKey } from "@/components/canvas/section-types";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { getAgentRuntime } from "@/lib/agent-runtime";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -158,13 +159,18 @@ export default function Gaps() {
     if (!accountId) return;
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
+      // Only the active company's gaps: rows from a previously analyzed
+      // company (or pre-scoping legacy rows) stay off the register.
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      let query = supabase
         .from("gaps")
         .select(
           "id, title, description, gap_type, severity, status, impact, effort, confidence, affected_sections, recommended_action, created_at",
         )
         .eq("account_id", accountId)
-        .neq("status", "superseded")
+        .neq("status", "superseded");
+      if (scope) query = query.in("business_context_version_id", scope.contextIds);
+      const { data, error } = await query
         .order("created_at", { ascending: false })
         .limit(200);
       if (cancelled) return;

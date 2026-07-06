@@ -7,6 +7,7 @@ import {
   type CanvasSectionKey,
 } from "@/components/canvas/section-types";
 import { getActiveAnalysisCanvas } from "@/lib/active-analysis";
+import { invalidateCompanyScope } from "@/lib/company-scope";
 
 interface BridgeInput {
   accountId: string;
@@ -46,6 +47,9 @@ export async function bridgeAnalysisToCanvasVersions(input: BridgeInput): Promis
   if (contextError || !context) {
     throw new Error(`Failed to create business context: ${contextError?.message ?? "unknown"}`);
   }
+  // A new context can change the active company era — scoped readers must
+  // not serve a stale cached scope after a bridge.
+  invalidateCompanyScope(input.accountId);
 
   const rows = sections.map((section) => ({
     account_id: input.accountId,

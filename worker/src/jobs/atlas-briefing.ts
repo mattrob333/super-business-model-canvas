@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAgentHooks } from "../agent/guardrails.js";
 import { ClaudeAgentRunner, type AgentRunner } from "../agent/runner.js";
+import { loadCompanyScope, type CompanyScope } from "../db/company-scope.js";
 import { asRecord } from "../db/json.js";
 import { isSectionKey, SECTION_KEYS, SECTION_LABELS, sectionKeyForAgentKey, type SectionKey } from "../domain/sections.js";
 import type { AgentJob } from "../queue/types.js";
@@ -106,23 +107,29 @@ export class AtlasBriefingHandler {
   async handle(job: AgentJob): Promise<void> {
     const accountId = job.account_id;
 
-    // Deterministic context assembly — plain account-scoped queries, no model.
-    const coverage = await loadSectionCoverage(this.deps.client, accountId);
-    const brief = await this.loadCompanyBrief(accountId);
-    const competitors = await this.loadCompetitors(accountId);
-    const gaps = await loadGapSummary(this.deps.client, accountId);
-    const artifacts = await this.loadRecentArtifacts(accountId);
+    // Deterministic context assembly — plain scoped queries, no model. Every
+    // read is confined to the ACTIVE company's context chain so briefings for
+    // Salesforce never narrate Tier4's canvas (owner bug 2026-07-06).
+    const scope = await loadCompanyScope(this.deps.client, accountId);
+    const coverage = await loadSectionCoverage(this.deps.client, accountId, scope);
+    const brief = await this.loadCompanyBrief(accountId, scope);
+    const competitors = await this.loadCompetitors(accountId, scope);
+    const gaps = await loadGapSummary(this.deps.client, accountId, scope);
+    const artifacts = await this.loadRecentArtifacts(accountId, scope);
     const skills = await loadImplementedSkills(this.deps.client);
-    const previous = await this.loadPreviousBriefing(accountId);
+    const previous = await this.loadPreviousBriefing(accountId, scope);
     const changes = computeChanges(coverage, gaps, artifacts, previous);
     const modelRoute = await this.loadModelRoute(accountId);
 
     // open_gaps in the run input is what lets the NEXT briefing compute the
     // gap-count delta deterministically — the payload contract has no slot
-    // for it, so it rides on the run record instead.
+    // for it, so it rides on the run record instead. company_key is how both
+    // the next briefing and the Atlas dock tell which company a briefing
+    // belongs to (deltas and display never cross companies).
     await this.markRunRunning(job, modelRoute, {
       open_gaps: gaps.total,
       coverage_empty: coverage.filter((entry) => entry.state === "empty").length,
+      company_key: scope.companyKey,
     });
 
     const result = await this.runner.run({
@@ -178,42 +185,48 @@ export class AtlasBriefingHandler {
     }
   }
 
-  private async loadCompanyBrief(accountId: string): Promise<CompanyBrief | null> {
+  private async loadCompanyBrief(accountId: string, scope: CompanyScope): Promise<CompanyBrief | null> {
+    if (!scope.activeContextId) return null;
     const { data, error } = await this.deps.client
       .from("business_context_versions")
       .select("company_name, industry, summary")
       .eq("account_id", accountId)
+      .in("id", scope.contextIds)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(10);
     if (error) throw new Error(`Failed to load company brief for briefing: ${error.message}`);
-    return (data as CompanyBrief | null) ?? null;
+    // Anonymous ensure-rows carry no company fields — brief from the newest
+    // NAMED context in the active company's chain.
+    const rows = (data ?? []) as CompanyBrief[];
+    return rows.find((row) => row.company_name) ?? rows[0] ?? null;
   }
 
-  private async loadCompetitors(accountId: string): Promise<CompetitorSummary[]> {
+  private async loadCompetitors(accountId: string, scope: CompanyScope): Promise<CompetitorSummary[]> {
     const { data, error } = await this.deps.client
       .from("companies")
       .select("name, website_url")
       .eq("account_id", accountId)
       .eq("is_competitor", true)
+      .in("business_context_version_id", scope.contextIds)
       .order("created_at", { ascending: true })
       .limit(6);
     if (error) throw new Error(`Failed to load competitors for briefing: ${error.message}`);
     return (data ?? []) as CompetitorSummary[];
   }
 
-  private async loadRecentArtifacts(accountId: string): Promise<ArtifactSummary[]> {
+  private async loadRecentArtifacts(accountId: string, scope: CompanyScope): Promise<ArtifactSummary[]> {
     const { data, error } = await this.deps.client
       .from("skill_artifacts")
       .select("title, skill_key, created_at")
       .eq("account_id", accountId)
+      .in("business_context_version_id", scope.contextIds)
       .order("created_at", { ascending: false })
       .limit(6);
     if (error) throw new Error(`Failed to load skill artifacts for briefing: ${error.message}`);
     return (data ?? []) as ArtifactSummary[];
   }
 
-  private async loadPreviousBriefing(accountId: string): Promise<PreviousBriefing | null> {
+  private async loadPreviousBriefing(accountId: string, scope: CompanyScope): Promise<PreviousBriefing | null> {
     const { data, error } = await this.deps.client
       .from("agent_runs")
       .select("output, input, completed_at")
@@ -229,6 +242,12 @@ export class AtlasBriefingHandler {
     const output = asRecord((data as Record<string, unknown>).output);
     if (output.kind !== "atlas_briefing_v1") return null;
 
+    // A briefing about a different company is not a baseline — deltas like
+    // "gaps went from 20 to 0" across a company switch would be nonsense.
+    const previousInput = asRecord((data as Record<string, unknown>).input);
+    const previousKey = typeof previousInput.company_key === "string" ? previousInput.company_key : null;
+    if (previousKey !== scope.companyKey) return null;
+
     const coverage = new Map<SectionKey, CoverageState>();
     if (Array.isArray(output.coverage)) {
       for (const entry of output.coverage) {
@@ -238,11 +257,10 @@ export class AtlasBriefingHandler {
         }
       }
     }
-    const input = asRecord((data as Record<string, unknown>).input);
     return {
       coverage,
       generatedAt: typeof output.generated_at === "string" ? output.generated_at : null,
-      openGaps: typeof input.open_gaps === "number" ? input.open_gaps : null,
+      openGaps: typeof previousInput.open_gaps === "number" ? previousInput.open_gaps : null,
     };
   }
 
@@ -288,12 +306,13 @@ export class AtlasBriefingHandler {
 // prompt reuses the exact same queries instead of duplicating them.
 // ---------------------------------------------------------------------------
 
-export async function loadSectionCoverage(client: SupabaseClient, accountId: string): Promise<CoverageEntry[]> {
+export async function loadSectionCoverage(client: SupabaseClient, accountId: string, scope: CompanyScope): Promise<CoverageEntry[]> {
   const { data, error } = await client
     .from("canvas_section_versions")
     .select("section_key, items, created_at")
     .eq("account_id", accountId)
     .is("competitor_id", null)
+    .in("business_context_version_id", scope.contextIds)
     .order("created_at", { ascending: false });
   if (error) throw new Error(`Failed to load canvas coverage: ${error.message}`);
 
@@ -316,11 +335,12 @@ export async function loadSectionCoverage(client: SupabaseClient, accountId: str
   });
 }
 
-export async function loadGapSummary(client: SupabaseClient, accountId: string): Promise<GapSummary> {
+export async function loadGapSummary(client: SupabaseClient, accountId: string, scope: CompanyScope): Promise<GapSummary> {
   const { data, error } = await client
     .from("gaps")
     .select("title, severity, status, score")
     .eq("account_id", accountId)
+    .in("business_context_version_id", scope.contextIds)
     .not("status", "in", "(resolved,superseded,wont_fix)")
     .order("score", { ascending: false, nullsFirst: false })
     .limit(50);

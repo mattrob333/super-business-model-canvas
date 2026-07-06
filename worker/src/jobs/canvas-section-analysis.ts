@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentTaskLimits } from "../agent/limits.js";
 import { createAgentHooks } from "../agent/guardrails.js";
 import { ClaudeAgentRunner, type AgentRunner } from "../agent/runner.js";
+import { loadCompanyScope } from "../db/company-scope.js";
 import { asRecord, asStringArray } from "../db/json.js";
 import { buildSystemPrompt, buildUserPrompt, parseLegacySectionAnalysis } from "../domain/legacy-output.js";
 import { isSectionKey, SECTION_AGENT_KEYS, SECTION_LABELS, type SectionKey } from "../domain/sections.js";
@@ -168,11 +169,14 @@ export class CanvasSectionAnalysisHandler {
     const payloadItems = asStringArray(payload.existing_items);
     if (payloadItems.length > 0) return payloadItems;
 
+    // Only the active company's rows may seed the analysis (company scoping).
+    const scope = await loadCompanyScope(this.deps.client, accountId);
     const { data, error } = await this.deps.client
       .from("canvas_section_versions")
       .select("items")
       .eq("account_id", accountId)
       .eq("section_key", sectionKey)
+      .in("business_context_version_id", scope.contextIds)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();

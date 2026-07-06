@@ -469,7 +469,8 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null; count?: num
   }
 
   maybeSingle(): Promise<{ data: unknown; error: null }> {
-    return Promise.resolve({ data: this.resolveSelect(), error: null });
+    const value = this.resolveSelect();
+    return Promise.resolve({ data: Array.isArray(value) ? value[0] ?? null : value, error: null });
   }
 
   single(): Promise<{ data: unknown; error: null }> {
@@ -511,16 +512,22 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: null; count?: num
       };
     }
     if (this.table === "model_routes") return DEFAULT_ROUTES;
-    if (this.table === "business_context_versions") return { id: "context-1" };
+    if (this.table === "business_context_versions") {
+      return [{ id: "context-1", company_name: "Acme Robotics", website: null, created_at: "2026-07-01T00:00:00Z" }];
+    }
     if (this.table === "agent_profiles") {
       return [
         { id: "agent-vp", agent_key: "agent_value_propositions", display_name: "Forge" },
       ];
     }
     if (this.table === "evidence_items") {
-      return [
+      const rows = [
         { id: "11111111-1111-4111-8111-111111111111", excerpt: "Our stack runs on AWS and Snowflake for warehousing." },
       ];
+      // The RF-3-7 dedup path matches on exact excerpt — honor that filter so
+      // owner claims with new excerpts create NEW evidence rows in tests too.
+      const excerptFilter = this.filters.find(([column]) => column === "excerpt");
+      return excerptFilter ? rows.filter((row) => row.excerpt === excerptFilter[1]) : rows;
     }
     if (this.table === "canvas_section_versions") {
       return [{

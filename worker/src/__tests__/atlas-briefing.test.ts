@@ -50,6 +50,12 @@ describe("AtlasBriefingHandler", () => {
     expect(runner.request?.prompt).toContain("Canvas coverage (9 sections");
     expect(runner.request?.prompt).toContain("Rival Robotics");
     expect(runner.request?.prompt).toContain("yield.pricing_teardown");
+    // Company scoping: the previously analyzed company's competitor, gap and
+    // artifact must never surface in the active company's briefing.
+    expect(runner.request?.prompt).not.toContain("Stale Rival Media");
+    expect(runner.request?.prompt).not.toContain("Old company's gap");
+    expect(runner.request?.prompt).not.toContain("Old company's artifact");
+    expect(runner.request?.prompt).not.toContain("Old Ventures");
 
     const payload = completedPayload(client);
     expect(payload.kind).toBe("atlas_briefing_v1");
@@ -183,26 +189,33 @@ class AtlasFakeClient {
 
   readonly tables: Record<string, unknown[]> = {
     // Newest-first, mirroring the created_at desc order the real query uses.
+    // Everything for the active company is stamped ctx-1; the ctx-0 rows
+    // below belong to a PREVIOUS company on the same account and must never
+    // leak into an Acme briefing (owner bug 2026-07-06).
     canvas_section_versions: [{
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       competitor_id: null,
       section_key: "customer_segments",
       items: ["Mid-market manufacturers", { text: "Enterprise OEMs" }, "Robotics integrators", "Aftermarket service buyers"],
       created_at: "2026-07-05T10:00:00Z",
     }, {
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       competitor_id: null,
       section_key: "customer_segments",
       items: ["Old single item"],
       created_at: "2026-07-01T10:00:00Z",
     }, {
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       competitor_id: null,
       section_key: "value_propositions",
       items: ["Assumption: best-in-class uptime", "Assumption— cheapest integration", { text: "Fast delivery" }],
       created_at: "2026-07-04T10:00:00Z",
     }, {
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       competitor_id: null,
       section_key: "revenue_streams",
       items: ["Hardware sales", "Service contracts"],
@@ -210,61 +223,111 @@ class AtlasFakeClient {
     }, {
       // Competitor canvases never count toward the account's own coverage.
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       competitor_id: "competitor-1",
       section_key: "channels",
       items: ["Their channel"],
       created_at: "2026-07-05T11:00:00Z",
+    }, {
+      // Previous company's canvas: without scoping this would flip
+      // key_partners to non-empty and corrupt the coverage board.
+      account_id: "account-1",
+      business_context_version_id: "ctx-0",
+      competitor_id: null,
+      section_key: "key_partners",
+      items: ["Old company's partner"],
+      created_at: "2026-06-20T10:00:00Z",
     }],
     business_context_versions: [{
+      id: "ctx-1",
       account_id: "account-1",
       company_name: "Acme Robotics",
+      website: null,
       industry: "Industrial automation",
       summary: "Sells robotic arms to mid-market manufacturers.",
       created_at: "2026-07-06T00:00:00Z",
+    }, {
+      // The previously analyzed company on this account.
+      id: "ctx-0",
+      account_id: "account-1",
+      company_name: "Old Ventures",
+      website: "https://old.example",
+      industry: "Media",
+      summary: "The company analyzed before Acme.",
+      created_at: "2026-06-15T00:00:00Z",
     }],
     companies: [{
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       name: "Rival Robotics",
       website_url: "https://rival.example",
       is_competitor: true,
       created_at: "2026-07-01T00:00:00Z",
     }, {
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       name: "Acme Robotics",
       website_url: null,
       is_competitor: false,
       created_at: "2026-07-01T00:00:00Z",
+    }, {
+      // Previous company's competitor — must never appear in Acme's briefing.
+      account_id: "account-1",
+      business_context_version_id: "ctx-0",
+      name: "Stale Rival Media",
+      website_url: "https://stalerival.example",
+      is_competitor: true,
+      created_at: "2026-06-16T00:00:00Z",
     }],
     gaps: [{
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       title: "No pricing data for any competitor",
       severity: "high",
       status: "open",
       score: 90,
     }, {
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       title: "Channels section is a guess",
       severity: "medium",
       status: "acknowledged",
       score: 60,
     }, {
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       title: "Churn rate unknown",
       severity: "low",
       status: "in_progress",
       score: 30,
     }, {
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       title: "Already fixed",
       severity: "high",
       status: "resolved",
       score: 95,
+    }, {
+      // Previous company's open gap — would inflate the count if unscoped.
+      account_id: "account-1",
+      business_context_version_id: "ctx-0",
+      title: "Old company's gap",
+      severity: "critical",
+      status: "open",
+      score: 99,
     }],
     skill_artifacts: [{
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       title: "Pricing teardown — Rival Robotics",
       skill_key: "yield.pricing_teardown",
       created_at: "2026-07-03T00:00:00Z",
+    }, {
+      account_id: "account-1",
+      business_context_version_id: "ctx-0",
+      title: "Old company's artifact",
+      skill_key: "yield.pricing_teardown",
+      created_at: "2026-07-05T00:00:00Z",
     }],
     skill_catalog: [{
       skill_key: "yield.pricing_teardown",
@@ -288,7 +351,9 @@ class AtlasFakeClient {
       run_type: "atlas_briefing",
       status: "completed",
       completed_at: "2026-07-01T00:00:00Z",
-      input: { open_gaps: 5 },
+      // company_key matches the active company (Acme) so deltas apply; a
+      // mismatching key would make the previous briefing an invalid baseline.
+      input: { open_gaps: 5, company_key: "acme robotics" },
       output: {
         kind: "atlas_briefing_v1",
         generated_at: "2026-07-01T00:00:00Z",

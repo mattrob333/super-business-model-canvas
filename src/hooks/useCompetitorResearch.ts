@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useAuth } from "@/hooks/useAuth";
 import { getAgentRuntime } from "@/lib/agent-runtime";
@@ -93,18 +94,27 @@ export function useCompetitorResearch(
     let cancelled = false;
     let pollTimer: ReturnType<typeof setTimeout> | undefined;
     (async () => {
+      // Competitor entities and research markers are read within the active
+      // company's context chain — a Salesforce canvas must never show Tier4's
+      // competitors as researched (owner bug 2026-07-06).
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      let companiesQuery = supabase
+        .from("companies")
+        .select("id, name, website_url, logo_url")
+        .eq("account_id", accountId)
+        .eq("is_competitor", true);
+      let versionsQuery = supabase
+        .from("canvas_section_versions")
+        .select("competitor_id")
+        .eq("account_id", accountId)
+        .not("competitor_id", "is", null);
+      if (scope) {
+        companiesQuery = companiesQuery.in("business_context_version_id", scope.contextIds);
+        versionsQuery = versionsQuery.in("business_context_version_id", scope.contextIds);
+      }
       const [companiesRes, versionsRes, metricsRes, runsRes] = await Promise.all([
-        supabase
-          .from("companies")
-          .select("id, name, website_url, logo_url")
-          .eq("account_id", accountId)
-          .eq("is_competitor", true),
-        supabase
-          .from("canvas_section_versions")
-          .select("competitor_id")
-          .eq("account_id", accountId)
-          .not("competitor_id", "is", null)
-          .limit(500),
+        companiesQuery,
+        versionsQuery.limit(500),
         supabaseUntyped
           .from<{ value: number | null; inputs: Record<string, unknown> | null; computed_at: string }>(
             "metric_snapshots",
@@ -230,53 +240,13 @@ export function useCompetitorResearch(
       const key = candidate.website || candidate.name;
       setPending((prev) => ({ ...prev, [key]: { status: "starting" } }));
       try {
-        // 1. Find-or-create the competitor entity (unique on account + lower(website_url)).
-        const host = hostOf(candidate.website);
-        let entity = entities.find((row) =>
-          host ? hostOf(row.website_url) === host : row.name.toLowerCase() === candidate.name.toLowerCase(),
-        );
-        if (!entity) {
-          const { data: inserted, error: insertError } = await supabase
-            .from("companies")
-            .insert({
-              account_id: accountId,
-              name: candidate.name,
-              website_url: candidate.website || null,
-              description: candidate.description ?? null,
-              is_competitor: true,
-              created_by: user?.id ?? null,
-            })
-            .select("id, name, website_url, logo_url")
-            .single();
-          if (insertError) {
-            // Unique-violation race: another tab created it — re-read.
-            const { data: existing } = await supabase
-              .from("companies")
-              .select("id, name, website_url, logo_url")
-              .eq("account_id", accountId)
-              .eq("is_competitor", true);
-            entity = (existing ?? []).find((row) => hostOf(row.website_url) === host) as
-              | CompetitorEntity
-              | undefined;
-            if (!entity) throw new Error(insertError.message);
-          } else {
-            entity = inserted as CompetitorEntity;
-          }
-        }
-
-        // 2. Ensure a business_context_version exists — the research job requires
-        // one (live failure 2026-07-04: accounts predating versioned context have
-        // none). Same ensure pattern as useCanvasSectionRun.
+        // 1. Resolve the active company's context first — the research job
+        // requires one (live failure 2026-07-04) and the competitor entity is
+        // stamped with it so company scoping can tell whose competitor it is.
         let contextVersionId: string;
-        const { data: existingContext } = await supabase
-          .from("business_context_versions")
-          .select("id")
-          .eq("account_id", accountId)
-          .order("version_number", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (existingContext) {
-          contextVersionId = existingContext.id;
+        const scope = await loadCompanyScope(accountId).catch(() => null);
+        if (scope?.activeContextId) {
+          contextVersionId = scope.activeContextId;
         } else {
           const { data: newContext, error: ctxError } = await supabase
             .from("business_context_versions")
@@ -293,6 +263,48 @@ export function useCompetitorResearch(
             throw new Error(`Failed to create business context: ${ctxError?.message ?? "unknown"}`);
           }
           contextVersionId = newContext.id;
+        }
+
+        // 2. Find-or-create the competitor entity (unique on account + lower(website_url)).
+        const host = hostOf(candidate.website);
+        let entity = entities.find((row) =>
+          host ? hostOf(row.website_url) === host : row.name.toLowerCase() === candidate.name.toLowerCase(),
+        );
+        if (!entity) {
+          const { data: inserted, error: insertError } = await supabase
+            .from("companies")
+            .insert({
+              account_id: accountId,
+              business_context_version_id: contextVersionId,
+              name: candidate.name,
+              website_url: candidate.website || null,
+              description: candidate.description ?? null,
+              is_competitor: true,
+              created_by: user?.id ?? null,
+            })
+            .select("id, name, website_url, logo_url")
+            .single();
+          if (insertError) {
+            // Unique violation: the row exists but sits outside the scoped
+            // entity list (another tab, or a previous company's era). Re-read
+            // account-wide and re-stamp it into the active company's scope.
+            const { data: existing } = await supabase
+              .from("companies")
+              .select("id, name, website_url, logo_url")
+              .eq("account_id", accountId)
+              .eq("is_competitor", true);
+            entity = (existing ?? []).find((row) => hostOf(row.website_url) === host) as
+              | CompetitorEntity
+              | undefined;
+            if (!entity) throw new Error(insertError.message);
+            await supabase
+              .from("companies")
+              .update({ business_context_version_id: contextVersionId })
+              .eq("id", entity.id)
+              .eq("account_id", accountId);
+          } else {
+            entity = inserted as CompetitorEntity;
+          }
         }
 
         // 3. Resolve the orchestrator profile (owner of cross-section research).

@@ -15,6 +15,7 @@ import {
   CANVAS_SECTION_LABELS,
 } from "@/components/canvas/section-types";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { ATLAS, parseAtlasBriefing, type AtlasBriefingPayload } from "@/lib/atlas";
 import { AtlasChat } from "@/components/atlas/AtlasChat";
 
@@ -29,6 +30,7 @@ import { AtlasChat } from "@/components/atlas/AtlasChat";
 interface BriefingRunRow {
   id: string;
   output: Record<string, unknown> | null;
+  input: Record<string, unknown> | null;
   created_at: string;
   status: string;
   error: string | null;
@@ -172,20 +174,32 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
   /** Returns the loaded run id so callers can mark it seen without a state race. */
   const loadBriefing = useCallback(async (): Promise<string | null> => {
     if (!accountId) return null;
-    const { data, error } = await supabaseUntyped
-      .from<BriefingRunRow>("agent_runs")
-      .select("id, output, created_at, status, error")
-      .eq("account_id", accountId)
-      .eq("run_type", "atlas_briefing")
-      .in("status", ["completed"])
-      .order("created_at", { ascending: false })
-      .limit(1);
+    const [{ data, error }, scope] = await Promise.all([
+      supabaseUntyped
+        .from<BriefingRunRow>("agent_runs")
+        .select("id, output, input, created_at, status, error")
+        .eq("account_id", accountId)
+        .eq("run_type", "atlas_briefing")
+        .in("status", ["completed"])
+        .order("created_at", { ascending: false })
+        .limit(5),
+      loadCompanyScope(accountId).catch(() => null),
+    ]);
     if (error) {
       setBriefing(null);
       setBriefingError(error.message);
       return null;
     }
-    const row = data?.[0];
+    // A briefing belongs to the company it was generated for (input.company_key,
+    // stamped by the worker). After a company switch the previous company's
+    // briefing must not brief the new one — show "no briefing yet" instead
+    // (owner bug 2026-07-06). Legacy briefings without a key are excluded once
+    // the account has a keyed active company.
+    const activeKey = scope?.companyKey ?? null;
+    const row = (data ?? []).find((candidate) => {
+      if (!activeKey) return true;
+      return candidate.input?.company_key === activeKey;
+    });
     if (!row) {
       setBriefing(null);
       setBriefingError(null);

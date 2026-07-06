@@ -55,6 +55,10 @@ describe("WorkspaceChatHandler", () => {
     expect(runner.request?.systemPrompt).toContain("Company: Acme Robotics");
     expect(runner.request?.systemPrompt).toContain("Enterprise SaaS subscriptions");
     expect(runner.request?.systemPrompt).toContain("Usage-based robotics API tier");
+    // Company scoping: a newer canvas row from a previously analyzed company
+    // must never win latest-per-section for the active company.
+    expect(runner.request?.systemPrompt).not.toContain("Stale segment from the old company");
+    expect(runner.request?.systemPrompt).not.toContain("Old Ventures");
   });
 
   it("teaches the data-gap protocol — thin data means coaching, not guessing (owner directive)", async () => {
@@ -207,6 +211,7 @@ class WorkspaceChatFakeClient {
     agent_runs: [{ id: "run-1", account_id: "account-1" }],
     canvas_section_versions: [{
       account_id: "account-1",
+      business_context_version_id: "ctx-1",
       section_key: "customer_segments",
       competitor_id: null,
       items: [
@@ -215,13 +220,33 @@ class WorkspaceChatFakeClient {
       ],
       notes: "Grow enterprise mix to 60% by Q4.",
       created_at: "2026-07-06T00:00:00Z",
+    }, {
+      // A previously analyzed company's canvas on the same account — company
+      // scoping must keep it out of the agent's grounding (owner bug 2026-07-06).
+      account_id: "account-1",
+      business_context_version_id: "ctx-0",
+      section_key: "customer_segments",
+      competitor_id: null,
+      items: [{ text: "Stale segment from the old company", confidence: 0.9 }],
+      notes: null,
+      created_at: "2026-07-07T00:00:00Z",
     }],
     business_context_versions: [{
+      id: "ctx-1",
       account_id: "account-1",
       company_name: "Acme Robotics",
+      website: null,
       industry: "Industrial automation",
       summary: "Sells robotic arms to mid-market manufacturers.",
       created_at: "2026-07-06T00:00:00Z",
+    }, {
+      id: "ctx-0",
+      account_id: "account-1",
+      company_name: "Old Ventures",
+      website: "https://old.example",
+      industry: "Media",
+      summary: "The company analyzed before Acme.",
+      created_at: "2026-06-15T00:00:00Z",
     }],
   };
 

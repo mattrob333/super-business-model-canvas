@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentRunner } from "../agent/runner.js";
 import { ClaudeAgentRunner, OpenRouterChatRunner } from "../agent/runner.js";
+import { loadCompanyScope, type CompanyScope } from "../db/company-scope.js";
 import { asRecord } from "../db/json.js";
 import { FeedRunner } from "../feeds/feed-runner.js";
 import { SECTION_LABELS, type SectionKey } from "../domain/sections.js";
@@ -76,24 +77,29 @@ export class SkillRunHandler {
     if (!skillKey) throw new Error("skill_run requires skill_key");
     await this.markRunRunning(job, skillKey);
 
+    // Skills read and write only the ACTIVE company's data — competitor
+    // lists and canvas items from a previously analyzed company must never
+    // feed another company's artifact (owner bug 2026-07-06).
+    const scope = await loadCompanyScope(this.deps.client, job.account_id);
+
     if (skillKey === "yield.pricing_teardown") {
-      await this.runPricingTeardown(job);
+      await this.runPricingTeardown(job, scope);
       return;
     }
     if (skillKey === "compass.avatar_refinement") {
-      await this.runAvatarRefinement(job);
+      await this.runAvatarRefinement(job, scope);
       return;
     }
     if (skillKey === "compass.segment_expansion") {
-      await this.runSegmentExpansion(job);
+      await this.runSegmentExpansion(job, scope);
       return;
     }
     if (skillKey === "relay.channel_gap_scan") {
-      await this.runChannelGapScan(job);
+      await this.runChannelGapScan(job, scope);
       return;
     }
     if (skillKey === "relay.channel_economics") {
-      await this.runChannelEconomics(job);
+      await this.runChannelEconomics(job, scope);
       return;
     }
     throw new Error(`skill ${skillKey} is not implemented in the worker (catalog implemented flag must stay false)`);
@@ -105,8 +111,8 @@ export class SkillRunHandler {
    * pricing matrix + recommendation memo, verifier-spot-check matrix claims,
    * write the artifact.
    */
-  private async runPricingTeardown(job: AgentJob): Promise<void> {
-    const competitors = await this.loadCompetitors(job.account_id);
+  private async runPricingTeardown(job: AgentJob, scope: CompanyScope): Promise<void> {
+    const competitors = await this.loadCompetitors(job.account_id, scope);
     if (competitors.length === 0) {
       throw new Error("pricing_teardown requires at least one competitor entity — run competitor research first");
     }
@@ -145,7 +151,7 @@ export class SkillRunHandler {
       throw new Error("pricing_teardown could not retrieve any competitor pricing content — check Firecrawl health");
     }
 
-    const ownItems = await this.loadOwnRevenueItems(job.account_id);
+    const ownItems = await this.loadOwnRevenueItems(job.account_id, scope);
     const routes = await this.loadModelRoutes(job.account_id, ["skill_run", "research_verify"]);
     const route = requiredRoute(routes, job.account_id, "skill_run", "skill_run");
     const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
@@ -186,6 +192,7 @@ export class SkillRunHandler {
 
     const { error } = await this.deps.client.from("skill_artifacts").insert({
       account_id: job.account_id,
+      business_context_version_id: scope.activeContextId,
       skill_key: "yield.pricing_teardown",
       title: `Pricing teardown — ${sources.length} competitor${sources.length === 1 ? "" : "s"}`,
       body_md: artifact.bodyMd,
@@ -208,8 +215,8 @@ export class SkillRunHandler {
     });
   }
 
-  private async runAvatarRefinement(job: AgentJob): Promise<void> {
-    const segments = await this.loadOwnSectionItems(job.account_id, "customer_segments");
+  private async runAvatarRefinement(job: AgentJob, scope: CompanyScope): Promise<void> {
+    const segments = await this.loadOwnSectionItems(job.account_id, "customer_segments", scope);
     if (segments.length === 0) {
       throw new Error("avatar_refinement requires Customer Segments canvas items first");
     }
@@ -255,7 +262,7 @@ export class SkillRunHandler {
       card.pains.map((pain) => ({ claim: `${card.segment}: ${pain.quote}`, excerpt: evidenceForSegment(evidence, card.segment) })),
     ).slice(0, 4), "avatar_refinement");
 
-    await this.writeSkillArtifact(job, {
+    await this.writeSkillArtifact(job, scope, {
       skillKey: "compass.avatar_refinement",
       title: `Avatar refinement - ${artifact.cards.length} segment${artifact.cards.length === 1 ? "" : "s"}`,
       bodyMd: artifact.bodyMd,
@@ -270,11 +277,11 @@ export class SkillRunHandler {
     });
   }
 
-  private async runSegmentExpansion(job: AgentJob): Promise<void> {
-    const ownSegments = await this.loadOwnSectionItems(job.account_id, "customer_segments");
-    const resources = await this.loadOwnSectionItems(job.account_id, "key_resources");
-    const activities = await this.loadOwnSectionItems(job.account_id, "key_activities");
-    const competitorSegments = await this.loadCompetitorSectionItems(job.account_id, "customer_segments");
+  private async runSegmentExpansion(job: AgentJob, scope: CompanyScope): Promise<void> {
+    const ownSegments = await this.loadOwnSectionItems(job.account_id, "customer_segments", scope);
+    const resources = await this.loadOwnSectionItems(job.account_id, "key_resources", scope);
+    const activities = await this.loadOwnSectionItems(job.account_id, "key_activities", scope);
+    const competitorSegments = await this.loadCompetitorSectionItems(job.account_id, "customer_segments", scope);
     if (ownSegments.length === 0) throw new Error("segment_expansion requires our Customer Segments canvas items first");
     if (competitorSegments.length === 0) throw new Error("segment_expansion requires competitor Customer Segments research first");
 
@@ -301,7 +308,7 @@ export class SkillRunHandler {
       excerpt: competitorExcerpt(competitorSegments, row.competitor),
     })).slice(0, 4), "segment_expansion");
 
-    await this.writeSkillArtifact(job, {
+    await this.writeSkillArtifact(job, scope, {
       skillKey: "compass.segment_expansion",
       title: `Segment expansion scan - ${artifact.opportunities.length} opportunities`,
       bodyMd: artifact.bodyMd,
@@ -319,9 +326,9 @@ export class SkillRunHandler {
     });
   }
 
-  private async runChannelGapScan(job: AgentJob): Promise<void> {
-    const ownChannels = await this.loadOwnSectionItems(job.account_id, "channels");
-    const competitorChannels = await this.loadCompetitorSectionItems(job.account_id, "channels");
+  private async runChannelGapScan(job: AgentJob, scope: CompanyScope): Promise<void> {
+    const ownChannels = await this.loadOwnSectionItems(job.account_id, "channels", scope);
+    const competitorChannels = await this.loadCompetitorSectionItems(job.account_id, "channels", scope);
     if (ownChannels.length === 0) throw new Error("channel_gap_scan requires our Channels canvas items first");
     if (competitorChannels.length === 0) throw new Error("channel_gap_scan requires competitor Channels research first");
 
@@ -348,7 +355,7 @@ export class SkillRunHandler {
       excerpt: competitorExcerpt(competitorChannels, row.competitor),
     })).slice(0, 4), "channel_gap_scan");
 
-    await this.writeSkillArtifact(job, {
+    await this.writeSkillArtifact(job, scope, {
       skillKey: "relay.channel_gap_scan",
       title: `Channel gap scan - ${artifact.gaps.length} ranked channels`,
       bodyMd: artifact.bodyMd,
@@ -363,9 +370,9 @@ export class SkillRunHandler {
     });
   }
 
-  private async runChannelEconomics(job: AgentJob): Promise<void> {
-    const ownChannels = await this.loadOwnSectionItems(job.account_id, "channels");
-    const competitorChannels = await this.loadCompetitorSectionItems(job.account_id, "channels");
+  private async runChannelEconomics(job: AgentJob, scope: CompanyScope): Promise<void> {
+    const ownChannels = await this.loadOwnSectionItems(job.account_id, "channels", scope);
+    const competitorChannels = await this.loadCompetitorSectionItems(job.account_id, "channels", scope);
     if (ownChannels.length === 0) throw new Error("channel_economics requires our Channels canvas items first");
     if (competitorChannels.length === 0) throw new Error("channel_economics requires competitor Channels research first");
 
@@ -392,7 +399,7 @@ export class SkillRunHandler {
       excerpt: competitorExcerpt(competitorChannels, row.competitor),
     })).slice(0, 4), "channel_economics");
 
-    await this.writeSkillArtifact(job, {
+    await this.writeSkillArtifact(job, scope, {
       skillKey: "relay.channel_economics",
       title: `Channel economics - ${artifact.channels.length} channel${artifact.channels.length === 1 ? "" : "s"}`,
       bodyMd: artifact.bodyMd,
@@ -407,24 +414,26 @@ export class SkillRunHandler {
     });
   }
 
-  private async loadCompetitors(accountId: string): Promise<Array<{ id: string; name: string; website_url: string | null }>> {
+  private async loadCompetitors(accountId: string, scope: CompanyScope): Promise<Array<{ id: string; name: string; website_url: string | null }>> {
     const { data, error } = await this.deps.client
       .from("companies")
       .select("id, name, website_url")
       .eq("account_id", accountId)
       .eq("is_competitor", true)
+      .in("business_context_version_id", scope.contextIds)
       .order("name", { ascending: true })
       .limit(8);
     if (error) throw new Error(`Failed to load competitors: ${error.message}`);
     return (data ?? []) as Array<{ id: string; name: string; website_url: string | null }>;
   }
 
-  private async loadOwnSectionItems(accountId: string, sectionKey: SectionKey): Promise<CanvasItemSource[]> {
+  private async loadOwnSectionItems(accountId: string, sectionKey: SectionKey, scope: CompanyScope): Promise<CanvasItemSource[]> {
     const { data, error } = await this.deps.client
       .from("canvas_section_versions")
       .select("section_key, items, created_at")
       .eq("account_id", accountId)
       .is("competitor_id", null)
+      .in("business_context_version_id", scope.contextIds)
       .eq("section_key", sectionKey)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -432,12 +441,13 @@ export class SkillRunHandler {
     return flattenCanvasItems(data ?? [], sectionKey);
   }
 
-  private async loadCompetitorSectionItems(accountId: string, sectionKey: SectionKey): Promise<CanvasItemSource[]> {
+  private async loadCompetitorSectionItems(accountId: string, sectionKey: SectionKey, scope: CompanyScope): Promise<CanvasItemSource[]> {
     const { data, error } = await this.deps.client
       .from("canvas_section_versions")
       .select("section_key, competitor_id, items, created_at, companies!canvas_section_versions_competitor_id_fkey(name)")
       .eq("account_id", accountId)
       .not("competitor_id", "is", null)
+      .in("business_context_version_id", scope.contextIds)
       .eq("section_key", sectionKey)
       .order("created_at", { ascending: false })
       .limit(24);
@@ -445,12 +455,13 @@ export class SkillRunHandler {
     return flattenCanvasItems(data ?? [], sectionKey);
   }
 
-  private async loadOwnRevenueItems(accountId: string): Promise<string[]> {
+  private async loadOwnRevenueItems(accountId: string, scope: CompanyScope): Promise<string[]> {
     const { data, error } = await this.deps.client
       .from("canvas_section_versions")
       .select("items, created_at")
       .eq("account_id", accountId)
       .is("competitor_id", null)
+      .in("business_context_version_id", scope.contextIds)
       .eq("section_key", "revenue_streams")
       .order("created_at", { ascending: false })
       .limit(1);
@@ -519,9 +530,10 @@ export class SkillRunHandler {
     return data.id;
   }
 
-  private async writeSkillArtifact(job: AgentJob, artifact: SkillArtifactWrite): Promise<void> {
+  private async writeSkillArtifact(job: AgentJob, scope: CompanyScope, artifact: SkillArtifactWrite): Promise<void> {
     const { error } = await this.deps.client.from("skill_artifacts").insert({
       account_id: job.account_id,
+      business_context_version_id: scope.activeContextId,
       skill_key: artifact.skillKey,
       title: artifact.title,
       body_md: artifact.bodyMd,

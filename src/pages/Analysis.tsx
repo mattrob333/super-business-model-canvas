@@ -22,6 +22,7 @@ import {
   setActiveAnalysis,
 } from "@/lib/active-analysis";
 import { bridgeAnalysisToCanvasVersions } from "@/lib/canvas-version-bridge";
+import { companyKeyOf, invalidateCompanyScope, loadCompanyScope } from "@/lib/company-scope";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Save, Search, ChevronUp, ArrowRight, Loader2, Sparkles } from "lucide-react";
@@ -139,36 +140,56 @@ const Analysis = () => {
     return savedId;
   }, [accountId, user]);
 
-  const backfillAttemptedRef = useRef(false);
+  // Keep the agents on the company the user is actually looking at. Opening
+  // a canvas whose company differs from the active context era re-bridges it,
+  // making it the new active era — canvas coverage, gaps, competitors and
+  // Atlas briefings all follow (owner bug 2026-07-06: a fresh Salesforce
+  // canvas still surfaced Tier4's data everywhere). Also covers the original
+  // backfill case: an account with no bridged canvas data at all.
+  const companySyncRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!hasAnalyzed || !analysisData || !accountId || !user || backfillAttemptedRef.current) return;
-    backfillAttemptedRef.current = true;
+    if (!hasAnalyzed || !analysisData || !accountId || !user) return;
+    const data = analysisData as Record<string, unknown>;
+    const company = (data.company && typeof data.company === "object" && !Array.isArray(data.company)
+      ? data.company
+      : {}) as Record<string, unknown>;
+    const loadedKey = companyKeyOf(
+      typeof company.name === "string" ? company.name : null,
+      typeof company.website === "string" && company.website
+        ? company.website
+        : typeof company.website_url === "string" ? company.website_url : null,
+    );
+    const syncToken = `${accountId}:${loadedKey ?? "anonymous"}`;
+    if (companySyncRef.current === syncToken) return;
+    companySyncRef.current = syncToken;
     (async () => {
       try {
-        const { data: existing } = await supabase
-          .from("canvas_section_versions")
-          .select("id")
-          .eq("account_id", accountId)
-          .is("competitor_id", null)
-          .limit(1);
-        if (existing && existing.length > 0) return;
+        const scope = await loadCompanyScope(accountId);
+        const isBackfill = !scope.activeContextId;
+        const isSwitch = Boolean(loadedKey && scope.activeContextId && scope.companyKey !== loadedKey);
+        if (!isBackfill && !isSwitch) return;
         const result = await bridgeAnalysisToCanvasVersions({
           accountId,
           userId: user.id,
           sourceAnalysisId: getActiveAnalysis()?.id ?? null,
-          analysisData: analysisData as Record<string, unknown>,
-          summaryPrefix: "Backfill from saved analysis",
+          analysisData: data,
+          summaryPrefix: isSwitch ? "Company switch" : "Backfill from saved analysis",
         });
-        if (result.sectionCount > 0) {
-          toast({
+        invalidateCompanyScope(accountId);
+        const companyName = typeof company.name === "string" && company.name.trim() ? company.name.trim() : "this company";
+        toast(isSwitch
+          ? {
+            title: `Agents switched to ${companyName}`,
+            description: "Canvas coverage, gaps and Atlas briefings now track this company.",
+          }
+          : {
             title: "Canvas synced for the agents",
             description: `${result.sectionCount} sections are now visible to Atlas and the section agents.`,
           });
-        }
       } catch {
-        // Non-fatal: the visible canvas still works; Atlas just reports lower
-        // coverage until a save re-triggers the bridge.
-        backfillAttemptedRef.current = false;
+        // Non-fatal: the visible canvas still works; Atlas just reports the
+        // previous company until a reload re-triggers the sync.
+        companySyncRef.current = null;
       }
     })();
   }, [hasAnalyzed, analysisData, accountId, user, toast]);

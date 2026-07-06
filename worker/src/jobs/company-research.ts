@@ -110,6 +110,8 @@ export class CompanyResearchHandler {
       ?? competitor.website_url;
     if (!competitorUrl) throw new Error("competitor_research requires a competitor with website_url or payload competitor_url");
 
+    await this.stampCompetitorContext(job, competitor.id, context.id);
+
     await this.runResearch(job, {
       context,
       targetName: competitor.name,
@@ -394,6 +396,21 @@ export class CompanyResearchHandler {
     return data as CompanyEntity;
   }
 
+  /**
+   * Researching a competitor claims it for the active company era: company
+   * scoping filters competitor lists by business_context_version_id, and a
+   * retry on a pre-scoping (NULL-stamped) row must bring it back into view.
+   * Best-effort — the research result stands even if the stamp fails.
+   */
+  private async stampCompetitorContext(job: AgentJob, competitorId: string, contextId: string): Promise<void> {
+    const { error } = await this.deps.client
+      .from("companies")
+      .update({ business_context_version_id: contextId })
+      .eq("account_id", job.account_id)
+      .eq("id", competitorId);
+    if (error) console.error(`Failed to stamp competitor ${competitorId} with context ${contextId}: ${error.message}`);
+  }
+
   private async loadModelRoutes(accountId: string): Promise<ModelRoute[]> {
     const { data, error } = await this.deps.client
       .from("model_routes")
@@ -529,6 +546,7 @@ ${evidencePrompt(evidence)}`,
   private async writeContradiction(job: AgentJob, subject: ResearchSubject, claim: VerifiedClaim): Promise<void> {
     const gap = {
       account_id: job.account_id,
+      business_context_version_id: subject.context.id,
       title: `Contradicted ${subject.runType} claim: ${claim.text}`,
       description: claim.reason,
       gap_type: "contradictory",

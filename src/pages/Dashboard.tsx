@@ -9,6 +9,7 @@ import { StrategicHealthPanel } from "@/components/dashboard/StrategicHealthPane
 import { useActiveAnalysis } from "@/hooks/useActiveAnalysis";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { SkillCatalogPanel } from "@/components/skills/SkillCatalogPanel";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useAuth } from "@/hooks/useAuth";
@@ -111,13 +112,18 @@ const Dashboard = () => {
     setLoading(true);
 
     try {
+      // Dashboard metrics describe the ACTIVE company, not the account's
+      // whole history — a company switch must reset the gap counts.
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      let gapsQuery = supabase
+        .from("gaps")
+        .select("severity")
+        .eq("account_id", accountId)
+        .in("status", ["open", "acknowledged", "in_progress"]);
+      if (scope) gapsQuery = gapsQuery.in("business_context_version_id", scope.contextIds);
       const [gapsRes, evidenceRes, contextRes, runsRes, loopsRes, reportsRes, threatRes] =
         await Promise.all([
-          supabase
-            .from("gaps")
-            .select("severity")
-            .eq("account_id", accountId)
-            .in("status", ["open", "acknowledged", "in_progress"]),
+          gapsQuery,
           supabase
             .from("evidence_items")
             .select("id", { count: "exact", head: true })
