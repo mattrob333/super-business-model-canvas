@@ -15,4 +15,7 @@ kill_timeout = "30s"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  # 1GB: the Claude Agent SDK spawns a Node CLI child per model call; at
+  # 512MB the spawn is the prime suspect for the live "exited with code 1"
+  # failures (2026-07-06 incident, see BUILD_STATE).
+  memory = "1024mb"
