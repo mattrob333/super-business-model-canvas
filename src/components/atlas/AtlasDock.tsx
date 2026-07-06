@@ -66,7 +66,6 @@ function safeSet(key: string, value: string): void {
 export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const { accountId } = useAccountId();
   const { user } = useAuth();
-<<<<<<< HEAD
   // Atlas is a copilot, not a drawer: default OPEN on desktop (the canvas
   // shares the row with it) unless the user has explicitly closed it before.
   const [open, setOpen] = useState(() => {
@@ -74,9 +73,6 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
     if (stored !== null) return stored === "true";
     return typeof window !== "undefined" && window.innerWidth >= 1024;
   });
-=======
-  const [open, setOpen] = useState(() => safeGet(DOCK_OPEN_KEY) === "true");
->>>>>>> origin/main
   // The chat mounts lazily on first expand and stays mounted after, so a
   // collapsed dock costs zero thread queries but reopening keeps its state.
   const [everOpened, setEverOpened] = useState(open);
