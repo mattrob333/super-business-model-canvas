@@ -17,7 +17,7 @@
 | 6 | War Room & orchestration | NOT STARTED | — | — |
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | — | — |
 | 8 | Hardening & commercial | HELD (await direction) | — | — |
-| A | Next Build: research depth | AWAITING REVIEW | `build/phase-a-research-depth` | 2026-07-06 |
+| A | Next Build: research depth | AWAITING REVIEW | `build/phase-a2-research-backfill` | 2026-07-06 |
 
 Statuses: `NOT STARTED` → `IN PROGRESS` → `AWAITING REVIEW` → `APPROVED` (or back to
 `IN PROGRESS` on review findings). Only one phase `IN PROGRESS` unless BUILD_PLAN Part IV
@@ -153,6 +153,33 @@ Status: OPEN | RESOLVED (<how>)
 
 ## NEXT BUILD PHASES
 
+### Phase A.2 - Competitor research web-evidence backfill (2026-07-06, `build/phase-a2-research-backfill`)
+
+- Read `docs/HANDOFF_NEXT_BUILD.md` known-fragile list first. This slice only touches the
+  worker company-research path and its tests; it does not alter chat auto-send, nested canvas
+  analysis reads, chat model routing, or the assumption-prefix storage/display behavior.
+- Implemented competitor-only web backfill after the existing crawl -> extract -> verify pass.
+  `runResearch` now computes sections with zero crawl-confirmed claims, batches missing
+  section labels into at most two `grok_live_search` FeedRunner calls, dedupes and byte-caps
+  the returned evidence with the Phase A helpers, then sends it through the same extract,
+  adversarial verify, evidence write, and canvas write pipeline.
+- Backfill discipline: claims only land in still-missing sections, never replace crawl-confirmed
+  sections, cap at 4 items per section, carry `source_kind: "web_search_backfill"` in evidence
+  metadata and canvas item metadata, and cap earned confidence at 0.6. If web search or
+  extraction finds nothing, sections stay honestly empty; the Phase A both-fail crawl error path
+  is unchanged.
+- Tests added/updated in `worker/src/__tests__/company-research.test.ts`: empty sections trigger
+  backfill and land capped verified claims; fully crawl-covered competitors do not query Grok;
+  web backfill with no extracted claims leaves uncovered sections empty; the bounded crawl test
+  now allows the new post-crawl Grok backfill while still asserting the exact Firecrawl page set.
+- Gates: `worker npx vitest run src/__tests__/company-research.test.ts` 15 passed; `worker npm
+  run typecheck` exit 0; `worker npm run lint` exit 0; `worker npm test` 76 passed / 2 skipped;
+  `worker npm run build` exit 0; root `npx tsc -p tsconfig.app.json --noEmit` exit 0; root
+  `npm run build` exit 0; root `npm run lint` exits 1 with the known frozen baseline of 64
+  problems (46 errors, 18 warnings), unchanged from the Phase A ceiling.
+- Honest deferral: this branch is code-path and unit/integration tested. Live coverage parity
+  against real third-party sources waits on deploy and an authenticated smoke run.
+
 ### Phase A - Research depth (2026-07-06, `build/phase-a-research-depth`)
 
 - Implemented bounded multi-page competitor research in `worker/src/jobs/company-research.ts`:
@@ -225,6 +252,16 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 - **Gates:** root tsc exit 0, build green, lint 68 (frozen ceiling), worker untouched.
 
 ## REVIEW FINDINGS
+
+### Phase A.2 review (Codex build/phase-a2-research-backfill, c442cd6) — APPROVED, no findings (2026-07-06)
+
+- Web-evidence backfill for competitor research: competitor-only guard, missing =
+  sections with zero CONFIRMED crawl claims, <=2 batched grok_live_search calls,
+  same dedupe/byte-cap/extract/verify/evidence-write pipeline, per-section cap 4,
+  confidence min(claim, 0.6), source_kind carried on evidence metadata AND claim
+  flags, empty-stays-empty when search finds nothing. Gates re-verified
+  independently (worker 76 passed, root tsc/build/lint 64<=65).
+
 
 ### Phase A review (Codex build/phase-a-research-depth, 0ea537b) — APPROVED, no findings (2026-07-06)
 
