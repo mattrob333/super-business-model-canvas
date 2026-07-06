@@ -2114,6 +2114,39 @@ cd worker && npm run build            -> exit 0
 cd worker && npm run lint             -> exit 0
 ```
 
+**2026-07-06 - Phase C.1 canvas bridge on `build/phase-c1-canvas-bridge`.**
+
+- Added the client-side versioned-canvas bridge for URL analysis saves, manual canvas saves,
+  playbook handoffs, and Knowledge deck-to-canvas builds. Each bridge first inserts a
+  `business_context_versions` row, then select-back-verifies one `canvas_section_versions`
+  row per non-empty own-company section with `competitor_id = null` and `{ text,
+  confidence: 0.4 }` items while preserving `Assumption:` as stored data.
+- Confirmed the existing account-scoped RLS policy loop already includes
+  `canvas_section_versions` member inserts; no migration was needed.
+- Studio skill tiles now track the durable `agent_runs` row after enqueue, keep the Run
+  button in a running state, surface failed run errors inline, and refresh the shelf with a
+  success toast on completion.
+- Assumed canvas items in workspace rooms can prefill the thread composer for verification
+  without auto-sending. Proposal approval now drops a matching `Assumption:`-prefixed item
+  when the approved replacement has the same stripped text.
+- The pinned Company Brief source opens a read-only popover showing the latest business
+  context company name, industry, summary, and timestamp.
+- Thread chrome now labels the dropdown as `Thread`, uses `General` as the default thread
+  title, and explains that new threads are separate conversations with the agent.
+- Honest scope: no worker handlers were changed, no auto-send effect was touched, and no
+  automatic canvas writes from skill outputs were introduced.
+
+**Gate results for Phase C.1 commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 64 problems (46 errors, 18 warnings), within frozen <=65 ceiling
+cd worker && npm run typecheck        -> exit 0
+cd worker && npm test                 -> 89 passed, 2 skipped
+cd worker && npm run build            -> exit 0
+cd worker && npm run lint             -> exit 0
+```
+
 ### Phase 6 — War Room & orchestration
 Tasks: 6.1 ☐ · 6.2 ☐ · 6.3 ☐ · 6.4 ☐ · 6.5 ☐ · 6.6 ☐ · 6.7 ☐ · 6.8 ☐ · 6.9 ☐
 
