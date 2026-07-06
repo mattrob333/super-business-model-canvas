@@ -285,6 +285,22 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas dock round 2 (owner live pass) — copilot layout + legacy coverage backfill (2026-07-06)
+
+- **"Blank slate" while the BMC showed items:** the live company predates the C.1
+  versioned-canvas bridge, so no canvas_section_versions rows existed and Atlas
+  honestly reported zero coverage. The canvas page now backfills on sight: if an
+  account has a loaded analysis but zero own-company versioned rows, it bridges them
+  once (ref-guarded, non-fatal on error, toast confirms "Canvas synced for the
+  agents"). Refreshing the briefing after backfill shows real coverage.
+- **Copilot, not drawer:** the dock defaults OPEN on desktop (stored preference still
+  wins), widens to 460px on xl, and the canvas page adds matching right padding when
+  open so the BMC shares the row instead of being covered — collaborative side-by-side
+  per the owner's direction. Mobile keeps the overlay.
+- Full-page War Room confirmed as the next Atlas slice (dock and War Room share the
+  one thread per spec 12 §6).
+
+
 ### Phase D.1 — Atlas dock: State of the Union v1 (built by Claude via orchestrated agents, adversarially reviewed) — SHIPPED (2026-07-06)
 
 - **Worker `atlas_briefing` job** (atlas-briefing.ts): deterministic context assembly

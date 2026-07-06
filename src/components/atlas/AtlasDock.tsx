@@ -66,7 +66,13 @@ function safeSet(key: string, value: string): void {
 export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const { accountId } = useAccountId();
   const { user } = useAuth();
-  const [open, setOpen] = useState(() => safeGet(DOCK_OPEN_KEY) === "true");
+  // Atlas is a copilot, not a drawer: default OPEN on desktop (the canvas
+  // shares the row with it) unless the user has explicitly closed it before.
+  const [open, setOpen] = useState(() => {
+    const stored = safeGet(DOCK_OPEN_KEY);
+    if (stored !== null) return stored === "true";
+    return typeof window !== "undefined" && window.innerWidth >= 1024;
+  });
   // The chat mounts lazily on first expand and stays mounted after, so a
   // collapsed dock costs zero thread queries but reopening keeps its state.
   const [everOpened, setEverOpened] = useState(open);
@@ -328,7 +334,7 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
         ref={asideRef}
         tabIndex={-1}
         className={cn(
-          "fixed inset-y-0 right-0 z-40 flex w-[min(94vw,400px)] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
+          "fixed inset-y-0 right-0 z-40 flex w-[min(94vw,420px)] xl:w-[460px] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
           open ? "translate-x-0" : "invisible translate-x-full",
         )}
         aria-hidden={!open}
