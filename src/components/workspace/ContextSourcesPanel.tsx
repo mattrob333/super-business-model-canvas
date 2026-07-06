@@ -1,6 +1,7 @@
 import { type ChangeEvent, useCallback, useEffect, useState } from "react";
 import { FilePlus2, Link2, Loader2, NotebookPen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,6 +50,7 @@ export function ContextSourcesPanel({
   const [noteText, setNoteText] = useState("");
   const [urlName, setUrlName] = useState("");
   const [urlValue, setUrlValue] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
 
   const loadSources = useCallback(async () => {
     setLoading(true);
@@ -106,6 +108,7 @@ export function ContextSourcesPanel({
       });
       setNoteName("");
       setNoteText("");
+      setAddOpen(false);
       toast({ title: "Note added", description: "It will be available on the next workspace reply." });
     } catch (error) {
       toast({ title: "Note was not added", description: error instanceof Error ? error.message : "Try again.", variant: "destructive" });
@@ -125,6 +128,7 @@ export function ContextSourcesPanel({
       });
       setUrlName("");
       setUrlValue("");
+      setAddOpen(false);
       toast({ title: "URL added", description: "The agent will see the URL label on the next reply." });
     } catch (error) {
       toast({ title: "URL was not added", description: error instanceof Error ? error.message : "Try again.", variant: "destructive" });
@@ -156,6 +160,7 @@ export function ContextSourcesPanel({
           file_size_bytes: file.size,
         },
       });
+      setAddOpen(false);
       toast({ title: "File added", description: "It is attached as a workspace context source." });
     } catch (error) {
       toast({ title: "File was not added", description: error instanceof Error ? error.message : "Try again.", variant: "destructive" });
@@ -219,62 +224,82 @@ export function ContextSourcesPanel({
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">Used on the next workspace reply.</p>
         </div>
-        <label className="inline-flex h-8 cursor-pointer items-center justify-center rounded-md border border-border px-2 text-muted-foreground hover:text-foreground">
-          <FilePlus2 className="h-4 w-4" />
-          <input
-            type="file"
-            className="sr-only"
-            onChange={(event) => void handleFileUpload(event)}
-            disabled={saving !== null}
-          />
-        </label>
       </div>
+
+      {/* One clean entry point (NotebookLM pattern, owner directive
+          2026-07-06) — the note/URL forms live behind it instead of
+          wallpapering the rail. Added sources stack in the list below. */}
+      <Popover open={addOpen} onOpenChange={setAddOpen}>
+        <PopoverTrigger asChild>
+          <Button size="sm" variant="outline" className="mt-3 h-8 w-full gap-1.5">
+            <FilePlus2 className="h-3.5 w-3.5" />
+            Add source
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-80 space-y-4 p-4">
+          <Button asChild size="sm" variant="outline" className="h-8 w-full gap-1.5" disabled={saving !== null}>
+            <label className="cursor-pointer">
+              {saving === "file" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FilePlus2 className="h-3.5 w-3.5" />}
+              Upload a file
+              <input
+                type="file"
+                className="sr-only"
+                onChange={(event) => void handleFileUpload(event)}
+                disabled={saving !== null}
+              />
+            </label>
+          </Button>
+
+          <div className="space-y-2 border-t border-border/60 pt-3">
+            <div className="flex gap-2">
+              <Input
+                value={urlValue}
+                onChange={(event) => setUrlValue(event.target.value)}
+                placeholder="https://..."
+                className="h-8 text-xs"
+                disabled={saving !== null}
+              />
+              <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={() => void handleAddUrl()} disabled={!urlValue.trim() || saving !== null}>
+                {saving === "url" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            <Input
+              value={urlName}
+              onChange={(event) => setUrlName(event.target.value)}
+              placeholder="URL label (optional)"
+              className="h-8 text-xs"
+              disabled={saving !== null}
+            />
+          </div>
+
+          <div className="space-y-2 border-t border-border/60 pt-3">
+            <Input
+              value={noteName}
+              onChange={(event) => setNoteName(event.target.value)}
+              placeholder="Note title (optional)"
+              className="h-8 text-xs"
+              disabled={saving !== null}
+            />
+            <Textarea
+              value={noteText}
+              onChange={(event) => setNoteText(event.target.value)}
+              placeholder="Add a note for this agent"
+              className="min-h-16 text-xs"
+              disabled={saving !== null}
+            />
+            <Button size="sm" className="h-8 w-full gap-1.5" onClick={() => void handleAddNote()} disabled={!noteText.trim() || saving !== null}>
+              {saving === "note" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <NotebookPen className="h-3.5 w-3.5" />}
+              Add note
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
 
       <div className="mt-3 rounded-md border border-border/60 bg-muted/30 p-3">
         <p className="text-sm font-semibold leading-snug">Company Brief</p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
           Pinned account brief. Always available to workspace agents.
         </p>
-      </div>
-
-      <div className="mt-3 space-y-2">
-        <Input
-          value={noteName}
-          onChange={(event) => setNoteName(event.target.value)}
-          placeholder="Note title"
-          disabled={saving !== null}
-        />
-        <Textarea
-          value={noteText}
-          onChange={(event) => setNoteText(event.target.value)}
-          placeholder="Add a note for this agent"
-          className="min-h-20"
-          disabled={saving !== null}
-        />
-        <Button size="sm" className="h-8 w-full gap-1.5" onClick={() => void handleAddNote()} disabled={!noteText.trim() || saving !== null}>
-          {saving === "note" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <NotebookPen className="h-3.5 w-3.5" />}
-          Add note
-        </Button>
-      </div>
-
-      <div className="mt-3 space-y-2">
-        <Input
-          value={urlName}
-          onChange={(event) => setUrlName(event.target.value)}
-          placeholder="URL label"
-          disabled={saving !== null}
-        />
-        <div className="flex gap-2">
-          <Input
-            value={urlValue}
-            onChange={(event) => setUrlValue(event.target.value)}
-            placeholder="https://..."
-            disabled={saving !== null}
-          />
-          <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={() => void handleAddUrl()} disabled={!urlValue.trim() || saving !== null}>
-            {saving === "url" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-          </Button>
-        </div>
       </div>
 
       {loading ? (
