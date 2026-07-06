@@ -1,7 +1,9 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, type ChangeEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   AlertTriangle,
   Filter,
@@ -11,12 +13,17 @@ import {
   CheckCircle2,
   Lightbulb,
   Loader2,
+  MessageSquare,
+  Upload,
   XCircle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
+import { CANVAS_SECTION_LABELS, type CanvasSectionKey } from "@/components/canvas/section-types";
+import { AGENT_ROSTER } from "@/lib/agent-roster";
+import { getAgentRuntime } from "@/lib/agent-runtime";
 import type { Database } from "@/integrations/supabase/types";
 
 /**
@@ -119,9 +126,26 @@ const GAP_TYPE_LABELS: Record<GapType, string> = {
   competitive: "Competitive",
 };
 
+/** Gap types where the fix is owner data, not competitive strategy. */
+const DATA_GAP_TYPES: ReadonlySet<GapType> = new Set([
+  "missing_data",
+  "low_confidence",
+  "no_evidence",
+  "outdated",
+]);
+
+/** First affected section that maps to a real agent room. */
+function gapSectionKey(gap: GapItem): CanvasSectionKey | null {
+  const match = gap.affected_sections.find((section) => section in CANVAS_SECTION_LABELS);
+  return (match as CanvasSectionKey | undefined) ?? null;
+}
+
 export default function Gaps() {
   const { accountId } = useAccountId();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const [uploadingGapId, setUploadingGapId] = useState<string | null>(null);
   const [filterSeverity, setFilterSeverity] = useState<GapSeverity | "all">(
     "all",
   );
@@ -172,6 +196,100 @@ export default function Gaps() {
     }
     setGaps((current) => current.map((item) => (item.id === gap.id ? { ...item, status } : item)));
   }, [accountId, toast]);
+
+  // Close a data gap at the source: upload the document right on the card.
+  // Same pipeline as the Knowledge page (storage -> founder_documents ->
+  // onboarding_extract run), then the gap moves to acknowledged while the
+  // agents distribute the new evidence into the affected sections.
+  const uploadForGap = useCallback(async (gap: GapItem, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !accountId || !user || uploadingGapId) return;
+    setUploadingGapId(gap.id);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 120);
+      const path = `${accountId}/${Date.now()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("founder-documents")
+        .upload(path, file, { contentType: file.type || "application/octet-stream" });
+      if (uploadError) throw uploadError;
+
+      const { data: document, error: insertError } = await supabase
+        .from("founder_documents")
+        .insert({
+          account_id: accountId,
+          title: file.name.replace(/\.[^.]+$/, ""),
+          file_name: file.name,
+          storage_bucket: "founder-documents",
+          storage_path: path,
+          content_type: file.type || "application/octet-stream",
+          file_size_bytes: file.size,
+          status: "uploaded",
+          uploaded_by: user.id,
+        })
+        .select("id")
+        .single();
+      if (insertError || !document) throw new Error(insertError?.message ?? "Failed to record document");
+
+      const { data: profiles } = await supabase
+        .from("agent_profiles")
+        .select("id, agent_key, account_id")
+        .eq("agent_key", "orchestrator")
+        .or(`account_id.eq.${accountId},account_id.is.null`)
+        .order("account_id", { ascending: false, nullsFirst: false })
+        .limit(1);
+      const profileId = profiles?.[0]?.id;
+      if (!profileId) throw new Error("No orchestrator profile available for ingestion.");
+
+      let contextVersionId: string;
+      const { data: existingContext } = await supabase
+        .from("business_context_versions")
+        .select("id")
+        .eq("account_id", accountId)
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existingContext) {
+        contextVersionId = existingContext.id;
+      } else {
+        const { data: newContext, error: ctxError } = await supabase
+          .from("business_context_versions")
+          .insert({ account_id: accountId, version_number: 1, summary: `Initial business context from ${file.name}`, data: {}, created_by: user.id })
+          .select("id")
+          .single();
+        if (ctxError || !newContext) throw new Error(`Failed to create business context: ${ctxError?.message ?? "unknown"}`);
+        contextVersionId = newContext.id;
+      }
+
+      const run = await getAgentRuntime(accountId).startRun({
+        accountId,
+        agentProfileId: profileId,
+        runType: "onboarding_extract",
+        triggerType: "manual",
+        triggeredBy: user.id,
+        input: { founder_document_id: document.id, business_context_version_id: contextVersionId },
+      });
+      await supabase
+        .from("founder_documents")
+        .update({ agent_run_id: run.runId, status: "parsing" })
+        .eq("id", document.id)
+        .eq("account_id", accountId);
+
+      if (gap.status === "open") await setGapStatus(gap, "acknowledged");
+      toast({
+        title: "Document queued against this gap",
+        description: `${file.name} is being parsed — the agents will distribute it into ${gap.affected_sections.map((section) => CANVAS_SECTION_LABELS[section as CanvasSectionKey] ?? section).join(", ")}. Track it on the Knowledge page.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingGapId(null);
+    }
+  }, [accountId, user, uploadingGapId, setGapStatus, toast]);
 
   const filteredGaps = useMemo(() => {
     return gaps.filter((g) => {
@@ -394,6 +512,40 @@ export default function Gaps() {
                       )}
                       {(gap.status === "open" || gap.status === "acknowledged" || gap.status === "in_progress") && (
                         <div className="mt-3 flex flex-wrap gap-2">
+                          {gapSectionKey(gap) && (
+                            <Button
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-xs"
+                              onClick={() => navigate(`/workspace/${gapSectionKey(gap)}?gap=${gap.id}`)}
+                            >
+                              <MessageSquare className="h-3 w-3" />
+                              Fix with {AGENT_ROSTER[gapSectionKey(gap) as CanvasSectionKey].callsign}
+                            </Button>
+                          )}
+                          {DATA_GAP_TYPES.has(gap.gap_type) && (
+                            <Button
+                              asChild
+                              size="sm"
+                              variant="outline"
+                              className="h-7 gap-1 px-2 text-xs"
+                              disabled={uploadingGapId !== null}
+                            >
+                              <label className="cursor-pointer">
+                                {uploadingGapId === gap.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Upload className="h-3 w-3" />
+                                )}
+                                Upload data
+                                <Input
+                                  className="sr-only"
+                                  type="file"
+                                  accept=".pdf,.docx,.txt,.md,.csv,text/plain,text/markdown,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                  onChange={(event) => void uploadForGap(gap, event)}
+                                />
+                              </label>
+                            </Button>
+                          )}
                           {gap.status === "open" && (
                             <Button
                               size="sm"

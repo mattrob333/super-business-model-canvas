@@ -104,10 +104,13 @@ export function WorkspaceThread({
   accountId,
   agentProfileId,
   sectionKey,
+  initialPrompt = null,
 }: {
   accountId: string;
   agentProfileId: string;
   sectionKey: CanvasSectionKey;
+  /** Auto-sent once on arrival (e.g. a Gap Register brief) so the agent starts working immediately. */
+  initialPrompt?: string | null;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -126,6 +129,7 @@ export function WorkspaceThread({
   const [decidingMessageId, setDecidingMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollTimer = useRef<ReturnType<typeof setTimeout>>();
+  const autoSentRef = useRef(false);
 
   useEffect(() => () => clearTimeout(pollTimer.current), []);
 
@@ -260,6 +264,14 @@ export function WorkspaceThread({
       setSending(false);
     }
   }, [accountId, agentProfileId, awaitingReply, ensureThread, loadMessages, pollRun, sending, user]);
+
+  // Gap Register arrivals: send the brief once, as soon as the thread is
+  // ready, so the agent is already working the problem when the user lands.
+  useEffect(() => {
+    if (!initialPrompt || autoSentRef.current || loadingMessages || sending || awaitingReply) return;
+    autoSentRef.current = true;
+    void sendMessage(initialPrompt);
+  }, [initialPrompt, loadingMessages, sending, awaitingReply, sendMessage]);
 
   const createThread = useCallback(async () => {
     const title = newThreadTitle.trim() || "New topic";
