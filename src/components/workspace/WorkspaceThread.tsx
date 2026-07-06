@@ -240,14 +240,14 @@ export function WorkspaceThread({
       });
   }, [accountId, entry.callsign, loadMessages]);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, threadIdOverride?: string) => {
     const trimmed = text.trim();
     if (!trimmed || sending || awaitingReply) return;
     setSending(true);
     setChatError(null);
     setRuntimeOffline(false);
     try {
-      const threadId = await ensureThread();
+      const threadId = threadIdOverride ?? await ensureThread();
       const { error: messageError } = await supabaseUntyped.from("workspace_messages").insert({
         thread_id: threadId,
         role: "user",
@@ -287,11 +287,37 @@ export function WorkspaceThread({
   useEffect(() => {
     if (!initialPrompt || autoSentRef.current || sending || awaitingReply) return;
     if (!threadsLoaded) return;
+    if (initialThreadTitle) {
+      // Atlas delegation: always a fresh thread — the handoff was consumed
+      // one-shot upstream, so refreshes cannot re-fire this.
+      autoSentRef.current = true;
+      void (async () => {
+        try {
+          const { data, error } = await supabaseUntyped
+            .from<ThreadRow>("workspace_threads")
+            .insert({
+              account_id: accountId,
+              agent_profile_id: agentProfileId,
+              title: initialThreadTitle,
+              created_by: user?.id ?? null,
+            })
+            .select("id, title, created_at")
+            .single();
+          if (error || !data) throw new Error(error?.message ?? "Failed to open the directive thread");
+          setThreads((prev) => [...prev, data]);
+          setActiveThreadId(data.id);
+          await sendMessage(initialPrompt, data.id);
+        } catch (sendError) {
+          setChatError(sendError instanceof Error ? sendError.message : "Could not deliver the directive");
+        }
+      })();
+      return;
+    }
     if (activeThreadId && !messagesReady) return;
     autoSentRef.current = true;
     if (messages.length > 0) return;
     void sendMessage(initialPrompt);
-  }, [initialPrompt, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage]);
+  }, [initialPrompt, initialThreadTitle, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage, accountId, agentProfileId, user]);
 
   useEffect(() => {
     if (!composerPrefill) return;
