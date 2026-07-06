@@ -61,6 +61,11 @@ interface ResearchSubject {
   canvasNotes: string;
 }
 
+interface ResearchFeedBundle {
+  payload: Record<string, unknown>;
+  evidence: EvidenceCandidate[];
+}
+
 export interface CompanyResearchDependencies extends FeedRuntimeConfig {
   client: SupabaseClient;
   runner?: AgentRunner;
@@ -123,14 +128,7 @@ export class CompanyResearchHandler {
 
   private async runResearch(job: AgentJob, subject: ResearchSubject): Promise<void> {
     await this.markRunRunning(job, subject.runType, subject.runInput);
-    const feedResult = await this.feedRunner.refresh({
-      accountId: job.account_id,
-      feedKey: "firecrawl_scrape",
-      cacheKey: subject.cacheKey,
-      companyName: subject.targetName,
-      companyUrl: subject.targetUrl,
-    });
-    if (feedResult.health !== "ok") throw new Error(`${subject.runType} crawl failed: ${feedResult.error ?? feedResult.health}`);
+    const feedResult = await this.collectResearchEvidence(job.account_id, subject);
 
     // 5.11: capture company branding from the crawl (never clobbers a manual logo).
     await this.captureCompanyLogo(job, subject, feedResult.payload);
@@ -168,6 +166,7 @@ export class CompanyResearchHandler {
       run_type: subject.runType,
       company_url: subject.targetUrl,
       competitor_id: subject.competitorId,
+      evidence_count: feedResult.evidence.length,
       claims: verified.map((claim) => ({
         section_key: claim.sectionKey,
         text: claim.text,
@@ -176,6 +175,60 @@ export class CompanyResearchHandler {
       })),
       escalation_rate: escalated ? 1 : 0,
     });
+  }
+
+  private async collectResearchEvidence(accountId: string, subject: ResearchSubject): Promise<ResearchFeedBundle> {
+    const pageUrls = subject.runType === "competitor_research"
+      ? competitorResearchUrls(subject.targetUrl)
+      : [{ label: "home", url: subject.targetUrl }];
+    const payloads: Record<string, unknown>[] = [];
+    const evidence: EvidenceCandidate[] = [];
+    const errors: string[] = [];
+
+    for (const page of pageUrls) {
+      const result = await this.feedRunner.refresh({
+        accountId,
+        feedKey: "firecrawl_scrape",
+        cacheKey: `${subject.cacheKey}:${page.label}`,
+        companyName: subject.targetName,
+        companyUrl: page.url,
+      });
+      if (result.health === "ok") {
+        payloads.push({ page: page.label, url: page.url, payload: result.payload });
+        evidence.push(...result.evidence.map((item) => ({
+          ...item,
+          title: `${subject.targetName} ${page.label} page`,
+          metadata: { ...(item.metadata ?? {}), page: page.label, research_url: page.url },
+        })));
+        continue;
+      }
+      errors.push(result.error ?? result.health);
+    }
+
+    const deduped = capEvidenceBytes(dedupeEvidence(evidence), 6_000).slice(0, 12);
+    if (deduped.length > 0) {
+      return { payload: { pages: payloads, primary: payloads[0]?.payload ?? {} }, evidence: deduped };
+    }
+
+    const blocked = errors.some(isBlockingError);
+    if (blocked) {
+      const fallback = await this.feedRunner.refresh({
+        accountId,
+        feedKey: "grok_live_search",
+        cacheKey: `${subject.cacheKey}:grok_fallback`,
+        companyName: subject.targetName,
+        query: `${subject.targetName} business model products pricing revenue`,
+      });
+      if (fallback.health === "ok" && fallback.evidence.length > 0) {
+        return {
+          payload: { fallback: "grok_live_search", firecrawl_errors: errors, payload: fallback.payload },
+          evidence: capEvidenceBytes(dedupeEvidence(fallback.evidence), 4_000).slice(0, 8),
+        };
+      }
+      errors.push(`grok_live_search fallback failed: ${fallback.error ?? fallback.health}`);
+    }
+
+    throw new Error(`${subject.runType} crawl failed: ${errors[0] ?? "no evidence returned"}`);
   }
 
   /**
@@ -563,6 +616,68 @@ function evidencePrompt(evidence: EvidenceCandidate[]): string {
   return evidence.map((item, index) => `[${index}] ${item.title}\n${item.excerpt ?? ""}`).join("\n\n");
 }
 
+function competitorResearchUrls(rootUrl: string): Array<{ label: string; url: string }> {
+  const candidates = [
+    ["home", ""],
+    ["pricing", "pricing"],
+    ["about", "about"],
+    ["customers", "customers"],
+    ["case-studies", "case-studies"],
+    ["careers", "careers"],
+  ] as const;
+  const seen = new Set<string>();
+  const pages: Array<{ label: string; url: string }> = [];
+  for (const [label, path] of candidates) {
+    const url = resolveSitePath(rootUrl, path);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    pages.push({ label, url });
+  }
+  return pages.slice(0, 6);
+}
+
+function resolveSitePath(rootUrl: string, path: string): string | null {
+  try {
+    const origin = new URL(rootUrl);
+    if (!path) return origin.toString();
+    return new URL(`/${path}`, origin.origin).toString();
+  } catch {
+    return null;
+  }
+}
+
+function dedupeEvidence(items: EvidenceCandidate[]): EvidenceCandidate[] {
+  const seen = new Set<string>();
+  const output: EvidenceCandidate[] = [];
+  for (const item of items) {
+    const excerpt = item.excerpt?.trim();
+    if (!excerpt) continue;
+    const key = `${item.sourceUrl ?? ""}|${excerpt}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push({ ...item, excerpt });
+  }
+  return output;
+}
+
+function capEvidenceBytes(items: EvidenceCandidate[], maxChars: number): EvidenceCandidate[] {
+  let remaining = maxChars;
+  const output: EvidenceCandidate[] = [];
+  for (const item of items) {
+    if (remaining <= 0) break;
+    const excerpt = item.excerpt ?? "";
+    const cappedExcerpt = excerpt.length > remaining ? excerpt.slice(0, remaining).trimEnd() : excerpt;
+    if (!cappedExcerpt) continue;
+    output.push({ ...item, excerpt: cappedExcerpt });
+    remaining -= cappedExcerpt.length;
+  }
+  return output;
+}
+
+function isBlockingError(error: string): boolean {
+  return /http\s*403|blocks automated crawling|blocked|forbidden/i.test(error);
+}
+
 function clampConfidence(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
 }
@@ -596,8 +711,10 @@ export function extractLogoFromPayload(
   payload: Record<string, unknown>,
   pageUrl: string,
 ): { url: string; source: LogoSource } | null {
-  const data = asRecord(payload.data);
-  const metadata = asRecord(data.metadata ?? payload.metadata);
+  const primary = asRecord(payload.primary);
+  const sourcePayload = Object.keys(primary).length > 0 ? primary : payload;
+  const data = asRecord(sourcePayload.data);
+  const metadata = asRecord(data.metadata ?? sourcePayload.metadata);
   const resolve = (value: unknown): string | null => {
     const raw = typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
     if (!raw) return null;

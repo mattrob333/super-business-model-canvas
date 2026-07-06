@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, GitCompareArrows, Lightbulb, Loader2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, GitCompareArrows, Lightbulb, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useCanvasEvidence } from "@/hooks/useCanvasEvidence";
@@ -394,9 +395,7 @@ function ItemColumn({
                     </Badge>
                   )}
                   {(item.evidence?.length ?? 0) > 0 && (
-                    <Badge variant="outline" className="text-[10px]">
-                      {item.evidence?.length} evidence
-                    </Badge>
+                    <EvidenceBadge evidence={item.evidence ?? []} />
                   )}
                   {onBorrow && (
                     <Button
@@ -411,34 +410,55 @@ function ItemColumn({
                     </Button>
                   )}
                 </div>
-                {item.evidence?.[0] && (
-                  <div className="mt-3 rounded-md border border-border/50 bg-muted/30 p-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="min-w-0 break-words text-xs font-medium text-foreground/80">
-                        {item.evidence[0].sourceName ?? item.evidence[0].title}
-                      </p>
-                      {item.evidence[0].sourceUrl && (
-                        <a
-                          href={item.evidence[0].sourceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                          aria-label="Open evidence source"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
-                    </div>
-                    <p className="mt-1 line-clamp-3 break-words text-xs leading-relaxed text-muted-foreground">
-                      {cleanExcerpt(item.evidence[0].excerpt ?? "")}
-                    </p>
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
       )}
     </div>
+  );
+}
+
+function EvidenceBadge({ evidence }: { evidence: NonNullable<CanvasItemEvidence["evidence"]> }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+          aria-label={`${evidence.length} evidence source${evidence.length === 1 ? "" : "s"}`}
+        >
+          <FileText className="h-3 w-3" />
+          {evidence.length}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 space-y-3 p-3">
+        {evidence.map((entry) => (
+          <div key={entry.id} className="space-y-1">
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 text-xs font-semibold leading-snug">
+                {entry.sourceName ?? entry.title}
+              </p>
+              {entry.sourceUrl && (
+                <a
+                  href={entry.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="Open evidence source"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+            {entry.excerpt && (
+              <p className="line-clamp-4 text-xs leading-relaxed text-muted-foreground">
+                {cleanExcerpt(entry.excerpt)}
+              </p>
+            )}
+          </div>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }
