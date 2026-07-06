@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { AtlasBriefingHandler } from "./atlas-briefing.js";
 import { CanvasSectionAnalysisHandler } from "./canvas-section-analysis.js";
 import { CompanyResearchHandler } from "./company-research.js";
 import { FeedRefreshHandler } from "./feed-refresh.js";
@@ -24,6 +25,7 @@ export interface JobDispatcherOptions extends FeedRuntimeConfig {
 }
 
 export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
+  const atlasBriefing = new AtlasBriefingHandler(options);
   const canvasSectionAnalysis = new CanvasSectionAnalysisHandler(options);
   const companyResearch = new CompanyResearchHandler(options);
   const workspaceChat = new WorkspaceChatHandler(options);
@@ -42,6 +44,11 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
 
       if (job.kind === "workspace_chat") {
         await workspaceChat.handle(job);
+        return;
+      }
+
+      if (job.kind === "atlas_briefing") {
+        await atlasBriefing.handle(job);
         return;
       }
 

@@ -6,6 +6,7 @@ import { EnterpriseBusinessModelCanvas } from "@/components/canvas/EnterpriseBus
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CompetitiveLandscape } from "@/components/CompetitiveLandscape";
 import { ChatDrawer } from "@/components/ChatDrawer";
+import { AtlasDock } from "@/components/atlas/AtlasDock";
 import { ProcessSteps } from "@/components/ProcessSteps";
 import { SuccessBanner } from "@/components/SuccessBanner";
 import { FloatingCTA } from "@/components/FloatingCTA";
@@ -75,6 +76,7 @@ const Analysis = () => {
   const [reviewedSections, setReviewedSections] = useState(0);
   const [showPlaybooksCTA, setShowPlaybooksCTA] = useState(false);
   const [bmcEditorOpen, setBmcEditorOpen] = useState(false);
+  const [atlasOpen, setAtlasOpen] = useState(false);
   const [analyzingLabel, setAnalyzingLabel] = useState<string | undefined>();
   const resultsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -586,8 +588,8 @@ Website: ${comp.website || 'N/A'}
       {/* Main Content */}
       <main className="space-y-4 sm:space-y-8 md:space-y-12">
         
-        {/* Copy Button - Top Right Corner */}
-        {hasAnalyzed && !isLoading && analysisData && (
+        {/* Copy Button - Top Right Corner — yields to the expanded Atlas dock */}
+        {hasAnalyzed && !isLoading && analysisData && !atlasOpen && (
           <div className="fixed top-16 right-4 z-50">
             <Button
               onClick={copyToMarkdown}
@@ -837,9 +839,9 @@ Website: ${comp.website || 'N/A'}
               />
             </section>
             
-            {/* Floating CTA - hide when BMC editor is open */}
-            <FloatingCTA 
-              show={showPlaybooksCTA && !bmcEditorOpen}
+            {/* Floating CTA - hide when the BMC editor or the Atlas dock is open */}
+            <FloatingCTA
+              show={showPlaybooksCTA && !bmcEditorOpen && !atlasOpen}
               onNavigate={handleNavigateToPlaybooks}
               variant="floating"
             />
@@ -878,6 +880,9 @@ Website: ${comp.website || 'N/A'}
         companyName={analysisData?.company?.name || ""}
         businessContext={analysisData}
       />
+      {/* Atlas rides beside the canvas it is helping to fill (spec 12 §6) —
+          only once a company exists; the dock resolves its own account. */}
+      {hasAnalyzed && analysisData && !isLoading && <AtlasDock onOpenChange={setAtlasOpen} />}
       <Toaster />
     </div>
   );

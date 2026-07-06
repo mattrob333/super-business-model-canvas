@@ -3097,3 +3097,17 @@ on conflict (route_key) where account_id is null do update set
   cost_per_1k_in = excluded.cost_per_1k_in, cost_per_1k_out = excluded.cost_per_1k_out,
   updated_by = excluded.updated_by;
 
+-- atlas_briefing route (spec 12): Atlas's State of the Union synthesizes the
+-- whole board in one opus-class call. Mirrors
+-- 20260707000000_atlas_briefing_route.sql.
+insert into public.model_routes
+  (account_id, route_key, label, provider, model_name, params, is_default, task_class, cost_per_1k_in, cost_per_1k_out, updated_by)
+values
+  (null, 'atlas_briefing', 'Atlas Briefing (top)', 'anthropic', 'claude-opus-4-8',
+   '{"temperature":0.3,"max_tokens":4000}'::jsonb, false, 'atlas_briefing', 0.015, 0.075, 'human')
+on conflict (route_key) where account_id is null do update set
+  label = excluded.label, provider = excluded.provider, model_name = excluded.model_name,
+  params = excluded.params, task_class = excluded.task_class,
+  cost_per_1k_in = excluded.cost_per_1k_in, cost_per_1k_out = excluded.cost_per_1k_out,
+  updated_by = excluded.updated_by;
+

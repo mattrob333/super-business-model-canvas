@@ -285,6 +285,43 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase D.1 — Atlas dock: State of the Union v1 (built by Claude via orchestrated agents, adversarially reviewed) — SHIPPED (2026-07-06)
+
+- **Worker `atlas_briefing` job** (atlas-briefing.ts): deterministic context assembly
+  (9-section coverage w/ empty/assumed/verified states, company brief, competitors,
+  gap summary, artifacts, implemented skills, prior-briefing deltas incl. gap-count
+  delta via run input bookkeeping) -> ONE Opus 4.8 call (dedicated anthropic route
+  `atlas_briefing`, seeded by migration + schema mirror; workspace_chat anthropic
+  fallback) -> hard validation (position <=4, watchouts <=2, directive.room must be a
+  section key, skill_key must be implemented AND live in the directive's room, else
+  nulled — rules B1/B2/B5) -> deterministic fallback payload when the model rambles:
+  Atlas always briefs. Registered in dispatch + agent-run edge allowlist. 4 tests.
+- **Atlas chat brain**: orchestrator profiles get a cross-company system prompt
+  (identity + doctrine + coverage/gaps/skills board) instead of the single-section
+  block; section agents byte-identical (verified by diff + tests).
+- **Review catch (HIGH, fixed)**: the legacy seeded orchestrator persona ends with
+  "Output format: Always respond with valid JSON…" and was being appended to the
+  Atlas prompt — the raw-JSON-chat regression class, reintroduced. Operator
+  instructions are now deliberately dropped for the orchestrator; hostile-instruction
+  test asserts the mandate never reaches the prompt.
+- **Atlas dock UI** (src/components/atlas/): collapsed edge tab w/ semantic unread
+  pulse; 400px panel — STATE OF THE UNION briefing (headline, position claims with
+  basis lines, 9-cell coverage board w/ 3-col mobile fallback, changes-since-last,
+  YOUR NEXT MOVE directive card routing to the named room, watchouts), refresh with
+  run polling + inline failure, War Room chat (find-or-create thread, no auto-send,
+  4 Atlas openers). Mounted on the canvas page when a company exists.
+- **UX review (13 findings, applied)**: z-50 collisions with the copy button and
+  FloatingCTA (hide-on-open via onOpenChange), focus restoration on open/close,
+  Escape scoped to dock focus, em-dashes removed from UI copy (DESIGN_TASTE),
+  directive-button truncation, break-words on model text, account-scoped +
+  crash-safe localStorage, generated_at date validation, honest chat error states,
+  skeleton/board parity, poll-chain unmount guard (also applied to briefing poll),
+  amber-600 alignment. Accepted as-is: collapsed tab overlaying the scrollbar.
+- Build method: parallel backend/frontend build agents + two adversarial reviewers
+  (correctness, UX) before integration — 4 agents, both builders' gates green,
+  findings fixed by the integrator.
+
+
 ### Phase E.1 review (Codex build/phase-e1-document-delivery, 9168bfc) — APPROVED, no findings (2026-07-06)
 
 - Documents that travel: /artifacts/:id full-page paper view, explicit share/revoke

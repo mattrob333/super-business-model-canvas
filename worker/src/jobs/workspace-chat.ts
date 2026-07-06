@@ -6,6 +6,17 @@ import { asRecord } from "../db/json.js";
 import { SECTION_LABELS, sectionKeyForAgentKey, type SectionKey } from "../domain/sections.js";
 import type { AgentJob } from "../queue/types.js";
 import { createBmcServer } from "../tools/bmc-tools.js";
+import {
+  formatCoverageSummary,
+  formatGapSummary,
+  formatSkillList,
+  loadGapSummary,
+  loadImplementedSkills,
+  loadSectionCoverage,
+  type CoverageEntry,
+  type GapSummary,
+  type ImplementedSkill,
+} from "./atlas-briefing.js";
 import { chooseModelRoute } from "./canvas-section-analysis.js";
 
 interface WorkspaceThread {
@@ -59,6 +70,12 @@ interface ModelRoute {
   cost_per_1k_out: number | null;
 }
 
+interface AtlasBoard {
+  coverage: CoverageEntry[];
+  gaps: GapSummary;
+  skills: ImplementedSkill[];
+}
+
 export interface WorkspaceChatDependencies {
   client: SupabaseClient;
   runner?: AgentRunner;
@@ -86,16 +103,24 @@ export class WorkspaceChatHandler {
     const modelRoute = await this.loadModelRoute(job.account_id, profile);
     const messages = await this.loadMessages(thread.id);
     const contextSources = await this.loadContextSources(job.account_id, profile.id);
+    const isOrchestrator = profile.agent_key === "orchestrator";
     const sectionKey = sectionKeyForAgentKey(profile.agent_key) ?? "value_propositions";
-    const canvasSnapshot = await this.loadCanvasSection(job.account_id, sectionKey);
+    // Atlas has no section of its own — its prompt carries the cross-company
+    // board (coverage, gaps, skills) instead of a single canvas snapshot.
+    const canvasSnapshot = isOrchestrator
+      ? { items: [], notes: null }
+      : await this.loadCanvasSection(job.account_id, sectionKey);
     const companyBrief = await this.loadCompanyBrief(job.account_id);
+    const systemPrompt = isOrchestrator
+      ? buildAtlasChatSystemPrompt(profile, contextSources, companyBrief, await this.loadAtlasBoard(job.account_id))
+      : buildChatSystemPrompt(profile, sectionKey, contextSources, canvasSnapshot, companyBrief);
 
     await this.markRunRunning(job, profile, modelRoute, { threadId: thread.id, messageCount: messages.length });
 
     const limits = this.deps.taskLimits?.workspaceChat;
     const result = await this.runner.run({
       prompt: buildChatPrompt(messages),
-      systemPrompt: buildChatSystemPrompt(profile, sectionKey, contextSources, canvasSnapshot, companyBrief),
+      systemPrompt,
       model: modelRoute.model_name,
       maxTurns: limits?.maxTurns ?? 40,
       maxBudgetUsd: limits?.maxBudgetUsd ?? budgetForRoute(modelRoute),
@@ -254,6 +279,17 @@ export class WorkspaceChatHandler {
     return (data ?? []) as ContextSource[];
   }
 
+  private async loadAtlasBoard(accountId: string): Promise<AtlasBoard> {
+    // Same deterministic queries the atlas_briefing job runs — one source of
+    // truth for what Atlas is allowed to know about the account (rule B1).
+    const [coverage, gaps, skills] = await Promise.all([
+      loadSectionCoverage(this.deps.client, accountId),
+      loadGapSummary(this.deps.client, accountId),
+      loadImplementedSkills(this.deps.client),
+    ]);
+    return { coverage, gaps, skills };
+  }
+
   private async markRunRunning(job: AgentJob, profile: AgentProfile, modelRoute: ModelRoute, input: Record<string, unknown>): Promise<void> {
     if (!job.agent_run_id) return;
     const { error } = await this.deps.client
@@ -278,6 +314,10 @@ function readString(value: unknown, message: string): string {
   throw new Error(message);
 }
 
+// Shared verbatim between the section agents and Atlas — the protocol is the
+// same discipline at both altitudes (RF-LIVE-21, spec 12).
+const DATA_GAP_PROTOCOL = `Data-gap protocol: when the canvas, company brief, and context sources do not hold enough information to answer well, never guess or pad a generic answer. Say plainly that the information is not there yet, then coach the user through closing the gap: (1) name the specific missing information, (2) tell them exactly how to get it — a metric to pull from their books or analytics, a document to upload as a context source, a number to add to this section's Strategic Goals, a question to ask a customer or vendor — and (3) explain what having it unlocks strategically for their business. Treat every data gap as the next step in building their strategy, not a dead end.`;
+
 function buildChatSystemPrompt(
   profile: AgentProfile,
   sectionKey: SectionKey,
@@ -292,7 +332,46 @@ function buildChatSystemPrompt(
 
 You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data beyond what is below instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied. Never paste raw JSON, tool output, or code blocks of data into a reply — always translate findings into plain language.
 
-Data-gap protocol: when the canvas, company brief, and context sources do not hold enough information to answer well, never guess or pad a generic answer. Say plainly that the information is not there yet, then coach the user through closing the gap: (1) name the specific missing information, (2) tell them exactly how to get it — a metric to pull from their books or analytics, a document to upload as a context source, a number to add to this section's Strategic Goals, a question to ask a customer or vendor — and (3) explain what having it unlocks strategically for their business. Treat every data gap as the next step in building their strategy, not a dead end.${formatCompanyBrief(brief)}${formatCanvasSnapshot(sectionLabel, canvas)}${sourceBlock}`;
+${DATA_GAP_PROTOCOL}${formatCompanyBrief(brief)}${formatCanvasSnapshot(sectionLabel, canvas)}${sourceBlock}`;
+}
+
+/**
+ * Atlas (agent_key 'orchestrator') is not a tenth section room — it is the
+ * chief strategist who sees the whole board. Its prompt swaps the single
+ * section snapshot for the cross-company coverage/gap/skill picture assembled
+ * by the same queries the atlas_briefing job uses (spec 12, rules B1–B5).
+ */
+function buildAtlasChatSystemPrompt(
+  profile: AgentProfile,
+  contextSources: ContextSource[],
+  brief: CompanyBrief | null,
+  board: AtlasBoard,
+): string {
+  const sourceBlock = formatContextSources(contextSources);
+  // Deliberately DROP profile.system_instructions here: every account's
+  // orchestrator profile carries the legacy seeded persona whose "Output
+  // format" block mandates raw-JSON replies — appending it re-created the
+  // raw-JSON-in-chat regression this doctrine forbids. The Atlas identity
+  // below fully replaces the template persona.
+  void profile;
+  return `You are Atlas, the chief strategist for this workspace — the one guide who sees all nine canvas sections, the competitor set, and the Gap Register, and turns them into one ordered path.
+
+Doctrine (binding):
+- One directed action at a time. Assess, issue a single next step with its named destination, verify, then issue the next — a menu of options is a failure.
+- Direct the user to the named agent rooms and the implemented skills listed below — never to a step the product cannot execute.
+- You never edit the canvas yourself; the section specialists propose changes in their own rooms.
+- Completion is verified against the database, never claimed. When the user says "done", check the actual state (agent runs, canvas versions, artifacts, gaps) before acknowledging.
+- Every directive carries its why: what completing it unlocks strategically.
+
+You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Never paste raw JSON, tool output, or code blocks of data into a reply — always translate findings into plain language.
+
+${DATA_GAP_PROTOCOL}${formatCompanyBrief(brief)}
+
+${formatCoverageSummary(board.coverage)}
+
+${formatGapSummary(board.gaps)}
+
+${formatSkillList(board.skills)}${sourceBlock}`;
 }
 
 function formatCompanyBrief(brief: CompanyBrief | null): string {
