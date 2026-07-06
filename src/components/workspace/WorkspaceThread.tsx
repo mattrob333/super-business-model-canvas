@@ -119,6 +119,8 @@ export function WorkspaceThread({
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [threadsLoaded, setThreadsLoaded] = useState(false);
+  const [messagesReady, setMessagesReady] = useState(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [awaitingReply, setAwaitingReply] = useState(false);
@@ -135,6 +137,7 @@ export function WorkspaceThread({
 
   useEffect(() => {
     let cancelled = false;
+    setThreadsLoaded(false);
     (async () => {
       const { data } = await supabaseUntyped
         .from<ThreadRow>("workspace_threads")
@@ -147,6 +150,7 @@ export function WorkspaceThread({
       if (cancelled) return;
       setThreads(data ?? []);
       setActiveThreadId((current) => current ?? data?.[0]?.id ?? null);
+      setThreadsLoaded(true);
     })();
     return () => {
       cancelled = true;
@@ -166,12 +170,17 @@ export function WorkspaceThread({
   useEffect(() => {
     if (!activeThreadId) {
       setMessages([]);
+      setMessagesReady(false);
       return;
     }
     let cancelled = false;
     setLoadingMessages(true);
+    setMessagesReady(false);
     void loadMessages(activeThreadId).finally(() => {
-      if (!cancelled) setLoadingMessages(false);
+      if (!cancelled) {
+        setLoadingMessages(false);
+        setMessagesReady(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -265,13 +274,20 @@ export function WorkspaceThread({
     }
   }, [accountId, agentProfileId, awaitingReply, ensureThread, loadMessages, pollRun, sending, user]);
 
-  // Gap Register arrivals: send the brief once, as soon as the thread is
-  // ready, so the agent is already working the problem when the user lands.
+  // Gap Register arrivals: send the brief once, so the agent is already
+  // working the problem when the user lands. Two hard conditions
+  // (RF-LIVE-29): wait until the thread list AND its messages have actually
+  // loaded — firing early made ensureThread create a duplicate thread on
+  // every refresh, stranding finished answers in orphaned threads — and only
+  // send into an EMPTY thread, since the ?gap= param survives remounts.
   useEffect(() => {
-    if (!initialPrompt || autoSentRef.current || loadingMessages || sending || awaitingReply) return;
+    if (!initialPrompt || autoSentRef.current || sending || awaitingReply) return;
+    if (!threadsLoaded) return;
+    if (activeThreadId && !messagesReady) return;
     autoSentRef.current = true;
+    if (messages.length > 0) return;
     void sendMessage(initialPrompt);
-  }, [initialPrompt, loadingMessages, sending, awaitingReply, sendMessage]);
+  }, [initialPrompt, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage]);
 
   const createThread = useCallback(async () => {
     const title = newThreadTitle.trim() || "New topic";
