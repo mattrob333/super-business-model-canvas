@@ -226,6 +226,20 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase A review (Codex build/phase-a-research-depth, 0ea537b) — APPROVED, no findings (2026-07-06)
+
+- Multi-page crawl: correct order of operations (dedupe → byte cap → count cap),
+  per-page cache keys, page labels carried into evidence metadata. Fallback fires
+  only when ALL pages fail AND an error is blocking-shaped; both-fail keeps the
+  honest throw and writes nothing. extractLogoFromPayload correctly reads the new
+  {pages, primary} payload shape. Drill-down compaction matches the main-canvas
+  badge+popover pattern. 3 new tests; gates re-verified independently (worker 73
+  passed, root tsc/build/lint 64<=65).
+- Accepted with a watch item: six sequential crawls with 120s timeouts can make a
+  worst-case ~12-minute job — fine under the current heartbeat, but parallelize
+  page fetches if live runs approach the stale threshold.
+
+
 ### RF-LIVE-29 (owner round 13: gap brief re-sent on every return) — FIXED (2026-07-06, reviewer-as-builder)
 
 - **RF-LIVE-29 — returning to a gap-linked room re-ran the brief.** The `?gap=` param
