@@ -1,2 +1,2 @@
 Touch this file (any content change) in a commit to main to run the Diagnose workflow.
-trigger: 2026-07-06T01
+trigger: 2026-07-06T02-selfcheck
