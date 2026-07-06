@@ -198,6 +198,32 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-13..16 (owner round 4: the payoff surfaces) — FIXED + spec 11 (2026-07-06, reviewer-as-builder)
+
+- **RF-LIVE-13 (HIGH) — the Gap Register page was a hardcoded placeholder** (`gaps = []`)
+  while the dashboard counted 4 real gaps. Wired to the `gaps` table (account-scoped,
+  superseded hidden), with triage actions — Acknowledge / Resolve / Dismiss — using
+  select-back-verified updates, section-label mapping, loading/filter-aware empty states,
+  and the dead "Add Gap" button removed. Opens with a "What is a gap?" explainer (the
+  owner's education directive: teach novel concepts where they live).
+- **RF-LIVE-14 (HIGH) — cross-workspace report leak.** Dashboard Recent Reports queried
+  by user_id only, so Delta's Porter report appeared inside the Tier 4 workspace. Now
+  additionally scoped to the ACTIVE company (`company_id = activeAnalysis.id`; none
+  selected → none shown). Playbooks was already scoped. Deeper fix (saved_analyses →
+  account tenancy) noted for commercial hardening.
+- **RF-LIVE-15 — pricing teardown artifact rendered as raw markdown.** New
+  `ArtifactDocument`: always-light paper sheet with title block (date, evidence count,
+  verifier spot-check stats), a TYPED pricing layout — competitor pricing matrix table
+  ("unknown — not published" honesty preserved), "Your position" callout, scenario cards —
+  rendered-markdown recommendation, and a provenance footer. Generic artifacts get the
+  same sheet with rendered markdown. Shelf query now fetches `payload`.
+- **RF-LIVE-16 — no design system for outputs.** New `docs/specs/11_ARTIFACT_PRESENTATION.md`:
+  binding rules (never raw; typed renderer first; always-light printable paper;
+  provenance ON the document; share-ready), the output_kind → layout inventory (native
+  framework boards land Phase 6.8b, Document Studio 6.11, /artifacts/:id route + share
+  links 6.10), chart-primitive policy, and the education checklist item. Reviewer
+  checklist addition: new surfaces ship WITH their explanation.
+
 ### RF-LIVE-9..12 (owner live-test round 3, all UI/quality) — FIXED (2026-07-06, reviewer-as-builder)
 
 - **RF-LIVE-9 — competitor canvas read as raw crawl junk in a generic card grid.** Two

@@ -1,28 +1,31 @@
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   AlertTriangle,
-  Plus,
   Filter,
   ArrowUpDown,
   Circle,
   Clock,
   CheckCircle2,
+  Lightbulb,
+  Loader2,
   XCircle,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAccountId } from "@/hooks/useAccountId";
+import { useToast } from "@/hooks/use-toast";
+import { CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
 import type { Database } from "@/integrations/supabase/types";
 
 /**
  * Gap Register page (/gaps)
  *
- * Shows all strategic gaps across the canvas sections. Gaps are typed
- * (missing_data, low_confidence, no_evidence, outdated, contradictory,
- * assumption) with severity levels and status tracking.
- *
- * Data source: `gaps` table (Phase 2 schema). Currently shows empty state
- * until agent runs start producing gaps.
+ * The working queue for strategic gaps — today primarily competitive gaps
+ * from the gap engine (a specific competitor advantage your canvas doesn't
+ * cover, scored by impact/effort/confidence). Owners triage each gap:
+ * acknowledge, resolve, or dismiss.
  */
 
 type GapType = Database["public"]["Enums"]["gap_type"];
@@ -117,13 +120,58 @@ const GAP_TYPE_LABELS: Record<GapType, string> = {
 };
 
 export default function Gaps() {
+  const { accountId } = useAccountId();
+  const { toast } = useToast();
   const [filterSeverity, setFilterSeverity] = useState<GapSeverity | "all">(
     "all",
   );
   const [filterStatus, setFilterStatus] = useState<GapStatus | "all">("all");
+  const [gaps, setGaps] = useState<GapItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // Placeholder: no gaps yet — populated when agent runs produce them
-  const gaps: GapItem[] = useMemo(() => [], []);
+  useEffect(() => {
+    if (!accountId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("gaps")
+        .select(
+          "id, title, description, gap_type, severity, status, impact, effort, confidence, affected_sections, recommended_action, created_at",
+        )
+        .eq("account_id", accountId)
+        .neq("status", "superseded")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (cancelled) return;
+      setGaps(error ? [] : ((data ?? []) as GapItem[]));
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId]);
+
+  const setGapStatus = useCallback(async (gap: GapItem, status: GapStatus) => {
+    if (!accountId) return;
+    setUpdatingId(gap.id);
+    const { data, error } = await supabase
+      .from("gaps")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", gap.id)
+      .eq("account_id", accountId)
+      .select("id");
+    setUpdatingId(null);
+    if (error || !data || data.length === 0) {
+      toast({
+        title: "Gap was not updated",
+        description: error?.message ?? "Update matched zero rows.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setGaps((current) => current.map((item) => (item.id === gap.id ? { ...item, status } : item)));
+  }, [accountId, toast]);
 
   const filteredGaps = useMemo(() => {
     return gaps.filter((g) => {
@@ -147,20 +195,32 @@ export default function Gaps() {
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Page heading */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Gap Register
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Strategic gaps identified across canvas sections — missing data, low
-            confidence, unverified assumptions, and contradictions.
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Gap Register
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Your working queue of competitive weaknesses, found automatically and
+          backed by evidence.
+        </p>
+      </div>
+
+      {/* What is a gap? — this is a new concept; teach it where it lives. */}
+      <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+        <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div className="space-y-1 text-sm leading-relaxed">
+          <p className="font-medium">What is a gap?</p>
+          <p className="text-muted-foreground">
+            When you research a competitor, the gap engine compares their canvas against
+            yours, section by section. A <span className="font-medium text-foreground">gap</span> is
+            a specific thing they do that your business model doesn&rsquo;t cover — each one cites
+            the evidence it was found in and is scored by how much it matters (severity).
+            Your job here is to triage: <span className="font-medium text-foreground">Acknowledge</span> it
+            while you decide, <span className="font-medium text-foreground">Resolve</span> it once your
+            canvas answers it, or <span className="font-medium text-foreground">Dismiss</span> it if it
+            doesn&rsquo;t apply to you. Open gaps lower your Strategic Health Score.
           </p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Gap
-        </Button>
       </div>
 
       {/* Stats row */}
@@ -252,23 +312,28 @@ export default function Gaps() {
         </select>
       </div>
 
-      {/* Empty state */}
-      {filteredGaps.length === 0 && (
+      {/* Loading / empty states */}
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : filteredGaps.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <AlertTriangle className="h-6 w-6 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-medium mb-2">No gaps detected</h3>
+            <h3 className="text-lg font-medium mb-2">
+              {gaps.length === 0 ? "No gaps yet" : "Nothing matches these filters"}
+            </h3>
             <p className="text-sm text-muted-foreground max-w-md mb-6">
-              Gaps are identified automatically when agents analyze your canvas
-              sections. Run a strategy playbook or trigger an agent analysis to
-              surface missing data, low-confidence claims, and unverified
-              assumptions.
+              {gaps.length === 0
+                ? "Research a competitor from the Canvas page — the gap engine compares their business model against yours and files what it finds here."
+                : "Clear the severity or status filter to see the rest of the register."}
             </p>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Gap list */}
       {filteredGaps.length > 0 && (
@@ -317,7 +382,7 @@ export default function Gaps() {
                               variant="secondary"
                               className="text-xs"
                             >
-                              {s}
+                              {(CANVAS_SECTION_LABELS as Record<string, string>)[s] ?? s}
                             </Badge>
                           ))}
                         </div>
@@ -326,6 +391,46 @@ export default function Gaps() {
                         <p className="text-xs text-muted-foreground mt-2 italic">
                           Recommended: {gap.recommended_action}
                         </p>
+                      )}
+                      {(gap.status === "open" || gap.status === "acknowledged" || gap.status === "in_progress") && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {gap.status === "open" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 gap-1 px-2 text-xs"
+                              disabled={updatingId === gap.id}
+                              onClick={() => void setGapStatus(gap, "acknowledged")}
+                            >
+                              <Clock className="h-3 w-3" />
+                              Acknowledge
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-xs text-success hover:text-success"
+                            disabled={updatingId === gap.id}
+                            onClick={() => void setGapStatus(gap, "resolved")}
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            Resolve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                            disabled={updatingId === gap.id}
+                            onClick={() => void setGapStatus(gap, "wont_fix")}
+                          >
+                            {updatingId === gap.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <XCircle className="h-3 w-3" />
+                            )}
+                            Dismiss
+                          </Button>
+                        </div>
                       )}
                     </div>
                     {gap.confidence !== null && (

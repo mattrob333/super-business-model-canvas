@@ -139,11 +139,15 @@ const Dashboard = () => {
             .from("scheduled_loops")
             .select("status")
             .eq("account_id", accountId),
-          user
+          // Scoped to the ACTIVE company, not the user — a user with several
+          // workspaces was seeing another company's reports here (owner live
+          // finding RF-LIVE-14).
+          user && activeAnalysis?.id
             ? supabase
                 .from("generated_reports")
                 .select("id, company_name, created_at, frameworks(title)")
                 .eq("user_id", user.id)
+                .eq("company_id", activeAnalysis.id)
                 .order("created_at", { ascending: false })
                 .limit(3)
             : Promise.resolve({ data: null, error: null }),
@@ -205,7 +209,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [accountId, accountLoading, user]);
+  }, [accountId, accountLoading, user, activeAnalysis?.id]);
 
   useEffect(() => {
     void fetchDashboard();
