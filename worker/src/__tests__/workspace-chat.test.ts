@@ -32,6 +32,17 @@ describe("WorkspaceChatHandler", () => {
     expect(runner.request?.systemPrompt).not.toContain("Disabled private thought");
     expect(client.inserts.some((entry) => entry.table === "workspace_messages")).toBe(true);
   });
+
+  it("skips non-anthropic routes — a legacy grok profile default never reaches the Claude CLI (RF-LIVE-8)", async () => {
+    const client = new WorkspaceChatFakeClient();
+    const runner = new CapturingRunner();
+    await new WorkspaceChatHandler({
+      client: client.asSupabase(),
+      runner,
+    }).handle(makeJob());
+
+    expect(runner.request?.model).toBe("claude-sonnet-5");
+  });
 });
 
 function makeJob(): AgentJob {
@@ -72,16 +83,25 @@ class WorkspaceChatFakeClient {
       agent_key: "customers",
       display_name: "Segment",
       system_instructions: "You are Segment.",
-      model_route_key: "workspace_chat",
+      // The live RF-LIVE-8 shape: profiles seeded with the legacy grok route.
+      model_route_key: "standard",
     }],
     model_routes: [{
       account_id: null,
+      route_key: "standard",
+      task_class: null,
+      provider: "xai",
+      model_name: "grok-4.3",
+      cost_per_1k_in: 0.00125,
+      cost_per_1k_out: 0.0025,
+    }, {
+      account_id: null,
       route_key: "workspace_chat",
       task_class: "workspace_chat",
-      provider: "openrouter",
-      model_name: "google/gemini-2.5-flash",
-      cost_per_1k_in: 0.001,
-      cost_per_1k_out: 0.002,
+      provider: "anthropic",
+      model_name: "claude-sonnet-5",
+      cost_per_1k_in: 0.002,
+      cost_per_1k_out: 0.01,
     }],
     workspace_messages: [{
       role: "user",

@@ -1,0 +1,63 @@
+name: DB Migrate
+
+# Continuous migration deployment: any merge to main that changes
+# supabase/migrations/** applies the pending migrations to the live project,
+# using the same self-healing reconcile as the Ops apply-migrations task.
+# Migrations follow the repo's idempotent convention (BUILD_PLAN rules 11/12),
+# so re-application is safe. The manual Ops task remains for ad-hoc runs.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+
+env:
+  SUPABASE_PROJECT_REF: mehhuxzamnpxnkbrslls
+
+jobs:
+  apply-migrations:
+    name: Apply pending DB migrations to the live project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link project and push migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+          push() { supabase db push --include-all 2>&1 | tee /tmp/push.log; }
+
+          if push; then
+            exit 0
+          fi
+
+          # Same reconciliation as the Ops task: manually-applied history rows
+          # get marked reverted (bookkeeping only), confirmed-live repo files
+          # get recorded as applied without re-running, then push the rest.
+          if ! grep -q "Remote migration versions not found" /tmp/push.log; then
+            exit 1
+          fi
+
+          revs=$(grep -oE 'repair --status reverted [0-9 ]+' /tmp/push.log | head -1 | sed 's/.*reverted //' | xargs || true)
+          if [ -n "$revs" ]; then
+            # shellcheck disable=SC2086 # versions are a space-separated list
+            supabase migration repair --status reverted $revs
+          fi
+
+          CUTOFF=20260705000000  # everything below is confirmed applied live (BUILD_STATE)
+          for f in supabase/migrations/*.sql; do
+            v=$(basename "$f" | cut -d_ -f1)
+            if [ "$v" -lt "$CUTOFF" ]; then
+              # || true: already-recorded versions are the safe case
+              supabase migration repair --status applied "$v" || true
+            fi
+          done
+
+          push

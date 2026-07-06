@@ -166,7 +166,7 @@ export class WorkspaceChatHandler {
   }
 
   private async loadModelRoute(accountId: string, profile: AgentProfile): Promise<ModelRoute> {
-    const routeKey = profile.model_route_key ?? "section_analysis";
+    const routeKey = profile.model_route_key ?? "workspace_chat";
     const { data, error } = await this.deps.client
       .from("model_routes")
       .select("account_id, route_key, task_class, provider, model_name, cost_per_1k_in, cost_per_1k_out")
@@ -174,9 +174,17 @@ export class WorkspaceChatHandler {
       .or(`task_class.eq.workspace_chat,task_class.eq.section_analysis,route_key.eq.${routeKey}`)
       .order("account_id", { ascending: false, nullsFirst: false });
     if (error) throw new Error(`Failed to load workspace chat model route: ${error.message}`);
-    const route = chooseModelRoute((data ?? []) as ModelRoute[], accountId, routeKey, "workspace_chat")
-      ?? chooseModelRoute((data ?? []) as ModelRoute[], accountId, routeKey, "section_analysis");
-    if (!route) throw new Error("No model route configured for workspace_chat");
+
+    // Chat runs on the Claude Agent SDK (MCP tools, proposal mode) — only
+    // anthropic-provider routes can drive it. Profiles seeded with the legacy
+    // 'standard' route (xai/grok) otherwise feed a Grok model name to the
+    // Claude CLI, which replies with a model-not-found message as the "agent"
+    // (live incident RF-LIVE-8, 2026-07-06). Non-anthropic selections fall
+    // back to the anthropic chat/section defaults.
+    const candidates = ((data ?? []) as ModelRoute[]).filter((route) => route.provider === "anthropic");
+    const route = chooseModelRoute(candidates, accountId, routeKey, "workspace_chat")
+      ?? chooseModelRoute(candidates, accountId, routeKey, "section_analysis");
+    if (!route) throw new Error("No anthropic model route configured for workspace_chat");
     return route;
   }
 

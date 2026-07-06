@@ -198,6 +198,26 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-8 (HIGH) — chat replied "issue with the selected model (grok 4.3)" — FIXED (2026-07-06, reviewer-as-builder)
+
+With RF-LIVE-7 fixed, the first live chat reply exposed the next layer: the seeded agent
+profiles default to `model_route_key = 'standard'`, the legacy pre-runtime route pointing
+at **xai/grok-4.3**. `WorkspaceChatHandler` resolved that route and fed the Grok model
+name to the Claude Agent SDK, whose CLI replied with a model-not-found message that got
+written to the thread as the agent's reply.
+**Fix:** (a) chat route resolution now filters to anthropic-provider routes ONLY (chat
+runs on the SDK with MCP tools — no other provider can drive it); legacy/non-anthropic
+selections fall back to the anthropic chat/section defaults, hard error if none exists;
+(b) new `workspace_chat` model route seeded (anthropic/claude-sonnet-5, migration
+`20260706010000_workspace_chat_route.sql` + schema mirror); (c) worker test: a grok
+profile default never reaches the Claude CLI (suite 64).
+**Infra:** new `DB Migrate` workflow — continuous migration deployment: merges touching
+`supabase/migrations/**` auto-apply to the live project with the same self-healing
+reconcile as the Ops task. This migration is its first automatic application.
+**Note:** the AgentSettingsSheet model-route picker still lists non-anthropic routes;
+picking one for chat now falls back safely instead of breaking — tightening the picker
+to compatible routes is queued polish.
+
 ### RF-LIVE-7 (BLOCKER) — ROOT CAUSE FOUND AND FIXED: all agent runs died because the worker ran as root (2026-07-06, reviewer-as-builder)
 
 Workspace chat, skill runs — every Claude Agent SDK call on the live worker failed with
