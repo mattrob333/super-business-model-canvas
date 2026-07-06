@@ -105,8 +105,44 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
+          set -euo pipefail
           supabase link --project-ref "$SUPABASE_PROJECT_REF"
-          supabase db push --include-all
+
+          push() { supabase db push --include-all 2>&1 | tee /tmp/push.log; }
+
+          if push; then
+            exit 0
+          fi
+
+          # Reconciliation: migrations before this CLI path existed were
+          # applied manually (MCP/CLI sessions), leaving history rows whose
+          # timestamps do not match the repo filenames — the CLI refuses to
+          # push until the ledgers agree. Mark the remote-only history rows
+          # reverted (bookkeeping only; the schema objects stay), record repo
+          # files older than the cutoff as applied WITHOUT re-running them
+          # (the live schema already contains them), then push what is
+          # genuinely pending. Files >= the cutoff follow the idempotent
+          # convention (BUILD_PLAN rules 11/12) and are safe to (re)run.
+          if ! grep -q "Remote migration versions not found" /tmp/push.log; then
+            exit 1
+          fi
+
+          revs=$(grep -oE 'repair --status reverted [0-9 ]+' /tmp/push.log | head -1 | sed 's/.*reverted //' | xargs || true)
+          if [ -n "$revs" ]; then
+            # shellcheck disable=SC2086 # versions are a space-separated list
+            supabase migration repair --status reverted $revs
+          fi
+
+          CUTOFF=20260705000000  # everything below is confirmed applied live (BUILD_STATE)
+          for f in supabase/migrations/*.sql; do
+            v=$(basename "$f" | cut -d_ -f1)
+            if [ "$v" -lt "$CUTOFF" ]; then
+              # || true: already-recorded versions are the safe case
+              supabase migration repair --status applied "$v" || true
+            fi
+          done
+
+          push
 
   live-golden-set:
     name: Run the live verifier golden set (must score >= 9/10)
