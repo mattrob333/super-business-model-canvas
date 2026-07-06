@@ -198,6 +198,25 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-24 (owner round 8: "New analysis" was a dead end) — FIXED (2026-07-06, reviewer-as-builder)
+
+- **RF-LIVE-24 (HIGH) — no path to a clean slate.** "New analysis" only re-expanded the
+  URL input above the old company; the previous canvas stayed on screen and the session
+  pointers kept restoring it. Owner couldn't start a fresh company to test a pitch deck.
+  Three fixes:
+  - The header button (now "New company") calls `startFreshAnalysis()`: resets all page
+    state, clears `activeAnalysis` + workspace-name session pointers and `loadedAnalysis`,
+    and returns to the fresh hero. It shows even while the search is expanded.
+  - The workspace switcher (top-left) is a real dropdown now: "Working on {company}" +
+    Open canvas, Saved companies (/my-analyses), and **New company** — which clears the
+    pointers and hard-loads /canvas so stale component state can never resurrect the
+    old company.
+  - The fresh hero offers the document path: "No website yet? Start from a pitch deck,
+    plan, or text file instead →" linking to the existing Knowledge ingestion pipeline
+    (founder_documents upload → parse → canvas grounding). A NotebookLM-style unified
+    intake (URL / upload / paste in one modal) is the follow-up slice, noted for Phase 6
+    planning.
+
 ### RF-LIVE-22..23 + Studio shelf + spec 12 + brand mark (owner round 7) — SHIPPED (2026-07-06, reviewer-as-builder)
 
 - **RF-LIVE-22 (HIGH) — agent replies opened with raw tool-result JSON** (Envoy echoed
