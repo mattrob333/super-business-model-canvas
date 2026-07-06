@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { summarizePreviewItem } from "@/lib/canvas-preview";
+import { splitAssumption } from "@/lib/assumption";
 import {
   Bot,
   FileCheck,
@@ -276,6 +277,7 @@ export function CanvasSectionCard({
                   <span
                     className={cn(
                       "text-foreground/85",
+                      splitAssumption(item.text).assumed && "text-foreground/60",
                       compactPreview
                         ? cn(
                             "text-sm leading-relaxed",
@@ -285,8 +287,8 @@ export function CanvasSectionCard({
                     )}
                   >
                     {compactPreview
-                      ? summarizePreviewItem(item.text, tallPreview ? 96 : 80)
-                      : item.text}
+                      ? summarizePreviewItem(splitAssumption(item.text).text, tallPreview ? 96 : 80)
+                      : splitAssumption(item.text).text}
                   </span>
                   {(item.evidence?.length ?? 0) > 0 && (
                     <EvidencePopover item={item} />
