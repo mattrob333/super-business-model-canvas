@@ -27,6 +27,9 @@ export interface AgentRunner {
 
 export class ClaudeAgentRunner implements AgentRunner {
   async run(request: AgentRunRequest): Promise<AgentRunResult> {
+    // Live incident 2026-07-05/06: CLI child processes died at spawn with only
+    // "exited with code 1" — keep the tail of stderr so the run error says WHY.
+    const stderrTail: string[] = [];
     const q = query({
       prompt: request.prompt,
       options: {
@@ -43,6 +46,10 @@ export class ClaudeAgentRunner implements AgentRunner {
         allowedTools: request.allowedTools,
         disallowedTools: ["Bash", "Write", "Edit"],
         hooks: request.hooks,
+        stderr: (data: string) => {
+          stderrTail.push(data);
+          if (stderrTail.length > 20) stderrTail.shift();
+        },
       },
     });
 
@@ -62,6 +69,12 @@ export class ClaudeAgentRunner implements AgentRunner {
           };
         }
       }
+    } catch (error) {
+      const stderrText = stderrTail.join("\n").trim();
+      if (error instanceof Error && stderrText) {
+        throw new Error(`${error.message}; CLI stderr tail: ${stderrText.slice(-800)}`);
+      }
+      throw error;
     } finally {
       q.close();
     }
