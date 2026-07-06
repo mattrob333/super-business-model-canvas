@@ -340,28 +340,24 @@ function truncate(text: string, max: number): string {
  * we never swallow a whole message.
  */
 export function stripLeadingToolEcho(text: string): string {
+  // Live incident follow-up: models emit slightly-INVALID JSON echoes too
+  // (trailing commas, unescaped chars), which JSON.parse rejects and the
+  // original guard let through. JSON-shaped is enough: a fenced block whose
+  // body starts with "{", or a brace-balanced bare prefix, gets stripped
+  // whenever real prose follows.
   const fenced = text.match(/^```[a-z]*\s*\n([\s\S]*?)\n```\s*/);
-  if (fenced && parsesAsJsonObject(fenced[1])) {
+  if (fenced && fenced[1].trimStart().startsWith("{")) {
     const rest = text.slice(fenced[0].length).trim();
     if (rest.length >= 40) return rest;
   }
   if (text.startsWith("{")) {
     const prefixLength = balancedJsonPrefixLength(text);
-    if (prefixLength > 0 && parsesAsJsonObject(text.slice(0, prefixLength))) {
+    if (prefixLength > 0) {
       const rest = text.slice(prefixLength).trim();
       if (rest.length >= 40) return rest;
     }
   }
   return text;
-}
-
-function parsesAsJsonObject(candidate: string): boolean {
-  try {
-    const parsed: unknown = JSON.parse(candidate);
-    return typeof parsed === "object" && parsed !== null;
-  } catch {
-    return false;
-  }
 }
 
 function balancedJsonPrefixLength(text: string): number {

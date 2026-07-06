@@ -88,6 +88,8 @@ describe("WorkspaceChatHandler", () => {
     expect(stripLeadingToolEcho(prose)).toBe(prose);
     expect(stripLeadingToolEcho('{"items": []}')).toBe('{"items": []}');
     expect(stripLeadingToolEcho(`{not json${prose}`)).toBe(`{not json${prose}`);
+    // Slightly-invalid JSON echoes (trailing commas) are still JSON-shaped — stripped.
+    expect(stripLeadingToolEcho(`{"items": [],}\n\n${prose}`)).toBe(prose);
   });
 });
 
