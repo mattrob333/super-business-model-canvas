@@ -68,7 +68,7 @@ export default function Agents() {
           .order("display_name", { ascending: true }),
         supabase
           .from("agent_runs")
-          .select("id, agent_profile_id, run_type, status, started_at, completed_at, summary, trigger_type")
+          .select("id, agent_profile_id, run_type, status, started_at, completed_at, summary, trigger_type, model_provider, model_name, estimated_cost, tokens_in, tokens_out")
           .eq("account_id", effectiveAccountId)
           .order("created_at", { ascending: false })
           .limit(10),
@@ -277,10 +277,15 @@ export default function Agents() {
                   {recentRuns.map((run) => {
                     const statusCfg =
                       RUN_STATUS_CONFIG[run.status] ?? RUN_STATUS_CONFIG.pending;
+                    const agent = agents.find((entry) => entry.id === run.agent_profile_id);
+                    const durationSeconds =
+                      run.started_at && run.completed_at
+                        ? Math.max(0, (new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()) / 1000)
+                        : null;
                     return (
                       <div
                         key={run.id}
-                        className="flex items-center justify-between gap-3 rounded-lg border p-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
+                        className="flex items-start justify-between gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40 hover:border-primary/25 transition-colors"
                         onClick={() => {
                           setDetailRunId(run.id);
                           setDetailOpen(true);
@@ -288,6 +293,11 @@ export default function Agents() {
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
+                            {agent?.display_name && (
+                              <span className="text-xs font-semibold">
+                                {agent.display_name.split(" — ")[0]}
+                              </span>
+                            )}
                             <Badge variant="secondary" className="text-xs">
                               {run.run_type}
                             </Badge>
@@ -302,10 +312,27 @@ export default function Agents() {
                             </Badge>
                           </div>
                           {run.summary && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                               {run.summary}
                             </p>
                           )}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground/80">
+                            {durationSeconds !== null && (
+                              <span title="Run duration">
+                                {durationSeconds >= 60
+                                  ? `${Math.round(durationSeconds / 60)}m ${Math.round(durationSeconds % 60)}s`
+                                  : `${Math.round(durationSeconds)}s`}
+                              </span>
+                            )}
+                            {run.model_name && (
+                              <span title="Model used">{run.model_name}</span>
+                            )}
+                            {typeof run.estimated_cost === "number" && run.estimated_cost > 0 && (
+                              <span title="Estimated model cost">
+                                ${run.estimated_cost.toFixed(run.estimated_cost < 0.01 ? 4 : 2)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <span className="text-xs text-muted-foreground shrink-0">
                           {run.started_at

@@ -9,9 +9,11 @@ import { useAccountId } from "@/hooks/useAccountId";
 import { useCanvasEvidence } from "@/hooks/useCanvasEvidence";
 import { useCompetitorCanvasEvidence } from "@/hooks/useCompetitorCanvasEvidence";
 import { supabase } from "@/integrations/supabase/client";
+import { cleanExcerpt } from "@/lib/clean-excerpt";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
 import {
   CANVAS_SECTION_AGENT_KEYS,
+  CANVAS_SECTION_GRID_PLACEMENT,
   CANVAS_SECTION_KEYS,
   CANVAS_SECTION_LABELS,
   type CanvasSectionKey,
@@ -205,21 +207,62 @@ export default function CompetitorCanvas() {
         <MetricCard label="Freshness" value={freshnessLabel} />
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-        {CANVAS_SECTION_KEYS.map((sectionKey) => (
-          <SectionCompareCard
-            key={sectionKey}
-            sectionKey={sectionKey}
-            competitorName={competitor.name}
-            competitorItems={itemsBySection[sectionKey] ?? []}
-            ownItems={compareMode ? ownCanvas.itemsBySection[sectionKey] ?? [] : []}
-            compareMode={compareMode}
-            deltaScore={sectionDeltas.find((metric) => metric.section_key === sectionKey)?.value}
-            borrowingKey={borrowingKey}
-            onBorrow={borrowIdea}
-          />
-        ))}
-      </section>
+      {/* Same silhouette as the main canvas so the competitor view reads as
+          "their BMC", not a generic card list. Compare mode needs the width
+          for side-by-side columns, so it keeps the wide grid. */}
+      {compareMode ? (
+        <section className="grid gap-3 lg:grid-cols-2">
+          {CANVAS_SECTION_KEYS.map((sectionKey) => (
+            <SectionCompareCard
+              key={sectionKey}
+              sectionKey={sectionKey}
+              competitorName={competitor.name}
+              competitorItems={itemsBySection[sectionKey] ?? []}
+              ownItems={ownCanvas.itemsBySection[sectionKey] ?? []}
+              compareMode
+              deltaScore={sectionDeltas.find((metric) => metric.section_key === sectionKey)?.value}
+              borrowingKey={borrowingKey}
+              onBorrow={borrowIdea}
+            />
+          ))}
+        </section>
+      ) : (
+        <section className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-5 md:grid-rows-2">
+            {CANVAS_SECTION_KEYS.filter(
+              (key) => key !== "cost_structure" && key !== "revenue_streams",
+            ).map((sectionKey) => (
+              <div key={sectionKey} className={`min-w-0 ${CANVAS_SECTION_GRID_PLACEMENT[sectionKey]}`}>
+                <SectionCompareCard
+                  sectionKey={sectionKey}
+                  competitorName={competitor.name}
+                  competitorItems={itemsBySection[sectionKey] ?? []}
+                  ownItems={[]}
+                  compareMode={false}
+                  deltaScore={sectionDeltas.find((metric) => metric.section_key === sectionKey)?.value}
+                  borrowingKey={borrowingKey}
+                  onBorrow={borrowIdea}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {(["cost_structure", "revenue_streams"] as const).map((sectionKey) => (
+              <SectionCompareCard
+                key={sectionKey}
+                sectionKey={sectionKey}
+                competitorName={competitor.name}
+                competitorItems={itemsBySection[sectionKey] ?? []}
+                ownItems={[]}
+                compareMode={false}
+                deltaScore={sectionDeltas.find((metric) => metric.section_key === sectionKey)?.value}
+                borrowingKey={borrowingKey}
+                onBorrow={borrowIdea}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -276,7 +319,7 @@ function SectionCompareCard({
 }) {
   const verdict = compareMode ? sectionVerdict(deltaScore, competitorItems.length) : null;
   return (
-    <Card className="border-border/60 bg-card shadow-sm transition-shadow hover:shadow-md">
+    <Card className="h-full border-border/60 bg-card shadow-sm transition-shadow hover:shadow-md">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="text-sm font-semibold">{CANVAS_SECTION_LABELS[sectionKey]}</CardTitle>
@@ -387,7 +430,7 @@ function ItemColumn({
                       )}
                     </div>
                     <p className="mt-1 line-clamp-3 break-words text-xs leading-relaxed text-muted-foreground">
-                      {item.evidence[0].excerpt}
+                      {cleanExcerpt(item.evidence[0].excerpt ?? "")}
                     </p>
                   </div>
                 )}

@@ -246,20 +246,28 @@ const Dashboard = () => {
             loading
               ? undefined
               : healthScore !== null
-                ? "Based on open gap severity"
-                : "Not yet assessed"
+                ? healthScore === 100
+                  ? "No open competitive gaps"
+                  : "Reduced by open gaps, weighted by severity"
+                : "Run competitor research to assess"
           }
           icon={Heart}
+          hint="Starts at 100 and loses points for every open gap the gap engine finds — critical gaps cost the most. 100 means no known competitive weaknesses; resolve or dismiss gaps in the Gap Register to raise it."
         />
         <MetricTile
           title="Active Gaps"
           value={loading ? "—" : String(openGapSeverities.length)}
           subtitle={
-            !loading && criticalGaps > 0
-              ? `${criticalGaps} critical`
-              : undefined
+            loading
+              ? undefined
+              : openGapSeverities.length === 0
+                ? "Nothing open — run competitor research to find more"
+                : criticalGaps > 0
+                  ? `${criticalGaps} critical — review in the Gap Register`
+                  : "Review in the Gap Register"
           }
           icon={AlertTriangle}
+          hint="Open findings where a competitor covers something your canvas doesn't. Each comes from an evidence-cited comparison of their canvas against yours. Work them in the Gap Register."
         />
         <MetricTile
           title="Context Freshness"
@@ -278,6 +286,7 @@ const Dashboard = () => {
                 : "Awaiting data ingestion"
           }
           icon={Clock}
+          hint="When your business context was last updated — by running research, uploading a document on the Knowledge page, or editing the canvas. Stale context means agents reason from old facts."
         />
         <MetricTile
           title="Evidence Coverage"
@@ -286,10 +295,11 @@ const Dashboard = () => {
             loading
               ? undefined
               : evidenceCount > 0
-                ? `evidence item${evidenceCount === 1 ? "" : "s"} collected`
+                ? `source excerpt${evidenceCount === 1 ? "" : "s"} backing your canvas`
                 : "No evidence collected"
           }
           icon={Shield}
+          hint="Source excerpts collected from web crawls, documents, and live search. Every verified canvas item cites at least one — more evidence means more of your strategy is backed by something checkable."
         />
       </div>
 

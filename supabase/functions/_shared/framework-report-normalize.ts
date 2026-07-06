@@ -152,6 +152,18 @@ function humanizeKey(key: string): string {
 }
 
 /**
+ * Model-written strings carry markdown emphasis ("**Capital Requirements:**")
+ * — escaped verbatim they read as asterisk noise in the finished document.
+ * Escape first, then honor bold/italic only. Kept in sync with
+ * src/lib/report-content.ts.
+ */
+function inlineMarkdown(text: string): string {
+  return escapeHtml(text)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s).,;:!?]|$)/g, "$1<em>$2</em>");
+}
+
+/**
  * Render arbitrary parsed JSON as readable report HTML: keys become section
  * headings, string arrays become lists, arrays of objects become cards. This
  * is the last-resort formatter — a report must never show raw JSON.
@@ -159,7 +171,7 @@ function humanizeKey(key: string): string {
 export function jsonToReportHtml(value: unknown, depth = 0): string {
   if (value === null || value === undefined || value === "") return "";
   if (typeof value === "string") {
-    return `<p style="line-height:1.7;white-space:pre-wrap">${escapeHtml(value)}</p>`;
+    return `<p style="line-height:1.7;white-space:pre-wrap">${inlineMarkdown(value)}</p>`;
   }
   if (typeof value === "number" || typeof value === "boolean") {
     return `<p>${escapeHtml(String(value))}</p>`;
@@ -168,7 +180,7 @@ export function jsonToReportHtml(value: unknown, depth = 0): string {
     if (value.length === 0) return "";
     if (value.every((item) => typeof item === "string" || typeof item === "number")) {
       const items = value
-        .map((item) => `<li style="margin-bottom:0.35rem">${escapeHtml(String(item))}</li>`)
+        .map((item) => `<li style="margin-bottom:0.35rem">${inlineMarkdown(String(item))}</li>`)
         .join("");
       return `<ul style="padding-left:1.25rem;line-height:1.6">${items}</ul>`;
     }
@@ -198,7 +210,7 @@ export function jsonToReportHtml(value: unknown, depth = 0): string {
       if (!body) return "";
       // Scalars under a key read best as "Label: value" rows inside cards.
       if (depth >= 2 && (typeof entry === "string" || typeof entry === "number" || typeof entry === "boolean")) {
-        return `<p style="margin:0 0 0.5rem;line-height:1.6"><strong>${escapeHtml(humanizeKey(key))}:</strong> ${escapeHtml(String(entry))}</p>`;
+        return `<p style="margin:0 0 0.5rem;line-height:1.6"><strong>${escapeHtml(humanizeKey(key))}:</strong> ${inlineMarkdown(String(entry))}</p>`;
       }
       const headingTag = depth === 0 ? "h3" : "h4";
       return `<section style="margin:0 0 1.25rem"><${headingTag} style="margin:0 0 0.5rem;color:#1a5490">${escapeHtml(humanizeKey(key))}</${headingTag}>${body}</section>`;

@@ -6,10 +6,30 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, Printer } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { isLikelyHtml, salvageReportHtml } from "@/lib/report-content";
+import { BASE_REPORT_STYLES } from "@/data/report-templates";
+
+/**
+ * Reports render as a light paper sheet regardless of app theme (matching the
+ * drawer's "boardroom report" rule) and print as a clean document: the print
+ * rules hide everything but the sheet.
+ */
+const REPORT_SHEET_STYLES = `
+.report-sheet { color: #1e293b; }
+.report-sheet h1 { font-size: 1.6rem; margin: 0 0 0.25rem; letter-spacing: -0.01em; }
+.report-sheet h2 { font-size: 1.1rem; font-weight: 600; color: #334155; margin: 0 0 1.25rem; }
+.report-sheet h3 { font-size: 1.05rem; margin: 1.75rem 0 0.6rem; padding-bottom: 0.35rem; border-bottom: 1px solid #e2e8f0; }
+.report-sheet h4 { font-size: 0.95rem; }
+.report-sheet p, .report-sheet li { font-size: 0.9rem; }
+@media print {
+  body * { visibility: hidden; }
+  .report-sheet, .report-sheet * { visibility: visible; }
+  .report-sheet { position: absolute; inset: 0 auto auto 0; width: 100%; margin: 0; box-shadow: none !important; border: none !important; padding: 0.25in !important; }
+}
+`;
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 interface Report {
@@ -121,37 +141,50 @@ const ReportViewer = () => {
           </Breadcrumb>
         </div>
       </div>
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-end mb-6">
+      <div className="mx-auto max-w-[860px]">
+        <div className="mb-6 flex items-center justify-end gap-2">
           <Button variant="outline" onClick={handleDownloadMarkdown}>
             <Download className="mr-2 h-4 w-4" />
             Download Markdown
           </Button>
+          <Button onClick={() => window.print()}>
+            <Printer className="mr-2 h-4 w-4" />
+            Print / Save PDF
+          </Button>
         </div>
 
-        <Card className="p-8">
-          {/* Report Header */}
-          <div className="mb-8 pb-6 border-b">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+        <style>{BASE_REPORT_STYLES}</style>
+        <style>{REPORT_SHEET_STYLES}</style>
+
+        {/* The sheet: always light, paper-proportioned, print-isolated. */}
+        <Card className="report-sheet border border-slate-200 bg-white px-8 py-10 shadow-md sm:px-12 sm:py-14">
+          <div className="mb-8 border-b border-slate-200 pb-6">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
               <FileText className="h-4 w-4" />
               <span>{report.company_name}</span>
               <span>•</span>
-              <span>{new Date(report.created_at).toLocaleDateString()}</span>
+              <span>
+                {new Date(report.created_at).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </span>
             </div>
           </div>
 
-          {/* Report Content — generated reports are stored as HTML; older or
-              malformed rows (raw JSON) are salvaged into formatted HTML.
-              Markdown rendering remains only for plain-prose content. */}
+          {/* Generated reports are stored as HTML; older or malformed rows
+              (raw JSON) are salvaged into formatted HTML. Markdown rendering
+              remains only for plain-prose content. */}
           {(() => {
             const content = salvageReportHtml(report.report_content);
             return isLikelyHtml(content) ? (
               <div
-                className="prose prose-slate dark:prose-invert max-w-none"
+                className="prose prose-slate max-w-none"
                 dangerouslySetInnerHTML={{ __html: content }}
               />
             ) : (
-              <div className="prose prose-slate dark:prose-invert max-w-none">
+              <div className="prose prose-slate max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
               </div>
             );

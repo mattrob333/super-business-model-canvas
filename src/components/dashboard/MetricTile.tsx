@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { type LucideIcon, ArrowUp, ArrowDown } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { type LucideIcon, ArrowUp, ArrowDown, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MetricTileProps {
@@ -9,14 +10,34 @@ interface MetricTileProps {
   icon: LucideIcon;
   trend?: "up" | "down" | "neutral";
   trendValue?: string;
+  /** Plain-language explanation of what the metric means and where it comes from. */
+  hint?: string;
 }
 
-export function MetricTile({ title, value, subtitle, icon: Icon, trend, trendValue }: MetricTileProps) {
+export function MetricTile({ title, value, subtitle, icon: Icon, trend, trendValue, hint }: MetricTileProps) {
   return (
     <Card>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <p className="truncate text-sm font-medium text-muted-foreground">{title}</p>
+            {hint && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="shrink-0 text-muted-foreground/60 transition-colors hover:text-foreground"
+                    aria-label={`What does ${title} mean?`}
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-72 text-xs leading-relaxed">
+                  {hint}
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </span>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
             <Icon className="h-4 w-4 text-primary" />
           </div>

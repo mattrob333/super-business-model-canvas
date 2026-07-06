@@ -58,7 +58,7 @@ function firecrawlScrapeFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): 
           sourceType: "website",
           sourceName: "Firecrawl",
           sourceUrl: url,
-          excerpt: markdown ? markdown.slice(0, 1200) : undefined,
+          excerpt: markdown ? cleanMarkdownExcerpt(markdown, 1200) : undefined,
           metadata: { feedKey: input.feedKey },
         }],
         metrics: [],
@@ -265,6 +265,25 @@ function githubRepoStatsFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): 
 
 function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Page markdown starts with navigation link soup ("[Skip to main content](…)"),
+ * which used to become the stored evidence excerpt verbatim — unreadable next
+ * to a canvas item, and it wasted the extraction model's context on nav chrome
+ * (owner live finding 2026-07-06). Reduce to prose BEFORE slicing the excerpt.
+ */
+export function cleanMarkdownExcerpt(markdown: string, maxLength: number): string {
+  const cleaned = markdown
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")            // images
+    .replace(/\[([^\]]*)\]\(([^)]*)\)/g, "$1")        // links -> label
+    .replace(/\b(Skip to (main content|footer|navigation))\b/gi, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/^[#>\-*_|\s]+$/gm, " ")                 // separator/heading-only lines
+    .replace(/[#*_`>|]{1,}/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return cleaned.slice(0, maxLength);
 }
 
 function readStringArray(value: unknown): string[] {

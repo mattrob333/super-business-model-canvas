@@ -198,6 +198,34 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-9..12 (owner live-test round 3, all UI/quality) — FIXED (2026-07-06, reviewer-as-builder)
+
+- **RF-LIVE-9 — competitor canvas read as raw crawl junk in a generic card grid.** Two
+  parts: (a) evidence excerpts were the page markdown verbatim — nav-link soup
+  ("[Skip to main content](…)") — under every item. New `cleanMarkdownExcerpt` in the
+  worker fetcher strips links/images/nav artifacts BEFORE slicing the stored excerpt (also
+  stops wasting extraction context on chrome; 2 tests, suite 66), and client
+  `cleanExcerpt` sanitizes already-stored rows at display (competitor canvas + workspace
+  evidence popovers). (b) The drill-down now renders the SAME BMC silhouette as the main
+  canvas (5-col grid with pillar row-spans + cost/revenue bottom row); compare mode keeps
+  the wide two-column grid it needs.
+- **RF-LIVE-10 — Porter report was a wall of text with literal `**` markers.** The
+  salvage renderer now honors inline markdown (bold/italic) after escaping — client +
+  edge mirrors. `ReportViewer` renders reports as a **paper document**: always-light
+  sheet (~860px), document typography, and a Print / Save PDF button with print CSS that
+  isolates the sheet (everything else hidden). Reads and prints like a deliverable.
+- **RF-LIVE-11 — Agents "Recent Runs" too thin.** Rows now show the agent callsign,
+  duration, model used, and estimated cost alongside type/status/trigger; two-line
+  summaries; hover affordance into the existing run-detail dialog.
+- **RF-LIVE-12 — dashboard metrics unexplained.** Every `MetricTile` gains a `hint` info
+  tooltip in plain language (health score formula and how to raise it, what a gap is and
+  where to work it, what freshness means, what evidence coverage counts), plus
+  action-pointing subtitles.
+- **Known follow-up (disclosed, for the next worker slice):** competitor research covered
+  only 2/9 sections for a content-light homepage — extraction reads ONE crawled page.
+  Multi-page crawl (about/pricing/product) + the slice-5 grok fallback are the coverage
+  fixes; queued for Codex.
+
 ### RF-LIVE-8 (HIGH) — chat replied "issue with the selected model (grok 4.3)" — FIXED (2026-07-06, reviewer-as-builder)
 
 With RF-LIVE-7 fixed, the first live chat reply exposed the next layer: the seeded agent
