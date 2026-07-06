@@ -18,6 +18,7 @@
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | — | — |
 | 8 | Hardening & commercial | HELD (await direction) | — | — |
 | A | Next Build: research depth | AWAITING REVIEW | `build/phase-a2-research-backfill` | 2026-07-06 |
+| B | Next Build: skills become real | AWAITING REVIEW | `build/phase-b-skills` | 2026-07-06 |
 
 Statuses: `NOT STARTED` → `IN PROGRESS` → `AWAITING REVIEW` → `APPROVED` (or back to
 `IN PROGRESS` on review findings). Only one phase `IN PROGRESS` unless BUILD_PLAN Part IV
@@ -152,6 +153,37 @@ Status: OPEN | RESOLVED (<how>)
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
 
 ## NEXT BUILD PHASES
+
+### Phase B - Skills become real (2026-07-06, `build/phase-b-skills`)
+
+- Read `docs/HANDOFF_NEXT_BUILD.md`, `docs/specs/10_SKILL_CATALOG_AND_ATLAS_DOCTRINE.md`,
+  `docs/specs/11_ARTIFACT_PRESENTATION.md`, and the existing `yield.pricing_teardown`
+  implementation first. Known-fragile chat auto-send, legacy analysis shape, chat model
+  routing/budget floor, and assumption-prefix behavior were not touched.
+- Implemented four worker-backed `skill_run` handlers in `worker/src/jobs/skill-run.ts`:
+  `compass.avatar_refinement`, `compass.segment_expansion`, `relay.channel_gap_scan`, and
+  `relay.channel_economics`. Each writes a typed `skill_artifacts` row only after verifier
+  spot-checks, populates `evidence_ids`, records reproducible inputs, and does not write canvas
+  items or proposals directly.
+- Skill behavior: avatar refinement starts from current Customer Segments and uses
+  `grok_live_search` review/community evidence; segment expansion reads competitor
+  `customer_segments` canvas sections plus our Key Resources/Activities; channel gap scan reads
+  competitor Channels versus ours; channel economics keeps exact `unknown — not published`
+  cells when public CAC signals are absent.
+- Added typed spec-11 renderers in `src/components/skills/ArtifactDocument.tsx`: ICP cards,
+  segment expansion shortlist, channel strategy board, and channel economics table, all on the
+  existing paper sheet with provenance/verifier footer. Pricing teardown rendering remains.
+- Added migration `20260706135158_phase_b_skills_implemented.sql` to flip `implemented=true`
+  only for the four shipped skills, and mirrored the catalog state in `supabase/schema.sql`.
+- Tests: `worker/src/__tests__/skill-run.test.ts` now covers parser behavior plus happy path,
+  verifier-reject path, and empty-input path for each new handler.
+- Gates: root `npx tsc -p tsconfig.app.json --noEmit` exit 0; root `npm run build` exit 0;
+  root `npm run lint` exits 1 with the known frozen baseline of 64 problems (46 errors, 18
+  warnings), under the <=65 gate; worker `npm run typecheck` exit 0; worker `npx vitest run
+  src/__tests__/skill-run.test.ts` 21 passed; worker `npm test` 89 passed / 2 skipped; worker
+  `npm run build` exit 0; worker `npm run lint` exit 0.
+- Honest deferral: this is code-path and unit/integration verified. Live artifact quality and
+  real FeedRunner evidence breadth still need deploy plus authenticated owner smoke testing.
 
 ### Phase A.2 - Competitor research web-evidence backfill (2026-07-06, `build/phase-a2-research-backfill`)
 
