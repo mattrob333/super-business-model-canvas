@@ -171,7 +171,6 @@ export function EnterpriseBusinessModelCanvas({
         tallPreview={compact && isTallPillar}
         icon={AGENT_ROSTER[key].icon}
         iconAccentClass={AGENT_ROSTER[key].accentTextClass}
-        hero={key === "value_propositions"}
         onClick={() => handleSectionClick(key)}
       />
     );

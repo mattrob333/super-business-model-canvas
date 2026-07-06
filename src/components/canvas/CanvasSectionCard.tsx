@@ -79,8 +79,6 @@ export interface CanvasSectionCardProps {
   icon?: LucideIcon;
   /** Accent text class for the icon (per-agent accent, spec 01) */
   iconAccentClass?: string;
-  /** The visual hero of the canvas (Value Propositions) gets emphasis */
-  hero?: boolean;
 }
 
 const freshnessConfig: Record<
@@ -133,7 +131,6 @@ export function CanvasSectionCard({
   tallPreview = false,
   icon: Icon,
   iconAccentClass,
-  hero = false,
 }: CanvasSectionCardProps) {
   const previewLimit = maxPreviewItems;
   const normalizedItems = items.map(normalizeCanvasItem);
@@ -156,11 +153,11 @@ export function CanvasSectionCard({
     <Card
       className={cn(
         "relative flex flex-col cursor-pointer transition-all duration-200 group overflow-hidden",
-        "hover:border-primary/40 hover:shadow-md",
+        // The orange tint follows the mouse instead of living on one card —
+        // a permanently tinted Value Propositions read as unexplained state
+        // (owner finding 2026-07-06).
+        "hover:border-primary/40 hover:bg-primary/[0.04] hover:shadow-md",
         compactPreview ? "p-2.5 sm:p-3" : "p-3 sm:p-4",
-        // The value proposition is the canvas's center of gravity — give it
-        // a quiet emphasis so the eye lands there first.
-        hero && "border-primary/30 bg-primary/[0.03]",
         span,
         height,
       )}
