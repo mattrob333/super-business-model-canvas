@@ -47,9 +47,12 @@ const ATLAS_PROMPTS = [
 export function AtlasChat({
   accountId,
   agentProfileId,
+  briefingSlot,
 }: {
   accountId: string;
   agentProfileId: string;
+  /** Rendered at the top of the scroll column — the briefing scrolls behind the pinned composer. */
+  briefingSlot?: React.ReactNode;
 }) {
   const { user } = useAuth();
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -216,7 +219,9 @@ export function AtlasChat({
   }, [accountId, agentProfileId, awaitingReply, ensureThread, loadMessages, pollRun, sending, user]);
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
+      {briefingSlot}
       <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           War Room
@@ -266,42 +271,46 @@ export function AtlasChat({
         )}
       </div>
 
+      </div>
+
       {chatError && (
-        <p className="mb-2 text-xs leading-relaxed text-destructive" role="alert">
+        <p className="px-4 pb-2 text-xs leading-relaxed text-destructive" role="alert">
           {chatError}
         </p>
       )}
 
-      {/* Composer — sticky so it stays reachable while the briefing scrolls away */}
+      {/* Composer — pinned to the panel bottom; the column scrolls behind it */}
       <form
-        className="sticky bottom-0 -mx-4 flex shrink-0 items-end gap-2 border-t border-border bg-card p-3"
+        className="shrink-0 border-t border-border bg-card p-3"
         onSubmit={(event) => {
           event.preventDefault();
           void sendMessage(draft);
         }}
       >
-        <Textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              void sendMessage(draft);
-            }
-          }}
-          placeholder={`Message ${ATLAS.name}… (Enter to send, Shift+Enter for a new line)`}
-          rows={2}
-          className="min-h-[44px] resize-none text-sm"
-        />
-        <Button
-          type="submit"
-          size="icon"
-          className="h-10 w-10 shrink-0"
-          disabled={sending || awaitingReply || !draft.trim()}
-          aria-label="Send message"
-        >
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </Button>
+        <div className="flex items-end gap-1.5 rounded-lg border border-border bg-background p-1.5 transition-colors focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/25">
+          <Textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void sendMessage(draft);
+              }
+            }}
+            placeholder={`Message ${ATLAS.name}…`}
+            rows={1}
+            className="max-h-40 min-h-[38px] flex-1 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none focus-visible:ring-0"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            className="h-8 w-8 shrink-0 rounded-md"
+            disabled={sending || awaitingReply || !draft.trim()}
+            aria-label="Send message"
+          >
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
       </form>
     </div>
   );

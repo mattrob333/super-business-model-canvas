@@ -285,6 +285,22 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas round 4 (owner pass) — Cursor-grade panel: pinned composer, aligned header, real width (2026-07-06)
+
+- **Pinned composer (Cursor pattern):** AtlasChat now owns the panel's flex column —
+  the briefing rides inside the chat's scroll area (briefingSlot) and the composer is
+  a fixed footer the content scrolls behind, always visible. Composer restyled as a
+  single input surface: rounded bordered box containing a borderless auto-height
+  textarea + an inset send button, focus ring on the box — no more misaligned
+  send button.
+- **Header alignment:** dock header is h-14 to match the main TopBar, borders align
+  across the page.
+- **Width earns its keep:** lg:w-[clamp(440px,26vw,600px)] with matching canvas
+  padding — about a quarter of the viewport on large monitors, capped at 600px.
+- Full-page War Room confirmed NOT yet built (dock-only today) — next slice; dock
+  and War Room will share the one thread per spec 12 §6.
+
+
 ### Atlas round 3 (owner mobile pass) — delegation handoff + mobile room declutter (2026-07-06)
 
 - **Atlas directive is now a real delegation.** "Open {agent}'s room" stashes the
