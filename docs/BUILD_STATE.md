@@ -198,6 +198,28 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-7 (BLOCKER) — ROOT CAUSE FOUND AND FIXED: all agent runs died because the worker ran as root (2026-07-06, reviewer-as-builder)
+
+Workspace chat, skill runs — every Claude Agent SDK call on the live worker failed with
+"Claude Code process exited with code 1". Diagnosed autonomously end-to-end without
+Fly/Supabase access:
+1. Runner change captured the CLI child's stderr tail into run errors (PR #57).
+2. New self-service diagnostics: Ops `worker-diagnose` task (PR #58) + push-triggered
+   `Diagnose` workflow via `.github/diagnose-now` (PR #59 — the API integration cannot
+   dispatch workflow_dispatch), readable through Actions job logs.
+3. Boot-time Claude self-check on the worker: one tiny SDK call per boot, result or full
+   failure printed to stdout (PR #60, which also bumped machines 512MB→1GB as a suspect —
+   memory was NOT the cause but stays as headroom).
+4. The self-check named it: **"--dangerously-skip-permissions cannot be used with
+   root/sudo privileges for security reasons"** — the container ran `node dist/index.js`
+   as root, and the CLI refuses `bypassPermissions` under root.
+**Fix:** worker Dockerfile runtime stage now runs as the stock non-root `node` user with
+`HOME=/home/node` (writable CLI config dir). The boot self-check remains as a permanent
+canary — any future regression prints itself to `fly logs` on the next boot.
+**Open question (disclosed):** why research-verify calls appeared to succeed on 07-04/05
+under the same root container is unresolved (possibly a CLI behavior change pulled in via
+an image rebuild). The canary makes the current state observable either way.
+
 ### 5B slice 4 review — APPROVED, no findings (2026-07-06)
 
 Codex's `build/phase-5b-slice-4` (commit `a83d5ae`: context sources) reviewed and merged
