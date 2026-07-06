@@ -703,7 +703,7 @@ function MessageCard({
         <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 ${entry.avatarClass}`}>
           <Icon className="h-3.5 w-3.5" />
         </span>
-        <div className="min-w-0 max-w-[85%] rounded-lg border border-border bg-card px-3.5 py-2.5 shadow-sm">
+        <div className="min-w-0 max-w-[85%] px-0.5 py-1">
           <div className="prose prose-sm prose-slate max-w-none dark:prose-invert [&_p]:my-2.5 [&_p]:leading-relaxed [&_li]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_strong]:font-semibold [&_strong]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-base [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3]:text-sm [&_h4]:mt-3 [&_h4]:mb-1 [&_h4]:text-sm">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{text ?? ""}</ReactMarkdown>
           </div>
