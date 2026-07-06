@@ -38,6 +38,17 @@ interface AgentProfile {
   model_route_key: string | null;
 }
 
+interface CanvasSectionSnapshot {
+  items: string[];
+  notes: string | null;
+}
+
+interface CompanyBrief {
+  company_name: string | null;
+  industry: string | null;
+  summary: string | null;
+}
+
 interface ModelRoute {
   account_id?: string | null;
   route_key?: string | null;
@@ -76,13 +87,15 @@ export class WorkspaceChatHandler {
     const messages = await this.loadMessages(thread.id);
     const contextSources = await this.loadContextSources(job.account_id, profile.id);
     const sectionKey = sectionKeyForAgentKey(profile.agent_key) ?? "value_propositions";
+    const canvasSnapshot = await this.loadCanvasSection(job.account_id, sectionKey);
+    const companyBrief = await this.loadCompanyBrief(job.account_id);
 
     await this.markRunRunning(job, profile, modelRoute, { threadId: thread.id, messageCount: messages.length });
 
     const limits = this.deps.taskLimits?.workspaceChat;
     const result = await this.runner.run({
       prompt: buildChatPrompt(messages),
-      systemPrompt: buildChatSystemPrompt(profile, sectionKey, contextSources),
+      systemPrompt: buildChatSystemPrompt(profile, sectionKey, contextSources, canvasSnapshot, companyBrief),
       model: modelRoute.model_name,
       maxTurns: limits?.maxTurns ?? 40,
       maxBudgetUsd: limits?.maxBudgetUsd ?? budgetForRoute(modelRoute),
@@ -199,6 +212,35 @@ export class WorkspaceChatHandler {
     return (data ?? []) as WorkspaceMessage[];
   }
 
+  private async loadCanvasSection(accountId: string, sectionKey: SectionKey): Promise<CanvasSectionSnapshot> {
+    const { data, error } = await this.deps.client
+      .from("canvas_section_versions")
+      .select("items, notes")
+      .eq("account_id", accountId)
+      .is("competitor_id", null)
+      .eq("section_key", sectionKey)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to load canvas section for chat: ${error.message}`);
+    return {
+      items: normalizeCanvasItems(data?.items),
+      notes: typeof data?.notes === "string" && data.notes.trim().length > 0 ? data.notes.trim() : null,
+    };
+  }
+
+  private async loadCompanyBrief(accountId: string): Promise<CompanyBrief | null> {
+    const { data, error } = await this.deps.client
+      .from("business_context_versions")
+      .select("company_name, industry, summary")
+      .eq("account_id", accountId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to load company brief for chat: ${error.message}`);
+    return (data as CompanyBrief | null) ?? null;
+  }
+
   private async loadContextSources(accountId: string, profileId: string): Promise<ContextSource[]> {
     const { data, error } = await this.deps.client
       .from("context_sources")
@@ -236,13 +278,56 @@ function readString(value: unknown, message: string): string {
   throw new Error(message);
 }
 
-function buildChatSystemPrompt(profile: AgentProfile, sectionKey: SectionKey, contextSources: ContextSource[] = []): string {
+function buildChatSystemPrompt(
+  profile: AgentProfile,
+  sectionKey: SectionKey,
+  contextSources: ContextSource[] = [],
+  canvas: CanvasSectionSnapshot = { items: [], notes: null },
+  brief: CompanyBrief | null = null,
+): string {
   const sectionLabel = SECTION_LABELS[sectionKey];
   const base = profile.system_instructions?.trim() || `You are ${profile.display_name ?? profile.agent_key}, a strategy workspace agent for ${sectionLabel}.`;
   const sourceBlock = formatContextSources(contextSources);
   return `${base}
 
-You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied.${sourceBlock}`;
+You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data beyond what is below instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied.${formatCompanyBrief(brief)}${formatCanvasSnapshot(sectionLabel, canvas)}${sourceBlock}`;
+}
+
+function formatCompanyBrief(brief: CompanyBrief | null): string {
+  if (!brief) return "";
+  const lines: string[] = [];
+  if (brief.company_name) lines.push(`Company: ${brief.company_name}`);
+  if (brief.industry) lines.push(`Industry: ${brief.industry}`);
+  if (brief.summary) lines.push(`Summary: ${truncate(brief.summary.trim(), 600)}`);
+  if (lines.length === 0) return "";
+  return `\n\nCompany brief (the business you are advising):\n${lines.join("\n")}`;
+}
+
+function formatCanvasSnapshot(sectionLabel: string, canvas: CanvasSectionSnapshot): string {
+  if (canvas.items.length === 0 && !canvas.notes) {
+    return `\n\nThe ${sectionLabel} canvas section is currently empty — say so if asked, and suggest running the section analysis.`;
+  }
+  const bullets = canvas.items.slice(0, 12).map((item) => `- ${truncate(item, 240)}`).join("\n");
+  const notes = canvas.notes ? `\nOwner goals for this section: ${truncate(canvas.notes, 400)}` : "";
+  return `\n\nCurrent ${sectionLabel} canvas items (already loaded — do not spend tool calls re-reading them):\n${bullets}${notes}`;
+}
+
+function normalizeCanvasItems(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const items: string[] = [];
+  for (const entry of value) {
+    if (typeof entry === "string" && entry.trim().length > 0) {
+      items.push(entry.trim());
+      continue;
+    }
+    const record = asRecord(entry);
+    if (typeof record.text === "string" && record.text.trim().length > 0) items.push(record.text.trim());
+  }
+  return items;
+}
+
+function truncate(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
 function formatContextSources(sources: ContextSource[]): string {
@@ -282,9 +367,14 @@ function messageText(content: unknown): string {
 }
 
 function budgetForRoute(route: ModelRoute): number {
-  const input = route.cost_per_1k_in ?? 0.002;
-  const output = route.cost_per_1k_out ?? 0.01;
-  return Math.max(0.05, input * 12 + output * 6);
+  // A chat turn with tool use accumulates the system prompt + transcript on
+  // every agentic step, so the old ~$0.13 ceiling tripped error_max_budget_usd
+  // mid-answer (live incident RF-LIVE-19, 2026-07-06). Budget for ~150k
+  // cumulative input tokens and ~8k output, with a floor that survives
+  // missing route costs.
+  const input = route.cost_per_1k_in ?? 0.003;
+  const output = route.cost_per_1k_out ?? 0.015;
+  return Math.max(0.75, input * 150 + output * 8);
 }
 
 function estimateCost(tokensIn: number | null, tokensOut: number | null, route: ModelRoute): number | null {

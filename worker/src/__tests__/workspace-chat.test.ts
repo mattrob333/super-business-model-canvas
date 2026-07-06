@@ -43,6 +43,30 @@ describe("WorkspaceChatHandler", () => {
 
     expect(runner.request?.model).toBe("claude-sonnet-5");
   });
+
+  it("injects the section canvas and company brief so the agent starts grounded (RF-LIVE-19)", async () => {
+    const client = new WorkspaceChatFakeClient();
+    const runner = new CapturingRunner();
+    await new WorkspaceChatHandler({
+      client: client.asSupabase(),
+      runner,
+    }).handle(makeJob());
+
+    expect(runner.request?.systemPrompt).toContain("Company: Acme Robotics");
+    expect(runner.request?.systemPrompt).toContain("Enterprise SaaS subscriptions");
+    expect(runner.request?.systemPrompt).toContain("Usage-based robotics API tier");
+  });
+
+  it("budgets enough for a tool-using chat turn — the old ~$0.13 ceiling tripped error_max_budget_usd (RF-LIVE-19)", async () => {
+    const client = new WorkspaceChatFakeClient();
+    const runner = new CapturingRunner();
+    await new WorkspaceChatHandler({
+      client: client.asSupabase(),
+      runner,
+    }).handle(makeJob());
+
+    expect(runner.request?.maxBudgetUsd).toBeGreaterThanOrEqual(0.75);
+  });
 });
 
 function makeJob(): AgentJob {
@@ -80,7 +104,7 @@ class WorkspaceChatFakeClient {
     agent_profiles: [{
       id: "profile-1",
       account_id: "account-1",
-      agent_key: "customers",
+      agent_key: "agent_customer_segments",
       display_name: "Segment",
       system_instructions: "You are Segment.",
       // The live RF-LIVE-8 shape: profiles seeded with the legacy grok route.
@@ -131,6 +155,24 @@ class WorkspaceChatFakeClient {
       created_at: "2026-07-06T00:01:00Z",
     }],
     agent_runs: [{ id: "run-1", account_id: "account-1" }],
+    canvas_section_versions: [{
+      account_id: "account-1",
+      section_key: "customer_segments",
+      competitor_id: null,
+      items: [
+        { text: "Enterprise SaaS subscriptions", confidence: 0.8 },
+        "Usage-based robotics API tier",
+      ],
+      notes: "Grow enterprise mix to 60% by Q4.",
+      created_at: "2026-07-06T00:00:00Z",
+    }],
+    business_context_versions: [{
+      account_id: "account-1",
+      company_name: "Acme Robotics",
+      industry: "Industrial automation",
+      summary: "Sells robotic arms to mid-market manufacturers.",
+      created_at: "2026-07-06T00:00:00Z",
+    }],
   };
 
   asSupabase() {
@@ -153,6 +195,11 @@ class WorkspaceChatFakeQuery {
   limit(count: number): this { this.limitCount = count; return this; }
 
   eq(column: string, value: unknown): this {
+    this.filters.push({ column, value });
+    return this;
+  }
+
+  is(column: string, value: unknown): this {
     this.filters.push({ column, value });
     return this;
   }

@@ -12,6 +12,7 @@ import {
 import type { CanvasSectionKey } from "./section-types";
 import { BMCSectionEditor } from "@/components/BMCSectionEditor";
 import { useCanvasEvidence } from "@/hooks/useCanvasEvidence";
+import { AGENT_ROSTER } from "@/lib/agent-roster";
 
 /** Two-row pillar sections — extra vertical room for all bullets */
 const TALL_PILLAR_SECTIONS = new Set<CanvasSectionKey>([
@@ -168,16 +169,19 @@ export function EnterpriseBusinessModelCanvas({
         maxPreviewItems={previewCount}
         compactPreview={compact}
         tallPreview={compact && isTallPillar}
+        icon={AGENT_ROSTER[key].icon}
+        iconAccentClass={AGENT_ROSTER[key].accentTextClass}
+        hero={key === "value_propositions"}
         onClick={() => handleSectionClick(key)}
       />
     );
   };
 
-  const topRowHeight = compact ? "h-[136px] md:h-full" : "h-[180px] md:h-full";
-  const bottomRowHeight = compact ? "h-[168px] md:h-[176px]" : "h-[200px]";
+  const topRowHeight = compact ? "h-[136px] md:h-full" : "h-[200px] md:h-full";
+  const bottomRowHeight = compact ? "h-[168px] md:h-[176px]" : "h-[216px]";
   const gridRowClass = compact
     ? "md:auto-rows-[minmax(136px,1fr)]"
-    : "md:auto-rows-[200px]";
+    : "md:auto-rows-[220px]";
 
   return (
     <>

@@ -13,7 +13,10 @@ export function CanvasGridFrame({ children, className }: CanvasGridFrameProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border-2 border-border bg-card shadow-sm p-3 sm:p-4",
+        // Tinted panel behind white cards: in light mode the canvas was
+        // white-on-white with no depth (owner finding 2026-07-06) — the frame
+        // now recedes so the nine sections read as cards ON a board.
+        "rounded-xl border-2 border-border bg-muted/40 shadow-sm p-3 sm:p-4",
         className,
       )}
     >

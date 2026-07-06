@@ -18,7 +18,7 @@ const envSchema = z.object({
   SECTION_ANALYSIS_TASK_BUDGET_TOKENS: z.coerce.number().int().positive().default(64000),
   SECTION_ANALYSIS_MAX_BUDGET_USD: z.coerce.number().positive().optional(),
   WORKSPACE_CHAT_MAX_TURNS: z.coerce.number().int().positive().default(40),
-  WORKSPACE_CHAT_TASK_BUDGET_TOKENS: z.coerce.number().int().positive().default(32000),
+  WORKSPACE_CHAT_TASK_BUDGET_TOKENS: z.coerce.number().int().positive().default(64000),
   WORKSPACE_CHAT_MAX_BUDGET_USD: z.coerce.number().positive().optional(),
 });
 

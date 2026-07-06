@@ -38,6 +38,22 @@ export function getActiveAnalysis(): ActiveAnalysisPayload | null {
   }
 }
 
+/**
+ * The nine canvas sections live under `data.canvas` in analysis payloads
+ * (older saves stored them flat). Reading the wrong level silently returns
+ * undefined for every section, so all legacy canvas reads go through here.
+ */
+export function getActiveAnalysisCanvas(
+  data: Record<string, unknown> | undefined | null = getActiveAnalysis()?.data,
+): Record<string, unknown> | null {
+  if (!data) return null;
+  const nested = data.canvas;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>;
+  }
+  return data;
+}
+
 export function clearActiveAnalysis() {
   try {
     sessionStorage.removeItem(ID_KEY);
