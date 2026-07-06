@@ -198,6 +198,28 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### 5B slice 4 review — APPROVED, no findings (2026-07-06)
+
+Codex's `build/phase-5b-slice-4` (commit `a83d5ae`: context sources) reviewed and merged
+clean — the first slice with zero reviewer fixes. What made it pass:
+- `context-files` bucket migration copies the founder-documents account-folder policy
+  pattern exactly (private, 50MB cap, doc mime allowlist, idempotent), applied live by
+  Codex; schema.sql mirrored.
+- `ContextSourcesPanel` (room left rail): note/url/file sources with enable toggle and
+  delete; **every write select-back-verifies** (insert returns the row, update returns
+  the changed row, delete read-back-confirms the row is gone) — the RF-5B3-1 lesson
+  fully absorbed. File uploads sanitize names and prefix paths with the account id.
+- Worker `workspace_chat` injects enabled sources only into the SYSTEM prompt: ≤12
+  sources, ~4k char budget with per-entry truncation, `[S1]`-style labels explicitly
+  distinguished from web-evidence `[1]` citations. Notes carry their text; files/urls
+  honestly carry only name+uri this slice (no content fetch). Test asserts an enabled
+  note appears and a disabled one doesn't (worker suite 63).
+- Branch was correctly based on the reviewed slice-3 code — no fix reversion.
+- Step 0 done: `agent_profile_revisions` DELETE policy applied live (recorded as
+  `20260706005009`).
+- Minor deferral (disclosed): the pinned Company Brief row is display-only; the spec's
+  click-through to the brief viewer lands with a later polish pass.
+
 ### 5B slice 3 review — RESOLVED: RF-5B3-1..3 fixed by the reviewer (2026-07-05)
 
 Codex's `build/phase-5b-slice-3` (commit `31a5609`: BMCSectionEditor chat rail retired per
