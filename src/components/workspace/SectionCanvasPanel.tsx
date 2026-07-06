@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ExternalLink, FileText, Loader2, PencilLine } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cleanExcerpt } from "@/lib/clean-excerpt";
+import { splitAssumption } from "@/lib/assumption";
 import type { CanvasItemEvidence } from "@/components/canvas/CanvasSectionCard";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
@@ -71,7 +72,14 @@ export function SectionCanvasPanel({
                       : `Confidence ${Math.round((item.confidence ?? 0) * 100)}%`
                   }
                 />
-                <span className="min-w-0 flex-1">{item.text}</span>
+                <span className="min-w-0 flex-1">
+                  {splitAssumption(item.text).text}
+                  {splitAssumption(item.text).assumed && (
+                    <span className="ml-1.5 inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-px align-middle text-[9px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                      assumed
+                    </span>
+                  )}
+                </span>
                 {evidence.length > 0 && <EvidenceBadge evidence={evidence} />}
               </li>
             );
