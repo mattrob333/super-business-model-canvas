@@ -22,6 +22,14 @@ interface WorkspaceMessage {
   created_at: string;
 }
 
+interface ContextSource {
+  id: string;
+  type: "file" | "url" | "note" | "evidence_query";
+  name: string;
+  uri: string | null;
+  config: unknown;
+}
+
 interface AgentProfile {
   id: string;
   agent_key: string;
@@ -66,6 +74,7 @@ export class WorkspaceChatHandler {
     const profile = await this.loadProfile(job.account_id, thread.agent_profile_id);
     const modelRoute = await this.loadModelRoute(job.account_id, profile);
     const messages = await this.loadMessages(thread.id);
+    const contextSources = await this.loadContextSources(job.account_id, profile.id);
     const sectionKey = sectionKeyForAgentKey(profile.agent_key) ?? "value_propositions";
 
     await this.markRunRunning(job, profile, modelRoute, { threadId: thread.id, messageCount: messages.length });
@@ -73,7 +82,7 @@ export class WorkspaceChatHandler {
     const limits = this.deps.taskLimits?.workspaceChat;
     const result = await this.runner.run({
       prompt: buildChatPrompt(messages),
-      systemPrompt: buildChatSystemPrompt(profile, sectionKey),
+      systemPrompt: buildChatSystemPrompt(profile, sectionKey, contextSources),
       model: modelRoute.model_name,
       maxTurns: limits?.maxTurns ?? 40,
       maxBudgetUsd: limits?.maxBudgetUsd ?? budgetForRoute(modelRoute),
@@ -182,6 +191,19 @@ export class WorkspaceChatHandler {
     return (data ?? []) as WorkspaceMessage[];
   }
 
+  private async loadContextSources(accountId: string, profileId: string): Promise<ContextSource[]> {
+    const { data, error } = await this.deps.client
+      .from("context_sources")
+      .select("id, type, name, uri, config")
+      .eq("account_id", accountId)
+      .eq("agent_profile_id", profileId)
+      .eq("enabled", true)
+      .order("created_at", { ascending: false })
+      .limit(12);
+    if (error) throw new Error(`Failed to load workspace context sources: ${error.message}`);
+    return (data ?? []) as ContextSource[];
+  }
+
   private async markRunRunning(job: AgentJob, profile: AgentProfile, modelRoute: ModelRoute, input: Record<string, unknown>): Promise<void> {
     if (!job.agent_run_id) return;
     const { error } = await this.deps.client
@@ -206,12 +228,38 @@ function readString(value: unknown, message: string): string {
   throw new Error(message);
 }
 
-function buildChatSystemPrompt(profile: AgentProfile, sectionKey: SectionKey): string {
+function buildChatSystemPrompt(profile: AgentProfile, sectionKey: SectionKey, contextSources: ContextSource[] = []): string {
   const sectionLabel = SECTION_LABELS[sectionKey];
   const base = profile.system_instructions?.trim() || `You are ${profile.display_name ?? profile.agent_key}, a strategy workspace agent for ${sectionLabel}.`;
+  const sourceBlock = formatContextSources(contextSources);
   return `${base}
 
-You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied.`;
+You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied.${sourceBlock}`;
+}
+
+function formatContextSources(sources: ContextSource[]): string {
+  if (sources.length === 0) return "";
+  let remaining = 4000;
+  const rendered: string[] = [];
+  for (const source of sources) {
+    if (remaining <= 0) break;
+    const body = contextSourceBody(source);
+    const label = `[S${rendered.length + 1}] ${source.name} (${source.type})`;
+    const entry = body ? `${label}\n${body}` : label;
+    const trimmed = entry.length > remaining ? `${entry.slice(0, Math.max(0, remaining - 15)).trimEnd()} [truncated]` : entry;
+    rendered.push(trimmed);
+    remaining -= trimmed.length + 2;
+  }
+  if (rendered.length === 0) return "";
+  return `\n\nEnabled workspace context sources. Cite these as [S1], [S2], etc.; keep them distinct from web evidence citations like [1].\n${rendered.join("\n\n")}`;
+}
+
+function contextSourceBody(source: ContextSource): string {
+  const config = asRecord(source.config);
+  if (source.type === "note" && typeof config.text === "string") return config.text.trim();
+  if (source.type === "url") return source.uri ? `URL: ${source.uri}` : "";
+  if (source.type === "file") return source.uri ? `File: ${source.uri}` : "";
+  return source.uri ?? "";
 }
 
 function buildChatPrompt(messages: WorkspaceMessage[]): string {
