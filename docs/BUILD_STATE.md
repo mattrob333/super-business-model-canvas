@@ -198,6 +198,26 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-27 (owner round 11: gaps become actions) — SHIPPED (2026-07-06, reviewer-as-builder)
+
+- **Owner directive: gap cards must be actionable, not just triage.** Two new actions
+  on every open/acknowledged/in-progress gap:
+  - **"Fix with {callsign}"** (primary): navigates to the affected section's agent room
+    with `?gap=<id>`. The room loads the gap (account-scoped), composes an opening
+    brief (title, details, the register's recommendation, "walk me through closing
+    this"), and **auto-sends it once** — the agent is already working the problem when
+    the user lands, and the data-gap protocol governs its answer. One-shot ref guard;
+    normal visits are unaffected.
+  - **"Upload data"** on data-shaped gaps (missing_data / low_confidence / no_evidence
+    / outdated): file picker on the card, same pipeline as Knowledge (storage →
+    founder_documents → orchestrator onboarding_extract run), open gaps move to
+    acknowledged, toast names the affected sections and points at Knowledge for
+    progress. Competitive gaps don't get the upload button — their fix is strategy,
+    not documents.
+- Honest scope: closing the loop (auto-resolving the gap when the re-run analysis
+  covers it) stays with the gap engine's supersede logic; the upload does not directly
+  write canvas items — it feeds the evidence pipeline that does.
+
 ### RF-LIVE-26 (owner round 10: deck upload dead-ended — no canvas) — FIXED (2026-07-06, reviewer-as-builder)
 
 - **RF-LIVE-26 (HIGH) — uploading a pitch deck produced no canvas.** The Knowledge

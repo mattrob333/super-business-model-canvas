@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
@@ -47,6 +47,36 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [latestRun, setLatestRun] = useState<AgentRunSnapshot | null>(null);
   const { itemsBySection, loading: canvasLoading } = useCanvasEvidence();
+
+  // Arriving from the Gap Register ("Fix with <agent>"): load the gap and
+  // hand the thread an opening brief so the agent starts working the problem
+  // instead of greeting an empty room.
+  const [searchParams] = useSearchParams();
+  const gapId = searchParams.get("gap");
+  const [gapPrompt, setGapPrompt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!gapId || !accountId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("gaps")
+        .select("title, description, recommended_action")
+        .eq("id", gapId)
+        .eq("account_id", accountId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const parts = [
+        `I came here from the Gap Register to work on this gap: "${data.title}".`,
+        data.description ? `Details: ${data.description}` : null,
+        data.recommended_action ? `The register recommends: ${data.recommended_action}` : null,
+        "Walk me through how to close this gap — what exactly do we need, how do I get it, and what should we do first?",
+      ].filter(Boolean);
+      setGapPrompt(parts.join("\n\n"));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [gapId, accountId]);
 
   useEffect(() => {
     if (!accountId) return;
@@ -157,6 +187,7 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
               accountId={accountId}
               agentProfileId={profile.id}
               sectionKey={sectionKey}
+              initialPrompt={gapPrompt}
             />
           </main>
 
