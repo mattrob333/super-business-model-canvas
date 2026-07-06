@@ -13,7 +13,7 @@
 | 2 | Agent worker service | **APPROVED** | `build/phase-2-worker` (merged, PR #8, `b6a8c40`) | 2026-07-02 |
 | 3 | Research engine & evidence | **APPROVED** | `build/phase-3-research` (merged with reviewer fixes, PR #13) | 2026-07-03 |
 | 4 | Competitor canvases & gap engine | **APPROVED** (merged with reviewer fixes — RF-4-1..14 all resolved, see REVIEW FINDINGS) | `build/phase-4-competitors` + reviewer-fix merge | 2026-07-04 |
-| 5 | Knowledge stack, grounding & section workspaces | IN PROGRESS (5A UI slice) | `build/phase-5-knowledge` | 2026-07-04 |
+| 5 | Knowledge stack, grounding & section workspaces | IN PROGRESS (5B slice 4) | `build/phase-5b-slice-4` | 2026-07-06 |
 | 6 | War Room & orchestration | NOT STARTED | — | — |
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | — | — |
 | 8 | Hardening & commercial | HELD (await direction) | — | — |
@@ -1454,8 +1454,39 @@ cd worker && npm run lint             -> exit 0
 
 ### Phase 5 - Knowledge stack, grounding & section workspaces
 5A tasks: schema [x] - jobs [x] - ingestion [worker + UI upload path] - UI/wizard [partial] - live walkthrough [ ]
-5B tasks: 5.1 [ ] - 5.2 [ ] - 5.3 [ ] - 5.4 [ ] - 5.5 [ ] - 5.6 [ ] - 5.7 [ ] - 5.8 [ ] - 5.9 [ ]
+5B tasks: 5.1 [ ] - 5.2 [x] - 5.3 [ ] - 5.4 [ ] - 5.5 [ ] - 5.6 [ ] - 5.7 [x] - 5.8 [ ] - 5.9 [ ]
 5A additions from BUILD_PLAN: 5.10 [schema + worker extraction pipeline + upload UI] - 5.11 [schema + logo display/manual URL UI; Firecrawl capture not complete]
+
+**2026-07-06 evening - 5B slice 4 complete on `build/phase-5b-slice-4`.**
+
+- Step 0 live DB completed first: applied the reviewed `agent_profile_revisions_delete_policy`
+  SQL to project `mehhuxzamnpxnkbrslls` via Supabase MCP. It is recorded as live migration
+  `20260706005009_profile_revisions_delete_policy`; verification found
+  `agent_profile_revisions_delete` on `public.agent_profile_revisions` for DELETE to
+  `authenticated`.
+- Added migration `20260706005500_context_files_bucket.sql` and mirrored it in
+  `supabase/schema.sql`: private `context-files` bucket, 50 MB limit, and select/insert/update/delete
+  storage policies copied from the `founder-documents` account-folder membership pattern. Applied
+  live via Supabase MCP and verified the bucket plus all four storage policies; live migration is
+  recorded as `20260706005500_context_files_bucket`.
+- Added `ContextSourcesPanel` below the section canvas in the workspace left rail. It pins a
+  read-only Company Brief row, supports note/url/file sources for the active agent profile, uploads
+  files to `context-files` under `${accountId}/...`, toggles enablement, deletes sources, and
+  verifies client table writes with select-back/delete-back checks so RLS no-ops do not toast as
+  success.
+- Updated `worker/src/jobs/workspace-chat.ts` to load enabled `context_sources` for the agent and
+  inject them into the workspace chat system prompt under `[S1]`, `[S2]`, etc., capped around 4k
+  characters and kept distinct from web-evidence `[1]` references. Notes include `config.text`;
+  URLs/files are passed by label + URI only in this slice.
+- Added `worker/src/__tests__/workspace-chat.test.ts` covering enabled note prompt injection and
+  disabled-note exclusion.
+- Gates: `npx tsc -p tsconfig.app.json --noEmit` exit 0; `npm run build` green; `npm run lint`
+  reports 64 problems (46 errors, 18 warnings), still within the frozen <=65 ceiling; `worker npm
+  run typecheck` exit 0; `worker npm test` 63 passed / 2 skipped; `worker npm run build` exit 0;
+  `worker npm run lint` exit 0.
+- Logged-in smoke still not completed in this pass: Dashboard Pricing Teardown retry, a workspace
+  chat reply, and one Porter Five Forces render still need an authenticated owner browser session
+  after deploy.
 
 **2026-07-05 evening - 5B slice 3 complete on `build/phase-5b-slice-3`.**
 
