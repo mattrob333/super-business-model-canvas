@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Bell, ChevronDown, Menu, Loader2 } from "lucide-react";
@@ -23,6 +24,7 @@ export function TopBar() {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
+  const [navSheetOpen, setNavSheetOpen] = useState(false);
 
   const displayName = getUserDisplayName(user);
   const initials = getUserInitials(user);
@@ -44,8 +46,10 @@ export function TopBar() {
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-card px-6">
-      {/* Mobile nav trigger: sidebar rail is hidden below md, this opens it as a slide-over */}
-      <Sheet>
+      {/* Mobile nav trigger: sidebar rail is hidden below md, this opens it as
+          a slide-over. Controlled so choosing a destination closes it — the
+          drawer must never sit on top of the page it just navigated to. */}
+      <Sheet open={navSheetOpen} onOpenChange={setNavSheetOpen}>
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" className="h-9 w-9 md:hidden shrink-0">
             <Menu className="h-5 w-5" />
@@ -54,7 +58,7 @@ export function TopBar() {
         </SheetTrigger>
         <SheetContent side="left" className="w-[240px] p-0 bg-card">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <SidebarNavContent />
+          <SidebarNavContent onNavigate={() => setNavSheetOpen(false)} />
         </SheetContent>
       </Sheet>
 

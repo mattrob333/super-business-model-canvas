@@ -242,8 +242,11 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
             </MobileCollapse>
           </aside>
 
-          {/* Center — the collaboration thread */}
-          <main className="order-1 flex min-h-[70vh] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:order-2 lg:col-span-6 lg:min-h-0">
+          {/* Center — the collaboration thread. On mobile it fills the first
+              screenful exactly (viewport minus top bar and page padding) so
+              the room reads as a full-screen chat; the supporting panels sit
+              below the fold (owner directive 2026-07-06). */}
+          <main className="order-1 flex min-h-[calc(100dvh-6.5rem)] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:order-2 lg:col-span-6 lg:min-h-0">
             <WorkspaceThread
               accountId={accountId}
               agentProfileId={profile.id}

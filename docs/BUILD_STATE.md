@@ -285,6 +285,49 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Owner round 7 — mobile experience pass + documents join company scoping (2026-07-06)
+
+Owner mobile screenshots: Atlas opened as a 94vw sliver with content clipped
+off-screen; the nav drawer stayed open on top of the page it navigated to;
+and the AcquiPortal pitch deck still showed on Tier 4's Knowledge page.
+
+- **Atlas is a full-screen chat on mobile** ("full screen chat or not open"):
+  expanded dock is w-full below lg (desktop side-dock width unchanged); the
+  close control is an X on mobile, chevron on desktop.
+- **Mobile nav drawer closes on navigation:** the TopBar Sheet is controlled;
+  SidebarNavContent takes onNavigate (nav rows + sign-out) and the sheet
+  closes itself when a destination is chosen.
+- **Workspace reads as a full-screen chat on mobile:** the thread column fills
+  the first screenful exactly (100dvh minus top bar + padding, up from
+  min-h-70vh); supporting panels stay as collapsibles below the fold.
+- **founder_documents join company scoping** (migration
+  20260707140000_document_company_scoping.sql): nullable
+  business_context_version_id + index. Uploads stamp the active context when
+  queued (Knowledge + Gap Register paths); "Build canvas from this" stamps
+  the deck with the context era it just created; the Gap Register upload's
+  ensure-context now prefers the scoped active context.
+- **User uploads never silently vanish** (unlike research data): the Knowledge
+  page shows the active company's documents, HIDES other companies' documents,
+  and lists pre-scoping NULL-stamped uploads in an explicit amber "not linked
+  to a company yet" group with a one-tap "Assign to {company}" action.
+- Honest scope: agent dossiers and owner questions remain account-scoped
+  (regenerated content; noted as future work), and the AtlasChat "War Room"
+  thread history is account-scoped across company switches — the board/brief
+  content is scoped, the old conversation text remains. Both are candidates
+  for a later company-scoped-threads slice.
+
+**Gate results for the round-7 commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> exit 0
+npm run lint                           -> 64 problems (46 errors, 18 warnings), within frozen <=65 ceiling
+cd worker && npx tsc --noEmit          -> exit 0
+cd worker && npx vitest run            -> 100 passed, 2 skipped
+UTF-8 touched-file decode              -> exit 0
+```
+
+
 ### Owner round 6c — the REAL workspace crash: undeclared prop from PR #88, caught by the new error boundary (2026-07-06)
 
 The AppErrorBoundary shipped in round 6b immediately surfaced the true bug:
