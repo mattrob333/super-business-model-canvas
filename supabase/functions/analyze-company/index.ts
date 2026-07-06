@@ -37,17 +37,17 @@ serve(async (req) => {
 
     console.log('Authenticated request received');
 
-    const { url } = await req.json();
-    
-    if (!url) {
-      throw new Error('URL is required');
+    const { url, document_text: documentText, document_name: documentName } = await req.json();
+
+    if (!url && !documentText) {
+      throw new Error('URL or document_text is required');
     }
 
     if (!hasGrokProvider()) {
       throw new Error('No research provider configured: set XAI_API_KEY or OPENROUTER_API_KEY');
     }
 
-    console.log('Analyzing company:', url);
+    console.log('Analyzing company:', url ?? `document "${documentName ?? 'untitled'}"`);
 
     // Retry configuration
     const maxRetries = 3;
@@ -57,8 +57,26 @@ serve(async (req) => {
       try {
         console.log(`Attempt ${attempt} of ${maxRetries}`);
 
-        // Use Perplexity to gather comprehensive company information with web search
-        const analysisPrompt = `Research and analyze the company at ${url} in detail. Focus on providing actionable strategic information.
+        // Document mode: an owner-provided deck/plan/idea is the primary
+        // source; web search grounds the market context around it. Items the
+        // document can't support are labeled "Assumption:" so the canvas is
+        // honest about guesses vs facts.
+        const documentPreamble = documentText
+          ? `Analyze the business described in this owner-provided document${documentName ? ` ("${documentName}")` : ""} — a pitch deck, business plan, or written idea. The extracted text is at the end of this prompt.
+
+Grounding rules:
+- Use the DOCUMENT for company facts: name, description, products/services, executives, website. If it names a real website, also research that site with web search and fold in what you verify.
+- For every Business Model Canvas item: if the document supports it, state it plainly. If the document is silent and you are inferring from market research, prefix that item with "Assumption: " so it is visibly labeled. Never present an inference as a documented fact.
+- Use web search to research the market, the industry, and comparable business models so assumptions are grounded in real market context, not invented.
+- For a pre-launch idea with no track record, it is fine for most items to be labeled assumptions — good, research-grounded guesses are the point.
+
+`
+          : "";
+        const analysisTarget = documentText
+          ? "the business described in the document"
+          : `the company at ${url}`;
+
+        const analysisPrompt = `${documentPreamble}Research and analyze ${analysisTarget} in detail. Focus on providing actionable strategic information.
 
 CRITICAL INFORMATION (must be comprehensive):
 1. Company Overview:
@@ -124,7 +142,12 @@ Return in this exact JSON format:
   "similarCompanies": [
     {"name": "Company Name", "description": "What they do and why they're similar", "website": "https://..."}
   ]
-}`;
+}${documentText ? `
+
+DOCUMENT TEXT:
+"""
+${String(documentText).slice(0, 24000)}
+"""` : ""}`;
 
         const analysisText = await callGrokChat({
           model: XAI_RESEARCH_MODEL,
