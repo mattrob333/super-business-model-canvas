@@ -198,6 +198,24 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-25 (owner round 9: section drawer redesign + PE positioning) — SHIPPED (2026-07-06, reviewer-as-builder)
+
+- **RF-LIVE-25 — the section editor drawer had no clear job.** It opened at 72vw with
+  content centered at max-w-4xl (dead margins both sides), led with a workspace ad,
+  buried the actual items under two label rows, and dressed the goals field in an
+  icon-box + IMPORTANT-badge callout. Redesigned as what it is — a quick-edit form:
+  `reading` width (720px, no dead margins), items first ("Items on the canvas" + Add,
+  clean rows, dashed empty state), then "Strategic goals" as a plain labeled field
+  ("Private — steers every AI recommendation"), and the workspace link demoted to a
+  slim footer row ("Need research or evidence? Open Forge's workspace →"). Sparkles
+  box, IMPORTANT badge, tooltip scaffolding, and the redundant context line removed.
+- **PE / acquisition positioning (owner value prop).** Landing "Who it's for" gains a
+  fourth audience — private equity & acquisition entrepreneurs: tear down a target
+  pre-close (nine blocks, scored gaps, AI opportunities in legacy operations), run the
+  optimization play post-close, document entry-to-exit value. Matching FAQ entry on
+  the acquisition workflow. Deeper product hooks (a "diligence mode" preset, PE
+  playbook) noted as Phase 6+ candidates, not built.
+
 ### RF-LIVE-24 (owner round 8: "New analysis" was a dead end) — FIXED (2026-07-06, reviewer-as-builder)
 
 - **RF-LIVE-24 (HIGH) — no path to a clean slate.** "New analysis" only re-expanded the
