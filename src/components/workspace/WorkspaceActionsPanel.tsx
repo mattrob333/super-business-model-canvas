@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FileText, Loader2, Play, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +29,15 @@ interface SkillArtifact {
   created_at: string;
 }
 
+interface SkillRunState {
+  skillKey: string;
+  runId: string;
+}
+
 /** New artifacts land while the user is in the room — keep the shelf live. */
 const ARTIFACT_REFRESH_MS = 30_000;
+const RUN_POLL_INTERVAL_MS = 3_000;
+const RUN_POLL_MAX_ATTEMPTS = 100;
 
 /**
  * Spec 10 ActionsPanel, studio edition: the top half runs this agent's
@@ -53,7 +60,11 @@ export function WorkspaceActionsPanel({
   const [artifacts, setArtifacts] = useState<SkillArtifact[]>([]);
   const [openArtifact, setOpenArtifact] = useState<SkillArtifact | null>(null);
   const [loading, setLoading] = useState(true);
-  const [runningKey, setRunningKey] = useState<string | null>(null);
+  const [runningRun, setRunningRun] = useState<SkillRunState | null>(null);
+  const [tileErrors, setTileErrors] = useState<Record<string, string>>({});
+  const pollTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => () => clearTimeout(pollTimer.current), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,12 +131,56 @@ export function WorkspaceActionsPanel({
     return created.id;
   }, [accountId, user]);
 
+  const pollSkillRun = useCallback((skill: CatalogSkill, runId: string, attempt: number) => {
+    if (attempt >= RUN_POLL_MAX_ATTEMPTS) {
+      setRunningRun(null);
+      setTileErrors((prev) => ({
+        ...prev,
+        [skill.skill_key]: "Run is taking longer than expected. Check Activity or try again shortly.",
+      }));
+      return;
+    }
+
+    getAgentRuntime(accountId)
+      .getRunStatus(runId)
+      .then((status) => {
+        if (!status || status.status === "pending" || status.status === "running") {
+          setRunningRun({ skillKey: skill.skill_key, runId });
+          pollTimer.current = setTimeout(
+            () => pollSkillRun(skill, runId, attempt + 1),
+            RUN_POLL_INTERVAL_MS,
+          );
+          return;
+        }
+
+        setRunningRun(null);
+        if (status.status === "completed") {
+          toast({
+            title: `${skill.title} complete`,
+            description: "The finished document is on the shelf.",
+          });
+          void loadArtifacts(skills.map((entry) => entry.skill_key));
+        } else {
+          setTileErrors((prev) => ({
+            ...prev,
+            [skill.skill_key]: status.error ?? `Run ${status.status}.`,
+          }));
+        }
+      })
+      .catch(() => {
+        pollTimer.current = setTimeout(
+          () => pollSkillRun(skill, runId, attempt + 1),
+          RUN_POLL_INTERVAL_MS,
+        );
+      });
+  }, [accountId, loadArtifacts, skills, toast]);
+
   const runSkill = useCallback(async (skill: CatalogSkill) => {
-    if (!skill.implemented || runningKey) return;
-    setRunningKey(skill.skill_key);
+    if (!skill.implemented || runningRun) return;
+    setTileErrors((prev) => ({ ...prev, [skill.skill_key]: "" }));
     try {
       const contextVersionId = await ensureBusinessContext();
-      await getAgentRuntime(accountId).startRun({
+      const { runId } = await getAgentRuntime(accountId).startRun({
         agentProfileId,
         accountId,
         runType: "skill_run",
@@ -136,20 +191,25 @@ export function WorkspaceActionsPanel({
           business_context_version_id: contextVersionId,
         },
       });
+      setRunningRun({ skillKey: skill.skill_key, runId });
       toast({
         title: `${skill.title} queued`,
         description: "Takes a few minutes. The finished document appears on the shelf below.",
       });
+      pollSkillRun(skill, runId, 0);
     } catch (error) {
+      setRunningRun(null);
+      setTileErrors((prev) => ({
+        ...prev,
+        [skill.skill_key]: error instanceof Error ? error.message : "Try again.",
+      }));
       toast({
         title: "Skill did not start",
         description: error instanceof Error ? error.message : "Try again.",
         variant: "destructive",
       });
-    } finally {
-      setRunningKey(null);
     }
-  }, [accountId, agentProfileId, ensureBusinessContext, runningKey, toast, user]);
+  }, [accountId, agentProfileId, ensureBusinessContext, pollSkillRun, runningRun, toast, user]);
 
   return (
     <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -192,12 +252,17 @@ export function WorkspaceActionsPanel({
                 size="sm"
                 className="mt-3 h-8 w-full gap-1.5"
                 variant={skill.implemented ? "default" : "outline"}
-                disabled={!skill.implemented || runningKey !== null}
+                disabled={!skill.implemented || runningRun !== null}
                 onClick={() => void runSkill(skill)}
               >
-                {runningKey === skill.skill_key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                {skill.implemented ? "Run" : "Coming"}
+                {runningRun?.skillKey === skill.skill_key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                {runningRun?.skillKey === skill.skill_key ? "Running" : skill.implemented ? "Run" : "Coming"}
               </Button>
+              {tileErrors[skill.skill_key] && (
+                <p className="mt-2 text-xs leading-relaxed text-destructive">
+                  {tileErrors[skill.skill_key]}
+                </p>
+              )}
             </li>
           ))}
         </ul>

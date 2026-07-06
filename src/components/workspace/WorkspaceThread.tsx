@@ -19,7 +19,7 @@ import { AGENT_ROSTER } from "@/lib/agent-roster";
 
 /**
  * Spec 02 zone 2 — the collaboration surface, slice 1: persistent threads
- * (default "Open floor"), human/agent text cards, proposal cards (borrowed
+ * (default "General"), human/agent text cards, proposal cards (borrowed
  * competitor ideas land here), and a composer wired to the real
  * `workspace_chat` worker job. The run is a durable agent_runs row; its
  * status is polled until the agent's reply message appears. Tool-call and
@@ -105,12 +105,16 @@ export function WorkspaceThread({
   agentProfileId,
   sectionKey,
   initialPrompt = null,
+  composerPrefill = null,
+  onComposerPrefillConsumed,
 }: {
   accountId: string;
   agentProfileId: string;
   sectionKey: CanvasSectionKey;
   /** Auto-sent once on arrival (e.g. a Gap Register brief) so the agent starts working immediately. */
   initialPrompt?: string | null;
+  composerPrefill?: string | null;
+  onComposerPrefillConsumed?: () => void;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -198,7 +202,7 @@ export function WorkspaceThread({
       .insert({
         account_id: accountId,
         agent_profile_id: agentProfileId,
-        title: "Open floor",
+        title: "General",
         created_by: user?.id ?? null,
       })
       .select("id, title, created_at")
@@ -288,6 +292,12 @@ export function WorkspaceThread({
     if (messages.length > 0) return;
     void sendMessage(initialPrompt);
   }, [initialPrompt, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage]);
+
+  useEffect(() => {
+    if (!composerPrefill) return;
+    setDraft(composerPrefill);
+    onComposerPrefillConsumed?.();
+  }, [composerPrefill, onComposerPrefillConsumed]);
 
   const createThread = useCallback(async () => {
     const title = newThreadTitle.trim() || "New topic";
@@ -399,11 +409,18 @@ export function WorkspaceThread({
           : typeof (item as { text?: unknown })?.text === "string"
             ? ((item as { text: string }).text)
             : "";
+      const stripAssumptionPrefix = (text: string): string => text.replace(/^Assumption:\s*/i, "").trim();
       const newText = proposalText.trim();
-      const alreadyPresent = existingItems.some(
-        (item) => itemText(item).trim().toLowerCase() === newText.toLowerCase(),
+      const normalizedNewText = stripAssumptionPrefix(newText).toLowerCase();
+      const withoutReplacedAssumption = existingItems.filter((item) => {
+        const text = itemText(item).trim();
+        if (!/^Assumption:\s*/i.test(text)) return true;
+        return stripAssumptionPrefix(text).toLowerCase() !== normalizedNewText;
+      });
+      const alreadyPresent = withoutReplacedAssumption.some(
+        (item) => stripAssumptionPrefix(itemText(item)).toLowerCase() === normalizedNewText,
       );
-      const mergedItems = alreadyPresent ? existingItems : [...existingItems, newText];
+      const mergedItems = alreadyPresent ? withoutReplacedAssumption : [...withoutReplacedAssumption, newText];
 
       const { error: versionError } = await supabase.from("canvas_section_versions").insert({
         account_id: accountId,
@@ -466,58 +483,66 @@ export function WorkspaceThread({
     <div className="flex h-full min-h-0 flex-col">
       {/* Thread header */}
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-2.5">
-        <Popover open={threadPopoverOpen} onOpenChange={setThreadPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1.5 font-semibold">
-              {activeThread?.title ?? "Open floor"}
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-72 p-2">
-            <div className="space-y-0.5">
-              {threads.map((thread) => (
-                <button
-                  key={thread.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveThreadId(thread.id);
-                    setThreadPopoverOpen(false);
-                  }}
-                  className={`block w-full truncate rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
-                    thread.id === activeThreadId ? "bg-muted font-medium" : "hover:bg-muted/60"
-                  }`}
-                >
-                  {thread.title ?? "Untitled thread"}
-                </button>
-              ))}
-              {threads.length === 0 && (
-                <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                  No threads yet — your first message opens “Open floor”.
-                </p>
-              )}
-            </div>
-            <form
-              className="mt-2 flex gap-1.5 border-t border-border pt-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void createThread();
-              }}
-            >
-              <Input
-                value={newThreadTitle}
-                onChange={(event) => setNewThreadTitle(event.target.value)}
-                placeholder="New thread topic…"
-                className="h-8 text-xs"
-              />
-              <Button type="submit" size="sm" variant="outline" className="h-8 gap-1 px-2">
-                <MessageSquarePlus className="h-3.5 w-3.5" />
-                Add
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Thread
+          </span>
+          <Popover open={threadPopoverOpen} onOpenChange={setThreadPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1.5 font-semibold">
+                {activeThread?.title ?? "General"}
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
-            </form>
-          </PopoverContent>
-        </Popover>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72 p-2">
+              <div className="space-y-0.5">
+                {threads.map((thread) => (
+                  <button
+                    key={thread.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveThreadId(thread.id);
+                      setThreadPopoverOpen(false);
+                    }}
+                    className={`block w-full truncate rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                      thread.id === activeThreadId ? "bg-muted font-medium" : "hover:bg-muted/60"
+                    }`}
+                  >
+                    {thread.title ?? "Untitled thread"}
+                  </button>
+                ))}
+                {threads.length === 0 && (
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                    No threads yet. Your first message opens "General".
+                  </p>
+                )}
+              </div>
+              <p className="mt-2 border-t border-border pt-2 text-[11px] leading-relaxed text-muted-foreground">
+                Threads are separate conversations with {entry.callsign}; start a new one for a distinct question or workflow.
+              </p>
+              <form
+                className="mt-2 flex gap-1.5 border-t border-border pt-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void createThread();
+                }}
+              >
+                <Input
+                  value={newThreadTitle}
+                  onChange={(event) => setNewThreadTitle(event.target.value)}
+                  placeholder="New thread topic..."
+                  className="h-8 text-xs"
+                />
+                <Button type="submit" size="sm" variant="outline" className="h-8 gap-1 px-2">
+                  <MessageSquarePlus className="h-3.5 w-3.5" />
+                  Add
+                </Button>
+              </form>
+            </PopoverContent>
+          </Popover>
+        </div>
         <span className="text-[10px] text-muted-foreground">
-          with {entry.callsign} · {CANVAS_SECTION_LABELS[sectionKey]}
+          with {entry.callsign} / {CANVAS_SECTION_LABELS[sectionKey]}
         </span>
       </div>
 
