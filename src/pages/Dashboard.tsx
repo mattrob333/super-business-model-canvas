@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Heart, AlertTriangle, Clock, Shield, FileText, RefreshCw, Bot, Loader2, Building2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +81,7 @@ function computeHealthScore(
 }
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { activeAnalysis } = useActiveAnalysis();
   const { user } = useAuth();
   const { accountId, loading: accountLoading } = useAccountId();
@@ -486,7 +487,16 @@ const Dashboard = () => {
               {recentReports.map((report) => (
                 <div
                   key={report.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border p-2.5"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/playbooks/reports/${report.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      navigate(`/playbooks/reports/${report.id}`);
+                    }
+                  }}
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-2.5 transition-colors hover:border-primary/35 hover:bg-muted/40"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">

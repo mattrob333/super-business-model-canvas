@@ -44,7 +44,10 @@ function firecrawlScrapeFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): 
         },
         body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
       });
-      if (!response.ok) return degraded("firecrawl_scrape", `Firecrawl scrape failed with HTTP ${response.status}`);
+      if (!response.ok) {
+        const hint = response.status === 403 ? " — the site blocks automated crawling" : "";
+        return degraded("firecrawl_scrape", `Firecrawl scrape failed with HTTP ${response.status}${hint}`);
+      }
       const payload = await response.json() as Record<string, unknown>;
       const markdown = readString(payload.markdown) ?? readString((payload.data as Record<string, unknown> | undefined)?.markdown);
       return {

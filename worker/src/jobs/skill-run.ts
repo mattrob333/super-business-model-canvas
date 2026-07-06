@@ -116,17 +116,20 @@ export class SkillRunHandler {
     const route = requiredRoute(routes, job.account_id, "skill_run", "skill_run");
     const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
 
-    const result = await this.runnerForRoute(route).run({
-      model: route.model_name,
-      modelParams: route.params ?? undefined,
-      maxTurns: 12,
-      maxBudgetUsd: budgetForRoute(route),
-      prompt: pricingTeardownPrompt(sources, ownItems),
-      systemPrompt:
-        "You are a pricing strategist. Normalize competitor pricing into a comparable matrix from the excerpts ONLY — never invent prices. Mark unknowns as unknown.",
-      mcpServers: {},
-      allowedTools: [],
-    });
+    const result = await runModelStep(
+      `pricing_teardown normalize (${route.provider}/${route.model_name})`,
+      () => this.runnerForRoute(route).run({
+        model: route.model_name,
+        modelParams: route.params ?? undefined,
+        maxTurns: 12,
+        maxBudgetUsd: budgetForRoute(route),
+        prompt: pricingTeardownPrompt(sources, ownItems),
+        systemPrompt:
+          "You are a pricing strategist. Normalize competitor pricing into a comparable matrix from the excerpts ONLY — never invent prices. Mark unknowns as unknown.",
+        mcpServers: {},
+        allowedTools: [],
+      }),
+    );
     const artifact = parsePricingArtifact(result.resultText, sources);
     if (!artifact) throw new Error("pricing_teardown produced unparseable output; refusing to write an artifact");
 
@@ -137,7 +140,10 @@ export class SkillRunHandler {
       const source = sources.find((entry) => entry.competitorId === row.competitor_id);
       if (!source) continue;
       const claim = `${source.name} pricing: model=${row.model}; price points=${row.price_points.join(", ") || "unknown"}`;
-      const verdict = await verifyClaimAgainstExcerpt(this.runnerForRoute(verifyRoute), verifyRoute, claim, source.excerpt);
+      const verdict = await runModelStep(
+        `pricing_teardown spot-check for ${source.name} (${verifyRoute.provider}/${verifyRoute.model_name})`,
+        () => verifyClaimAgainstExcerpt(this.runnerForRoute(verifyRoute), verifyRoute, claim, source.excerpt),
+      );
       if (verdict.status === "contradicted") {
         throw new Error(`pricing_teardown spot-check contradicted for ${source.name}: ${verdict.reason}`);
       }
@@ -340,6 +346,31 @@ export function parsePricingArtifact(text: string, sources: CompetitorPricingSou
         })
       : [],
   };
+}
+
+/**
+ * Live incident 2026-07-05: a skill run failed with "Claude Code process
+ * exited with code 1" — the SDK's CLI child died at spawn, not a model
+ * refusal (the identical runner+model works in the research verifier). Such
+ * process-level failures get ONE immediate in-place retry (the job-level
+ * retry re-crawls everything first), and every model step is labeled so the
+ * run error names where it died.
+ */
+const PROCESS_FAILURE = /exited with code|ENOMEM|spawn|ECONNRESET/i;
+
+export async function runModelStep<T>(step: string, attempt: () => Promise<T>): Promise<T> {
+  try {
+    return await attempt();
+  } catch (first) {
+    const firstMessage = first instanceof Error ? first.message : String(first);
+    if (!PROCESS_FAILURE.test(firstMessage)) throw new Error(`${step}: ${firstMessage}`);
+    try {
+      return await attempt();
+    } catch (second) {
+      const secondMessage = second instanceof Error ? second.message : String(second);
+      throw new Error(`${step} failed twice at the process level: "${firstMessage}", retry: "${secondMessage}"`);
+    }
+  }
 }
 
 function joinUrl(base: string, path: string): string {
