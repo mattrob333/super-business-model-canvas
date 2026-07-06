@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,6 +80,38 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
       cancelled = true;
     };
   }, [gapId, accountId]);
+
+  // Arriving from an Atlas directive ("Open {agent}'s room" on the dock):
+  // consume the stashed brief (one-shot — a refresh finds nothing and sends
+  // nothing) and hand the thread a delegation the agent must acknowledge.
+  const fromAtlas = searchParams.get("from") === "atlas";
+  const [atlasPrompt, setAtlasPrompt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fromAtlas) return;
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem("atlas:handoff");
+      sessionStorage.removeItem("atlas:handoff");
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    try {
+      const handoff = JSON.parse(raw) as { room?: string; action?: string; why?: string; skillTitle?: string | null; headline?: string };
+      if (handoff.room !== sectionKey || !handoff.action) return;
+      const parts = [
+        `Atlas, the chief strategist, has delegated a task to you.`,
+        `Directive: ${handoff.action}`,
+        handoff.why ? `Why it matters: ${handoff.why}` : null,
+        handoff.skillTitle ? `Atlas suggests your "${handoff.skillTitle}" skill for this.` : null,
+        handoff.headline ? `Atlas's current read on the business: ${handoff.headline}` : null,
+        `Acknowledge the task, then get to work: lay out exactly how you'll close it, start whatever you can from here, and tell me precisely what you need from me for the rest.`,
+      ].filter(Boolean);
+      setAtlasPrompt(parts.join("\n\n"));
+    } catch {
+      // Malformed handoff: open the room normally.
+    }
+  }, [fromAtlas, sectionKey]);
 
   useEffect(() => {
     if (!accountId) return;
@@ -174,53 +208,92 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-4 lg:grid-cols-12 lg:overflow-hidden">
-          {/* Left rail — identity + the section's live canvas */}
-          <aside className="space-y-4 lg:col-span-3 lg:overflow-y-auto lg:pr-1">
-            <AgentIdentityCard
-              accountId={accountId}
-              agentProfileId={profile.id}
-              sectionKey={sectionKey}
-              description={profile.description}
-              latestRun={latestRun}
-            />
-            <SectionCanvasPanel
-              sectionKey={sectionKey}
-              items={items}
-              loading={canvasLoading}
-              onVerifyAssumption={handleVerifyAssumption}
-            />
-            <ContextSourcesPanel accountId={accountId} agentProfileId={profile.id} />
+          {/* Left rail — identity + the section's live canvas. On mobile the
+              chat leads and these panels collapse (owner pass 2026-07-06). */}
+          <aside className="order-2 space-y-3 lg:order-1 lg:col-span-3 lg:space-y-4 lg:overflow-y-auto lg:pr-1">
+            <MobileCollapse title={`About ${entry.callsign}`}>
+              <AgentIdentityCard
+                accountId={accountId}
+                agentProfileId={profile.id}
+                sectionKey={sectionKey}
+                description={profile.description}
+                latestRun={latestRun}
+              />
+            </MobileCollapse>
+            <MobileCollapse title="Section canvas" defaultOpen>
+              <SectionCanvasPanel
+                sectionKey={sectionKey}
+                items={items}
+                loading={canvasLoading}
+                onVerifyAssumption={handleVerifyAssumption}
+              />
+            </MobileCollapse>
+            <MobileCollapse title="Context sources">
+              <ContextSourcesPanel accountId={accountId} agentProfileId={profile.id} />
+            </MobileCollapse>
             {/* Activity lives with context on the left — the right rail is the
                 Studio: outputs only (owner direction 2026-07-06). */}
-            <WorkspaceRunQueue
-              accountId={accountId}
-              agentProfileId={profile.id}
-              onLatestRun={handleLatestRun}
-            />
+            <MobileCollapse title="Recent activity">
+              <WorkspaceRunQueue
+                accountId={accountId}
+                agentProfileId={profile.id}
+                onLatestRun={handleLatestRun}
+              />
+            </MobileCollapse>
           </aside>
 
           {/* Center — the collaboration thread */}
-          <main className="flex min-h-[60vh] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:col-span-6 lg:min-h-0">
+          <main className="order-1 flex min-h-[70vh] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:order-2 lg:col-span-6 lg:min-h-0">
             <WorkspaceThread
               accountId={accountId}
               agentProfileId={profile.id}
               sectionKey={sectionKey}
-              initialPrompt={gapPrompt}
+              initialPrompt={gapPrompt ?? atlasPrompt}
+              initialThreadTitle={atlasPrompt ? "Directive from Atlas" : null}
               composerPrefill={composerPrefill}
               onComposerPrefillConsumed={() => setComposerPrefill(null)}
             />
           </main>
 
           {/* Right rail — room actions + run queue */}
-          <aside className="space-y-4 lg:col-span-3 lg:overflow-y-auto lg:pl-1">
-            <WorkspaceActionsPanel
-              accountId={accountId}
-              agentProfileId={profile.id}
-              agentKey={entry.agentKey}
-            />
+          <aside className="order-3 space-y-3 lg:col-span-3 lg:space-y-4 lg:overflow-y-auto lg:pl-1">
+            <MobileCollapse title="Studio and shelf">
+              <WorkspaceActionsPanel
+                accountId={accountId}
+                agentProfileId={profile.id}
+                agentKey={entry.agentKey}
+              />
+            </MobileCollapse>
           </aside>
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Below md the room's supporting panels fold behind slim summary rows so the
+ * conversation leads (the mobile room was five panels of preamble before the
+ * chat). Desktop renders children untouched.
+ */
+function MobileCollapse({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const isMobile = useIsMobile();
+  if (!isMobile) return <>{children}</>;
+  return (
+    <details className="group" open={defaultOpen}>
+      <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg border border-border bg-card px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm [&::-webkit-details-marker]:hidden">
+        {title}
+        <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mt-2">{children}</div>
+    </details>
   );
 }

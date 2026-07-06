@@ -550,7 +550,24 @@ function BriefingCard({
       <DirectiveCard
         directive={payload.directive}
         skillTitle={skillTitle}
-        onOpenRoom={(room) => navigate(`/workspace/${room}`)}
+        onOpenRoom={(room) => {
+          // A directive is a delegation, not a door: stash the brief so the
+          // room opens a fresh thread, auto-sends it, and the agent
+          // acknowledges the task from Atlas (owner direction 2026-07-06).
+          try {
+            sessionStorage.setItem("atlas:handoff", JSON.stringify({
+              room,
+              action: payload.directive.action,
+              why: payload.directive.why,
+              skillKey: payload.directive.skill_key,
+              skillTitle,
+              headline: payload.headline,
+            }));
+          } catch {
+            // Storage unavailable: the room still opens, just without the brief.
+          }
+          navigate(`/workspace/${room}?from=atlas`);
+        }}
       />
 
       {payload.watchouts.length > 0 && (

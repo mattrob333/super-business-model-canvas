@@ -285,6 +285,22 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas round 3 (owner mobile pass) — delegation handoff + mobile room declutter (2026-07-06)
+
+- **Atlas directive is now a real delegation.** "Open {agent}'s room" stashes the
+  brief (action, why, suggested skill, headline) in sessionStorage — consumed
+  one-shot, so refreshes can never re-fire — and navigates with ?from=atlas. The
+  room opens a FRESH thread titled "Directive from Atlas" and auto-sends the
+  delegation; the prompt instructs the agent to acknowledge the task, lay out the
+  plan, start what it can, and name exactly what it needs from the owner.
+  sendMessage gained an explicit thread override (fresh-thread id can't ride async
+  state); the RF-LIVE-29 empty-thread guard still governs gap briefs unchanged.
+- **Mobile room decluttered.** The chat now leads on mobile (order-1, min-h-[70vh]);
+  About {agent}, Section canvas (open by default), Context sources, Recent activity,
+  and Studio fold behind slim summary rows via a MobileCollapse (native details,
+  useIsMobile). Desktop layout unchanged.
+
+
 ### Atlas dock round 2 (owner live pass) — copilot layout + legacy coverage backfill (2026-07-06)
 
 - **"Blank slate" while the BMC showed items:** the live company predates the C.1
