@@ -4,12 +4,18 @@ import { BadgeCheck, FileText } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
 
 export interface ArtifactRecord {
+  id?: string;
   skill_key: string;
   title: string;
   body_md: string;
   payload: Json;
   evidence_ids: string[];
   created_at: string;
+}
+
+export interface ArtifactBrand {
+  logoUrl?: string | null;
+  brandColor?: string | null;
 }
 
 interface PricingPayload {
@@ -72,28 +78,50 @@ interface SpotCheck {
   confirmed: number;
 }
 
-export function ArtifactDocument({ artifact }: { artifact: ArtifactRecord }) {
+export function ArtifactDocument({
+  artifact,
+  brand,
+  publicFooter = false,
+}: {
+  artifact: ArtifactRecord;
+  brand?: ArtifactBrand;
+  publicFooter?: boolean;
+}) {
   const pricing = artifact.skill_key === "yield.pricing_teardown" ? asPricingPayload(artifact.payload) : null;
   const avatar = artifact.skill_key === "compass.avatar_refinement" ? asAvatarPayload(artifact.payload) : null;
   const expansion = artifact.skill_key === "compass.segment_expansion" ? asSegmentExpansionPayload(artifact.payload) : null;
   const channelGap = artifact.skill_key === "relay.channel_gap_scan" ? asChannelGapPayload(artifact.payload) : null;
   const economics = artifact.skill_key === "relay.channel_economics" ? asChannelEconomicsPayload(artifact.payload) : null;
   const checks = pricing?.spot_check ?? avatar?.spot_check ?? expansion?.spot_check ?? channelGap?.spot_check ?? economics?.spot_check;
+  const accent = validHexColor(brand?.brandColor) ?? "#f97316";
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white px-6 py-8 text-slate-800 shadow-sm sm:px-10 sm:py-10">
+    <article className="artifact-paper rounded-lg border border-slate-200 bg-white px-6 py-8 text-slate-800 shadow-sm sm:px-10 sm:py-10">
       <header className="border-b border-slate-200 pb-5">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-          Evidence-cited artifact
-        </p>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">{artifact.title}</h1>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Evidence-cited artifact
+            </p>
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">{artifact.title}</h1>
+          </div>
+          {brand?.logoUrl && (
+            <img
+              src={brand.logoUrl}
+              alt=""
+              className="max-h-10 max-w-28 shrink-0 object-contain"
+              loading="lazy"
+            />
+          )}
+        </div>
+        <div className="mt-4 h-1 w-24 rounded-full" style={{ backgroundColor: accent }} />
         <p className="mt-1.5 text-xs text-slate-500">
           {new Date(artifact.created_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
-          {" · "}
+          {" ? "}
           {artifact.evidence_ids.length} evidence source{artifact.evidence_ids.length === 1 ? "" : "s"}
           {checks && checks.checked > 0 && (
             <>
-              {" · "}
+              {" ? "}
               verifier confirmed {checks.confirmed}/{checks.checked} spot-checks
             </>
           )}
@@ -119,11 +147,21 @@ export function ArtifactDocument({ artifact }: { artifact: ArtifactRecord }) {
         </span>
         <span className="inline-flex items-center gap-1">
           <FileText className="h-3.5 w-3.5 text-slate-400" />
-          Built only from cited evidence — unknowns are marked, never invented
+          Built only from cited evidence - unknowns are marked, never invented
         </span>
+        {publicFooter && (
+          <span className="basis-full pt-2 text-[11px] text-slate-400">
+            Made with Super Business Model Canvas
+          </span>
+        )}
       </footer>
     </article>
   );
+}
+
+function validHexColor(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value : null;
 }
 
 function PricingExhibit({ pricing }: { pricing: PricingPayload }) {

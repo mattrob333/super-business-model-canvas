@@ -1,6 +1,9 @@
 import { useTheme } from "next-themes";
-import { Monitor, Moon, Sun, Settings2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Monitor, Moon, Palette, Settings2, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -13,6 +16,8 @@ import { AgentRuntimePanel } from "@/components/settings/AgentRuntimePanel";
 import { ScheduledLoopsManager } from "@/components/settings/ScheduledLoopsManager";
 import { SecurityPanel } from "@/components/settings/SecurityPanel";
 import { useAccountId } from "@/hooks/useAccountId";
+import { useToast } from "@/hooks/use-toast";
+import { supabaseUntyped } from "@/lib/supabase-untyped";
 
 const tabSections = [
   { id: "general", label: "General" },
@@ -50,10 +55,52 @@ function PlaceholderTab({ sectionName, description }: PlaceholderTabProps) {
 const Settings = () => {
   const { theme, setTheme } = useTheme();
   const { accountId, loading: accountLoading } = useAccountId();
+  const { toast } = useToast();
+  const [brandColor, setBrandColor] = useState("#f97316");
+  const [savingBrand, setSavingBrand] = useState(false);
 
   // Fallback: use a placeholder UUID when no account is resolved yet
   // (prevents queries from erroring — they'll return empty results)
   const effectiveAccountId = accountId ?? "00000000-0000-0000-0000-000000000000";
+
+  useEffect(() => {
+    if (!accountId) return;
+    let cancelled = false;
+    void supabaseUntyped
+      .from<{ brand_color: string | null }>("accounts")
+      .select("brand_color")
+      .eq("id", accountId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled && data?.brand_color && /^#[0-9a-fA-F]{6}$/.test(data.brand_color)) {
+          setBrandColor(data.brand_color);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId]);
+
+  const saveBrandColor = useCallback(async () => {
+    if (!accountId || !/^#[0-9a-fA-F]{6}$/.test(brandColor)) return;
+    setSavingBrand(true);
+    const { data, error } = await supabaseUntyped
+      .from<{ id: string; brand_color: string | null }>("accounts")
+      .update({ brand_color: brandColor })
+      .eq("id", accountId)
+      .select("id, brand_color")
+      .single();
+    setSavingBrand(false);
+    if (error || data?.brand_color !== brandColor) {
+      toast({
+        title: "Brand color was not saved",
+        description: error?.message ?? "Update matched zero rows.",
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: "Brand color saved", description: "New documents will use this accent color." });
+  }, [accountId, brandColor, toast]);
 
   return (
     <div className="bg-grid-subtle flex min-h-full flex-col gap-6 p-6">
@@ -124,6 +171,39 @@ const Settings = () => {
                   </Label>
                 </div>
               </RadioGroup>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Palette className="h-4 w-4" />
+                Document brand color
+              </CardTitle>
+              <CardDescription>
+                Used as the accent rule on artifact and shared document letterheads.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  type="color"
+                  value={brandColor}
+                  onChange={(event) => setBrandColor(event.target.value)}
+                  className="h-10 w-16 p-1"
+                  aria-label="Document brand color"
+                  disabled={!accountId || savingBrand}
+                />
+                <Input
+                  value={brandColor}
+                  onChange={(event) => setBrandColor(event.target.value)}
+                  className="h-10 w-28 font-mono text-sm"
+                  disabled={!accountId || savingBrand}
+                />
+                <Button onClick={() => void saveBrandColor()} disabled={!accountId || savingBrand || !/^#[0-9a-fA-F]{6}$/.test(brandColor)}>
+                  {savingBrand ? "Saving..." : "Save"}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

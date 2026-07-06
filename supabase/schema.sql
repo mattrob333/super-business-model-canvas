@@ -130,6 +130,7 @@ create table if not exists public.accounts (
   name text not null,
   slug text unique,
   runtime_config jsonb default '{}'::jsonb,
+  brand_color text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -787,7 +788,9 @@ create policy "accounts_insert_authenticated" on public.accounts
 
 drop policy if exists "accounts_update_member" on public.accounts;
 create policy "accounts_update_member" on public.accounts
-  for update to authenticated using (public.is_account_member(id));
+  for update to authenticated
+  using (public.is_account_member(id))
+  with check (public.is_account_member(id));
 
 -- ---- account_members ----
 -- NOTE: policies here are intentionally based on the user's own row (not
@@ -2978,6 +2981,60 @@ alter table public.skill_artifacts enable row level security;
 drop policy if exists "skill_artifacts_select_account" on public.skill_artifacts;
 create policy "skill_artifacts_select_account" on public.skill_artifacts
   for select to authenticated using (public.is_account_member(account_id));
+
+create table if not exists public.artifact_shares (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.accounts(id) on delete cascade,
+  artifact_id uuid not null references public.skill_artifacts(id) on delete cascade,
+  token text not null unique,
+  created_by uuid,
+  revoked boolean not null default false,
+  created_at timestamptz not null default now(),
+  constraint artifact_shares_token_length check (char_length(token) >= 32)
+);
+
+create index if not exists idx_artifact_shares_account
+  on public.artifact_shares(account_id, created_at desc);
+
+create index if not exists idx_artifact_shares_artifact
+  on public.artifact_shares(artifact_id, revoked, created_at desc);
+
+create unique index if not exists idx_artifact_shares_active_artifact
+  on public.artifact_shares(artifact_id)
+  where revoked = false;
+
+alter table public.artifact_shares enable row level security;
+drop policy if exists "artifact_shares_select_account" on public.artifact_shares;
+create policy "artifact_shares_select_account" on public.artifact_shares
+  for select to authenticated
+  using (public.is_account_member(account_id));
+
+drop policy if exists "artifact_shares_insert_account" on public.artifact_shares;
+create policy "artifact_shares_insert_account" on public.artifact_shares
+  for insert to authenticated
+  with check (
+    public.is_account_member(account_id)
+    and exists (
+      select 1
+      from public.skill_artifacts artifact
+      where artifact.id = artifact_shares.artifact_id
+        and artifact.account_id = artifact_shares.account_id
+    )
+  );
+
+drop policy if exists "artifact_shares_update_account" on public.artifact_shares;
+create policy "artifact_shares_update_account" on public.artifact_shares
+  for update to authenticated
+  using (public.is_account_member(account_id))
+  with check (public.is_account_member(account_id));
+
+drop policy if exists "artifact_shares_delete_account" on public.artifact_shares;
+create policy "artifact_shares_delete_account" on public.artifact_shares
+  for delete to authenticated
+  using (public.is_account_member(account_id));
+
+grant select, insert, update, delete on public.artifact_shares to authenticated;
+grant select, update on public.accounts to authenticated;
 
 insert into public.skill_catalog (skill_key, agent_key, title, description, trigger_kinds, output_kind, implemented, sort_order) values
   ('yield.pricing_teardown', 'agent_revenue_streams', 'Pricing teardown', 'Crawls competitor pricing, normalizes models and price points into a matrix, positions yours, recommends a strategy with scenarios.', '{manual,atlas}', 'matrix_board', true, 1),

@@ -28,6 +28,8 @@ const AgentDetail = lazy(() => import("./pages/AgentDetail"));
 const Activity = lazy(() => import("./pages/Activity"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Workspace = lazy(() => import("./pages/Workspace"));
+const ArtifactPage = lazy(() => import("./pages/ArtifactPage"));
+const SharedArtifactPage = lazy(() => import("./pages/SharedArtifactPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -63,6 +65,7 @@ const App = () => (
           {/* Public routes — no shell */}
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/share/:token" element={withSuspense(SharedArtifactPage)} />
           {import.meta.env.DEV && (
             <Route path="/dev/overlays" element={withSuspense(DevOverlayPreview)} />
           )}
@@ -80,6 +83,7 @@ const App = () => (
             <Route path="/agents" element={withSuspense(Agents)} />
             <Route path="/agents/:agentId" element={withSuspense(AgentDetail)} />
             <Route path="/activity" element={withSuspense(Activity)} />
+            <Route path="/artifacts/:id" element={withSuspense(ArtifactPage)} />
             <Route path="/analyze" element={<Navigate to="/canvas" replace />} />
             <Route path="/my-analyses" element={withSuspense(MyAnalyses)} />
             <Route path="/playbooks" element={withSuspense(Playbooks)} />
