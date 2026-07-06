@@ -1,6 +1,7 @@
 import { createSdkMcpServer, tool, type McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { loadCompanyScope } from "../db/company-scope.js";
 import { SECTION_KEYS, type SectionKey } from "../domain/sections.js";
 import { FeedRunner } from "../feeds/feed-runner.js";
 import type { FeedRuntimeConfig } from "../feeds/types.js";
@@ -32,17 +33,19 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
 
   const readCanvas = tool(
     "read_canvas",
-    "Read current Business Model Canvas items for a section. Always account-scoped by worker context.",
+    "Read current Business Model Canvas items for a section. Always scoped to the active company.",
     {
       section_key: sectionKeySchema,
       include_evidence: z.boolean().default(false),
     },
     async (args) => {
+      const scope = await loadCompanyScope(client, ctx.accountId);
       const { data, error } = await client
         .from("canvas_section_versions")
         .select("id, section_key, section_title, items, notes, confidence, created_at")
         .eq("account_id", ctx.accountId)
         .is("competitor_id", null)
+        .in("business_context_version_id", scope.contextIds)
         .eq("section_key", args.section_key)
         .order("created_at", { ascending: false })
         .limit(1);
@@ -145,10 +148,12 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
       recommended_action: z.string().optional(),
     },
     async (args) => {
+      const scope = await loadCompanyScope(client, ctx.accountId);
       const { data, error } = await client
         .from("gaps")
         .insert({
           account_id: ctx.accountId,
+          business_context_version_id: scope.activeContextId,
           title: args.title,
           description: args.description ?? null,
           severity: args.severity,

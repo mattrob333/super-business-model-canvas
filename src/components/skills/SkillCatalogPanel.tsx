@@ -9,6 +9,7 @@ import type { Json } from "@/integrations/supabase/types";
 // Both tables sit beyond the generated Database type's TS2589 depth horizon —
 // documented escape hatch (src/lib/supabase-untyped.ts), explicit row types.
 import { supabaseUntyped } from "@/lib/supabase-untyped";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -50,15 +51,19 @@ export function SkillCatalogPanel() {
 
   const load = useCallback(async () => {
     if (!accountId) return;
+    // Artifacts are shown for the ACTIVE company only (company scoping).
+    const scope = await loadCompanyScope(accountId).catch(() => null);
+    let artifactsQuery = supabaseUntyped
+      .from<SkillArtifact>("skill_artifacts")
+      .select("id, skill_key, title, body_md, payload, evidence_ids, created_at")
+      .eq("account_id", accountId);
+    if (scope) artifactsQuery = artifactsQuery.in("business_context_version_id", scope.contextIds);
     const [catalogRes, artifactsRes] = await Promise.all([
       supabaseUntyped
         .from<CatalogSkill>("skill_catalog")
         .select("skill_key, agent_key, title, description, implemented, sort_order")
         .order("sort_order", { ascending: true }),
-      supabaseUntyped
-        .from<SkillArtifact>("skill_artifacts")
-        .select("id, skill_key, title, body_md, payload, evidence_ids, created_at")
-        .eq("account_id", accountId)
+      artifactsQuery
         .order("created_at", { ascending: false })
         .limit(10),
     ]);
@@ -75,15 +80,10 @@ export function SkillCatalogPanel() {
     if (!accountId || runningKey) return;
     setRunningKey(skill.skill_key);
     try {
-      // Standing invariant: ensure a business context version before enqueueing.
-      const { data: existingContext } = await supabase
-        .from("business_context_versions")
-        .select("id")
-        .eq("account_id", accountId)
-        .order("version_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      let contextVersionId = existingContext?.id;
+      // Standing invariant: ensure a business context version before enqueueing
+      // — the ACTIVE company's context, never a stale prior-company row.
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      let contextVersionId = scope?.activeContextId ?? undefined;
       if (!contextVersionId) {
         const { data: created, error } = await supabase
           .from("business_context_versions")

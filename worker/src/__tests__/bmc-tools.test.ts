@@ -29,6 +29,9 @@ describe("BMC MCP tools", () => {
         ["account_id", "account-1"],
         // RF-4-2: own-canvas reads must never see competitor-linked versions.
         ["is:competitor_id", null],
+        // Company scoping: reads are confined to the active company's context
+        // chain (empty fake account -> empty chain).
+        ["in:business_context_version_id", []],
         ["section_key", "value_propositions"],
       ],
     });
@@ -168,6 +171,11 @@ class FakeQuery {
 
   is(column: string, value: unknown): this {
     this.filters.push([`is:${column}`, value]);
+    return this;
+  }
+
+  in(column: string, values: unknown[]): this {
+    this.filters.push([`in:${column}`, values]);
     return this;
   }
 

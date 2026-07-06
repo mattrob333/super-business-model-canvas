@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentTaskLimits } from "../agent/limits.js";
 import { createAgentHooks } from "../agent/guardrails.js";
 import { ClaudeAgentRunner, type AgentRunner } from "../agent/runner.js";
+import { loadCompanyScope, type CompanyScope } from "../db/company-scope.js";
 import { asRecord } from "../db/json.js";
 import { SECTION_LABELS, sectionKeyForAgentKey, type SectionKey } from "../domain/sections.js";
 import type { AgentJob } from "../queue/types.js";
@@ -105,14 +106,17 @@ export class WorkspaceChatHandler {
     const contextSources = await this.loadContextSources(job.account_id, profile.id);
     const isOrchestrator = profile.agent_key === "orchestrator";
     const sectionKey = sectionKeyForAgentKey(profile.agent_key) ?? "value_propositions";
+    // All canvas/gap reads are confined to the active company's context chain
+    // so agents never quote a previously analyzed company's data.
+    const scope = await loadCompanyScope(this.deps.client, job.account_id);
     // Atlas has no section of its own — its prompt carries the cross-company
     // board (coverage, gaps, skills) instead of a single canvas snapshot.
     const canvasSnapshot = isOrchestrator
       ? { items: [], notes: null }
-      : await this.loadCanvasSection(job.account_id, sectionKey);
-    const companyBrief = await this.loadCompanyBrief(job.account_id);
+      : await this.loadCanvasSection(job.account_id, sectionKey, scope);
+    const companyBrief = await this.loadCompanyBrief(job.account_id, scope);
     const systemPrompt = isOrchestrator
-      ? buildAtlasChatSystemPrompt(profile, contextSources, companyBrief, await this.loadAtlasBoard(job.account_id))
+      ? buildAtlasChatSystemPrompt(profile, contextSources, companyBrief, await this.loadAtlasBoard(job.account_id, scope))
       : buildChatSystemPrompt(profile, sectionKey, contextSources, canvasSnapshot, companyBrief);
 
     await this.markRunRunning(job, profile, modelRoute, { threadId: thread.id, messageCount: messages.length });
@@ -237,12 +241,13 @@ export class WorkspaceChatHandler {
     return (data ?? []) as WorkspaceMessage[];
   }
 
-  private async loadCanvasSection(accountId: string, sectionKey: SectionKey): Promise<CanvasSectionSnapshot> {
+  private async loadCanvasSection(accountId: string, sectionKey: SectionKey, scope: CompanyScope): Promise<CanvasSectionSnapshot> {
     const { data, error } = await this.deps.client
       .from("canvas_section_versions")
       .select("items, notes")
       .eq("account_id", accountId)
       .is("competitor_id", null)
+      .in("business_context_version_id", scope.contextIds)
       .eq("section_key", sectionKey)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -254,16 +259,20 @@ export class WorkspaceChatHandler {
     };
   }
 
-  private async loadCompanyBrief(accountId: string): Promise<CompanyBrief | null> {
+  private async loadCompanyBrief(accountId: string, scope: CompanyScope): Promise<CompanyBrief | null> {
+    if (!scope.activeContextId) return null;
     const { data, error } = await this.deps.client
       .from("business_context_versions")
       .select("company_name, industry, summary")
       .eq("account_id", accountId)
+      .in("id", scope.contextIds)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(10);
     if (error) throw new Error(`Failed to load company brief for chat: ${error.message}`);
-    return (data as CompanyBrief | null) ?? null;
+    // Anonymous ensure-rows carry no company fields — brief from the newest
+    // NAMED context in the active company's chain.
+    const rows = (data ?? []) as CompanyBrief[];
+    return rows.find((row) => row.company_name) ?? rows[0] ?? null;
   }
 
   private async loadContextSources(accountId: string, profileId: string): Promise<ContextSource[]> {
@@ -279,12 +288,12 @@ export class WorkspaceChatHandler {
     return (data ?? []) as ContextSource[];
   }
 
-  private async loadAtlasBoard(accountId: string): Promise<AtlasBoard> {
+  private async loadAtlasBoard(accountId: string, scope: CompanyScope): Promise<AtlasBoard> {
     // Same deterministic queries the atlas_briefing job runs — one source of
     // truth for what Atlas is allowed to know about the account (rule B1).
     const [coverage, gaps, skills] = await Promise.all([
-      loadSectionCoverage(this.deps.client, accountId),
-      loadGapSummary(this.deps.client, accountId),
+      loadSectionCoverage(this.deps.client, accountId, scope),
+      loadGapSummary(this.deps.client, accountId, scope),
       loadImplementedSkills(this.deps.client),
     ]);
     return { coverage, gaps, skills };

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AccountSwitcher } from "./AccountSwitcher";
+import { BrandLogo } from "@/components/brand/BrandMark";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getUserDisplayName, getUserInitials } from "@/lib/user-display";
@@ -141,8 +142,14 @@ function SidebarUserFooter() {
 export function SidebarNavContent() {
   return (
     <div className="flex h-full flex-col">
-      {/* Workspace switcher — h-14 matches TopBar so header borders align */}
-      <div className="flex h-14 shrink-0 items-center border-b px-3">
+      {/* Brand lockup owns the top-left corner — h-14 matches TopBar so the
+          header borders align. The company switcher sits one step below. */}
+      <div className="flex h-14 shrink-0 items-center border-b px-4">
+        <BrandLogo iconClassName="h-7" />
+      </div>
+
+      {/* Workspace switcher */}
+      <div className="flex h-12 shrink-0 items-center border-b px-3">
         <AccountSwitcher />
       </div>
 

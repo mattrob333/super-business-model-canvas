@@ -1,8 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
-import { Sun, Moon, Search, Bell, ChevronDown, Menu, Loader2 } from "lucide-react";
+import { Sun, Moon, Bell, ChevronDown, Menu, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { GlobalSearch } from "./GlobalSearch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +14,6 @@ import {
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarNavContent } from "./SidebarNav";
-import { BrandMark } from "@/components/brand/BrandMark";
 import { useAuth } from "@/hooks/useAuth";
 import { getUserDisplayName, getUserInitials } from "@/lib/user-display";
 import { clearActiveWorkspaceName } from "@/lib/active-workspace";
@@ -59,21 +58,9 @@ export function TopBar() {
         </SheetContent>
       </Sheet>
 
-      {/* Left: brand */}
-      <div className="flex min-w-0 items-center gap-2">
-        <BrandMark iconClassName="h-5" wordmarkClassName="text-xs" />
-      </div>
-
-      {/* Center: global search */}
+      {/* Center: global search (the brand lockup lives in the sidebar now) */}
       <div className="flex flex-1 items-center justify-center max-w-xl mx-auto">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search frameworks, analyses, playbooks..."
-            className="pl-9 h-9 text-sm bg-muted/50"
-          />
-        </div>
+        <GlobalSearch />
       </div>
 
       {/* Right: actions */}

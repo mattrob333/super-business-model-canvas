@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { useAccountId } from "@/hooks/useAccountId";
 import { CANVAS_SECTION_KEYS } from "@/components/canvas/section-types";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
@@ -42,11 +43,15 @@ export function useCanvasEvidence(options?: { enabled?: boolean }): {
     const load = async () => {
       setLoading(true);
       try {
+        // Only the active company's context chain: after a company switch the
+        // evidence popovers must not resurrect the previous company's rows.
+        const scope = await loadCompanyScope(accountId);
         const { data: versions, error } = await supabase
           .from("canvas_section_versions")
           .select("section_key, items, freshness_status, created_at")
           .eq("account_id", accountId)
           .is("competitor_id", null)
+          .in("business_context_version_id", scope.contextIds)
           .order("created_at", { ascending: false })
           .limit(200);
         if (error || !versions) return;

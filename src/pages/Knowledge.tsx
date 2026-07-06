@@ -35,6 +35,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getAgentRuntime } from "@/lib/agent-runtime";
 import { setActiveAnalysis } from "@/lib/active-analysis";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { setActiveWorkspaceName } from "@/lib/active-workspace";
 import { bridgeAnalysisToCanvasVersions } from "@/lib/canvas-version-bridge";
 import { cn } from "@/lib/utils";
@@ -211,14 +212,19 @@ export default function Knowledge() {
           .eq("is_competitor", false)
           .order("updated_at", { ascending: false })
           .limit(1),
-        supabase
-          .from("canvas_section_versions")
-          .select("section_key, groundedness_score, created_at")
-          .eq("account_id", accountId)
-          .is("competitor_id", null)
-          .not("groundedness_score", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(100),
+        loadCompanyScope(accountId)
+          .catch(() => null)
+          .then((scope) => {
+            // Groundedness meters describe the ACTIVE company's canvas only.
+            let query = supabase
+              .from("canvas_section_versions")
+              .select("section_key, groundedness_score, created_at")
+              .eq("account_id", accountId)
+              .is("competitor_id", null)
+              .not("groundedness_score", "is", null);
+            if (scope) query = query.in("business_context_version_id", scope.contextIds);
+            return query.order("created_at", { ascending: false }).limit(100);
+          }),
       ]);
 
       if (documentsResult.error) throw documentsResult.error;
@@ -318,15 +324,10 @@ export default function Knowledge() {
       // Pre-launch accounts have no business_context_versions row yet, and the
       // extract job requires one (the RF-4-15 failure class) — ensure it here.
       let contextVersionId: string;
-      const { data: existingContext } = await supabase
-        .from("business_context_versions")
-        .select("id")
-        .eq("account_id", accountId)
-        .order("version_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (existingContext) {
-        contextVersionId = existingContext.id;
+      // The ACTIVE company's context, never a stale prior-company row.
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      if (scope?.activeContextId) {
+        contextVersionId = scope.activeContextId;
       } else {
         const { data: newContext, error: ctxError } = await supabase
           .from("business_context_versions")

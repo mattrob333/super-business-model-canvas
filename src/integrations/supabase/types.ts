@@ -638,6 +638,7 @@ export type Database = {
           logo_source: Database["public"]["Enums"]["company_logo_source"] | null
           brand_assets: Json
           metadata: Json
+          business_context_version_id: string | null
           created_by: string | null
           created_at: string
           updated_at: string
@@ -654,6 +655,7 @@ export type Database = {
           logo_source?: Database["public"]["Enums"]["company_logo_source"] | null
           brand_assets?: Json
           metadata?: Json
+          business_context_version_id?: string | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -670,6 +672,7 @@ export type Database = {
           logo_source?: Database["public"]["Enums"]["company_logo_source"] | null
           brand_assets?: Json
           metadata?: Json
+          business_context_version_id?: string | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -680,6 +683,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companies_business_context_version_id_fkey"
+            columns: ["business_context_version_id"]
+            isOneToOne: false
+            referencedRelation: "business_context_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -1309,6 +1319,7 @@ export type Database = {
           evidence_ids: string[]
           recommended_action: string | null
           created_by_agent_run_id: string | null
+          business_context_version_id: string | null
           created_at: string
           updated_at: string
         }
@@ -1331,6 +1342,7 @@ export type Database = {
           evidence_ids?: string[]
           recommended_action?: string | null
           created_by_agent_run_id?: string | null
+          business_context_version_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1353,6 +1365,7 @@ export type Database = {
           evidence_ids?: string[]
           recommended_action?: string | null
           created_by_agent_run_id?: string | null
+          business_context_version_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1369,6 +1382,13 @@ export type Database = {
             columns: ["competitor_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gaps_business_context_version_id_fkey"
+            columns: ["business_context_version_id"]
+            isOneToOne: false
+            referencedRelation: "business_context_versions"
             referencedColumns: ["id"]
           },
         ]

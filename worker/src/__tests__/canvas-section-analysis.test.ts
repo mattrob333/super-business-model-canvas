@@ -207,6 +207,9 @@ class FakeSupabaseClient {
   }
 
   selectMany(table: string): Array<Record<string, unknown>> {
+    if (table === "business_context_versions") {
+      return [{ id: "ctx-1", company_name: "Acme", website: null, created_at: "2026-07-01T00:00:00Z" }];
+    }
     if (table === "model_routes") {
       return [
         {
@@ -248,6 +251,11 @@ class FakeQuery {
 
   update(values: Record<string, unknown>): this {
     this.updateValues = values;
+    return this;
+  }
+
+  in(column: string, values: unknown[]): this {
+    this.filters.push([`in:${column}`, values]);
     return this;
   }
 

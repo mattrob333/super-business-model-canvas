@@ -285,6 +285,77 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Owner round 6 — company scoping (cross-pollination fix), new brand lockup, real search (2026-07-06)
+
+Owner bug: a fresh Salesforce canvas still surfaced Tier 4 Intelligence's briefing,
+gaps, competitors and canvas rows — every versioned table was account-scoped with
+multiple companies per account and no discriminator.
+
+- **Company scoping model:** `business_context_versions` rows partition an account
+  into company "eras". The active company = the company of the newest context; its
+  scope = ALL context ids for that company (matched by website domain, else
+  normalized name — legal suffixes like "Inc." never split a history), so
+  re-analyzing a company extends it instead of orphaning it. Anonymous
+  "Initial business context" ensure-rows inherit the era they were created in.
+  Implemented twice, deliberately mirrored: `worker/src/db/company-scope.ts` and
+  `src/lib/company-scope.ts` (frontend adds a 30s TTL cache + invalidation on
+  bridge). Unit-tested including the A→B→A switch-back case.
+- **Migration `20260707120000_company_scoping.sql`:** adds nullable
+  `business_context_version_id` (+ index) to `gaps`, `companies`,
+  `skill_artifacts`. Existing rows stay NULL — their company is unknowable — so
+  scoped readers exclude them; a fresh research run repopulates the active company.
+- **Worker readers scoped to the chain:** atlas-briefing coverage/gaps/competitors/
+  artifacts/company-brief, workspace-chat section grounding + Atlas board,
+  skill-run loaders (own + competitor items, competitor list), gap-engine
+  (sweep + canvas), knowledge-jobs grounding queue, bmc-tools read_canvas,
+  canvas-section-analysis existing items. Writers stamp the active context id:
+  gap-engine gaps, contradiction gaps, open_gap tool, skill artifacts; competitor
+  research re-stamps the competitor row (self-heals legacy NULL rows on retry).
+- **Briefings are company-keyed:** the worker stamps `input.company_key`; the next
+  briefing ignores a previous one from a different company (no nonsense deltas),
+  and AtlasDock only displays a briefing whose key matches the active company —
+  after a switch it honestly shows "no briefing yet" until one is requested.
+- **Frontend switch mechanic:** Analysis.tsx replaces the zero-rows backfill with a
+  company-sync effect — opening a canvas whose company differs from the active era
+  re-bridges it (toast: "Agents switched to …"). All frontend readers filter to the
+  chain: canvas evidence popovers, proposal-approve merge, Gap Register, Dashboard
+  gap counts, competitor entity/research markers, artifact shelves (Studio +
+  Dashboard catalog), grounding wizard, Knowledge groundedness. All
+  ensure-business-context helpers now prefer the scoped active context so writes
+  land in the right era.
+- **Regression traps in tests:** atlas-briefing and workspace-chat fixtures carry a
+  second company's rows (newer created_at where it hurts most) with assertions
+  that they never reach prompts/coverage; worker suite now 100 passed / 2 skipped.
+- **New brand lockup (owner logo files):** `BrandOutlineIcon` (stroked nine-block
+  glyph) + `BrandLogo` (SUPER orange wide-tracked over BMC — deep navy `#0e142a`
+  in light, white in dark) mounted in the sidebar's top-left h-14 row; the company
+  switcher moved down one step; the old BrandMark removed from TopBar. Landing and
+  favicon untouched.
+- **Search bar answered + made real:** the TopBar search input was decorative (no
+  state, no handler). Replaced with `GlobalSearch` — a Cmd/Ctrl+K command palette
+  over saved companies (opens via the My Analyses pointer flow, agents follow via
+  the company-sync effect), the nine agent rooms, pages, and the active company's
+  documents. Dynamic entries load only when the palette opens.
+- Honest scope: legacy NULL-stamped gaps/competitors/artifacts drop out of scoped
+  views until re-run (intended — that stale data is exactly the bug); the
+  "Retry research: company_research requires a business context [website]" error on
+  a competitor card in the owner's screenshot was NOT addressed this round;
+  full-page War Room still not built. Live data note: Salesforce/Tier4 rows created
+  before this migration are all NULL-stamped, so the register/landscape start clean
+  after deploy and repopulate from the next research runs.
+
+**Gate results for the company-scoping commit:**
+```
+npx tsc --noEmit                      -> exit 0
+npm run build                         -> exit 0
+npm run lint                          -> 65 problems (46 errors, 19 warnings), unchanged from branch baseline, within frozen <=65 ceiling
+cd worker && npx tsc --noEmit         -> exit 0
+cd worker && npx vitest run           -> 100 passed, 2 skipped
+cd worker && npm run build            -> exit 0
+cd worker && npx eslint src           -> exit 0
+UTF-8 touched-file decode             -> exit 0
+```
+
 ### Atlas round 4 (owner pass) — Cursor-grade panel: pinned composer, aligned header, real width (2026-07-06)
 
 - **Pinned composer (Cursor pattern):** AtlasChat now owns the panel's flex column —

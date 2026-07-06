@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadCompanyScope, type CompanyScope } from "../db/company-scope.js";
 import { asRecord } from "../db/json.js";
 import { SECTION_LABELS, SECTION_KEYS, type SectionKey } from "../domain/sections.js";
 import type { AgentJob } from "../queue/types.js";
@@ -45,8 +46,11 @@ export class GapEngineHandler {
   async handle(job: AgentJob): Promise<void> {
     const payload = asRecord(job.payload);
     const requestedCompetitorId = readString(payload.competitor_id ?? payload.competitorId);
-    const competitors = await this.loadCompetitors(job.account_id, requestedCompetitorId);
-    const versions = await this.loadCanvasVersions(job.account_id);
+    // Comparisons only make sense inside one company's era: the active
+    // company's own canvas against the competitors researched for it.
+    const scope = await loadCompanyScope(this.client, job.account_id);
+    const competitors = await this.loadCompetitors(job.account_id, requestedCompetitorId, scope);
+    const versions = await this.loadCanvasVersions(job.account_id, scope);
     const ownBySection = latestOwnCanvasBySection(versions);
     const competitorById = latestCompetitorCanvasById(versions);
 
@@ -64,7 +68,7 @@ export class GapEngineHandler {
       }
     }
 
-    await this.writeGaps(job, competitors, gaps);
+    await this.writeGaps(job, competitors, gaps, scope);
     await this.writeMetrics(job.account_id, competitors, gaps);
     await markJobRunCompleted(this.client, job, "Gap engine completed competitor comparison.", {
       competitors_analyzed: competitors.length,
@@ -74,29 +78,33 @@ export class GapEngineHandler {
     });
   }
 
-  private async loadCompetitors(accountId: string, competitorId: string | undefined): Promise<CompanyRow[]> {
+  private async loadCompetitors(accountId: string, competitorId: string | undefined, scope: CompanyScope): Promise<CompanyRow[]> {
     let query = this.client
       .from("companies")
       .select("id, name, website_url")
       .eq("account_id", accountId)
       .eq("is_competitor", true);
-    if (competitorId) query = query.eq("id", competitorId);
+    // An explicit competitor id is an explicit instruction (chained from a
+    // research run the user just triggered) — only the account-wide sweep is
+    // confined to the active company's competitors.
+    query = competitorId ? query.eq("id", competitorId) : query.in("business_context_version_id", scope.contextIds);
     const { data, error } = await query.order("name", { ascending: true });
     if (error) throw new Error(`Failed to load competitors for gap engine: ${error.message}`);
     return (data ?? []) as CompanyRow[];
   }
 
-  private async loadCanvasVersions(accountId: string): Promise<CanvasVersionRow[]> {
+  private async loadCanvasVersions(accountId: string, scope: CompanyScope): Promise<CanvasVersionRow[]> {
     const { data, error } = await this.client
       .from("canvas_section_versions")
       .select("id, competitor_id, section_key, items, confidence, created_at")
       .eq("account_id", accountId)
+      .in("business_context_version_id", scope.contextIds)
       .order("created_at", { ascending: false });
     if (error) throw new Error(`Failed to load canvas versions for gap engine: ${error.message}`);
     return (data ?? []) as CanvasVersionRow[];
   }
 
-  private async writeGaps(job: AgentJob, competitors: CompanyRow[], gaps: GapCandidate[]): Promise<void> {
+  private async writeGaps(job: AgentJob, competitors: CompanyRow[], gaps: GapCandidate[], scope: CompanyScope): Promise<void> {
     // Idempotency (RF-4-5): each run supersedes the prior open competitive gaps for the
     // competitors it analyzed, so re-runs and mid-job retries never duplicate rows.
     if (competitors.length > 0) {
@@ -112,6 +120,7 @@ export class GapEngineHandler {
     if (gaps.length === 0) return;
     const rows = gaps.map((gap) => ({
       account_id: job.account_id,
+      business_context_version_id: scope.activeContextId,
       competitor_id: gap.competitor.id,
       title: `${gap.competitor.name} advantage in ${SECTION_LABELS[gap.sectionKey]}`,
       description: gap.competitorItem.text,

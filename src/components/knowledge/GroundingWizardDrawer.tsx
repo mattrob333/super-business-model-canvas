@@ -10,6 +10,7 @@ import type { Json } from "@/integrations/supabase/types";
 // grounding_suggestions is beyond the generated Database type's TS2589 depth
 // horizon (see src/lib/supabase-untyped.ts) — explicit row type + escape hatch.
 import { supabaseUntyped } from "@/lib/supabase-untyped";
+import { loadCompanyScope } from "@/lib/company-scope";
 
 interface GroundingSuggestion {
   id: string;
@@ -122,12 +123,16 @@ export function GroundingWizardDrawer({
     if (!accountId) return;
     setLoading(true);
     try {
+      // The wizard grounds the ACTIVE company's canvas only.
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      let versionsQuery = supabase
+        .from("canvas_section_versions")
+        .select("id, section_key, items, business_context_version_id, created_at")
+        .eq("account_id", accountId)
+        .is("competitor_id", null);
+      if (scope) versionsQuery = versionsQuery.in("business_context_version_id", scope.contextIds);
       const [{ data, error }, suggestionsRes] = await Promise.all([
-        supabase
-          .from("canvas_section_versions")
-          .select("id, section_key, items, business_context_version_id, created_at")
-          .eq("account_id", accountId)
-          .is("competitor_id", null)
+        versionsQuery
           .order("created_at", { ascending: false })
           .limit(200),
         supabaseUntyped

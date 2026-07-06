@@ -135,6 +135,9 @@ class GapEngineFakeClient {
   }
 
   selectMany(table: string): Array<Record<string, unknown>> {
+    if (table === "business_context_versions") {
+      return [{ id: "ctx-1", company_name: "Acme Robotics", website: null, created_at: "2026-07-01T00:00:00Z" }];
+    }
     if (table === "companies") {
       return [{ id: "competitor-1", name: "RivalCo", website_url: "https://rival.example" }];
     }
@@ -206,6 +209,10 @@ class GapEngineFakeQuery {
   }
 
   order(): this {
+    return this;
+  }
+
+  limit(): this {
     return this;
   }
 

@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CANVAS_SECTION_LABELS, LEGACY_SECTION_KEYS } from "@/components/canvas/section-types";
 import { getActiveAnalysisCanvas } from "@/lib/active-analysis";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
 
 /**
@@ -348,14 +349,9 @@ export function WorkspaceThread({
   }, [accountId, agentProfileId, newThreadTitle, user]);
 
   const ensureBusinessContext = useCallback(async (): Promise<string> => {
-    const { data: existingContext } = await supabase
-      .from("business_context_versions")
-      .select("id")
-      .eq("account_id", accountId)
-      .order("version_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (existingContext?.id) return existingContext.id;
+    // The active company's newest context — never a stale prior-company row.
+    const scope = await loadCompanyScope(accountId).catch(() => null);
+    if (scope?.activeContextId) return scope.activeContextId;
 
     const { data: created, error } = await supabase
       .from("business_context_versions")
@@ -412,13 +408,17 @@ export function WorkspaceThread({
       // A new version REPLACES the section for every reader (latest-per-section
       // semantics) — approving must append to the current items, never reduce
       // the section to the proposal alone. Same fallback order as the canvas:
-      // latest version first, else the legacy analysis strings.
-      const { data: latestVersion } = await supabase
+      // latest version first, else the legacy analysis strings. Scoped to the
+      // active company so an approval never merges another company's items.
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      let latestQuery = supabase
         .from("canvas_section_versions")
         .select("items")
         .eq("account_id", accountId)
         .eq("section_key", sectionKey)
-        .is("competitor_id", null)
+        .is("competitor_id", null);
+      if (scope) latestQuery = latestQuery.in("business_context_version_id", scope.contextIds);
+      const { data: latestVersion } = await latestQuery
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

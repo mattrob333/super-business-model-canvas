@@ -3,6 +3,7 @@ import { PDFParse } from "pdf-parse";
 import * as mammoth from "mammoth";
 import type { AgentRunner } from "../agent/runner.js";
 import { ClaudeAgentRunner, OpenRouterChatRunner } from "../agent/runner.js";
+import { loadCompanyScope } from "../db/company-scope.js";
 import { asRecord, asStringArray } from "../db/json.js";
 import { FeedRunner } from "../feeds/feed-runner.js";
 import type { EvidenceCandidate, FeedRuntimeConfig } from "../feeds/types.js";
@@ -435,11 +436,14 @@ export class KnowledgeJobHandler {
   }
 
   private async loadUngroundedItems(accountId: string): Promise<UngroundedItem[]> {
+    // Grounding suggestions target the active company's canvas only.
+    const scope = await loadCompanyScope(this.deps.client, accountId);
     const { data, error } = await this.deps.client
       .from("canvas_section_versions")
       .select("section_key, items, created_at")
       .eq("account_id", accountId)
       .is("competitor_id", null)
+      .in("business_context_version_id", scope.contextIds)
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(`Failed to load canvas versions: ${error.message}`);

@@ -8,6 +8,7 @@ import { ArtifactDocument } from "@/components/skills/ArtifactDocument";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { getAgentRuntime } from "@/lib/agent-runtime";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -90,11 +91,16 @@ export function WorkspaceActionsPanel({
       setArtifacts([]);
       return;
     }
-    const { data, error } = await supabaseUntyped
+    // The shelf shows the ACTIVE company's artifacts only — a company switch
+    // must not leave the previous company's documents on display.
+    const scope = await loadCompanyScope(accountId).catch(() => null);
+    let query = supabaseUntyped
       .from<SkillArtifact>("skill_artifacts")
       .select("id, skill_key, title, body_md, payload, evidence_ids, created_at")
       .eq("account_id", accountId)
-      .in("skill_key", skillKeys)
+      .in("skill_key", skillKeys);
+    if (scope) query = query.in("business_context_version_id", scope.contextIds);
+    const { data, error } = await query
       .order("created_at", { ascending: false })
       .limit(8);
     setArtifacts(error ? [] : data ?? []);
@@ -108,14 +114,9 @@ export function WorkspaceActionsPanel({
   }, [skills, loadArtifacts]);
 
   const ensureBusinessContext = useCallback(async (): Promise<string> => {
-    const { data: existingContext } = await supabase
-      .from("business_context_versions")
-      .select("id")
-      .eq("account_id", accountId)
-      .order("version_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (existingContext?.id) return existingContext.id;
+    // The active company's newest context — never a stale prior-company row.
+    const scope = await loadCompanyScope(accountId).catch(() => null);
+    if (scope?.activeContextId) return scope.activeContextId;
 
     const { data: created, error } = await supabase
       .from("business_context_versions")

@@ -14,6 +14,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { getAgentRuntime, getRuntimeMode } from "@/lib/agent-runtime";
 import type { AgentRunStatus } from "@/lib/agent-runtime";
 import {
@@ -214,18 +215,13 @@ export function useCanvasSectionRun() {
           );
         }
 
-        // Step 2: Ensure a business_context_version exists for this account
+        // Step 2: Ensure a business_context_version exists for this account —
+        // the ACTIVE company's context, never a stale prior-company row.
         let contextVersionId: string;
-        const { data: existingContext } = await supabase
-          .from("business_context_versions")
-          .select("id")
-          .eq("account_id", accountId)
-          .order("version_number", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const scope = await loadCompanyScope(accountId).catch(() => null);
 
-        if (existingContext) {
-          contextVersionId = existingContext.id;
+        if (scope?.activeContextId) {
+          contextVersionId = scope.activeContextId;
         } else {
           // Create a default context version
           const { data: newContext, error: ctxError } = await supabase
