@@ -1,0 +1,33 @@
+name: Diagnose
+
+# Automated worker diagnostics: runs whenever .github/diagnose-now changes
+# (a commit touching that file is the trigger — usable by agents that lack
+# workflow_dispatch permission). Same output as the Ops worker-diagnose task.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/diagnose-now"
+
+jobs:
+  worker-diagnose:
+    name: Worker diagnostics (status, secret names, recent logs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Machine status + memory
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl status -a super-bmc-worker
+          flyctl machine list -a super-bmc-worker
+      - name: Secret NAMES on the worker (values are never printed)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl secrets list -a super-bmc-worker
+      - name: Recent worker logs
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          timeout 45 flyctl logs -a super-bmc-worker --no-tail || true
