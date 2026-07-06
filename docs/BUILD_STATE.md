@@ -198,6 +198,34 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-22..23 + Studio shelf + spec 12 + brand mark (owner round 7) — SHIPPED (2026-07-06, reviewer-as-builder)
+
+- **RF-LIVE-22 (HIGH) — agent replies opened with raw tool-result JSON** (Envoy echoed
+  `{"items": [], "notes": ...}` before its answer; the run-queue summary showed the same
+  junk). Two layers: a system-prompt rule (never paste raw JSON/tool output — translate
+  to plain language) plus a deterministic `stripLeadingToolEcho()` on the worker that
+  removes a leading fenced-or-bare JSON object only when real prose follows — a reply
+  that IS just JSON passes through so a message is never swallowed. Unit-tested (6
+  workspace-chat tests).
+- **RF-LIVE-23 — chat column smushed in the middle.** The thread's `mx-auto max-w-3xl`
+  centered a narrow column inside the wide center pane. Rows are full-width now: agent
+  bubbles hug the left rail (avatar + 85%-capped bubble), user bubbles hug the right.
+- **Studio shelf (NotebookLM direction, owner-approved).** The room's Actions panel is
+  now the Studio: skill tiles on top, and below them the shelf — this agent's
+  `skill_artifacts` (scoped to its catalog skill keys + account), opening in the spec 11
+  ArtifactDocument via FocusDrawer, refreshing every 30s so finished runs land while
+  you watch. Toast copy now points at the shelf instead of the Dashboard.
+- **Spec 12 — Atlas Guided Setup ("State of the Union").** Captured the owner's
+  onboarding-loop vision: evidence-bound position briefing, one directed action per
+  message, database-verified completion (never trust "done"), rendered synopses per
+  spec 11, dock placement per spec 03, binding rules B1–B6. Drafted by a subagent,
+  reviewed and approved as written. All Atlas-side behavior honestly marked Phase 6.
+- **Brand mark (owner's glyph).** New `BrandIcon`/`BrandMark`
+  (src/components/brand/BrandMark.tsx): the nine-block BMC silhouette in brand orange +
+  Montserrat wordmark — bold SUPER, light BUSINESS MODEL CANVAS, orange closing dot.
+  favicon.svg is now the glyph (was a plain circle); Montserrat 700 added to the font
+  link; TopBar and Landing header both use the shared mark.
+
 ### RF-LIVE-21 (owner round 6: data gaps are onboarding, not dead ends) — SHIPPED (2026-07-06, reviewer-as-builder)
 
 - **Owner directive:** when a section agent lacks the data to answer (brand-new startup,

@@ -20,6 +20,7 @@ import {
   Target,
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -183,12 +184,9 @@ function Logo() {
   return (
     <Link
       to="/"
-      className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <span className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-sm font-semibold tracking-wide text-primary-foreground">
-        SUPER
-      </span>
-      <span className="text-sm font-medium tracking-wide text-foreground sm:text-base">Business Model Canvas</span>
+      <BrandMark />
     </Link>
   );
 }

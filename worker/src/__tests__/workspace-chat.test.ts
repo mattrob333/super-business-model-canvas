@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AgentRunRequest, AgentRunResult, AgentRunner } from "../agent/runner.js";
-import { WorkspaceChatHandler } from "../jobs/workspace-chat.js";
+import { WorkspaceChatHandler, stripLeadingToolEcho } from "../jobs/workspace-chat.js";
 import type { AgentJob } from "../queue/types.js";
 
 class CapturingRunner implements AgentRunner {
@@ -78,6 +78,16 @@ describe("WorkspaceChatHandler", () => {
     }).handle(makeJob());
 
     expect(runner.request?.maxBudgetUsd).toBeGreaterThanOrEqual(0.75);
+  });
+
+  it("strips a leading tool-result JSON echo from replies but never swallows a whole message", () => {
+    const prose = "Bottom line: the section is empty, so let's run the analysis first and go from there.";
+    expect(stripLeadingToolEcho(`{"items": [], "confidence": "low"}\n\n${prose}`)).toBe(prose);
+    expect(stripLeadingToolEcho("```json\n{\"items\": []}\n```\n" + prose)).toBe(prose);
+    // Prose-only, JSON-only, and JSON-looking-but-invalid replies pass through untouched.
+    expect(stripLeadingToolEcho(prose)).toBe(prose);
+    expect(stripLeadingToolEcho('{"items": []}')).toBe('{"items": []}');
+    expect(stripLeadingToolEcho(`{not json${prose}`)).toBe(`{not json${prose}`);
   });
 });
 
