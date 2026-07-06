@@ -179,6 +179,13 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
             />
             <SectionCanvasPanel sectionKey={sectionKey} items={items} loading={canvasLoading} />
             <ContextSourcesPanel accountId={accountId} agentProfileId={profile.id} />
+            {/* Activity lives with context on the left — the right rail is the
+                Studio: outputs only (owner direction 2026-07-06). */}
+            <WorkspaceRunQueue
+              accountId={accountId}
+              agentProfileId={profile.id}
+              onLatestRun={handleLatestRun}
+            />
           </aside>
 
           {/* Center — the collaboration thread */}
@@ -197,11 +204,6 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
               accountId={accountId}
               agentProfileId={profile.id}
               agentKey={entry.agentKey}
-            />
-            <WorkspaceRunQueue
-              accountId={accountId}
-              agentProfileId={profile.id}
-              onLatestRun={handleLatestRun}
             />
           </aside>
         </div>

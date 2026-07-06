@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight, Plus, Save, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { splitAssumption } from "@/lib/assumption";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,6 +45,8 @@ export const BMCSectionEditor = ({
   const [editedItems, setEditedItems] = useState<string[]>(section.items);
   const [notes, setNotes] = useState(section.notes || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [editingItems, setEditingItems] = useState(false);
+  const navigate = useNavigate();
   const [saveSuccess, setSaveSuccess] = useState(false);
   const { toast } = useToast();
 
@@ -99,10 +102,26 @@ export const BMCSectionEditor = ({
       title={section.title}
       subtitle={SECTION_DESCRIPTIONS[section.title]}
       footer={
-        <Button onClick={handleSave} className="w-full font-medium" disabled={isSaving}>
-          <Save className="mr-2 h-4 w-4" />
-          {isSaving ? "Saving..." : saveSuccess ? "Saved" : "Save Changes"}
-        </Button>
+        <div className="flex w-full gap-2">
+          {/* The workspace is the destination; Save is the quick-edit escape
+              hatch. The orange button owns the eye (owner finding 2026-07-06). */}
+          <Button onClick={handleSave} variant="outline" className="flex-1 font-medium" disabled={isSaving}>
+            <Save className="mr-2 h-4 w-4" />
+            {isSaving ? "Saving..." : saveSuccess ? "Saved" : "Save changes"}
+          </Button>
+          {workspaceEntry && (
+            <Button
+              className="flex-[1.4] font-medium"
+              onClick={() => {
+                onOpenChange(false);
+                navigate(`/workspace/${workspaceEntry.sectionKey}`);
+              }}
+            >
+              Open {workspaceEntry.callsign}&rsquo;s workspace
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          )}
+        </div>
       }
     >
       {/* A quick-edit form, not a document: the reading-width panel and a
@@ -112,42 +131,74 @@ export const BMCSectionEditor = ({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-sm font-semibold">Items on the canvas</label>
-            <Button
-              onClick={addItem}
-              size="sm"
-              variant="ghost"
-              className="h-8 border border-primary/30 hover:border-primary hover:bg-transparent"
-            >
-              <Plus className="mr-1 h-3 w-3" />
-              Add item
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {editedItems.map((item, index) => (
-              <div key={index} className="flex gap-2">
-                <Input
-                  value={item}
-                  onChange={(e) => updateItem(index, e.target.value)}
-                  className="flex-1"
-                  placeholder={`Item ${index + 1}`}
-                />
+            {editingItems ? (
+              <div className="flex gap-1.5">
                 <Button
-                  onClick={() => removeItem(index)}
-                  size="icon"
+                  onClick={addItem}
+                  size="sm"
                   variant="ghost"
-                  className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
-                  aria-label={`Remove item ${index + 1}`}
+                  className="h-8 border border-primary/30 hover:border-primary hover:bg-transparent"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add item
+                </Button>
+                <Button onClick={() => setEditingItems(false)} size="sm" variant="ghost" className="h-8 text-muted-foreground">
+                  Done
                 </Button>
               </div>
-            ))}
-            {editedItems.length === 0 && (
-              <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                No items yet — add one above, or let {workspaceEntry?.callsign ?? "the agent"} research this section.
-              </p>
+            ) : (
+              <Button onClick={() => setEditingItems(true)} size="sm" variant="ghost" className="h-8 gap-1 text-muted-foreground hover:text-foreground">
+                <Pencil className="h-3 w-3" />
+                Edit
+              </Button>
             )}
           </div>
+          {/* Read view by default — these bullets are maintained by the agents
+              over time; hand-editing is the exception, not the surface. */}
+          {editingItems ? (
+            <div className="space-y-2">
+              {editedItems.map((item, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    value={item}
+                    onChange={(e) => updateItem(index, e.target.value)}
+                    className="flex-1"
+                    placeholder={`Item ${index + 1}`}
+                  />
+                  <Button
+                    onClick={() => removeItem(index)}
+                    size="icon"
+                    variant="ghost"
+                    className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
+                    aria-label={`Remove item ${index + 1}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : editedItems.length > 0 ? (
+            <ul className="space-y-2">
+              {editedItems.map((item, index) => (
+                <li key={index} className="flex items-start gap-2 text-sm leading-relaxed">
+                  <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-primary" />
+                  <span className="min-w-0">
+                    {splitAssumption(item).text}
+                    {splitAssumption(item).assumed && (
+                      <span className="ml-1.5 inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-px align-middle text-[9px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                        assumed
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {editedItems.length === 0 && (
+            <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+              No items yet — add one with Edit, or let {workspaceEntry?.callsign ?? "the agent"} research this section.
+            </p>
+          )}
         </div>
 
         <div className="space-y-2 border-t border-border pt-5">
@@ -163,24 +214,6 @@ export const BMCSectionEditor = ({
           />
         </div>
 
-        {workspaceEntry && (
-          <Link
-            to={`/workspace/${workspaceEntry.sectionKey}`}
-            onClick={() => onOpenChange(false)}
-            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5 transition-colors hover:border-primary/35"
-          >
-            <span className="flex min-w-0 items-center gap-2.5">
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 ${workspaceEntry.avatarClass}`}>
-                <workspaceEntry.icon className="h-3.5 w-3.5" />
-              </span>
-              <span className="min-w-0 text-xs text-muted-foreground">
-                Need research or evidence?{" "}
-                <span className="font-semibold text-foreground">Open {workspaceEntry.callsign}&rsquo;s workspace</span>
-              </span>
-            </span>
-            <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
-          </Link>
-        )}
       </div>
     </FocusDrawer>
   );
