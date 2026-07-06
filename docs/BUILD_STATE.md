@@ -285,6 +285,44 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Owner round 6c — the REAL workspace crash: undeclared prop from PR #88, caught by the new error boundary (2026-07-06)
+
+The AppErrorBoundary shipped in round 6b immediately surfaced the true bug:
+`initialThreadTitle is not defined`.
+
+- **Root cause:** PR #88 (Atlas delegation handoff) added the fresh-thread
+  auto-send effect that reads `initialThreadTitle` — and its dependency array
+  evaluates it on EVERY render — but never added the prop to WorkspaceThread's
+  destructuring. Undeclared identifier -> ReferenceError on every workspace
+  mount. The /workspace route has been crashing for every visit since #88
+  merged; round 6b's stale-chunk diagnosis was real but secondary.
+- **Why four rounds of gates missed it:** the gate command drifted. This
+  session ran `npx tsc --noEmit` at the root, which is a no-op under this
+  repo's project-references tsconfig; the real gate is
+  `npx tsc -p tsconfig.app.json --noEmit` (as every earlier BUILD_STATE entry
+  records). Vite's build is transpile-only, so the bundle shipped with the
+  bare identifier intact. GATE CORRECTION (binding): root typecheck is
+  `npx tsc -p tsconfig.app.json --noEmit` + `npx tsc -p tsconfig.node.json --noEmit`.
+- **Fix:** `initialThreadTitle = null` restored to the destructuring with its
+  prop type; full-app typecheck now clean (this was the only error of its
+  kind in the entire app). Delegation flow ("Directive from Atlas" fresh
+  thread) is effectively getting its first working run in prod.
+- The 6b hardening stands: vite:preloadError one-shot reload for genuinely
+  stale chunks, and the boundary that turned this from a black void into a
+  named, reported error within minutes.
+
+**Gate results for the round-6c commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                         -> exit 0
+npm run lint                          -> 64 problems (46 errors, 18 warnings), within frozen <=65 ceiling
+cd worker && npx tsc --noEmit         -> exit 0
+cd worker && npx vitest run           -> 100 passed, 2 skipped
+UTF-8 touched-file decode             -> exit 0
+```
+
+
 ### Owner round 6b — black-screen navigation fixed (stale lazy chunks), sanity pass (2026-07-06)
 
 Owner report: clicking Atlas's directive or the canvas drawer's "Open full

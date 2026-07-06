@@ -106,6 +106,7 @@ export function WorkspaceThread({
   agentProfileId,
   sectionKey,
   initialPrompt = null,
+  initialThreadTitle = null,
   composerPrefill = null,
   onComposerPrefillConsumed,
 }: {
@@ -114,6 +115,8 @@ export function WorkspaceThread({
   sectionKey: CanvasSectionKey;
   /** Auto-sent once on arrival (e.g. a Gap Register brief) so the agent starts working immediately. */
   initialPrompt?: string | null;
+  /** When set (Atlas delegation), the initialPrompt opens a FRESH thread with this title. */
+  initialThreadTitle?: string | null;
   composerPrefill?: string | null;
   onComposerPrefillConsumed?: () => void;
 }) {
