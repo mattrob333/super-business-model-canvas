@@ -267,11 +267,15 @@ export function WorkspaceThread({
 
   // Gap Register arrivals: send the brief once, as soon as the thread is
   // ready, so the agent is already working the problem when the user lands.
+  // Only into an EMPTY thread — the ?gap= param survives tab switches and
+  // remounts, and re-sending replaced the agent's finished answer with a
+  // brand-new run every time the owner came back (finding 2026-07-06).
   useEffect(() => {
     if (!initialPrompt || autoSentRef.current || loadingMessages || sending || awaitingReply) return;
     autoSentRef.current = true;
+    if (messages.length > 0) return;
     void sendMessage(initialPrompt);
-  }, [initialPrompt, loadingMessages, sending, awaitingReply, sendMessage]);
+  }, [initialPrompt, loadingMessages, sending, awaitingReply, messages.length, sendMessage]);
 
   const createThread = useCallback(async () => {
     const title = newThreadTitle.trim() || "New topic";

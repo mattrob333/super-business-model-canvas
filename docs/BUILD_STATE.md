@@ -198,6 +198,21 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-29 (owner round 13: gap brief re-sent on every return) — FIXED (2026-07-06, reviewer-as-builder)
+
+- **RF-LIVE-29 — returning to a gap-linked room re-ran the brief.** The `?gap=` param
+  survives tab switches and remounts, so the auto-send fired again, replacing the
+  agent's finished answer with a fresh run each visit. Auto-send now fires only into
+  an EMPTY thread; an existing conversation is never overwritten.
+- **Owner direction captured (next slices):** gap-driven workflows — the Studio's
+  "Coming" skills for a section (avatar refinement, segment expansion) are the natural
+  fix-path for data gaps; the agent should be able to trigger its own section analysis
+  from chat when the user says yes ("want me to kick that off?" must be a real button,
+  not an offer it can't execute); pasted owner data in a gap thread should land as a
+  context source + canvas proposal in one motion. These ride with the skill
+  implementations (spec 10) and the multi-page crawl slice.
+
+
 ### RF-LIVE-28 (owner round 12: competitor claims read as raw crawl text) — PROMPT FIX SHIPPED (2026-07-06, reviewer-as-builder)
 
 - **RF-LIVE-28 — competitor canvas items were undistilled page spans** ("VC Investment
