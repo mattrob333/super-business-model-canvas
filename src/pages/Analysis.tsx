@@ -12,8 +12,9 @@ import { FloatingCTA } from "@/components/FloatingCTA";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { setActiveWorkspaceName } from "@/lib/active-workspace";
+import { clearActiveWorkspaceName, setActiveWorkspaceName } from "@/lib/active-workspace";
 import {
+  clearActiveAnalysis,
   getActiveAnalysis,
   setActiveAnalysis,
 } from "@/lib/active-analysis";
@@ -590,6 +591,22 @@ Website: ${comp.website || 'N/A'}
     setSimilarCompanyChatOpen(true);
   };
 
+  const startFreshAnalysis = () => {
+    // "New analysis" must actually start over. It previously just re-expanded
+    // the URL input above the old company — the old canvas stayed put and
+    // there was no path to a clean slate (owner finding 2026-07-06).
+    setAnalysisData(null);
+    setHasAnalyzed(false);
+    setIsNewAnalysis(false);
+    setSearchCollapsed(false);
+    setIsLoading(false);
+    setAnalyzingLabel(undefined);
+    clearActiveAnalysis();
+    clearActiveWorkspaceName();
+    sessionStorage.removeItem("loadedAnalysis");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleSearchToggle = () => {
     if (searchCollapsed) {
       // Currently collapsed → expand it
@@ -668,6 +685,19 @@ Website: ${comp.website || 'N/A'}
                   isLoading={isLoading}
                   companyName={analyzingLabel ?? analysisData?.company?.name}
                 />
+
+                {!hasAnalyzed && !isLoading && (
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => navigate("/knowledge")}
+                      className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      No website yet? Start from a pitch deck, plan, or text file instead
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
 
                 {!hasAnalyzed && !isLoading && recentAnalyses.length === 0 && (
                   <p className="text-center text-xs text-muted-foreground/60">
@@ -792,20 +822,15 @@ Website: ${comp.website || 'N/A'}
                     onUpdate={handleBusinessOverviewUpdate}
                   />
                 </div>
-                {searchCollapsed && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSearchCollapsed(false);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="shrink-0 gap-1.5"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    New analysis
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={startFreshAnalysis}
+                  className="shrink-0 gap-1.5"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  New company
+                </Button>
               </div>
             </header>
 
