@@ -15,6 +15,7 @@ on:
           - deploy-edge-functions
           - apply-migrations
           - live-golden-set
+          - worker-diagnose
 
 env:
   SUPABASE_PROJECT_REF: mehhuxzamnpxnkbrslls
@@ -161,3 +162,27 @@ jobs:
         run: |
           npm ci
           npx vitest run verifier-golden
+
+  worker-diagnose:
+    name: Worker diagnostics (status, secret names, recent logs)
+    if: inputs.task == 'worker-diagnose'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Machine status + memory
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl status -a super-bmc-worker
+          flyctl machine list -a super-bmc-worker
+      - name: Secret NAMES on the worker (values are never printed)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl secrets list -a super-bmc-worker
+      - name: Recent worker logs
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          # fly logs streams; --no-tail returns the recent buffer and exits.
+          # timeout guards against CLI versions that keep the stream open.
+          timeout 45 flyctl logs -a super-bmc-worker --no-tail || true
