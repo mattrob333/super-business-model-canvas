@@ -253,6 +253,16 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase A.2 review (Codex build/phase-a2-research-backfill, c442cd6) — APPROVED, no findings (2026-07-06)
+
+- Web-evidence backfill for competitor research: competitor-only guard, missing =
+  sections with zero CONFIRMED crawl claims, <=2 batched grok_live_search calls,
+  same dedupe/byte-cap/extract/verify/evidence-write pipeline, per-section cap 4,
+  confidence min(claim, 0.6), source_kind carried on evidence metadata AND claim
+  flags, empty-stays-empty when search finds nothing. Gates re-verified
+  independently (worker 76 passed, root tsc/build/lint 64<=65).
+
+
 ### Phase A review (Codex build/phase-a-research-depth, 0ea537b) — APPROVED, no findings (2026-07-06)
 
 - Multi-page crawl: correct order of operations (dedupe → byte cap → count cap),
