@@ -173,6 +173,115 @@ describe("CompanyResearchHandler", () => {
     });
   });
 
+  it("crawls a bounded multi-page set for competitor research", async () => {
+    const client = new CompanyResearchFakeClient();
+    const calls: Array<{ feedKey: string; companyUrl?: string; cacheKey?: string }> = [];
+    const handler = new CompanyResearchHandler({
+      client: client.asSupabase(),
+      runner: new ScriptedRunner([
+        JSON.stringify({ claims: [{ section_key: "channels", text: "RivalCo sells through partners.", confidence: 0.74, evidence_index: 1 }] }),
+        JSON.stringify({ status: "confirmed", reason: "Supported." }),
+      ]),
+      feedRunner: {
+        async refresh(request: { feedKey: string; companyUrl?: string; cacheKey?: string }) {
+          calls.push(request);
+          return {
+            health: "ok" as const,
+            payload: { data: { metadata: {} } },
+            evidence: [{
+              title: request.companyUrl ?? "page",
+              sourceType: "website" as const,
+              sourceName: "Firecrawl",
+              sourceUrl: request.companyUrl,
+              excerpt: `Evidence from ${request.companyUrl}`,
+              metadata: {},
+            }],
+            metrics: [],
+          };
+        },
+      },
+    });
+
+    await handler.handleCompetitor(makeCompetitorJob());
+
+    expect(calls.map((call) => call.companyUrl)).toEqual([
+      "https://rival.example/",
+      "https://rival.example/pricing",
+      "https://rival.example/about",
+      "https://rival.example/customers",
+      "https://rival.example/case-studies",
+      "https://rival.example/careers",
+    ]);
+    expect(calls.every((call) => call.feedKey === "firecrawl_scrape")).toBe(true);
+  });
+
+  it("falls back to Grok live search when Firecrawl is blocked by HTTP 403", async () => {
+    const client = new CompanyResearchFakeClient();
+    const calls: string[] = [];
+    const runner = new ScriptedRunner([
+      JSON.stringify({ claims: [{ section_key: "revenue_streams", text: "RivalCo sells enterprise subscriptions.", confidence: 0.8, evidence_index: 0 }] }),
+      JSON.stringify({ status: "confirmed", reason: "Supported by live search." }),
+    ]);
+    const handler = new CompanyResearchHandler({
+      client: client.asSupabase(),
+      runner,
+      feedRunner: {
+        async refresh(request: { feedKey: string; query?: string }) {
+          calls.push(request.feedKey);
+          if (request.feedKey === "firecrawl_scrape") {
+            return { health: "degraded" as const, payload: {}, evidence: [], metrics: [], error: "Firecrawl scrape failed with HTTP 403" };
+          }
+          return {
+            health: "ok" as const,
+            payload: { fallback: true },
+            evidence: [{
+              title: "Live search RivalCo",
+              sourceType: "news" as const,
+              sourceName: "Grok Live Search",
+              sourceUrl: "https://news.example/rivalco",
+              excerpt: "RivalCo sells enterprise subscriptions and product analytics.",
+              metadata: { query: request.query },
+            }],
+            metrics: [],
+          };
+        },
+      },
+    });
+
+    await handler.handleCompetitor(makeCompetitorJob());
+
+    expect(calls).toContain("grok_live_search");
+    expect(runner.requests[0]?.prompt).toContain("Live search RivalCo");
+    expect(client.inserts.find((insert) => insert.table === "evidence_items")?.value).toMatchObject({
+      source_type: "news",
+      source_name: "Grok Live Search",
+    });
+  });
+
+  it("keeps the honest crawl error when Firecrawl and fallback both fail", async () => {
+    const client = new CompanyResearchFakeClient();
+    const handler = new CompanyResearchHandler({
+      client: client.asSupabase(),
+      runner: new ScriptedRunner([]),
+      feedRunner: {
+        async refresh(request: { feedKey: string }) {
+          return {
+            health: "degraded" as const,
+            payload: {},
+            evidence: [],
+            metrics: [],
+            error: request.feedKey === "firecrawl_scrape"
+              ? "Firecrawl scrape failed with HTTP 403"
+              : "Grok search failed with HTTP 500",
+          };
+        },
+      },
+    });
+
+    await expect(handler.handleCompetitor(makeCompetitorJob())).rejects.toThrow(/competitor_research crawl failed: Firecrawl scrape failed with HTTP 403/);
+    expect(client.inserts.filter((insert) => insert.table === "canvas_section_versions")).toHaveLength(0);
+  });
+
   it("dispatcher supports competitor_research jobs", async () => {
     const client = new CompanyResearchFakeClient();
     const dispatcher = createJobDispatcher({

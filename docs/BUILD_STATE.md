@@ -17,6 +17,7 @@
 | 6 | War Room & orchestration | NOT STARTED | — | — |
 | 7 | Metrics, KPIs & interpretation | NOT STARTED | — | — |
 | 8 | Hardening & commercial | HELD (await direction) | — | — |
+| A | Next Build: research depth | AWAITING REVIEW | `build/phase-a-research-depth` | 2026-07-06 |
 
 Statuses: `NOT STARTED` → `IN PROGRESS` → `AWAITING REVIEW` → `APPROVED` (or back to
 `IN PROGRESS` on review findings). Only one phase `IN PROGRESS` unless BUILD_PLAN Part IV
@@ -149,6 +150,33 @@ Status: OPEN | RESOLVED (<how>)
      `GOLDEN_LIVE=1 ANTHROPIC_API_KEY=sk-... npx vitest run verifier-golden` (must be >= 9/10).
 
 <!-- Agents append: exact commands/clicks, why needed, which acceptance criterion waits on it. -->
+
+## NEXT BUILD PHASES
+
+### Phase A - Research depth (2026-07-06, `build/phase-a-research-depth`)
+
+- Implemented bounded multi-page competitor research in `worker/src/jobs/company-research.ts`:
+  competitor runs now scrape home, pricing, about, customers, case-studies, and careers pages
+  through `FeedRunner`/`firecrawl_scrape`, with the existing request timeout preserved. Evidence
+  is deduped before writes and capped to a fixed excerpt budget before extraction.
+- Added the deferred 403 fallback: if Firecrawl returns only blocking-style failures such as HTTP
+  403, research falls back to `grok_live_search` using the query
+  `<company> business model products pricing revenue`; fallback evidence keeps its truthful
+  `news` source type from the feed instead of pretending to be website crawl evidence. If both
+  Firecrawl and fallback fail, the job keeps the existing honest crawl error and writes no canvas
+  sections.
+- Tightened the competitor drill-down cards in `src/pages/CompetitorCanvas.tsx`: item cards now
+  show clean item text plus a compact evidence-count popover instead of rendering full excerpts
+  inline and ballooning the BMC grid.
+- Added worker tests for bounded multi-page competitor crawls, 403 to Grok fallback to success,
+  and both-fail behavior; existing RF-3-7 evidence reuse remains in the write path.
+- Gates: `npx tsc -p tsconfig.app.json --noEmit` exit 0; `npm run build` green; `npm run
+  lint` reports 64 problems (46 errors, 18 warnings), still within the frozen <=65 ceiling;
+  `worker npm run typecheck` exit 0; `worker npm test` 73 passed / 2 skipped; `worker npm run
+  build` exit 0; `worker npm run lint` exit 0.
+- Honest deferral: live verification against an actually blocked competitor site waits on deploy
+  and an authenticated owner smoke run; this branch is ready for reviewer/code-path review, not
+  claimed live-proven.
 
 ## OVERLAY SYSTEM — 2026-07-04 (reviewer, spec 09, PR #26)
 
