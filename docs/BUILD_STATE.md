@@ -198,6 +198,26 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-28 (owner round 12: competitor claims read as raw crawl text) — PROMPT FIX SHIPPED (2026-07-06, reviewer-as-builder)
+
+- **RF-LIVE-28 — competitor canvas items were undistilled page spans** ("VC Investment
+  DashboardLive tracker…", "CompaniesProfiles of notable…"): the extraction prompt in
+  company-research.ts never required rewriting, so the model returned source spans
+  verbatim. The prompt now carries binding claim-writing rules: rewrite as one clean
+  analyst statement (~18 words max), never copy navigation/heading soup, one idea per
+  claim, max 5 per section, skip rather than pad — while staying fully supported by
+  the cited excerpt. Verifier unchanged (claims must still match evidence).
+- **Owner logo question answered (not a regression):** logo capture runs INSIDE
+  competitor research (og:image → favicon, RF-5A completion slice). Cards for
+  similar-companies that haven't been researched yet have no logo by design; it lands
+  when "Research this competitor" completes.
+- **Still open (next round, larger slices):** single-page homepage crawl leaves 2/9
+  sections covered (multi-page crawl was deferred to Codex and remains the root cause
+  of empty sections); the competitor drill-down's item cards render full evidence
+  excerpts inline, which balloons the grid versus the main canvas silhouette — display
+  tightening queued with the crawl fix so items shrink for real, not just visually.
+
+
 ### RF-LIVE-27 (owner round 11: gaps become actions) — SHIPPED (2026-07-06, reviewer-as-builder)
 
 - **Owner directive: gap cards must be actionable, not just triage.** Two new actions
