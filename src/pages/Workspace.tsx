@@ -46,6 +46,7 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
   const [profile, setProfile] = useState<{ id: string; description: string | null } | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [latestRun, setLatestRun] = useState<AgentRunSnapshot | null>(null);
+  const [composerPrefill, setComposerPrefill] = useState<string | null>(null);
   const { itemsBySection, loading: canvasLoading } = useCanvasEvidence();
 
   // Arriving from the Gap Register ("Fix with <agent>"): load the gap and
@@ -147,6 +148,11 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
       : [];
   }, [itemsBySection, sectionKey, activeAnalysis]);
   const handleLatestRun = useCallback((run: AgentRunSnapshot | null) => setLatestRun(run), []);
+  const handleVerifyAssumption = useCallback((text: string) => {
+    setComposerPrefill(
+      `Let's verify this assumption: «${text}». Research it with your tools and propose an evidence-backed replacement through the proposal loop — or tell me what information you need from me.`,
+    );
+  }, []);
 
   if (accountLoading || (!profile && !profileError)) {
     return (
@@ -177,7 +183,12 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
               description={profile.description}
               latestRun={latestRun}
             />
-            <SectionCanvasPanel sectionKey={sectionKey} items={items} loading={canvasLoading} />
+            <SectionCanvasPanel
+              sectionKey={sectionKey}
+              items={items}
+              loading={canvasLoading}
+              onVerifyAssumption={handleVerifyAssumption}
+            />
             <ContextSourcesPanel accountId={accountId} agentProfileId={profile.id} />
             {/* Activity lives with context on the left — the right rail is the
                 Studio: outputs only (owner direction 2026-07-06). */}
@@ -195,6 +206,8 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
               agentProfileId={profile.id}
               sectionKey={sectionKey}
               initialPrompt={gapPrompt}
+              composerPrefill={composerPrefill}
+              onComposerPrefillConsumed={() => setComposerPrefill(null)}
             />
           </main>
 

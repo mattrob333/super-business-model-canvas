@@ -25,6 +25,14 @@ interface ContextSource {
   created_at: string;
 }
 
+interface BusinessContextBrief {
+  id: string;
+  company_name: string | null;
+  industry: string | null;
+  summary: string | null;
+  created_at: string;
+}
+
 function sourceText(source: ContextSource): string {
   const config = source.config;
   if (config && typeof config === "object" && !Array.isArray(config) && "text" in config) {
@@ -51,21 +59,33 @@ export function ContextSourcesPanel({
   const [urlName, setUrlName] = useState("");
   const [urlValue, setUrlValue] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [brief, setBrief] = useState<BusinessContextBrief | null>(null);
 
   const loadSources = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabaseUntyped
-      .from<ContextSource>("context_sources")
-      .select("id, account_id, agent_profile_id, type, name, uri, config, enabled, created_at")
-      .eq("account_id", accountId)
-      .eq("agent_profile_id", agentProfileId)
-      .order("created_at", { ascending: false });
+    const [sourcesResult, briefResult] = await Promise.all([
+      supabaseUntyped
+        .from<ContextSource>("context_sources")
+        .select("id, account_id, agent_profile_id, type, name, uri, config, enabled, created_at")
+        .eq("account_id", accountId)
+        .eq("agent_profile_id", agentProfileId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("business_context_versions")
+        .select("id, company_name, industry, summary, created_at")
+        .eq("account_id", accountId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const { data, error } = sourcesResult;
     if (error) {
       toast({ title: "Context sources did not load", description: error.message, variant: "destructive" });
       setSources([]);
     } else {
       setSources((data ?? []) as ContextSource[]);
     }
+    setBrief(briefResult.error ? null : briefResult.data ?? null);
     setLoading(false);
   }, [accountId, agentProfileId, toast]);
 
@@ -295,12 +315,41 @@ export function ContextSourcesPanel({
         </PopoverContent>
       </Popover>
 
-      <div className="mt-3 rounded-md border border-border/60 bg-muted/30 p-3">
-        <p className="text-sm font-semibold leading-snug">Company Brief</p>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Pinned account brief. Always available to workspace agents.
-        </p>
-      </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="mt-3 w-full rounded-md border border-border/60 bg-muted/30 p-3 text-left transition-colors hover:border-primary/35 hover:bg-muted/45"
+          >
+            <p className="text-sm font-semibold leading-snug">Company Brief</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Pinned account brief. Always available to workspace agents.
+            </p>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-80 space-y-3 p-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Company Brief</p>
+            <p className="mt-1 text-sm font-semibold">{brief?.company_name ?? "No company name yet"}</p>
+          </div>
+          <div className="space-y-2 text-xs">
+            <div>
+              <p className="font-medium text-muted-foreground">Industry</p>
+              <p className="mt-0.5 leading-relaxed">{brief?.industry ?? "Not set"}</p>
+            </div>
+            <div>
+              <p className="font-medium text-muted-foreground">Summary</p>
+              <p className="mt-0.5 leading-relaxed">{brief?.summary ?? "No business context version has been saved yet."}</p>
+            </div>
+            {brief?.created_at && (
+              <div>
+                <p className="font-medium text-muted-foreground">Updated</p>
+                <p className="mt-0.5 leading-relaxed">{new Date(brief.created_at).toLocaleString()}</p>
+              </div>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
 
       {loading ? (
         <div className="flex justify-center py-4">

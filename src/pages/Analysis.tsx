@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
 import { CompanyProfileDrawer } from "@/components/CompanyProfileDrawer";
@@ -10,6 +10,8 @@ import { ProcessSteps } from "@/components/ProcessSteps";
 import { SuccessBanner } from "@/components/SuccessBanner";
 import { FloatingCTA } from "@/components/FloatingCTA";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
+import { useAccountId } from "@/hooks/useAccountId";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { clearActiveWorkspaceName, setActiveWorkspaceName } from "@/lib/active-workspace";
@@ -18,6 +20,7 @@ import {
   getActiveAnalysis,
   setActiveAnalysis,
 } from "@/lib/active-analysis";
+import { bridgeAnalysisToCanvasVersions } from "@/lib/canvas-version-bridge";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Save, Search, ChevronUp, ArrowRight, Loader2, Sparkles } from "lucide-react";
@@ -57,6 +60,7 @@ function domainLabelFromUrl(url: string): string {
 const Analysis = () => {
   const navigate = useNavigate();
   const { user, isAdmin, signOut } = useAuth();
+  const { accountId } = useAccountId();
   const [isLoading, setIsLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [isNewAnalysis, setIsNewAnalysis] = useState(false);
@@ -74,6 +78,64 @@ const Analysis = () => {
   const [analyzingLabel, setAnalyzingLabel] = useState<string | undefined>();
   const resultsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const saveAnalysisRecord = useCallback(async (
+    nextAnalysisData: Record<string, unknown>,
+    options?: { bridge?: boolean; summaryPrefix?: string },
+  ): Promise<string | null> => {
+    if (!user) return null;
+    const companyRecord =
+      nextAnalysisData.company &&
+      typeof nextAnalysisData.company === "object" &&
+      !Array.isArray(nextAnalysisData.company)
+        ? nextAnalysisData.company as Record<string, unknown>
+        : {};
+    const rawName = companyRecord.name;
+    const companyName = typeof rawName === "string" && rawName.trim() ? rawName.trim() : "Unknown Company";
+
+    const { data: existing } = await supabase
+      .from("saved_analyses")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("company_name", companyName)
+      .maybeSingle();
+
+    let savedId: string;
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from("saved_analyses")
+        .update({ analysis_data: nextAnalysisData as Json })
+        .eq("id", existing.id)
+        .select("id")
+        .single();
+      if (error || !data) throw new Error(error?.message ?? "Saved analysis update matched zero rows.");
+      savedId = data.id;
+    } else {
+      const { data, error } = await supabase
+        .from("saved_analyses")
+        .insert({
+          user_id: user.id,
+          company_name: companyName,
+          analysis_data: nextAnalysisData as Json,
+        })
+        .select("id")
+        .single();
+      if (error || !data) throw new Error(error?.message ?? "Saved analysis insert matched zero rows.");
+      savedId = data.id;
+    }
+
+    if (options?.bridge && accountId) {
+      await bridgeAnalysisToCanvasVersions({
+        accountId,
+        userId: user.id,
+        sourceAnalysisId: savedId,
+        analysisData: nextAnalysisData,
+        summaryPrefix: options.summaryPrefix,
+      });
+    }
+
+    return savedId;
+  }, [accountId, user]);
 
   // Scroll tracking for CTA display
   useEffect(() => {
@@ -230,32 +292,11 @@ const Analysis = () => {
     // Auto-save if user is logged in
     if (user) {
       try {
-        const companyName = updatedData.name || 'Unknown Company';
-        
-        // Check for existing analysis
-        const { data: existing } = await supabase
-          .from('saved_analyses')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('company_name', companyName)
-          .maybeSingle();
-
-        if (existing) {
-          // Update existing
-          await supabase
-            .from('saved_analyses')
-            .update({ analysis_data: newAnalysisData })
-            .eq('id', existing.id);
-        } else {
-          // Insert new
-          await supabase
-            .from('saved_analyses')
-            .insert({
-              user_id: user.id,
-              company_name: companyName,
-              analysis_data: newAnalysisData,
-            });
-        }
+        const savedId = await saveAnalysisRecord(newAnalysisData, {
+          bridge: true,
+          summaryPrefix: "Business overview update",
+        });
+        persistActiveAnalysis(newAnalysisData, savedId);
       } catch (error) {
         console.error('Auto-save error:', error);
       }
@@ -267,76 +308,55 @@ const Analysis = () => {
     if (hasAnalyzed && analysisData && user && isNewAnalysis) {
       const autoSave = async () => {
         try {
-          const companyName = analysisData.company?.name || 'Unknown Company';
-          
-          const { data: existing } = await supabase
-            .from('saved_analyses')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('company_name', companyName)
-            .maybeSingle();
-
-          if (!existing) {
-            const { data: inserted } = await supabase
-              .from("saved_analyses")
-              .insert({
-                user_id: user.id,
-                company_name: companyName,
-                analysis_data: analysisData,
-              })
-              .select("id")
-              .single();
-
-            if (inserted?.id) {
-              persistActiveAnalysis(analysisData, inserted.id);
-            }
-          } else {
-            persistActiveAnalysis(analysisData, existing.id);
-          }
+          const savedId = await saveAnalysisRecord(analysisData, {
+            bridge: true,
+            summaryPrefix: "URL analysis",
+          });
+          persistActiveAnalysis(analysisData, savedId);
         } catch (error) {
           console.error('Initial auto-save error:', error);
         }
       };
       autoSave();
     }
-  }, [hasAnalyzed, analysisData, user, isNewAnalysis]);
+  }, [hasAnalyzed, analysisData, user, isNewAnalysis, saveAnalysisRecord]);
 
   const handleBMCSectionUpdate = (sectionKey: CanvasSectionKey, updatedData: { items: string[]; notes: string }) => {
     const legacyKeyMap: Record<CanvasSectionKey, string> = {
-      key_partners: 'keyPartners',
-      key_activities: 'keyActivities',
-      key_resources: 'keyResources',
-      value_propositions: 'valuePropositions',
-      customer_relationships: 'customerRelationships',
-      channels: 'channels',
-      customer_segments: 'customerSegments',
-      cost_structure: 'costStructure',
-      revenue_streams: 'revenueStreams'
+      key_partners: "keyPartners",
+      key_activities: "keyActivities",
+      key_resources: "keyResources",
+      value_propositions: "valuePropositions",
+      customer_relationships: "customerRelationships",
+      channels: "channels",
+      customer_segments: "customerSegments",
+      cost_structure: "costStructure",
+      revenue_streams: "revenueStreams",
     };
-    
+
     const legacyKey = legacyKeyMap[sectionKey];
     if (!legacyKey) return;
 
     const sectionTitleMap: Record<CanvasSectionKey, string> = {
-      key_partners: 'Key Partners',
-      key_activities: 'Key Activities',
-      key_resources: 'Key Resources',
-      value_propositions: 'Value Propositions',
-      customer_relationships: 'Customer Relationships',
-      channels: 'Channels',
-      customer_segments: 'Customer Segments',
-      cost_structure: 'Cost Structure',
-      revenue_streams: 'Revenue Streams'
+      key_partners: "Key Partners",
+      key_activities: "Key Activities",
+      key_resources: "Key Resources",
+      value_propositions: "Value Propositions",
+      customer_relationships: "Customer Relationships",
+      channels: "Channels",
+      customer_segments: "Customer Segments",
+      cost_structure: "Cost Structure",
+      revenue_streams: "Revenue Streams",
     };
     const sectionTitle = sectionTitleMap[sectionKey];
 
     // Track unique reviewed sections
-    setReviewedSections(prev => Math.min(prev + 1, 11));
+    setReviewedSections((prev) => Math.min(prev + 1, 11));
 
     const updatedCanvas = {
       ...analysisData.canvas,
       [legacyKey]: updatedData.items,
-      [`${legacyKey}_notes`]: updatedData.notes
+      [`${legacyKey}_notes`]: updatedData.notes,
     };
 
     const nextAnalysisData = {
@@ -349,28 +369,22 @@ const Analysis = () => {
 
     // Auto-save if user is logged in
     if (user && analysisData) {
-      supabase
-        .from('saved_analyses')
-        .update({
-          analysis_data: nextAnalysisData,
-        })
-        .eq('user_id', user.id)
-        .eq('company_name', analysisData.company?.name || 'Unknown Company')
-        .select('id')
-        .then(({ data, error }) => {
-          if (error || !data || data.length === 0) {
-            toast({
-              title: "Save failed",
-              description: error
-                ? error.message
-                : "No saved analysis found for this company — changes are kept locally only.",
-              variant: "destructive",
-            });
-            return;
-          }
+      void saveAnalysisRecord(nextAnalysisData, {
+        bridge: true,
+        summaryPrefix: "Canvas section update",
+      })
+        .then((savedId) => {
+          persistActiveAnalysis(nextAnalysisData, savedId);
           toast({
             title: "Saved",
             description: `${sectionTitle} updated and saved`,
+          });
+        })
+        .catch((error) => {
+          toast({
+            title: "Save failed",
+            description: error instanceof Error ? error.message : "Changes are kept locally only.",
+            variant: "destructive",
           });
         });
     } else {
@@ -387,7 +401,7 @@ const Analysis = () => {
         title: "Sign up to save",
         description: "Create an account to save your analyses",
       });
-      navigate('/auth');
+      navigate("/auth");
       return;
     }
 
@@ -395,61 +409,28 @@ const Analysis = () => {
 
     setIsSaving(true);
     try {
-      const companyName = analysisData.company?.name || 'Unknown Company';
-      
-      // Check for existing analysis
-      const { data: existing } = await supabase
-        .from('saved_analyses')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('company_name', companyName)
-        .maybeSingle();
+      const savedId = await saveAnalysisRecord(analysisData, {
+        bridge: true,
+        summaryPrefix: "Manual save",
+      });
+      persistActiveAnalysis(analysisData, savedId);
 
-      if (existing) {
-        // Update existing record
-        const { error } = await supabase
-          .from('saved_analyses')
-          .update({
-            analysis_data: analysisData,
-          })
-          .eq('id', existing.id);
+      toast({
+        title: "Saved!",
+        description: "Analysis saved to your account and synced to the agent canvas.",
+      });
 
-        if (error) throw error;
-        
-        toast({
-          title: "Updated!",
-          description: "Analysis updated in your account",
-        });
-      } else {
-        // Insert new record
-        const { error } = await supabase
-          .from('saved_analyses')
-          .insert({
-            user_id: user.id,
-            company_name: companyName,
-            analysis_data: analysisData
-          });
-
-        if (error) throw error;
-
-        toast({
-          title: "Saved!",
-          description: "Analysis saved to your account",
-        });
-      }
-      
       // Refresh recent analyses list
       const { data } = await supabase
-        .from('saved_analyses')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .from("saved_analyses")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
         .limit(3);
-      
+
       if (data) setRecentAnalyses(data);
-      
     } catch (error: any) {
-      console.error('Save error:', error);
+      console.error("Save error:", error);
       toast({
         title: "Save Failed",
         description: error.message || "Failed to save analysis",
@@ -464,46 +445,25 @@ const Analysis = () => {
     // Save analysis first if user is logged in
     if (user && analysisData) {
       try {
-        const companyName = analysisData.company?.name || 'Unknown Company';
-        
-        // Check for existing analysis
-        const { data: existing } = await supabase
-          .from('saved_analyses')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('company_name', companyName)
-          .maybeSingle();
-
-        if (existing) {
-          // Update existing record
-          await supabase
-            .from('saved_analyses')
-            .update({ analysis_data: analysisData })
-            .eq('id', existing.id);
-        } else {
-          // Insert new record
-          await supabase
-            .from('saved_analyses')
-            .insert({
-              user_id: user.id,
-              company_name: companyName,
-              analysis_data: analysisData
-            });
-        }
+        const savedId = await saveAnalysisRecord(analysisData, {
+          bridge: true,
+          summaryPrefix: "Playbooks handoff",
+        });
+        persistActiveAnalysis(analysisData, savedId);
       } catch (error) {
-        console.error('Failed to save before navigation:', error);
+        console.error("Failed to save before navigation:", error);
         // Continue to navigate even if save fails
       }
     }
-    
+
     // Store analysis in sessionStorage for Playbooks page to pick up
-    sessionStorage.setItem('playbookContext', JSON.stringify({
-      companyName: analysisData?.company?.name || 'Unknown Company',
-      businessContext: analysisData
+    sessionStorage.setItem("playbookContext", JSON.stringify({
+      companyName: analysisData?.company?.name || "Unknown Company",
+      businessContext: analysisData,
     }));
-    
+
     // Navigate to Playbooks
-    navigate('/playbooks');
+    navigate("/playbooks");
   };
 
   const copyToMarkdown = () => {

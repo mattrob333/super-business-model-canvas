@@ -19,10 +19,12 @@ export function SectionCanvasPanel({
   sectionKey,
   items,
   loading,
+  onVerifyAssumption,
 }: {
   sectionKey: CanvasSectionKey;
   items: CanvasItemEvidence[];
   loading: boolean;
+  onVerifyAssumption?: (text: string) => void;
 }) {
   const entry = AGENT_ROSTER[sectionKey];
 
@@ -57,6 +59,7 @@ export function SectionCanvasPanel({
             const solid = (item.confidence ?? 0) >= 0.7;
             const stale = item.freshness === "stale" || item.freshness === "outdated";
             const evidence = item.evidence ?? [];
+            const assumption = splitAssumption(item.text);
             return (
               <li
                 key={`${index}-${item.text.slice(0, 24)}`}
@@ -73,8 +76,19 @@ export function SectionCanvasPanel({
                   }
                 />
                 <span className="min-w-0 flex-1">
-                  {splitAssumption(item.text).text}
-                  {splitAssumption(item.text).assumed && (
+                  {assumption.assumed && onVerifyAssumption ? (
+                    <button
+                      type="button"
+                      onClick={() => onVerifyAssumption(assumption.text)}
+                      className="text-left underline-offset-2 hover:text-primary hover:underline"
+                      title="Ask the agent to verify this assumption"
+                    >
+                      {assumption.text}
+                    </button>
+                  ) : (
+                    assumption.text
+                  )}
+                  {assumption.assumed && (
                     <span className="ml-1.5 inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-px align-middle text-[9px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">
                       assumed
                     </span>

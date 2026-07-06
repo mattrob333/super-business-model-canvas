@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getAgentRuntime } from "@/lib/agent-runtime";
 import { setActiveAnalysis } from "@/lib/active-analysis";
 import { setActiveWorkspaceName } from "@/lib/active-workspace";
+import { bridgeAnalysisToCanvasVersions } from "@/lib/canvas-version-bridge";
 import { cn } from "@/lib/utils";
 
 type FounderDocument = Database["public"]["Tables"]["founder_documents"]["Row"];
@@ -130,13 +131,21 @@ export default function Knowledge() {
       const companyName: string = data.company?.name || doc.title || "Untitled company";
       let savedId: string | null = null;
       if (user) {
-        const { data: inserted } = await supabase
+        const { data: inserted, error: saveError } = await supabase
           .from("saved_analyses")
           .insert({ user_id: user.id, company_name: companyName, analysis_data: data })
           .select("id")
-          .maybeSingle();
-        savedId = inserted?.id ?? null;
+          .single();
+        if (saveError || !inserted) throw new Error(saveError?.message ?? "Saved analysis insert matched zero rows.");
+        savedId = inserted.id;
       }
+      await bridgeAnalysisToCanvasVersions({
+        accountId,
+        userId: user?.id ?? null,
+        sourceAnalysisId: savedId,
+        analysisData: data as Record<string, unknown>,
+        summaryPrefix: `Deck analysis from ${doc.title}`,
+      });
       setActiveWorkspaceName(companyName);
       setActiveAnalysis({ id: savedId, data });
       sessionStorage.setItem("loadedAnalysis", JSON.stringify(data));
