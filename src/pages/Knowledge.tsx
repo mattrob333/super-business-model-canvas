@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   BadgeCheck,
@@ -10,6 +11,7 @@ import {
   ExternalLink,
   FileText,
   ImageIcon,
+  LayoutGrid,
   Loader2,
   MessageSquare,
   RefreshCw,
@@ -32,6 +34,8 @@ import { useAccountId } from "@/hooks/useAccountId";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getAgentRuntime } from "@/lib/agent-runtime";
+import { setActiveAnalysis } from "@/lib/active-analysis";
+import { setActiveWorkspaceName } from "@/lib/active-workspace";
 import { cn } from "@/lib/utils";
 
 type FounderDocument = Database["public"]["Tables"]["founder_documents"]["Row"];
@@ -61,6 +65,8 @@ export default function Knowledge() {
   const { accountId, loading: accountLoading } = useAccountId();
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [buildingDocId, setBuildingDocId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<FounderDocument[]>([]);
   const [dossiers, setDossiers] = useState<AgentDocument[]>([]);
   const [questions, setQuestions] = useState<OwnerQuestion[]>([]);
@@ -81,6 +87,74 @@ export default function Knowledge() {
   const failedCount = documents.filter((document) => document.status === "failed").length;
   const [canvasGroundedness, setCanvasGroundedness] = useState<number | null>(null);
   const selectedQuestion = questions.find((question) => question.id === selectedQuestionId) ?? null;
+
+  async function openDocument(doc: FounderDocument) {
+    if (!doc.storage_bucket || !doc.storage_path) {
+      toast({ title: "No file to open", description: "This document has no stored file.", variant: "destructive" });
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from(doc.storage_bucket)
+      .createSignedUrl(doc.storage_path, 3600);
+    if (error || !data?.signedUrl) {
+      toast({ title: "Could not open file", description: error?.message ?? "Try again.", variant: "destructive" });
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener");
+  }
+
+  // The deck-to-canvas bridge: the same analyze-company function the URL flow
+  // uses, fed the parsed document text instead. Document-silent items come
+  // back labeled "Assumption:" so the canvas is honest about guesses vs facts.
+  async function buildCanvasFromDocument(doc: FounderDocument) {
+    if (buildingDocId || !accountId) return;
+    setBuildingDocId(doc.id);
+    try {
+      const { data: docRow, error: docError } = await supabase
+        .from("founder_documents")
+        .select("extracted_text")
+        .eq("id", doc.id)
+        .eq("account_id", accountId)
+        .maybeSingle();
+      const text = docRow?.extracted_text?.trim();
+      if (docError || !text) {
+        throw new Error("No extracted text yet — wait for parsing to finish, then try again.");
+      }
+
+      const { data, error } = await supabase.functions.invoke("analyze-company", {
+        body: { document_text: text, document_name: doc.title },
+      });
+      if (error) throw new Error(error.message ?? "Analysis failed — try again.");
+      if (!data?.company || !data?.canvas) throw new Error("The analysis came back empty — try again.");
+
+      const companyName: string = data.company?.name || doc.title || "Untitled company";
+      let savedId: string | null = null;
+      if (user) {
+        const { data: inserted } = await supabase
+          .from("saved_analyses")
+          .insert({ user_id: user.id, company_name: companyName, analysis_data: data })
+          .select("id")
+          .maybeSingle();
+        savedId = inserted?.id ?? null;
+      }
+      setActiveWorkspaceName(companyName);
+      setActiveAnalysis({ id: savedId, data });
+      sessionStorage.setItem("loadedAnalysis", JSON.stringify(data));
+      toast({
+        title: `${companyName} canvas built`,
+        description: "Document-grounded items read as facts; market-research inferences are labeled as assumptions.",
+      });
+      navigate("/canvas");
+    } catch (error) {
+      toast({
+        title: "Canvas build failed",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setBuildingDocId(null);
+    }
+  }
 
   const loadEvidenceForDossiers = useCallback(async (nextDossiers: AgentDocument[]) => {
     const ids = [...new Set(nextDossiers.flatMap((doc) => doc.evidence_ids))];
@@ -400,7 +474,12 @@ export default function Knowledge() {
 
       <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
         <div className="min-w-0 space-y-6">
-          <DocumentPanel documents={documents} />
+          <DocumentPanel
+            documents={documents}
+            buildingDocId={buildingDocId}
+            onOpen={openDocument}
+            onBuildCanvas={buildCanvasFromDocument}
+          />
           <DossierPanel
             dossiers={dossiers}
             profiles={profiles}
@@ -494,7 +573,17 @@ function Metric({ label, value, detail, icon: Icon }: { label: string; value: st
   );
 }
 
-function DocumentPanel({ documents }: { documents: FounderDocument[] }) {
+function DocumentPanel({
+  documents,
+  buildingDocId,
+  onOpen,
+  onBuildCanvas,
+}: {
+  documents: FounderDocument[];
+  buildingDocId: string | null;
+  onOpen: (doc: FounderDocument) => void;
+  onBuildCanvas: (doc: FounderDocument) => void;
+}) {
   return (
     <section className="space-y-3">
       <SectionHeader title="Document ingestion" detail="Upload, parse, distribute" />
@@ -533,6 +622,30 @@ function DocumentPanel({ documents }: { documents: FounderDocument[] }) {
                       Distributed into {document.evidence_ids.length} evidence-backed claims.
                     </p>
                   )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      className="h-8 gap-1.5"
+                      disabled={document.status !== "distributed" || buildingDocId !== null}
+                      onClick={() => onBuildCanvas(document)}
+                    >
+                      {buildingDocId === document.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <LayoutGrid className="h-3.5 w-3.5" />
+                      )}
+                      {buildingDocId === document.id ? "Researching…" : "Build canvas from this"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1.5 text-muted-foreground"
+                      onClick={() => onOpen(document)}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Open file
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             );

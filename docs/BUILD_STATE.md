@@ -198,6 +198,35 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-26 (owner round 10: deck upload dead-ended — no canvas) — FIXED (2026-07-06, reviewer-as-builder)
+
+- **RF-LIVE-26 (HIGH) — uploading a pitch deck produced no canvas.** The Knowledge
+  pipeline parsed and distributed the PDF, then stopped: no analysis, no company, no
+  workspace — clicking Canvas showed the empty URL hero. And the uploaded file itself
+  couldn't be opened. Fixes:
+  - **`analyze-company` edge function gains document mode** (`document_text` +
+    `document_name`): the owner document is the primary source for company facts;
+    web search grounds the market/industry context around it. Binding grounding rule
+    in the prompt: document-supported items read as plain facts, document-silent
+    items are prefixed **"Assumption:"** — for a pre-launch idea it is expected that
+    most items are labeled assumptions grounded in market research. Text capped at
+    24k chars.
+  - **"Build canvas from this" button** on each distributed document (Knowledge page):
+    reads `extracted_text`, invokes the same function the URL flow uses, inserts the
+    `saved_analyses` row, sets the workspace-name/activeAnalysis pointers, and lands
+    on /canvas with the new company — identical end state to a URL analysis, so the
+    switcher shows the new company. Loading state ("Researching…"), honest failure
+    toasts (including "no extracted text yet").
+  - **"Open file"** on each document: signed URL (1h) opens the stored PDF/DOCX.
+  - **edge-deploy.yml** (new): push-to-main deploys of `supabase/functions/**`,
+    mirroring the DB Migrate pattern — the manual Ops task can't be dispatched by the
+    API integration, so function changes now ship on merge.
+  - Honest scope: the deck flow returns the same legacy analysis shape as URL mode
+    (string items; assumptions labeled in text, not yet a structured confidence
+    score), and auto-build-on-upload is deliberately not wired — the button keeps the
+    owner in control until the flow is proven live. Full evidence-cited verification
+    of deck claims is the section-analysis/grounding pipeline's job (spec 08).
+
 ### RF-LIVE-25 (owner round 9: section drawer redesign + PE positioning) — SHIPPED (2026-07-06, reviewer-as-builder)
 
 - **RF-LIVE-25 — the section editor drawer had no clear job.** It opened at 72vw with

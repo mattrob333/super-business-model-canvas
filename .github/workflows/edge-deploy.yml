@@ -1,0 +1,30 @@
+name: Edge Deploy
+
+# Continuous edge-function deployment: any merge to main that changes
+# supabase/functions/** redeploys all functions to the live project. Mirrors
+# the DB Migrate pattern (push-triggered because workflow_dispatch is not
+# available to the API integration). The manual Ops task remains for ad-hoc
+# runs.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/**"
+
+env:
+  SUPABASE_PROJECT_REF: mehhuxzamnpxnkbrslls
+
+jobs:
+  deploy-edge-functions:
+    name: Deploy all Supabase edge functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"
