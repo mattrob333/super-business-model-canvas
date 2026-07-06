@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Blocks,
   BriefcaseBusiness,
+  Repeat,
   Check,
   ClipboardList,
   FileSearch,
@@ -136,6 +137,11 @@ const audiences = [
     title: "Advisors & fractional executives",
     body: "Run deeper engagements for more clients, with receipts for every recommendation.",
   },
+  {
+    icon: Repeat,
+    title: "Private equity & acquisition entrepreneurs",
+    body: "Tear down a target before you buy: nine blocks, scored gaps, and the AI opportunities hiding in a legacy operation. Post-close, the same canvas runs the optimization play - and the before/after documents the value you created at exit.",
+  },
 ];
 
 const faqs = [
@@ -152,6 +158,11 @@ const faqs = [
   {
     question: "Do I need to connect my internal data?",
     answer: "No. Super BMC works from public data - yours and your competitors'. Private-data integrations are on the roadmap.",
+  },
+  {
+    question: "We buy and optimize businesses. Does this fit an acquisition workflow?",
+    answer:
+      "It's one of the strongest fits. Point it at a target before you close: the canvas breaks the business into nine blocks, scores the gaps against comparable companies, and shows where AI removes cost or unlocks pricing power - the bottleneck map most diligence never produces. After close, the same workspace becomes the optimization playbook: agents track the levers you're pulling, and the evolving canvas documents the value created between entry and exit.",
   },
   {
     question: "We're pre-launch - there's nothing to scrape yet. Can we still use it?",
