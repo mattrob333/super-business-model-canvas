@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AccountSwitcher } from "./AccountSwitcher";
-import { BrandLogo } from "@/components/brand/BrandMark";
+import logoLight from "@/assets/superbmc-logo-light.png";
+import logoDark from "@/assets/superbmc-logo-dark.png";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getUserDisplayName, getUserInitials } from "@/lib/user-display";
@@ -142,10 +143,12 @@ function SidebarUserFooter() {
 export function SidebarNavContent() {
   return (
     <div className="flex h-full flex-col">
-      {/* Brand lockup owns the top-left corner — h-14 matches TopBar so the
-          header borders align. The company switcher sits one step below. */}
+      {/* The owner's logo files own the top-left corner (navy BMC in light
+          mode, white in dark) — h-14 matches TopBar so the header borders
+          align. The company switcher sits one step below. */}
       <div className="flex h-14 shrink-0 items-center border-b px-4">
-        <BrandLogo iconClassName="h-7" />
+        <img src={logoLight} alt="Super BMC" className="h-8 w-auto dark:hidden" />
+        <img src={logoDark} alt="Super BMC" className="hidden h-8 w-auto dark:block" />
       </div>
 
       {/* Workspace switcher */}
