@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentRunner } from "../agent/runner.js";
 import { ClaudeAgentRunner, OpenRouterChatRunner } from "../agent/runner.js";
 import { asRecord } from "../db/json.js";
-import { SECTION_LABELS, isSectionKey, type SectionKey } from "../domain/sections.js";
+import { SECTION_KEYS, SECTION_LABELS, isSectionKey, type SectionKey } from "../domain/sections.js";
 import { FeedRunner } from "../feeds/feed-runner.js";
 import type { EvidenceCandidate, FeedRuntimeConfig } from "../feeds/types.js";
 import type { AgentJob } from "../queue/types.js";
@@ -48,6 +48,7 @@ interface VerifiedClaim extends ExtractedClaim {
   status: VerificationStatus;
   reason: string;
   evidenceId: string;
+  sourceKind?: "crawl" | "web_search_backfill";
 }
 
 interface ResearchSubject {
@@ -155,10 +156,13 @@ export class CompanyResearchHandler {
       const evidenceId = evidenceIds[claim.evidenceIndex] ?? evidenceIds[0];
       if (!evidenceId) continue;
       const verdict = await this.verifyClaim(verifyRoute, claim, feedResult.evidence[claim.evidenceIndex] ?? feedResult.evidence[0]);
-      verified.push({ ...claim, ...verdict, evidenceId });
+      verified.push({ ...claim, ...verdict, evidenceId, sourceKind: "crawl" });
     }
 
-    await this.writeVerifiedClaims(job, subject, verified);
+    const backfillVerified = await this.backfillMissingSections(job, subject, verified, extractRoute, verifyRoute);
+    const allVerified = [...verified, ...backfillVerified];
+
+    await this.writeVerifiedClaims(job, subject, allVerified);
     if (subject.runType === "competitor_research" && subject.competitorId) {
       await this.enqueueGapEngine(job, subject.competitorId);
     }
@@ -166,8 +170,8 @@ export class CompanyResearchHandler {
       run_type: subject.runType,
       company_url: subject.targetUrl,
       competitor_id: subject.competitorId,
-      evidence_count: feedResult.evidence.length,
-      claims: verified.map((claim) => ({
+      evidence_count: feedResult.evidence.length + new Set(backfillVerified.map((claim) => claim.evidenceId)).size,
+      claims: allVerified.map((claim) => ({
         section_key: claim.sectionKey,
         text: claim.text,
         status: claim.status,
@@ -175,6 +179,62 @@ export class CompanyResearchHandler {
       })),
       escalation_rate: escalated ? 1 : 0,
     });
+  }
+
+  private async backfillMissingSections(
+    job: AgentJob,
+    subject: ResearchSubject,
+    crawlVerified: VerifiedClaim[],
+    extractRoute: ModelRoute,
+    verifyRoute: ModelRoute,
+  ): Promise<VerifiedClaim[]> {
+    if (subject.runType !== "competitor_research") return [];
+    const covered = new Set(crawlVerified.filter((claim) => claim.status === "confirmed").map((claim) => claim.sectionKey));
+    const missing = SECTION_KEYS.filter((sectionKey) => !covered.has(sectionKey));
+    if (missing.length === 0) return [];
+
+    const evidence: EvidenceCandidate[] = [];
+    const batches = batchSections(missing, 5).slice(0, 2);
+    for (const batch of batches) {
+      const result = await this.feedRunner.refresh({
+        accountId: job.account_id,
+        feedKey: "grok_live_search",
+        cacheKey: `${subject.cacheKey}:web_backfill:${batch.join(",")}`,
+        companyName: subject.targetName,
+        query: backfillQuery(subject.targetName, batch),
+      });
+      if (result.health !== "ok") continue;
+      evidence.push(...result.evidence.map((item) => ({
+        ...item,
+        metadata: { ...(item.metadata ?? {}), source_kind: "web_search_backfill", sections: batch },
+      })));
+    }
+
+    const backfillEvidence = capEvidenceBytes(dedupeEvidence(evidence), 4_000).slice(0, 8);
+    if (backfillEvidence.length === 0) return [];
+    const evidenceIds = await this.writeEvidence(job, backfillEvidence);
+    const extracted = await this.extractClaims(extractRoute, subject.context, backfillEvidence, subject.targetName);
+    const missingSet = new Set(missing);
+    const sectionCounts = new Map<SectionKey, number>();
+    const verified: VerifiedClaim[] = [];
+    for (const claim of extracted) {
+      if (!missingSet.has(claim.sectionKey)) continue;
+      const count = sectionCounts.get(claim.sectionKey) ?? 0;
+      if (count >= 4) continue;
+      const evidence = backfillEvidence[claim.evidenceIndex] ?? backfillEvidence[0];
+      const evidenceId = evidenceIds[claim.evidenceIndex] ?? evidenceIds[0];
+      if (!evidence || !evidenceId) continue;
+      const verdict = await this.verifyClaim(verifyRoute, claim, evidence);
+      verified.push({
+        ...claim,
+        confidence: Math.min(claim.confidence, 0.6),
+        ...verdict,
+        evidenceId,
+        sourceKind: "web_search_backfill",
+      });
+      if (verdict.status !== "contradicted") sectionCounts.set(claim.sectionKey, count + 1);
+    }
+    return verified;
   }
 
   private async collectResearchEvidence(accountId: string, subject: ResearchSubject): Promise<ResearchFeedBundle> {
@@ -448,7 +508,11 @@ ${evidencePrompt(evidence)}`,
           confidence: earnedConfidence(claim),
           evidence_ids: [claim.evidenceId],
           verification_status: claim.status,
-          flags: claim.status === "unsupported" ? ["unsupported"] : [],
+          flags: [
+            ...(claim.status === "unsupported" ? ["unsupported"] : []),
+            ...(claim.sourceKind === "web_search_backfill" ? ["web_search_backfill"] : []),
+          ],
+          source_kind: claim.sourceKind ?? "crawl",
         })),
         notes: subject.canvasNotes,
         confidence: average(sectionClaims.map(earnedConfidence)),
@@ -614,6 +678,19 @@ function earnedConfidence(claim: VerifiedClaim): number {
 
 function evidencePrompt(evidence: EvidenceCandidate[]): string {
   return evidence.map((item, index) => `[${index}] ${item.title}\n${item.excerpt ?? ""}`).join("\n\n");
+}
+
+function batchSections(sections: SectionKey[], maxPerBatch: number): SectionKey[][] {
+  const batches: SectionKey[][] = [];
+  for (let index = 0; index < sections.length; index += maxPerBatch) {
+    batches.push(sections.slice(index, index + maxPerBatch));
+  }
+  return batches;
+}
+
+function backfillQuery(targetName: string, sections: SectionKey[]): string {
+  const labels = sections.map((sectionKey) => SECTION_LABELS[sectionKey]);
+  return `${targetName} business model ${labels.join(", ")}: partners, cost structure, revenue`;
 }
 
 function competitorResearchUrls(rootUrl: string): Array<{ label: string; url: string }> {

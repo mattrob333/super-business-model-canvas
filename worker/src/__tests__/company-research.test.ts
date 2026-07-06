@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AgentRunner } from "../agent/runner.js";
+import { SECTION_KEYS } from "../domain/sections.js";
 import { CompanyResearchHandler } from "../jobs/company-research.js";
 import { createJobDispatcher } from "../jobs/dispatch.js";
 import type { AgentJob } from "../queue/types.js";
@@ -204,7 +205,7 @@ describe("CompanyResearchHandler", () => {
 
     await handler.handleCompetitor(makeCompetitorJob());
 
-    expect(calls.map((call) => call.companyUrl)).toEqual([
+    expect(calls.filter((call) => call.feedKey === "firecrawl_scrape").map((call) => call.companyUrl)).toEqual([
       "https://rival.example/",
       "https://rival.example/pricing",
       "https://rival.example/about",
@@ -212,7 +213,7 @@ describe("CompanyResearchHandler", () => {
       "https://rival.example/case-studies",
       "https://rival.example/careers",
     ]);
-    expect(calls.every((call) => call.feedKey === "firecrawl_scrape")).toBe(true);
+    expect(calls.filter((call) => call.feedKey === "grok_live_search").length).toBeLessThanOrEqual(2);
   });
 
   it("falls back to Grok live search when Firecrawl is blocked by HTTP 403", async () => {
@@ -256,6 +257,153 @@ describe("CompanyResearchHandler", () => {
       source_type: "news",
       source_name: "Grok Live Search",
     });
+  });
+
+  it("backfills empty competitor sections with capped verified web-search claims", async () => {
+    const client = new CompanyResearchFakeClient();
+    const calls: Array<{ feedKey: string; query?: string }> = [];
+    const runner = new ScriptedRunner([
+      JSON.stringify({ claims: [{ section_key: "value_propositions", text: "RivalCo offers managed onboarding.", confidence: 0.78, evidence_index: 0 }] }),
+      JSON.stringify({ status: "confirmed", reason: "The crawl supports onboarding." }),
+      JSON.stringify({
+        claims: [
+          { section_key: "revenue_streams", text: "RivalCo sells enterprise subscriptions.", confidence: 0.93, evidence_index: 0 },
+          { section_key: "cost_structure", text: "RivalCo invests heavily in sales hiring.", confidence: 0.88, evidence_index: 0 },
+        ],
+      }),
+      JSON.stringify({ status: "confirmed", reason: "Search evidence mentions enterprise subscriptions." }),
+      JSON.stringify({ status: "confirmed", reason: "Search evidence mentions sales hiring." }),
+    ]);
+    const handler = new CompanyResearchHandler({
+      client: client.asSupabase(),
+      runner,
+      feedRunner: {
+        async refresh(request: { feedKey: string; query?: string; companyUrl?: string }) {
+          calls.push(request);
+          if (request.feedKey === "grok_live_search") {
+            return {
+              health: "ok" as const,
+              payload: { search: true },
+              evidence: [{
+                title: "Live search RivalCo business model",
+                sourceType: "news" as const,
+                sourceName: "Grok Live Search",
+                sourceUrl: "https://news.example/rivalco-business",
+                excerpt: "RivalCo sells enterprise subscriptions and is hiring sales leaders.",
+                metadata: {},
+              }],
+              metrics: [],
+            };
+          }
+          return {
+            health: "ok" as const,
+            payload: { data: { metadata: {} } },
+            evidence: [{
+              title: request.companyUrl ?? "crawl",
+              sourceType: "website" as const,
+              sourceName: "Firecrawl",
+              sourceUrl: request.companyUrl,
+              excerpt: "RivalCo offers managed onboarding.",
+              metadata: {},
+            }],
+            metrics: [],
+          };
+        },
+      },
+    });
+
+    await handler.handleCompetitor(makeCompetitorJob());
+
+    expect(calls.filter((call) => call.feedKey === "grok_live_search")).toHaveLength(2);
+    const backfillEvidence = client.inserts.find((insert) =>
+      insert.table === "evidence_items" && insert.value.source_name === "Grok Live Search");
+    expect(backfillEvidence?.value.metadata).toMatchObject({ source_kind: "web_search_backfill" });
+    const revenueInsert = client.inserts.find((insert) =>
+      insert.table === "canvas_section_versions" && insert.value.section_key === "revenue_streams");
+    const revenueItem = (revenueInsert?.value.items as Array<{ confidence: number; flags: string[]; source_kind: string }>)[0];
+    expect(revenueItem).toMatchObject({
+      confidence: 0.6,
+      flags: ["web_search_backfill"],
+      source_kind: "web_search_backfill",
+    });
+  });
+
+  it("does not run web backfill when crawl already covers every section", async () => {
+    const client = new CompanyResearchFakeClient();
+    const calls: Array<{ feedKey: string }> = [];
+    const runner = new ScriptedRunner([
+      JSON.stringify({
+        claims: SECTION_KEYS.map((sectionKey) => ({
+          section_key: sectionKey,
+          text: `RivalCo has ${sectionKey}.`,
+          confidence: 0.8,
+          evidence_index: 0,
+        })),
+      }),
+      ...SECTION_KEYS.map(() => JSON.stringify({ status: "confirmed", reason: "Supported." })),
+    ]);
+    const handler = new CompanyResearchHandler({
+      client: client.asSupabase(),
+      runner,
+      feedRunner: {
+        async refresh(request: { feedKey: string; companyUrl?: string }) {
+          calls.push(request);
+          return {
+            health: "ok" as const,
+            payload: {},
+            evidence: [{
+              title: request.companyUrl ?? "crawl",
+              sourceType: "website" as const,
+              sourceName: "Firecrawl",
+              sourceUrl: request.companyUrl,
+              excerpt: "RivalCo has business model evidence for all sections.",
+              metadata: {},
+            }],
+            metrics: [],
+          };
+        },
+      },
+    });
+
+    await handler.handleCompetitor(makeCompetitorJob());
+
+    expect(calls.some((call) => call.feedKey === "grok_live_search")).toBe(false);
+  });
+
+  it("leaves uncovered sections empty when web backfill extracts no claims", async () => {
+    const client = new CompanyResearchFakeClient();
+    const runner = new ScriptedRunner([
+      JSON.stringify({ claims: [{ section_key: "channels", text: "RivalCo sells through partners.", confidence: 0.74, evidence_index: 0 }] }),
+      JSON.stringify({ status: "confirmed", reason: "Supported." }),
+      JSON.stringify({ claims: [] }),
+    ]);
+    const handler = new CompanyResearchHandler({
+      client: client.asSupabase(),
+      runner,
+      feedRunner: {
+        async refresh(request: { feedKey: string; companyUrl?: string }) {
+          return {
+            health: "ok" as const,
+            payload: {},
+            evidence: [{
+              title: request.feedKey === "grok_live_search" ? "Search found nothing useful" : request.companyUrl ?? "crawl",
+              sourceType: request.feedKey === "grok_live_search" ? "news" as const : "website" as const,
+              sourceName: request.feedKey === "grok_live_search" ? "Grok Live Search" : "Firecrawl",
+              sourceUrl: request.companyUrl,
+              excerpt: request.feedKey === "grok_live_search" ? "No clear business model claims." : "RivalCo sells through partners.",
+              metadata: {},
+            }],
+            metrics: [],
+          };
+        },
+      },
+    });
+
+    await handler.handleCompetitor(makeCompetitorJob());
+
+    const canvasInserts = client.inserts.filter((insert) => insert.table === "canvas_section_versions");
+    expect(canvasInserts).toHaveLength(1);
+    expect(canvasInserts[0]?.value.section_key).toBe("channels");
   });
 
   it("keeps the honest crawl error when Firecrawl and fallback both fail", async () => {
