@@ -139,6 +139,40 @@ const Analysis = () => {
     return savedId;
   }, [accountId, user]);
 
+  const backfillAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!hasAnalyzed || !analysisData || !accountId || !user || backfillAttemptedRef.current) return;
+    backfillAttemptedRef.current = true;
+    (async () => {
+      try {
+        const { data: existing } = await supabase
+          .from("canvas_section_versions")
+          .select("id")
+          .eq("account_id", accountId)
+          .is("competitor_id", null)
+          .limit(1);
+        if (existing && existing.length > 0) return;
+        const result = await bridgeAnalysisToCanvasVersions({
+          accountId,
+          userId: user.id,
+          sourceAnalysisId: getActiveAnalysis()?.id ?? null,
+          analysisData: analysisData as Record<string, unknown>,
+          summaryPrefix: "Backfill from saved analysis",
+        });
+        if (result.sectionCount > 0) {
+          toast({
+            title: "Canvas synced for the agents",
+            description: `${result.sectionCount} sections are now visible to Atlas and the section agents.`,
+          });
+        }
+      } catch {
+        // Non-fatal: the visible canvas still works; Atlas just reports lower
+        // coverage until a save re-triggers the bridge.
+        backfillAttemptedRef.current = false;
+      }
+    })();
+  }, [hasAnalyzed, analysisData, accountId, user, toast]);
+
   // Scroll tracking for CTA display
   useEffect(() => {
     if (!hasAnalyzed || !analysisData) return;
@@ -584,7 +618,14 @@ Website: ${comp.website || 'N/A'}
   };
 
   return (
-    <div className="bg-grid-subtle min-h-full p-6">
+    <div
+      className={cn(
+        "bg-grid-subtle min-h-full p-6 transition-[padding] duration-200 motion-reduce:transition-none",
+        // The open Atlas dock shares the row on desktop instead of covering
+        // the canvas (owner direction 2026-07-06: collaborative copilot).
+        atlasOpen && "lg:pr-[436px] xl:pr-[476px]",
+      )}
+    >
       {/* Main Content */}
       <main className="space-y-4 sm:space-y-8 md:space-y-12">
         
