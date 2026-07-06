@@ -198,6 +198,40 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-17..20 (owner round 5: canvas marquee pass + workspace chat substance) — FIXED (2026-07-06, reviewer-as-builder)
+
+- **Canvas design pass (the marquee hero was underwhelming).** Section cards now carry
+  their agent's roster icon + accent color beside the label, Value Propositions reads as
+  the hero cell (primary ring + tint), item text moved up to `text-sm leading-relaxed`
+  with more breathing room, card padding normalized, and the sparkle affordance is
+  hover/focus-only (the header already teaches the click). The grid frame recedes to
+  `bg-muted/40` so the nine white cards read as cards ON a board in light mode
+  (owner: "bright white… not very much contrast"). Company header on Analysis is a
+  step larger; non-compact rows got taller (`220px`) for the bigger type. Section
+  editor drawer widened to `max-w-4xl`.
+- **RF-LIVE-17 (HIGH) — workspace claimed "No canvas items yet" while the canvas had
+  bullets.** Analysis payloads nest the nine sections under `data.canvas.*`; the
+  workspace fallback (and the proposal-approve merge in WorkspaceThread) read the top
+  level, got `undefined` for every section, and the room looked empty — approving a
+  proposal there would also have dropped all legacy items. New `getActiveAnalysisCanvas()`
+  helper (handles nested + flat shapes) used by both readers.
+- **RF-LIVE-18 (HIGH) — chat turns died with `error_max_budget_usd` and agents claimed
+  "no budget/tool access left".** `budgetForRoute` capped a turn at ~$0.13, but an
+  agentic turn re-sends the system prompt + transcript every step. Floor raised to
+  $0.75 (~150k cumulative input tokens), and `WORKSPACE_CHAT_TASK_BUDGET_TOKENS`
+  default raised 32k → 64k to match section analysis.
+- **RF-LIVE-19 — agents started blind (Yield had no canvas/company context).** The
+  workspace_chat system prompt now injects the section's latest canvas items + owner
+  goal notes and the company brief (name, industry, summary from
+  `business_context_versions`) up front, marked "already loaded — do not spend tool
+  calls re-reading", with an honest empty-section line otherwise. Tests cover
+  injection and the budget floor (worker: 4 workspace-chat tests).
+- **RF-LIVE-20 — all nine rooms shared identical suggested prompts.** Each section now
+  opens with three domain-specific questions (partner dependency exposure, channel CAC
+  concentration, pricing power, etc.), keyed by `CanvasSectionKey`.
+- **Chat readability:** agent replies are now width-capped bubbles (avatar left) and
+  user messages stay right-aligned; the message column is `max-w-3xl`.
+
 ### RF-LIVE-13..16 (owner round 4: the payoff surfaces) — FIXED + spec 11 (2026-07-06, reviewer-as-builder)
 
 - **RF-LIVE-13 (HIGH) — the Gap Register page was a hardcoded placeholder** (`gaps = []`)

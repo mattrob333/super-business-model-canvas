@@ -100,7 +100,7 @@ export const BMCSectionEditor = ({
       title={section.title}
       subtitle={SECTION_DESCRIPTIONS[section.title]}
       footer={
-        <div className="mx-auto w-full max-w-3xl space-y-2">
+        <div className="mx-auto w-full max-w-4xl space-y-2">
           <p className="text-xs text-muted-foreground">All changes save to your Context File.</p>
           <Button onClick={handleSave} className="w-full font-medium" disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" />
@@ -109,7 +109,7 @@ export const BMCSectionEditor = ({
         </div>
       }
     >
-      <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6 sm:px-6">
+      <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-8">
         {workspaceEntry && (
           <Link
             to={`/workspace/${workspaceEntry.sectionKey}`}

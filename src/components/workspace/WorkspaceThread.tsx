@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CANVAS_SECTION_LABELS, LEGACY_SECTION_KEYS } from "@/components/canvas/section-types";
-import { getActiveAnalysis } from "@/lib/active-analysis";
+import { getActiveAnalysisCanvas } from "@/lib/active-analysis";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
 
 /**
@@ -43,11 +43,52 @@ interface MessageRow {
 const RUN_POLL_INTERVAL_MS = 3_000;
 const RUN_POLL_MAX_ATTEMPTS = 100; // ~5 minutes
 
+/** Domain-specific openers per room — a generic prompt gets a generic answer. */
 const SUGGESTED_PROMPTS: Record<string, string[]> = {
-  default: [
-    "What do you see in this section that worries you most?",
-    "Which item here has the weakest evidence, and how would you firm it up?",
-    "What would you change first, and why?",
+  key_partners: [
+    "Which partnership are we most dependent on, and what's our exposure if it ends?",
+    "What partnership do our competitors have that we should counter or copy?",
+    "Which of our partners could become a channel, not just a supplier?",
+  ],
+  key_activities: [
+    "Which activity here actually differentiates us, and which is just table stakes?",
+    "What are we doing in-house that the market now sells as a service?",
+    "Where would one more hire or tool most increase our shipping speed?",
+  ],
+  key_resources: [
+    "Which resource is our real moat, and how defensible is it honestly?",
+    "Where is our single point of failure — a person, supplier, or platform?",
+    "What resource would a well-funded competitor find hardest to replicate?",
+  ],
+  value_propositions: [
+    "Which value prop here would a skeptical buyer challenge first?",
+    "How does our strongest claim compare to what competitors promise?",
+    "Which proposition lacks evidence, and what proof would close that?",
+  ],
+  customer_relationships: [
+    "Where in the customer lifecycle are we most likely losing people?",
+    "Which relationship motion should we automate, and which must stay human?",
+    "What would make our customers actively recommend us?",
+  ],
+  channels: [
+    "Which channel earns us customers cheapest, and are we over-invested elsewhere?",
+    "What channel are competitors using that we're ignoring?",
+    "If we could only keep two channels, which two and why?",
+  ],
+  customer_segments: [
+    "Which segment here is most profitable versus most demanding?",
+    "What adjacent segment could we serve with what we already have?",
+    "Which segment is drifting away from us, and what's the signal?",
+  ],
+  cost_structure: [
+    "Which cost line grows faster than revenue, and can we break that link?",
+    "Where could we cut 15% without customers noticing?",
+    "Which cost is actually an investment we should protect?",
+  ],
+  revenue_streams: [
+    "Are we over-concentrated in one revenue stream, and how risky is that?",
+    "Which stream has pricing power we haven't used?",
+    "What recurring-revenue motion fits our current customers best?",
   ],
 };
 
@@ -311,7 +352,7 @@ export function WorkspaceThread({
         .maybeSingle();
       let existingItems: unknown[] = Array.isArray(latestVersion?.items) ? latestVersion.items : [];
       if (existingItems.length === 0) {
-        const legacy = getActiveAnalysis()?.data?.[LEGACY_SECTION_KEYS[sectionKey]];
+        const legacy = getActiveAnalysisCanvas()?.[LEGACY_SECTION_KEYS[sectionKey]];
         if (Array.isArray(legacy)) {
           existingItems = legacy.filter((item) => typeof item === "string" && item.length > 0);
         }
@@ -454,10 +495,11 @@ export function WorkspaceThread({
           <EmptyThread
             callsign={entry.callsign}
             sectionLabel={CANVAS_SECTION_LABELS[sectionKey]}
+            sectionKey={sectionKey}
             onPick={(prompt) => setDraft(prompt)}
           />
         ) : (
-          <div className="mx-auto max-w-2xl space-y-3">
+          <div className="mx-auto max-w-3xl space-y-3">
             {messages.map((message) => (
               <MessageCard
                 key={message.id}
@@ -528,12 +570,15 @@ export function WorkspaceThread({
 function EmptyThread({
   callsign,
   sectionLabel,
+  sectionKey,
   onPick,
 }: {
   callsign: string;
   sectionLabel: string;
+  sectionKey: CanvasSectionKey;
   onPick: (prompt: string) => void;
 }) {
+  const prompts = SUGGESTED_PROMPTS[sectionKey] ?? [];
   return (
     <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center gap-4 text-center">
       <div>
@@ -544,7 +589,7 @@ function EmptyThread({
         </p>
       </div>
       <div className="w-full space-y-1.5">
-        {SUGGESTED_PROMPTS.default.map((prompt) => (
+        {prompts.map((prompt) => (
           <button
             key={prompt}
             type="button"
@@ -622,7 +667,7 @@ function MessageCard({
         <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 ${entry.avatarClass}`}>
           <Icon className="h-3.5 w-3.5" />
         </span>
-        <div className="min-w-0 rounded-lg border border-border bg-card px-3.5 py-2.5 shadow-sm">
+        <div className="min-w-0 max-w-[85%] rounded-lg border border-border bg-card px-3.5 py-2.5 shadow-sm">
           <div className="prose prose-sm prose-slate max-w-none dark:prose-invert [&_p]:my-1.5">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{text ?? ""}</ReactMarkdown>
           </div>

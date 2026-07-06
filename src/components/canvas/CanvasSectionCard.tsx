@@ -13,6 +13,7 @@ import {
   Loader2,
   AlertCircle,
   ExternalLink,
+  type LucideIcon,
 } from "lucide-react";
 
 export type FreshnessStatus =
@@ -73,6 +74,12 @@ export interface CanvasSectionCardProps {
   compactPreview?: boolean;
   /** Tall pillar sections (2-row span) — show more text per bullet */
   tallPreview?: boolean;
+  /** Section identity icon (the owning agent's motif) */
+  icon?: LucideIcon;
+  /** Accent text class for the icon (per-agent accent, spec 01) */
+  iconAccentClass?: string;
+  /** The visual hero of the canvas (Value Propositions) gets emphasis */
+  hero?: boolean;
 }
 
 const freshnessConfig: Record<
@@ -123,6 +130,9 @@ export function CanvasSectionCard({
   maxPreviewItems = 3,
   compactPreview = false,
   tallPreview = false,
+  icon: Icon,
+  iconAccentClass,
+  hero = false,
 }: CanvasSectionCardProps) {
   const previewLimit = maxPreviewItems;
   const normalizedItems = items.map(normalizeCanvasItem);
@@ -144,16 +154,28 @@ export function CanvasSectionCard({
   return (
     <Card
       className={cn(
-        "relative flex flex-col p-2.5 sm:p-3 cursor-pointer transition-all duration-200 group overflow-hidden",
+        "relative flex flex-col cursor-pointer transition-all duration-200 group overflow-hidden",
         "hover:border-primary/40 hover:shadow-md",
+        compactPreview ? "p-2.5 sm:p-3" : "p-3 sm:p-4",
+        // The value proposition is the canvas's center of gravity — give it
+        // a quiet emphasis so the eye lands there first.
+        hero && "border-primary/30 bg-primary/[0.03]",
         span,
         height,
       )}
       onClick={onClick}
     >
-      {/* Title — orange section label */}
-      <div className="mb-1.5 flex items-center gap-1.5 min-w-0 pr-6">
-        <h3 className="truncate text-[10px] font-semibold uppercase tracking-wide text-primary sm:text-xs">
+      {/* Title — section identity: agent-accent icon + label */}
+      <div className={cn("flex items-center gap-1.5 min-w-0 pr-6", compactPreview ? "mb-1.5" : "mb-2")}>
+        {Icon && (
+          <Icon className={cn("h-3.5 w-3.5 shrink-0", iconAccentClass ?? "text-primary")} />
+        )}
+        <h3
+          className={cn(
+            "truncate font-semibold uppercase tracking-wider text-primary",
+            compactPreview ? "text-[10px] sm:text-xs" : "text-[11px] sm:text-xs",
+          )}
+        >
           {title}
         </h3>
         {meta?.hasNotes || notes ? (
@@ -242,13 +264,13 @@ export function CanvasSectionCard({
       <div className="min-h-0 flex-1 overflow-hidden pb-5">
         {items.length > 0 ? (
           <>
-            <ul className={cn("space-y-1", compactPreview && "space-y-1.5")}>
+            <ul className={cn(compactPreview ? "space-y-1.5" : "space-y-2")}>
               {previewItems.map((item, index) => (
-                <li key={index} className="flex items-start gap-1.5">
+                <li key={index} className="flex items-start gap-2">
                   <div
                     className={cn(
                       "h-1 w-1 shrink-0 rounded-full bg-primary",
-                      compactPreview ? "mt-2" : "mt-1.5",
+                      compactPreview ? "mt-2" : "mt-[9px]",
                     )}
                   />
                   <span
@@ -259,7 +281,7 @@ export function CanvasSectionCard({
                             "text-sm leading-relaxed",
                             tallPreview ? "line-clamp-2" : "line-clamp-1",
                           )
-                        : "line-clamp-2 text-xs leading-snug text-foreground/80",
+                        : "line-clamp-2 text-sm leading-relaxed",
                     )}
                   >
                     {compactPreview
@@ -286,7 +308,9 @@ export function CanvasSectionCard({
         )}
       </div>
 
-      {/* Sparkle — bottom-right refine affordance */}
+      {/* Sparkle — refine affordance, quiet until the card is hovered/focused
+          (the header instruction carries discoverability; nine always-on
+          sparkles read as noise). */}
       <div className="pointer-events-none absolute bottom-2 right-2">
         {isAnalyzing ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
@@ -294,7 +318,7 @@ export function CanvasSectionCard({
           <button
             type="button"
             onClick={handleAnalyzeClick}
-            className="pointer-events-auto rounded p-1 text-primary/70 transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="pointer-events-auto rounded p-1 text-primary/70 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             title={`Refine ${title} with AI`}
             aria-label={`Refine ${title} with AI`}
           >

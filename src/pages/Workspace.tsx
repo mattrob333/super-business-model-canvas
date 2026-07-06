@@ -6,7 +6,7 @@ import { useAccountId } from "@/hooks/useAccountId";
 import { useActiveAnalysis } from "@/hooks/useActiveAnalysis";
 import { useAuth } from "@/hooks/useAuth";
 import { useCanvasEvidence } from "@/hooks/useCanvasEvidence";
-import { setActiveAnalysis } from "@/lib/active-analysis";
+import { getActiveAnalysisCanvas, setActiveAnalysis } from "@/lib/active-analysis";
 import type { CanvasItemEvidence } from "@/components/canvas/CanvasSectionCard";
 import {
   CANVAS_SECTION_KEYS,
@@ -106,7 +106,10 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
   const items = useMemo<CanvasItemEvidence[]>(() => {
     const versioned = itemsBySection[sectionKey];
     if (versioned && versioned.length > 0) return versioned;
-    const legacy = activeAnalysis?.data?.[LEGACY_SECTION_KEYS[sectionKey]];
+    // Analysis payloads nest the nine sections under `canvas`; a top-level
+    // read returned undefined for every section and the room claimed the
+    // canvas was empty while it had bullets (owner finding 2026-07-06).
+    const legacy = getActiveAnalysisCanvas(activeAnalysis?.data)?.[LEGACY_SECTION_KEYS[sectionKey]];
     return Array.isArray(legacy)
       ? legacy
           .filter((text): text is string => typeof text === "string" && text.length > 0)
