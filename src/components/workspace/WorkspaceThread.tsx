@@ -43,6 +43,14 @@ interface MessageRow {
 const RUN_POLL_INTERVAL_MS = 3_000;
 const RUN_POLL_MAX_ATTEMPTS = 100; // ~5 minutes
 
+/**
+ * Every room closes with this opener: the agent's job includes auditing its
+ * own blind spots and coaching the user through closing them (owner
+ * directive 2026-07-06 — data gaps are onboarding, not dead ends).
+ */
+const MISSING_DATA_PROMPT =
+  "What information are you missing to give me your best advice — and how do I get it?";
+
 /** Domain-specific openers per room — a generic prompt gets a generic answer. */
 const SUGGESTED_PROMPTS: Record<string, string[]> = {
   key_partners: [
@@ -578,7 +586,7 @@ function EmptyThread({
   sectionKey: CanvasSectionKey;
   onPick: (prompt: string) => void;
 }) {
-  const prompts = SUGGESTED_PROMPTS[sectionKey] ?? [];
+  const prompts = [...(SUGGESTED_PROMPTS[sectionKey] ?? []), MISSING_DATA_PROMPT];
   return (
     <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center gap-4 text-center">
       <div>

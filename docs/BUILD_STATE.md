@@ -198,6 +198,20 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-21 (owner round 6: data gaps are onboarding, not dead ends) — SHIPPED (2026-07-06, reviewer-as-builder)
+
+- **Owner directive:** when a section agent lacks the data to answer (brand-new startup,
+  thin canvas), it must not guess or go generic — it should say so, then coach: what
+  specific information is missing, exactly how to get it (metric to pull, document to
+  upload as a context source, number for Strategic Goals, question to ask a customer),
+  and what having it unlocks strategically.
+- **Worker:** `workspace_chat` system prompt now carries a binding "Data-gap protocol"
+  paragraph; the empty-section line points at it too. Test asserts the protocol text
+  (5 workspace-chat tests).
+- **UI:** every room's suggested prompts now end with "What information are you missing
+  to give me your best advice — and how do I get it?" — the per-agent version of the
+  planned Atlas data-completeness walkthrough (Atlas itself lands with Phase 6).
+
 ### RF-LIVE-17..20 (owner round 5: canvas marquee pass + workspace chat substance) — FIXED (2026-07-06, reviewer-as-builder)
 
 - **Canvas design pass (the marquee hero was underwhelming).** Section cards now carry
