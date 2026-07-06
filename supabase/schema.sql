@@ -2060,6 +2060,20 @@ create policy "agent_profile_revisions_insert" on public.agent_profile_revisions
         and public.is_account_member(ap.account_id)
     )
   );
+
+-- DELETE mirrors INSERT scope (RF-5B3-2: settings-sheet last-10 pruning needs
+-- it; template-profile revisions stay undeletable by clients).
+drop policy if exists "agent_profile_revisions_delete" on public.agent_profile_revisions;
+create policy "agent_profile_revisions_delete" on public.agent_profile_revisions
+  for delete to authenticated
+  using (
+    exists (
+      select 1 from public.agent_profiles ap
+      where ap.id = agent_profile_id
+        and ap.account_id is not null
+        and public.is_account_member(ap.account_id)
+    )
+  );
 -- =============================================================================
 -- PHASE 1 — work order 1.4: seed data
 -- =============================================================================

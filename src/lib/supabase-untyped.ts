@@ -26,6 +26,7 @@ export interface UntypedQuery<T> extends PromiseLike<QueryResponse<T>> {
   select(columns?: string, options?: Record<string, unknown>): UntypedQuery<T>;
   insert(value: unknown): UntypedQuery<T>;
   update(value: unknown): UntypedQuery<T>;
+  delete(): UntypedQuery<T>;
   eq(column: string, value: unknown): UntypedQuery<T>;
   contains(column: string, value: Record<string, unknown>): UntypedQuery<T>;
   is(column: string, value: unknown): UntypedQuery<T>;
@@ -33,6 +34,7 @@ export interface UntypedQuery<T> extends PromiseLike<QueryResponse<T>> {
   or(filters: string): UntypedQuery<T>;
   order(column: string, options?: Record<string, unknown>): UntypedQuery<T>;
   limit(count: number): UntypedQuery<T>;
+  range(from: number, to: number): UntypedQuery<T>;
   maybeSingle(): Promise<SingleResponse<T>>;
   single(): Promise<SingleResponse<T>>;
 }

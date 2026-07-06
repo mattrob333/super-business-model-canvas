@@ -198,6 +198,33 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### 5B slice 3 review — RESOLVED: RF-5B3-1..3 fixed by the reviewer (2026-07-05)
+
+Codex's `build/phase-5b-slice-3` (commit `31a5609`: BMCSectionEditor chat rail retired per
+5.7, `AgentSettingsSheet` with instructions/behavior/model-route + revisions) reviewed and
+merged with fixes:
+
+- **RF-5B3-1 (HIGH, fixed):** profile updates ran `.eq("id", profileId)` with no
+  select-back. When the resolved profile is the shared template (account_id null — any
+  account without provisioned per-account profiles), RLS matches zero rows, Supabase
+  reports success, and the user gets a "Settings saved" toast for a write that never
+  happened; the revision insert then fails with a bare RLS error. Fix: updates now scope
+  `.eq("account_id", accountId)` and `.select("id")`-verify a row actually changed;
+  template profiles render an honest read-only notice with Save/Restore disabled.
+- **RF-5B3-2 (HIGH, fixed):** the last-10 revision pruning deletes through the client, but
+  `agent_profile_revisions` had no DELETE policy — every prune silently removed nothing
+  and history grew unbounded while the UI claimed "keep last 10". New migration
+  `20260705220000_profile_revisions_delete_policy.sql` (DELETE mirrors the INSERT scope:
+  account-scoped parents only) + schema.sql mirror. **Needs live application** (Ops
+  apply-migrations or Codex direct) before pruning works in production.
+- **RF-5B3-3 (LOW, fixed):** em-dashes in `AgentIdentityCard` copy came back as plain
+  hyphens (the recurring Windows cp1252 encoding issue) — restored.
+- **Reviewed and accepted:** the slice-2-parallel worker/Dashboard changes on the branch
+  are byte-identical to what merged in PR #52 (no drift); drawer demotion is clean (no
+  `bmc-chat` references remain in the editor, removed constants have no other consumers,
+  Analysis-page ChatDrawer still owns the `bmc-chat` edge fn until its own retirement);
+  `delete()`/`range()` additions to the untyped escape hatch are typed correctly.
+
 ### RF-LIVE-4/5/6 (owner live-test round 2) — FIXED (2026-07-05, reviewer-as-builder)
 
 - **RF-LIVE-4 — skill_run failed: "Claude Code process exited with code 1".** The SDK's
@@ -1429,6 +1456,28 @@ cd worker && npm run lint             -> exit 0
 5A tasks: schema [x] - jobs [x] - ingestion [worker + UI upload path] - UI/wizard [partial] - live walkthrough [ ]
 5B tasks: 5.1 [ ] - 5.2 [ ] - 5.3 [ ] - 5.4 [ ] - 5.5 [ ] - 5.6 [ ] - 5.7 [ ] - 5.8 [ ] - 5.9 [ ]
 5A additions from BUILD_PLAN: 5.10 [schema + worker extraction pipeline + upload UI] - 5.11 [schema + logo display/manual URL UI; Firecrawl capture not complete]
+
+**2026-07-05 evening - 5B slice 3 complete on `build/phase-5b-slice-3`.**
+
+- Read the resolved `RF-5B2-1` note before touching workspace/canvas code. No canvas-version
+  write paths were added in this slice.
+- Retired the section drawer AI chat rail per work order 5.7. `BMCSectionEditor` remains the
+  quick edit surface with item editing, strategic-goal notes, save, and the "Open
+  <Agent>'s workspace" route card as the primary agent CTA. The `bmc-chat` edge function is
+  untouched because Analysis-page chat still uses it.
+- Added `AgentSettingsSheet` behind a quiet settings button on `AgentIdentityCard`:
+  system-instructions editor, behavior sliders (`proactivity`, `risk`, `verbosity`,
+  `evidence_bar`), model-route selector, last-10 revision list, restore per revision, and
+  persistent "changes take effect on the next run" copy. Saves update `agent_profiles` and write
+  `agent_profile_revisions`; revision pruning keeps the latest 10.
+- Extended the local `supabaseUntyped` helper interface with `delete()` and `range()` for
+  typed-safe access to late-declared tables that trip the generated client horizon.
+- Gates: `npx tsc -p tsconfig.app.json --noEmit` exit 0; `npm run build` green; `npm run lint`
+  reports 64 problems (46 errors, 18 warnings), within the frozen <=65 ceiling; `worker npm run
+  typecheck` exit 0; `worker npm test` 62 passed / 2 skipped; `worker npm run build` exit 0;
+  `worker npm run lint` exit 0.
+- Logged-in smoke still not completed in this pass: Dashboard Pricing Teardown retry, Yield room
+  chat reply, and Porter render need an authenticated owner browser session after deploy.
 
 **2026-07-05 - Live Supabase catch-up + 5B slice 2 started on `build/phase-5b-slice-2`.**
 
