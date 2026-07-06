@@ -285,6 +285,19 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase C.1 review (Codex build/phase-c1-canvas-bridge, 98d3fb4) — APPROVED, no findings (2026-07-06)
+
+- Versioned-canvas bridge (canvas-version-bridge.ts): account-scoped inserts,
+  competitor_id null, ensure-context invariant honored; wired into URL auto-save,
+  deck build, and manual saves — worker skills now see the same canvas the UI shows
+  (fixes the live avatar_refinement empty-canvas failure). Studio tiles poll runs
+  with inline failure states; assumed items prefill (never auto-send) the chat for
+  verification; proposal approval retires the matching Assumption item; Company
+  Brief popover; default thread renamed General. RF-LIVE-29 guards untouched
+  (threadsLoaded/messagesReady/autoSentRef all intact). Gates re-verified
+  independently (worker 89 passed, root tsc/build/lint 64<=65).
+
+
 ### Phase B review (Codex build/phase-b-skills, ef7a447) — APPROVED, no findings (2026-07-06)
 
 - Four skills shipped end-to-end (compass.avatar_refinement, compass.segment_expansion,
