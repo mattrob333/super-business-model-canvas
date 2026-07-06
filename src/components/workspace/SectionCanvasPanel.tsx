@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ExternalLink, FileText, Loader2, PencilLine } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cleanExcerpt } from "@/lib/clean-excerpt";
 import type { CanvasItemEvidence } from "@/components/canvas/CanvasSectionCard";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
@@ -105,7 +106,7 @@ function EvidenceBadge({ evidence }: { evidence: NonNullable<CanvasItemEvidence[
             </p>
             {entry.excerpt && (
               <p className="line-clamp-3 text-[11px] leading-relaxed text-foreground/80">
-                “{entry.excerpt}”
+                “{cleanExcerpt(entry.excerpt)}”
               </p>
             )}
             {entry.sourceUrl && (
