@@ -623,7 +623,7 @@ Website: ${comp.website || 'N/A'}
         "bg-grid-subtle min-h-full p-6 transition-[padding] duration-200 motion-reduce:transition-none",
         // The open Atlas dock shares the row on desktop instead of covering
         // the canvas (owner direction 2026-07-06: collaborative copilot).
-        atlasOpen && "lg:pr-[436px] xl:pr-[476px]",
+        atlasOpen && "lg:pr-[calc(clamp(440px,26vw,600px)+16px)]",
       )}
     >
       {/* Main Content */}

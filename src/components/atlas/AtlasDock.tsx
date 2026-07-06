@@ -334,13 +334,13 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
         ref={asideRef}
         tabIndex={-1}
         className={cn(
-          "fixed inset-y-0 right-0 z-40 flex w-[min(94vw,420px)] xl:w-[460px] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
+          "fixed inset-y-0 right-0 z-40 flex w-[min(94vw,440px)] lg:w-[clamp(440px,26vw,600px)] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
           open ? "translate-x-0" : "invisible translate-x-full",
         )}
         aria-hidden={!open}
         aria-label="Atlas strategy dock"
       >
-        <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/40">
             <AtlasIcon className="h-4 w-4" />
           </span>
@@ -371,13 +371,17 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
           </Button>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-4">
-          {profileError ? (
+        {profileError ? (
+          <div className="px-4 pt-4">
             <p className="text-xs leading-relaxed text-destructive" role="alert">
               {profileError}
             </p>
-          ) : (
-            <>
+          </div>
+        ) : everOpened && profileId ? (
+          <AtlasChat
+            accountId={accountId}
+            agentProfileId={profileId}
+            briefingSlot={
               <BriefingCard
                 loading={briefingLoading}
                 error={briefingError}
@@ -388,12 +392,22 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
                 canRequest={Boolean(profileId)}
                 onRequest={() => void requestBriefing()}
               />
-              {everOpened && profileId && (
-                <AtlasChat accountId={accountId} agentProfileId={profileId} />
-              )}
-            </>
-          )}
-        </div>
+            }
+          />
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
+            <BriefingCard
+              loading={briefingLoading}
+              error={briefingError}
+              refreshing={refreshing}
+              refreshError={refreshError}
+              briefing={briefing}
+              skillTitle={skillTitle}
+              canRequest={Boolean(profileId)}
+              onRequest={() => void requestBriefing()}
+            />
+          </div>
+        )}
       </aside>
     </>
   );
