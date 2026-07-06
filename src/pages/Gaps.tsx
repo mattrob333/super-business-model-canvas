@@ -248,15 +248,10 @@ export default function Gaps() {
       if (!profileId) throw new Error("No orchestrator profile available for ingestion.");
 
       let contextVersionId: string;
-      const { data: existingContext } = await supabase
-        .from("business_context_versions")
-        .select("id")
-        .eq("account_id", accountId)
-        .order("version_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (existingContext) {
-        contextVersionId = existingContext.id;
+      // The ACTIVE company's context, never a stale prior-company row.
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      if (scope?.activeContextId) {
+        contextVersionId = scope.activeContextId;
       } else {
         const { data: newContext, error: ctxError } = await supabase
           .from("business_context_versions")
@@ -277,7 +272,7 @@ export default function Gaps() {
       });
       await supabase
         .from("founder_documents")
-        .update({ agent_run_id: run.runId, status: "parsing" })
+        .update({ agent_run_id: run.runId, status: "parsing", business_context_version_id: contextVersionId })
         .eq("id", document.id)
         .eq("account_id", accountId);
 

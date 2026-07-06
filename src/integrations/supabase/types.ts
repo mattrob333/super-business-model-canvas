@@ -861,6 +861,7 @@ export type Database = {
           section_claims: Json
           evidence_ids: string[]
           agent_run_id: string | null
+          business_context_version_id: string | null
           uploaded_by: string | null
           error: string | null
           created_at: string
@@ -881,6 +882,7 @@ export type Database = {
           section_claims?: Json
           evidence_ids?: string[]
           agent_run_id?: string | null
+          business_context_version_id?: string | null
           uploaded_by?: string | null
           error?: string | null
           created_at?: string
@@ -901,6 +903,7 @@ export type Database = {
           section_claims?: Json
           evidence_ids?: string[]
           agent_run_id?: string | null
+          business_context_version_id?: string | null
           uploaded_by?: string | null
           error?: string | null
           created_at?: string
@@ -919,6 +922,13 @@ export type Database = {
             columns: ["agent_run_id"]
             isOneToOne: false
             referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "founder_documents_business_context_version_id_fkey"
+            columns: ["business_context_version_id"]
+            isOneToOne: false
+            referencedRelation: "business_context_versions"
             referencedColumns: ["id"]
           },
         ]

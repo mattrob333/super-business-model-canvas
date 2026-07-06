@@ -70,6 +70,9 @@ export default function Knowledge() {
   const navigate = useNavigate();
   const [buildingDocId, setBuildingDocId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<FounderDocument[]>([]);
+  const [unassignedDocuments, setUnassignedDocuments] = useState<FounderDocument[]>([]);
+  const [activeCompanyName, setActiveCompanyName] = useState<string | null>(null);
+  const [assigningDocId, setAssigningDocId] = useState<string | null>(null);
   const [dossiers, setDossiers] = useState<AgentDocument[]>([]);
   const [questions, setQuestions] = useState<OwnerQuestion[]>([]);
   const [evidenceById, setEvidenceById] = useState<Map<string, EvidenceItem>>(new Map());
@@ -89,6 +92,33 @@ export default function Knowledge() {
   const failedCount = documents.filter((document) => document.status === "failed").length;
   const [canvasGroundedness, setCanvasGroundedness] = useState<number | null>(null);
   const selectedQuestion = questions.find((question) => question.id === selectedQuestionId) ?? null;
+
+  // One-tap adoption for pre-scoping uploads: stamp the document into the
+  // active company's era so it appears in this company's knowledge base.
+  async function assignDocument(doc: FounderDocument) {
+    if (!accountId || assigningDocId) return;
+    setAssigningDocId(doc.id);
+    try {
+      const scope = await loadCompanyScope(accountId);
+      if (!scope.activeContextId) throw new Error("No active company yet — build a canvas first.");
+      const { error } = await supabase
+        .from("founder_documents")
+        .update({ business_context_version_id: scope.activeContextId })
+        .eq("id", doc.id)
+        .eq("account_id", accountId);
+      if (error) throw error;
+      toast({ title: "Document assigned", description: `${doc.title} now belongs to ${scope.companyName ?? "this company"}.` });
+      await loadKnowledge({ background: true });
+    } catch (error) {
+      toast({
+        title: "Could not assign document",
+        description: error instanceof Error ? error.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAssigningDocId(null);
+    }
+  }
 
   async function openDocument(doc: FounderDocument) {
     if (!doc.storage_bucket || !doc.storage_path) {
@@ -140,13 +170,19 @@ export default function Knowledge() {
         if (saveError || !inserted) throw new Error(saveError?.message ?? "Saved analysis insert matched zero rows.");
         savedId = inserted.id;
       }
-      await bridgeAnalysisToCanvasVersions({
+      const bridge = await bridgeAnalysisToCanvasVersions({
         accountId,
         userId: user?.id ?? null,
         sourceAnalysisId: savedId,
         analysisData: data as Record<string, unknown>,
         summaryPrefix: `Deck analysis from ${doc.title}`,
       });
+      // The deck that built this canvas belongs to the company it created.
+      await supabase
+        .from("founder_documents")
+        .update({ business_context_version_id: bridge.businessContextVersionId })
+        .eq("id", doc.id)
+        .eq("account_id", accountId);
       setActiveWorkspaceName(companyName);
       setActiveAnalysis({ id: savedId, data });
       sessionStorage.setItem("loadedAnalysis", JSON.stringify(data));
@@ -228,14 +264,24 @@ export default function Knowledge() {
       ]);
 
       if (documentsResult.error) throw documentsResult.error;
+      // Company scoping (owner report 2026-07-06): another company's documents
+      // must not appear here. NULL-stamped rows are user uploads from before
+      // scoping — surface them in an explicit "assign" group, never hide them.
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      setActiveCompanyName(scope?.companyName ?? null);
       if (dossiersResult.error) throw dossiersResult.error;
       if (questionsResult.error) throw questionsResult.error;
       if (profilesResult.error) throw profilesResult.error;
       if (companiesResult.error) throw companiesResult.error;
 
       const nextDossiers = dossiersResult.data ?? [];
-      const nextDocuments = documentsResult.data ?? [];
+      const allDocuments = documentsResult.data ?? [];
+      const contextIds = new Set(scope?.contextIds ?? []);
+      const nextDocuments = scope
+        ? allDocuments.filter((doc) => doc.business_context_version_id && contextIds.has(doc.business_context_version_id))
+        : allDocuments;
       setDocuments(nextDocuments);
+      setUnassignedDocuments(scope ? allDocuments.filter((doc) => !doc.business_context_version_id) : []);
       setDossiers(nextDossiers);
       setQuestions(questionsResult.data ?? []);
       setProfiles(profilesResult.data ?? []);
@@ -361,7 +407,7 @@ export default function Knowledge() {
 
       await supabase
         .from("founder_documents")
-        .update({ agent_run_id: run.runId, status: "parsing" })
+        .update({ agent_run_id: run.runId, status: "parsing", business_context_version_id: contextVersionId })
         .eq("id", document.id)
         .eq("account_id", accountId);
 
@@ -486,9 +532,13 @@ export default function Knowledge() {
         <div className="min-w-0 space-y-6">
           <DocumentPanel
             documents={documents}
+            unassignedDocuments={unassignedDocuments}
+            activeCompanyName={activeCompanyName}
             buildingDocId={buildingDocId}
+            assigningDocId={assigningDocId}
             onOpen={openDocument}
             onBuildCanvas={buildCanvasFromDocument}
+            onAssign={assignDocument}
           />
           <DossierPanel
             dossiers={dossiers}
@@ -585,19 +635,28 @@ function Metric({ label, value, detail, icon: Icon }: { label: string; value: st
 
 function DocumentPanel({
   documents,
+  unassignedDocuments,
+  activeCompanyName,
   buildingDocId,
+  assigningDocId,
   onOpen,
   onBuildCanvas,
+  onAssign,
 }: {
   documents: FounderDocument[];
+  /** Pre-scoping uploads with no company stamp — shown with an assign action, never hidden. */
+  unassignedDocuments: FounderDocument[];
+  activeCompanyName: string | null;
   buildingDocId: string | null;
+  assigningDocId: string | null;
   onOpen: (doc: FounderDocument) => void;
   onBuildCanvas: (doc: FounderDocument) => void;
+  onAssign: (doc: FounderDocument) => void;
 }) {
   return (
     <section className="space-y-3">
       <SectionHeader title="Document ingestion" detail="Upload, parse, distribute" />
-      {documents.length === 0 ? (
+      {documents.length === 0 && unassignedDocuments.length === 0 ? (
         <EmptyState icon={Upload} title="No founder documents yet" detail="Upload a deck, plan, one-pager, TXT, or Markdown file to start grounding the canvas." />
       ) : (
         <div className="space-y-3">
@@ -660,6 +719,54 @@ function DocumentPanel({
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {unassignedDocuments.length > 0 && (
+        <div className="space-y-3">
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+            <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+              These documents were uploaded before company tracking, so they are not
+              linked to any company yet. Assign the ones that belong to
+              {activeCompanyName ? ` ${activeCompanyName}` : " the current company"};
+              the rest stay here, out of the agents' view.
+            </p>
+          </div>
+          {unassignedDocuments.map((document) => (
+            <Card key={document.id} className="border-dashed border-border/60">
+              <CardContent className="flex min-w-0 flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-semibold">{document.title}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {document.file_name ?? "Untitled source"} · {formatBytes(document.file_size_bytes)} · {formatDate(document.created_at)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5"
+                    disabled={assigningDocId !== null}
+                    onClick={() => onAssign(document)}
+                  >
+                    {assigningDocId === document.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    Assign to {activeCompanyName ?? "this company"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 gap-1.5 text-muted-foreground"
+                    onClick={() => onOpen(document)}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open file
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </section>

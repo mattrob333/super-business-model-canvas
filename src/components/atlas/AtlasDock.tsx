@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowRight, ChevronRight, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
+import { ArrowRight, ChevronRight, Loader2, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -348,7 +348,10 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
         ref={asideRef}
         tabIndex={-1}
         className={cn(
-          "fixed inset-y-0 right-0 z-40 flex w-[min(94vw,440px)] lg:w-[clamp(440px,26vw,600px)] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
+          // Below lg Atlas is a FULL-SCREEN chat (owner directive 2026-07-06:
+          // "full screen chat or not open" — a 94vw sliver clipped content and
+          // left a useless strip of canvas). Desktop keeps the side-dock width.
+          "fixed inset-y-0 right-0 z-40 flex w-full lg:w-[clamp(440px,26vw,600px)] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
           open ? "translate-x-0" : "invisible translate-x-full",
         )}
         aria-hidden={!open}
@@ -378,10 +381,13 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
             size="icon"
             className="h-8 w-8"
             onClick={() => setOpenPersist(false)}
-            aria-label="Collapse Atlas dock"
-            title="Collapse (Esc)"
+            aria-label="Close Atlas"
+            title="Close (Esc)"
           >
-            <ChevronRight className="h-4 w-4" />
+            {/* Full-screen mobile closes with an X; the desktop side dock
+                collapses toward the right edge, so the chevron reads better. */}
+            <X className="h-4 w-4 lg:hidden" />
+            <ChevronRight className="hidden h-4 w-4 lg:block" />
           </Button>
         </header>
 

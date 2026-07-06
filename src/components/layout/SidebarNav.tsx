@@ -48,7 +48,7 @@ const secondaryNavItems: NavItem[] = [
   { label: "Settings", icon: Settings, path: "/settings" },
 ];
 
-function NavItemRow({ item }: { item: NavItem }) {
+function NavItemRow({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
   // NavLink's function-as-className isn't used here on purpose: Radix's
   // TooltipTrigger asChild merges the child's className as a string, and
   // stringifying a function prop corrupts the class list. Compute the
@@ -63,6 +63,7 @@ function NavItemRow({ item }: { item: NavItem }) {
       <TooltipTrigger asChild>
         <NavLink
           to={item.path}
+          onClick={onNavigate}
           className={cn(
             "flex items-center gap-3 px-3 h-10 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             isActive
@@ -81,7 +82,7 @@ function NavItemRow({ item }: { item: NavItem }) {
   );
 }
 
-function SidebarUserFooter() {
+function SidebarUserFooter({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
 
@@ -101,6 +102,7 @@ function SidebarUserFooter() {
 
     clearActiveWorkspaceName();
     clearActiveAnalysis();
+    onNavigate?.();
     navigate("/auth");
   };
 
@@ -139,8 +141,11 @@ function SidebarUserFooter() {
   );
 }
 
-// Shared nav content, reused by the desktop rail and the mobile slide-over Sheet.
-export function SidebarNavContent() {
+// Shared nav content, reused by the desktop rail and the mobile slide-over
+// Sheet. onNavigate fires when a destination is chosen so the mobile sheet
+// can close itself — tapping a page must not leave the drawer covering it
+// (owner directive 2026-07-06).
+export function SidebarNavContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       {/* The owner's logo files own the top-left corner (navy BMC in light
@@ -160,7 +165,7 @@ export function SidebarNavContent() {
       <nav className="flex-1 overflow-y-auto p-3">
         <div className="flex flex-col gap-1">
           {mainNavItems.map((item) => (
-            <NavItemRow key={item.path} item={item} />
+            <NavItemRow key={item.path} item={item} onNavigate={onNavigate} />
           ))}
         </div>
 
@@ -168,14 +173,14 @@ export function SidebarNavContent() {
 
         <div className="flex flex-col gap-1">
           {secondaryNavItems.map((item) => (
-            <NavItemRow key={item.path} item={item} />
+            <NavItemRow key={item.path} item={item} onNavigate={onNavigate} />
           ))}
         </div>
       </nav>
 
       <Separator />
 
-      <SidebarUserFooter />
+      <SidebarUserFooter onNavigate={onNavigate} />
     </div>
   );
 }
