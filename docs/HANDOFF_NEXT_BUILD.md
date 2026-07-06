@@ -78,6 +78,57 @@ verifier gate, typed spec-11 artifact, honest `implemented` flag).
 4. **Chat message polish**: streaming (or optimistic chunking), and the
    Studio "Coming" tiles hidden until ≥1 implemented skill per room ships.
 
+## Phase F — Forge & proof (NEXT FOR CODEX, 2026-07-06 handoff)
+
+Atlas's own briefings keep flagging the same hole: Value Propositions gaps
+have no runnable skill, so the directive falls back to "run a section
+analysis". Give Forge (value_propositions) real hands, and wire artifacts
+back into agent context so finished work compounds.
+
+1. **`forge.differentiator_audit` skill** (worker `skill-run.ts` registry +
+   catalog migration flipping `implemented` for it only): compare own
+   value_propositions items against ALL researched competitors' items
+   (the segment_expansion pattern), classify each own claim as
+   unique / contested / table-stakes with the named contesting competitor,
+   verifier-spot-check up to 4 claims, write a skill_artifacts row
+   (markdown body + typed payload). Mirror relay.channel_gap_scan end to end
+   — including the "requires … canvas items first" honest failures.
+2. **`forge.proof_gap_scan` skill**: for each own value_propositions item,
+   check evidence_ids on the latest canvas rows; items with zero evidence or
+   assumption-prefixed text become a "proof gap" list with a suggested
+   evidence source per item (crawl page, owner document, metric). No web
+   calls needed — this one is pure database analysis + one model pass +
+   verifier. Write the artifact; open ONE `gaps` row per proof gap
+   (severity medium, gap_type missing_data) — stamp `business_context_version_id`
+   from the company scope like every other writer.
+3. **Artifact → context source wiring**: on artifact creation, upsert a
+   `context_sources` row (type `note`, name = artifact title, config.text =
+   a <=1200-char summary of body_md) for the OWNING section agent's profile,
+   so the next chat turn in that room already knows the artifact exists.
+   Cap: keep only the 5 newest artifact-sourced notes per profile (delete
+   older artifact-sourced ones; never touch user-created sources).
+4. **Catalog copy**: update the two skills' descriptions to say exactly what
+   they consume and produce (the tiles are the UI contract).
+
+Binding rules for this phase:
+- COMPANY SCOPING IS LAW (new, 2026-07-06): every read of
+  canvas_section_versions / gaps / companies / skill_artifacts goes through
+  `loadCompanyScope` (worker: `worker/src/db/company-scope.ts`) and filters
+  `.in("business_context_version_id", scope.contextIds)`; every write stamps
+  `business_context_version_id: scope.activeContextId`. Copy the pattern from
+  skill-run.ts — do NOT hand-roll account-wide queries.
+- Skills must fail loudly with actionable messages when inputs are missing;
+  never write an artifact from unverifiable model output (parse-or-throw).
+- Tests: extend `worker/src/__tests__/skill-run.test.ts` fixtures with a
+  second company's rows and assert they never reach the artifact (the
+  atlas-briefing.test.ts pattern).
+- Gates before every commit: root `npx tsc --noEmit` + `npm run build` +
+  `npm run lint` (frozen ceiling 65); worker `npx tsc --noEmit` +
+  `npx vitest run` + `npm run build` + `npx eslint src`; UTF-8 decode check
+  on touched files (no cp1252 mojibake).
+- Migration-only changes to `skill_catalog.implemented`; the worker throws
+  for unimplemented keys — keep that invariant.
+
 ## Known-fragile spots (do not regress)
 
 - Workspace chat auto-send: must wait for `threadsLoaded` + `messagesReady`
@@ -88,3 +139,13 @@ verifier gate, typed spec-11 artifact, honest `implemented` flag).
   non-root (RF-LIVE-7); chat budget floor $0.75 (RF-LIVE-18).
 - "Assumption:" prefix is data, not decoration — display strips it
   (src/lib/assumption.ts); storage keeps it until evidence upgrades it.
+- Company scoping (2026-07-06): all canvas/gaps/companies/skill_artifacts
+  reads AND writes are scoped to the active company era via
+  `loadCompanyScope` (worker/src/db/company-scope.ts mirrored by
+  src/lib/company-scope.ts). An unscoped account-wide query reintroduces the
+  cross-company pollution bug.
+- Every page is a lazy chunk: deploys rename them, so `src/main.tsx` has a
+  `vite:preloadError` one-shot reload + `AppErrorBoundary` is the last line
+  of defense. Do not remove either, and keep new routes lazy-loaded inside
+  `withSuspense`.
+
