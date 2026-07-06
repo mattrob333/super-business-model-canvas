@@ -4,7 +4,9 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
 import { useActiveAnalysis } from "@/hooks/useActiveAnalysis";
+import { useAuth } from "@/hooks/useAuth";
 import { useCanvasEvidence } from "@/hooks/useCanvasEvidence";
+import { setActiveAnalysis } from "@/lib/active-analysis";
 import type { CanvasItemEvidence } from "@/components/canvas/CanvasSectionCard";
 import {
   CANVAS_SECTION_KEYS,
@@ -76,6 +78,31 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
   // first, else the legacy analysis strings — the room must never claim the
   // section is empty while the canvas shows items.
   const { activeAnalysis } = useActiveAnalysis();
+  const { user } = useAuth();
+
+  // The legacy strings live behind a session pointer that only the canvas
+  // surfaces set. Landing in a room without it (fresh tab, mobile, direct
+  // link) left this panel claiming "no items" while the canvas had bullets —
+  // restore the pointer from the latest saved analysis so every surface
+  // agrees on the company.
+  useEffect(() => {
+    if (activeAnalysis || !user) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("saved_analyses")
+        .select("id, analysis_data")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled || !data?.analysis_data || typeof data.analysis_data !== "object") return;
+      setActiveAnalysis({ id: data.id, data: data.analysis_data as Record<string, unknown> });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAnalysis, user]);
   const items = useMemo<CanvasItemEvidence[]>(() => {
     const versioned = itemsBySection[sectionKey];
     if (versioned && versioned.length > 0) return versioned;
