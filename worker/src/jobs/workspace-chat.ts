@@ -290,7 +290,9 @@ function buildChatSystemPrompt(
   const sourceBlock = formatContextSources(contextSources);
   return `${base}
 
-You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data beyond what is below instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied.${formatCompanyBrief(brief)}${formatCanvasSnapshot(sectionLabel, canvas)}${sourceBlock}`;
+You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data beyond what is below instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied.
+
+Data-gap protocol: when the canvas, company brief, and context sources do not hold enough information to answer well, never guess or pad a generic answer. Say plainly that the information is not there yet, then coach the user through closing the gap: (1) name the specific missing information, (2) tell them exactly how to get it — a metric to pull from their books or analytics, a document to upload as a context source, a number to add to this section's Strategic Goals, a question to ask a customer or vendor — and (3) explain what having it unlocks strategically for their business. Treat every data gap as the next step in building their strategy, not a dead end.${formatCompanyBrief(brief)}${formatCanvasSnapshot(sectionLabel, canvas)}${sourceBlock}`;
 }
 
 function formatCompanyBrief(brief: CompanyBrief | null): string {
@@ -305,7 +307,7 @@ function formatCompanyBrief(brief: CompanyBrief | null): string {
 
 function formatCanvasSnapshot(sectionLabel: string, canvas: CanvasSectionSnapshot): string {
   if (canvas.items.length === 0 && !canvas.notes) {
-    return `\n\nThe ${sectionLabel} canvas section is currently empty — say so if asked, and suggest running the section analysis.`;
+    return `\n\nThe ${sectionLabel} canvas section is currently empty — say so, suggest running the section analysis from the canvas page, and apply the data-gap protocol to whatever the user asks.`;
   }
   const bullets = canvas.items.slice(0, 12).map((item) => `- ${truncate(item, 240)}`).join("\n");
   const notes = canvas.notes ? `\nOwner goals for this section: ${truncate(canvas.notes, 400)}` : "";

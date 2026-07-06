@@ -57,6 +57,18 @@ describe("WorkspaceChatHandler", () => {
     expect(runner.request?.systemPrompt).toContain("Usage-based robotics API tier");
   });
 
+  it("teaches the data-gap protocol — thin data means coaching, not guessing (owner directive)", async () => {
+    const client = new WorkspaceChatFakeClient();
+    const runner = new CapturingRunner();
+    await new WorkspaceChatHandler({
+      client: client.asSupabase(),
+      runner,
+    }).handle(makeJob());
+
+    expect(runner.request?.systemPrompt).toContain("Data-gap protocol");
+    expect(runner.request?.systemPrompt).toContain("what having it unlocks strategically");
+  });
+
   it("budgets enough for a tool-using chat turn — the old ~$0.13 ceiling tripped error_max_budget_usd (RF-LIVE-19)", async () => {
     const client = new WorkspaceChatFakeClient();
     const runner = new CapturingRunner();
