@@ -15,6 +15,7 @@ interface AgentProfileSettings {
   system_instructions: string | null;
   behavior: Json;
   model_route_key: string | null;
+  account_id: string | null;
 }
 
 interface ModelRoute {
@@ -105,7 +106,7 @@ export function AgentSettingsSheet({
       const [profileRes, routeRes, revisionRes] = await Promise.all([
         supabase
           .from("agent_profiles")
-          .select("system_instructions, behavior, model_route_key")
+          .select("system_instructions, behavior, model_route_key, account_id")
           .eq("id", agentProfileId)
           .single(),
         supabase
@@ -161,15 +162,23 @@ export function AgentSettingsSheet({
     try {
       const nextBehavior = behaviorToJson(behavior);
       const nextInstructions = instructions.trim() || null;
-      const { error: profileError } = await supabase
+      // Explicit account scope + select-back: RLS silently matches zero rows
+      // on a profile this account cannot edit (e.g. the shared template), and
+      // a save that changed nothing must not report success.
+      const { data: updated, error: profileError } = await supabase
         .from("agent_profiles")
         .update({
           system_instructions: nextInstructions,
           behavior: nextBehavior,
           model_route_key: modelRouteKey === MODEL_SELECT_NONE ? null : modelRouteKey,
         })
-        .eq("id", agentProfileId);
+        .eq("id", agentProfileId)
+        .eq("account_id", accountId)
+        .select("id");
       if (profileError) throw profileError;
+      if (!updated || updated.length === 0) {
+        throw new Error("This agent profile is not editable by your account.");
+      }
 
       const { error: revisionError } = await supabaseUntyped.from("agent_profile_revisions").insert({
         agent_profile_id: agentProfileId,
@@ -190,19 +199,24 @@ export function AgentSettingsSheet({
     } finally {
       setSaving(false);
     }
-  }, [agentProfileId, behavior, instructions, load, modelRouteKey, pruneRevisions, toast, user]);
+  }, [accountId, agentProfileId, behavior, instructions, load, modelRouteKey, pruneRevisions, toast, user]);
 
   const restoreRevision = useCallback(async (revision: ProfileRevision) => {
     setSaving(true);
     try {
-      const { error: profileError } = await supabase
+      const { data: updated, error: profileError } = await supabase
         .from("agent_profiles")
         .update({
           system_instructions: revision.system_instructions,
           behavior: revision.behavior,
         })
-        .eq("id", agentProfileId);
+        .eq("id", agentProfileId)
+        .eq("account_id", accountId)
+        .select("id");
       if (profileError) throw profileError;
+      if (!updated || updated.length === 0) {
+        throw new Error("This agent profile is not editable by your account.");
+      }
 
       const { error: revisionError } = await supabaseUntyped.from("agent_profile_revisions").insert({
         agent_profile_id: agentProfileId,
@@ -223,13 +237,17 @@ export function AgentSettingsSheet({
     } finally {
       setSaving(false);
     }
-  }, [agentProfileId, load, pruneRevisions, toast, user]);
+  }, [accountId, agentProfileId, load, pruneRevisions, toast, user]);
 
   const selectedRouteLabel = useMemo(() => {
     if (!profile?.model_route_key) return "Default routing";
     const route = routes.find((entry) => entry.route_key === profile.model_route_key);
     return route ? `${route.label} (${route.provider})` : profile.model_route_key;
   }, [profile, routes]);
+
+  // Accounts without provisioned per-account profiles resolve to the shared
+  // global template (account_id null) — that row is read-only by design.
+  const isSharedTemplate = profile !== null && profile.account_id === null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -306,7 +324,7 @@ export function AgentSettingsSheet({
                           size="sm"
                           variant="outline"
                           className="h-8 gap-1.5"
-                          disabled={saving}
+                          disabled={saving || isSharedTemplate}
                           onClick={() => void restoreRevision(revision)}
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
@@ -325,7 +343,17 @@ export function AgentSettingsSheet({
         )}
 
         <div className="border-t border-border p-4">
-          <Button className="w-full gap-2" disabled={saving || loading} onClick={() => void saveSettings()}>
+          {isSharedTemplate && (
+            <p className="mb-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground" role="note">
+              This agent currently runs on the shared template, which is read-only. Per-company
+              settings unlock once this workspace&rsquo;s agent profiles are provisioned.
+            </p>
+          )}
+          <Button
+            className="w-full gap-2"
+            disabled={saving || loading || isSharedTemplate}
+            onClick={() => void saveSettings()}
+          >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save settings
           </Button>

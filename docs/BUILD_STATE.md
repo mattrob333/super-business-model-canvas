@@ -198,6 +198,33 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### 5B slice 3 review — RESOLVED: RF-5B3-1..3 fixed by the reviewer (2026-07-05)
+
+Codex's `build/phase-5b-slice-3` (commit `31a5609`: BMCSectionEditor chat rail retired per
+5.7, `AgentSettingsSheet` with instructions/behavior/model-route + revisions) reviewed and
+merged with fixes:
+
+- **RF-5B3-1 (HIGH, fixed):** profile updates ran `.eq("id", profileId)` with no
+  select-back. When the resolved profile is the shared template (account_id null — any
+  account without provisioned per-account profiles), RLS matches zero rows, Supabase
+  reports success, and the user gets a "Settings saved" toast for a write that never
+  happened; the revision insert then fails with a bare RLS error. Fix: updates now scope
+  `.eq("account_id", accountId)` and `.select("id")`-verify a row actually changed;
+  template profiles render an honest read-only notice with Save/Restore disabled.
+- **RF-5B3-2 (HIGH, fixed):** the last-10 revision pruning deletes through the client, but
+  `agent_profile_revisions` had no DELETE policy — every prune silently removed nothing
+  and history grew unbounded while the UI claimed "keep last 10". New migration
+  `20260705220000_profile_revisions_delete_policy.sql` (DELETE mirrors the INSERT scope:
+  account-scoped parents only) + schema.sql mirror. **Needs live application** (Ops
+  apply-migrations or Codex direct) before pruning works in production.
+- **RF-5B3-3 (LOW, fixed):** em-dashes in `AgentIdentityCard` copy came back as plain
+  hyphens (the recurring Windows cp1252 encoding issue) — restored.
+- **Reviewed and accepted:** the slice-2-parallel worker/Dashboard changes on the branch
+  are byte-identical to what merged in PR #52 (no drift); drawer demotion is clean (no
+  `bmc-chat` references remain in the editor, removed constants have no other consumers,
+  Analysis-page ChatDrawer still owns the `bmc-chat` edge fn until its own retirement);
+  `delete()`/`range()` additions to the untyped escape hatch are typed correctly.
+
 ### RF-LIVE-4/5/6 (owner live-test round 2) — FIXED (2026-07-05, reviewer-as-builder)
 
 - **RF-LIVE-4 — skill_run failed: "Claude Code process exited with code 1".** The SDK's

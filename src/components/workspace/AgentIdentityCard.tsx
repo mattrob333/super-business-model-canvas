@@ -12,7 +12,7 @@ export interface AgentRunSnapshot {
 }
 
 /**
- * Spec 02 zone 1a - the name on the office door. Live status derives from the
+ * Spec 02 zone 1a — the name on the office door. Live status derives from the
  * agent's latest run; the quiet settings button opens the prompt/behavior sheet.
  */
 export function AgentIdentityCard({
@@ -49,13 +49,13 @@ export function AgentIdentityCard({
               {running ? (
                 <>
                   <span className={`h-1.5 w-1.5 animate-pulse rounded-full bg-current ${entry.accentTextClass}`} />
-                  <span className={entry.accentTextClass}>active - in a run</span>
+                  <span className={entry.accentTextClass}>active — in a run</span>
                 </>
               ) : attention ? (
                 <>
                   <AlertTriangle className="h-3 w-3 text-destructive" />
                   <span className="text-destructive" title={latestRun?.error ?? undefined}>
-                    needs attention - last run failed
+                    needs attention — last run failed
                   </span>
                 </>
               ) : (
@@ -80,7 +80,7 @@ export function AgentIdentityCard({
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
         {description ??
-          `Owns ${CANVAS_SECTION_LABELS[sectionKey]} on the canvas - evidence-cited items, proposals over silent edits.`}
+          `Owns ${CANVAS_SECTION_LABELS[sectionKey]} on the canvas — evidence-cited items, proposals over silent edits.`}
       </p>
       <AgentSettingsSheet
         open={settingsOpen}
