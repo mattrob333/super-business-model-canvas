@@ -1,0 +1,328 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Lightbulb, Loader2, Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { supabaseUntyped } from "@/lib/supabase-untyped";
+import { getAgentRuntime } from "@/lib/agent-runtime";
+import { useAuth } from "@/hooks/useAuth";
+import { ATLAS } from "@/lib/atlas";
+
+/**
+ * The War Room thread, dock edition (spec 12 §6): one durable
+ * workspace_threads conversation with the orchestrator profile, shared later
+ * with the full-screen War Room. Same durable-run chat loop as
+ * WorkspaceThread — user message insert, workspace_chat run, poll until the
+ * reply lands — but deliberately without the gap auto-send machinery: Atlas
+ * speaks only when spoken to here.
+ */
+
+interface ThreadRow {
+  id: string;
+  title: string | null;
+  created_at: string;
+}
+
+interface MessageRow {
+  id: string;
+  role: string;
+  kind: string;
+  content: Record<string, unknown>;
+  created_at: string;
+}
+
+const THREAD_TITLE = "War Room";
+const RUN_POLL_INTERVAL_MS = 3_000;
+const RUN_POLL_MAX_ATTEMPTS = 100; // ~5 minutes
+
+/** Cross-company openers — Atlas reads all nine sections, so the prompts do too. */
+const ATLAS_PROMPTS = [
+  "Give me the state of the union.",
+  "What single move matters most this week?",
+  "Where am I losing to competitors right now?",
+  "What information are you missing to steer better, and how do I get it?",
+];
+
+export function AtlasChat({
+  accountId,
+  agentProfileId,
+}: {
+  accountId: string;
+  agentProfileId: string;
+}) {
+  const { user } = useAuth();
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [threadLoaded, setThreadLoaded] = useState(false);
+  const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [awaitingReply, setAwaitingReply] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const disposedRef = useRef(false);
+  const pollTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(
+    () => () => {
+      disposedRef.current = true;
+      clearTimeout(pollTimer.current);
+    },
+    [],
+  );
+
+  // Find the existing War Room thread; creation waits for the first send so
+  // an idle dock never writes rows.
+  useEffect(() => {
+    let cancelled = false;
+    setThreadLoaded(false);
+    (async () => {
+      const { data, error } = await supabaseUntyped
+        .from<ThreadRow>("workspace_threads")
+        .select("id, title, created_at")
+        .eq("account_id", accountId)
+        .eq("agent_profile_id", agentProfileId)
+        .eq("archived", false)
+        .eq("title", THREAD_TITLE)
+        .order("created_at", { ascending: true })
+        .limit(1);
+      if (cancelled) return;
+      if (error) setChatError(error.message);
+      setThreadId(data?.[0]?.id ?? null);
+      setThreadLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId, agentProfileId]);
+
+  const loadMessages = useCallback(async (thread: string) => {
+    const { data, error } = await supabaseUntyped
+      .from<MessageRow>("workspace_messages")
+      .select("id, role, kind, content, created_at")
+      .eq("thread_id", thread)
+      .order("created_at", { ascending: true })
+      .limit(100);
+    if (error) {
+      // Keep whatever is already on screen; an honest error beats a silent wipe.
+      setChatError(error.message);
+      return;
+    }
+    setMessages(data ?? []);
+  }, []);
+
+  useEffect(() => {
+    if (!threadId) {
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingMessages(true);
+    void loadMessages(threadId).finally(() => {
+      if (!cancelled) setLoadingMessages(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId, loadMessages]);
+
+  useEffect(() => {
+    if (messages.length === 0 && !awaitingReply) return;
+    // block:"nearest" keeps the scroll inside the dock's own container —
+    // scrolling the page under a fixed dock would be disorienting.
+    bottomRef.current?.scrollIntoView({ block: "nearest" });
+  }, [messages, awaitingReply]);
+
+  const ensureThread = useCallback(async (): Promise<string> => {
+    if (threadId) return threadId;
+    // Select-back verifies the insert actually landed before we hang a run on it.
+    const { data, error } = await supabaseUntyped
+      .from<ThreadRow>("workspace_threads")
+      .insert({
+        account_id: accountId,
+        agent_profile_id: agentProfileId,
+        title: THREAD_TITLE,
+        created_by: user?.id ?? null,
+      })
+      .select("id, title, created_at")
+      .single();
+    if (error || !data) throw new Error(error?.message ?? "Failed to create the War Room thread");
+    setThreadId(data.id);
+    return data.id;
+  }, [accountId, agentProfileId, threadId, user]);
+
+  const pollRun = useCallback((runId: string, thread: string, attempt: number) => {
+    if (attempt >= RUN_POLL_MAX_ATTEMPTS) {
+      setAwaitingReply(false);
+      setChatError(
+        `${ATLAS.name} is taking longer than expected. The run continues in the background. Check the Activity page or reload shortly.`,
+      );
+      return;
+    }
+    getAgentRuntime(accountId)
+      .getRunStatus(runId)
+      .then((status) => {
+        if (disposedRef.current) return;
+        if (!status || status.status === "pending" || status.status === "running") {
+          pollTimer.current = setTimeout(() => pollRun(runId, thread, attempt + 1), RUN_POLL_INTERVAL_MS);
+          return;
+        }
+        setAwaitingReply(false);
+        if (status.status === "completed") {
+          void loadMessages(thread);
+        } else {
+          setChatError(status.error ?? `Run ${status.status}. Send the message again to retry.`);
+        }
+      })
+      .catch(() => {
+        if (disposedRef.current) return;
+        pollTimer.current = setTimeout(() => pollRun(runId, thread, attempt + 1), RUN_POLL_INTERVAL_MS);
+      });
+  }, [accountId, loadMessages]);
+
+  const sendMessage = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || sending || awaitingReply) return;
+    setSending(true);
+    setChatError(null);
+    try {
+      const thread = await ensureThread();
+      const { error: messageError } = await supabaseUntyped.from("workspace_messages").insert({
+        thread_id: thread,
+        role: "user",
+        kind: "text",
+        content: { text: trimmed },
+      });
+      if (messageError) throw new Error(messageError.message);
+      setDraft("");
+      await loadMessages(thread);
+
+      const { runId } = await getAgentRuntime(accountId).startRun({
+        agentProfileId,
+        accountId,
+        runType: "workspace_chat",
+        triggerType: "manual",
+        triggeredBy: user?.id ?? null,
+        input: { thread_id: thread },
+      });
+      setAwaitingReply(true);
+      pollRun(runId, thread, 0);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Runtime unreachable");
+    } finally {
+      setSending(false);
+    }
+  }, [accountId, agentProfileId, awaitingReply, ensureThread, loadMessages, pollRun, sending, user]);
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          War Room
+        </h3>
+        <span className="text-[10px] text-muted-foreground">with {ATLAS.name}</span>
+      </div>
+
+      {/* Messages — natural height inside the dock's single scroll column */}
+      <div className="flex-1 py-3">
+        {!threadLoaded || loadingMessages ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : messages.length === 0 && !awaitingReply ? (
+          <div className="space-y-2">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Ask the strategist who reads all nine sections, your competitors, and the Gap
+              Register.
+            </p>
+            <div className="space-y-1.5">
+              {ATLAS_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => setDraft(prompt)}
+                  className="flex w-full items-start gap-2 rounded-md border border-border px-3 py-2 text-left text-xs transition-colors hover:border-primary/35 hover:bg-muted/40"
+                >
+                  <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {messages.map((message) => (
+              <AtlasMessage key={message.id} message={message} />
+            ))}
+            {awaitingReply && (
+              <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Atlas is thinking. This can take a minute…
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+        )}
+      </div>
+
+      {chatError && (
+        <p className="mb-2 text-xs leading-relaxed text-destructive" role="alert">
+          {chatError}
+        </p>
+      )}
+
+      {/* Composer — sticky so it stays reachable while the briefing scrolls away */}
+      <form
+        className="sticky bottom-0 -mx-4 flex shrink-0 items-end gap-2 border-t border-border bg-card p-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void sendMessage(draft);
+        }}
+      >
+        <Textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void sendMessage(draft);
+            }
+          }}
+          placeholder={`Message ${ATLAS.name}… (Enter to send, Shift+Enter for a new line)`}
+          rows={2}
+          className="min-h-[44px] resize-none text-sm"
+        />
+        <Button
+          type="submit"
+          size="icon"
+          className="h-10 w-10 shrink-0"
+          disabled={sending || awaitingReply || !draft.trim()}
+          aria-label="Send message"
+        >
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function AtlasMessage({ message }: { message: MessageRow }) {
+  const text = typeof message.content?.text === "string" ? message.content.text : null;
+
+  if (message.role === "agent") {
+    return (
+      <div className="prose prose-sm prose-slate min-w-0 max-w-none break-words dark:prose-invert [&_p]:my-2.5 [&_p]:leading-relaxed [&_li]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_strong]:font-semibold [&_strong]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-base [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3]:text-sm [&_h4]:mt-3 [&_h4]:mb-1 [&_h4]:text-sm [&_pre]:my-2 [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:rounded-md [&_pre]:bg-muted/40 [&_pre]:p-2.5 [&_pre]:text-xs [&_code]:break-words">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text ?? ""}</ReactMarkdown>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[85%] break-words rounded-lg bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
+        {text ?? JSON.stringify(message.content)}
+      </div>
+    </div>
+  );
+}

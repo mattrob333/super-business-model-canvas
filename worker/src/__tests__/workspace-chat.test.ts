@@ -80,6 +80,32 @@ describe("WorkspaceChatHandler", () => {
     expect(runner.request?.maxBudgetUsd).toBeGreaterThanOrEqual(0.75);
   });
 
+  it("gives the orchestrator profile the Atlas whole-board prompt, not a single-section one (spec 12)", async () => {
+    const client = new WorkspaceChatFakeClient();
+    client.tables.agent_profiles = [{
+      id: "profile-1",
+      account_id: "account-1",
+      agent_key: "orchestrator",
+      display_name: "Atlas",
+      system_instructions: "Legacy persona. Output format: Always respond with valid JSON containing: items / notes / confidence / summary",
+      model_route_key: "workspace_chat",
+    }];
+    const runner = new CapturingRunner();
+    await new WorkspaceChatHandler({
+      client: client.asSupabase(),
+      runner,
+    }).handle(makeJob());
+
+    expect(runner.request?.systemPrompt).toContain("You are Atlas");
+    // The seeded legacy persona mandates raw-JSON output; Atlas must never inherit it.
+    expect(runner.request?.systemPrompt).not.toContain("Always respond with valid JSON");
+    expect(runner.request?.systemPrompt).toContain("Canvas coverage (9 sections");
+    expect(runner.request?.systemPrompt).toContain("Customer Segments (customer_segments): verified — 2 items");
+    expect(runner.request?.systemPrompt).toContain("Data-gap protocol");
+    // The single-section grounding block belongs to the nine room agents only.
+    expect(runner.request?.systemPrompt).not.toContain("canvas items (already loaded");
+  });
+
   it("strips a leading tool-result JSON echo from replies but never swallows a whole message", () => {
     const prose = "Bottom line: the section is empty, so let's run the analysis first and go from there.";
     expect(stripLeadingToolEcho(`{"items": [], "confidence": "low"}\n\n${prose}`)).toBe(prose);
@@ -208,6 +234,7 @@ class WorkspaceChatFakeClient {
 
 class WorkspaceChatFakeQuery {
   private filters: Array<{ column: string; value: unknown }> = [];
+  private listFilters: Array<{ column: string; values: unknown[]; negated: boolean }> = [];
   private limitCount: number | null = null;
   private pendingInsert: unknown | null = null;
   private pendingUpdate: unknown | null = null;
@@ -225,6 +252,18 @@ class WorkspaceChatFakeQuery {
 
   is(column: string, value: unknown): this {
     this.filters.push({ column, value });
+    return this;
+  }
+
+  in(column: string, values: unknown[]): this {
+    this.listFilters.push({ column, values, negated: false });
+    return this;
+  }
+
+  // Supabase's negated-in shape: .not("status", "in", "(a,b,c)").
+  not(column: string, _operator: string, value: unknown): this {
+    const values = String(value).replace(/^\(|\)$/g, "").split(",");
+    this.listFilters.push({ column, values, negated: true });
     return this;
   }
 
@@ -263,6 +302,9 @@ class WorkspaceChatFakeQuery {
     let rows = [...(this.client.tables[this.table] ?? [])] as Record<string, unknown>[];
     for (const filter of this.filters) {
       rows = rows.filter((row) => row[filter.column] === filter.value);
+    }
+    for (const filter of this.listFilters) {
+      rows = rows.filter((row) => filter.values.includes(row[filter.column]) !== filter.negated);
     }
     if (this.limitCount !== null) rows = rows.slice(0, this.limitCount);
     return rows;
