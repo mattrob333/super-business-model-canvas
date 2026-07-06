@@ -3,7 +3,8 @@ import type { AgentRunner } from "../agent/runner.js";
 import { ClaudeAgentRunner, OpenRouterChatRunner } from "../agent/runner.js";
 import { asRecord } from "../db/json.js";
 import { FeedRunner } from "../feeds/feed-runner.js";
-import type { FeedRuntimeConfig } from "../feeds/types.js";
+import { SECTION_LABELS, type SectionKey } from "../domain/sections.js";
+import type { EvidenceCandidate, FeedRuntimeConfig } from "../feeds/types.js";
 import type { AgentJob } from "../queue/types.js";
 import { chooseModelRoute } from "./canvas-section-analysis.js";
 import { verifyClaimAgainstExcerpt } from "./company-research.js";
@@ -35,6 +36,23 @@ interface CompetitorPricingSource {
   evidenceId: string;
 }
 
+interface CanvasItemSource {
+  sectionKey: SectionKey;
+  text: string;
+  evidenceIds: string[];
+  competitorId?: string | null;
+  competitorName?: string | null;
+}
+
+interface SkillArtifactWrite {
+  skillKey: string;
+  title: string;
+  bodyMd: string;
+  payload: Record<string, unknown>;
+  evidenceIds: string[];
+  inputs: Record<string, unknown>;
+}
+
 export interface SkillRunDependencies extends FeedRuntimeConfig {
   client: SupabaseClient;
   runner?: AgentRunner;
@@ -60,6 +78,22 @@ export class SkillRunHandler {
 
     if (skillKey === "yield.pricing_teardown") {
       await this.runPricingTeardown(job);
+      return;
+    }
+    if (skillKey === "compass.avatar_refinement") {
+      await this.runAvatarRefinement(job);
+      return;
+    }
+    if (skillKey === "compass.segment_expansion") {
+      await this.runSegmentExpansion(job);
+      return;
+    }
+    if (skillKey === "relay.channel_gap_scan") {
+      await this.runChannelGapScan(job);
+      return;
+    }
+    if (skillKey === "relay.channel_economics") {
+      await this.runChannelEconomics(job);
       return;
     }
     throw new Error(`skill ${skillKey} is not implemented in the worker (catalog implemented flag must stay false)`);
@@ -174,6 +208,205 @@ export class SkillRunHandler {
     });
   }
 
+  private async runAvatarRefinement(job: AgentJob): Promise<void> {
+    const segments = await this.loadOwnSectionItems(job.account_id, "customer_segments");
+    if (segments.length === 0) {
+      throw new Error("avatar_refinement requires Customer Segments canvas items first");
+    }
+
+    const evidence: Array<{ segment: string; evidence: EvidenceCandidate; evidenceId: string }> = [];
+    for (const segment of segments.slice(0, 6)) {
+      const result = await this.feedRunner.refresh({
+        accountId: job.account_id,
+        feedKey: "grok_live_search",
+        cacheKey: `avatar_refinement:${job.account_id}:${slug(segment.text)}`,
+        companyName: segment.text,
+        query: `${segment.text} reviews community forum pain points buying triggers objections`,
+      });
+      if (result.health !== "ok") continue;
+      for (const item of result.evidence.slice(0, 2)) {
+        const evidenceId = await this.writeEvidenceCandidate(job, item, "compass.avatar_refinement");
+        evidence.push({ segment: segment.text, evidence: item, evidenceId });
+      }
+    }
+    if (evidence.length === 0) {
+      throw new Error("avatar_refinement could not find review/community evidence for the current segments");
+    }
+
+    const routes = await this.loadModelRoutes(job.account_id, ["skill_run", "research_verify"]);
+    const route = requiredRoute(routes, job.account_id, "skill_run", "skill_run");
+    const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
+    const modelResult = await runModelStep(
+      `avatar_refinement artifact (${route.provider}/${route.model_name})`,
+      () => this.runnerForRoute(route).run({
+        model: route.model_name,
+        modelParams: route.params ?? undefined,
+        maxTurns: 12,
+        maxBudgetUsd: budgetForRoute(route),
+        prompt: avatarRefinementPrompt(segments.map((item) => item.text), evidence),
+        systemPrompt: "You build ICP cards from cited evidence only. Quotes must appear verbatim in the supplied excerpts. Return JSON only.",
+        mcpServers: {},
+        allowedTools: [],
+      }),
+    );
+    const artifact = parseAvatarArtifact(modelResult.resultText, segments.map((item) => item.text));
+    if (!artifact) throw new Error("avatar_refinement produced unparseable output; refusing to write an artifact");
+    const checked = await this.verifyArtifactClaims(job, verifyRoute, artifact.cards.flatMap((card) =>
+      card.pains.map((pain) => ({ claim: `${card.segment}: ${pain.quote}`, excerpt: evidenceForSegment(evidence, card.segment) })),
+    ).slice(0, 4), "avatar_refinement");
+
+    await this.writeSkillArtifact(job, {
+      skillKey: "compass.avatar_refinement",
+      title: `Avatar refinement - ${artifact.cards.length} segment${artifact.cards.length === 1 ? "" : "s"}`,
+      bodyMd: artifact.bodyMd,
+      payload: { cards: artifact.cards, messaging_hooks: artifact.messagingHooks, spot_check: checked },
+      evidenceIds: unique(evidence.map((item) => item.evidenceId)),
+      inputs: { sections: ["customer_segments"], segments: segments.map((item) => item.text) },
+    });
+    await this.markRunCompleted(job, "Avatar refinement completed", {
+      skill_key: "compass.avatar_refinement",
+      cards: artifact.cards.length,
+      spot_check_confirmed: checked.confirmed,
+    });
+  }
+
+  private async runSegmentExpansion(job: AgentJob): Promise<void> {
+    const ownSegments = await this.loadOwnSectionItems(job.account_id, "customer_segments");
+    const resources = await this.loadOwnSectionItems(job.account_id, "key_resources");
+    const activities = await this.loadOwnSectionItems(job.account_id, "key_activities");
+    const competitorSegments = await this.loadCompetitorSectionItems(job.account_id, "customer_segments");
+    if (ownSegments.length === 0) throw new Error("segment_expansion requires our Customer Segments canvas items first");
+    if (competitorSegments.length === 0) throw new Error("segment_expansion requires competitor Customer Segments research first");
+
+    const routes = await this.loadModelRoutes(job.account_id, ["skill_run", "research_verify"]);
+    const route = requiredRoute(routes, job.account_id, "skill_run", "skill_run");
+    const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
+    const modelResult = await runModelStep(
+      `segment_expansion artifact (${route.provider}/${route.model_name})`,
+      () => this.runnerForRoute(route).run({
+        model: route.model_name,
+        modelParams: route.params ?? undefined,
+        maxTurns: 12,
+        maxBudgetUsd: budgetForRoute(route),
+        prompt: segmentExpansionPrompt(ownSegments, competitorSegments, resources, activities),
+        systemPrompt: "You identify adjacent customer segments from competitor canvas evidence only. Do not invent segments. Return JSON only.",
+        mcpServers: {},
+        allowedTools: [],
+      }),
+    );
+    const artifact = parseSegmentExpansionArtifact(modelResult.resultText);
+    if (!artifact) throw new Error("segment_expansion produced unparseable output; refusing to write an artifact");
+    const checked = await this.verifyArtifactClaims(job, verifyRoute, artifact.opportunities.map((row) => ({
+      claim: `${row.segment}: ${row.competitor_evidence}`,
+      excerpt: competitorExcerpt(competitorSegments, row.competitor),
+    })).slice(0, 4), "segment_expansion");
+
+    await this.writeSkillArtifact(job, {
+      skillKey: "compass.segment_expansion",
+      title: `Segment expansion scan - ${artifact.opportunities.length} opportunities`,
+      bodyMd: artifact.bodyMd,
+      payload: { opportunities: artifact.opportunities, spot_check: checked },
+      evidenceIds: unique(competitorSegments.flatMap((item) => item.evidenceIds)),
+      inputs: {
+        sections: ["customer_segments", "key_resources", "key_activities"],
+        competitor_items: competitorSegments.length,
+      },
+    });
+    await this.markRunCompleted(job, "Segment expansion scan completed", {
+      skill_key: "compass.segment_expansion",
+      opportunities: artifact.opportunities.length,
+      spot_check_confirmed: checked.confirmed,
+    });
+  }
+
+  private async runChannelGapScan(job: AgentJob): Promise<void> {
+    const ownChannels = await this.loadOwnSectionItems(job.account_id, "channels");
+    const competitorChannels = await this.loadCompetitorSectionItems(job.account_id, "channels");
+    if (ownChannels.length === 0) throw new Error("channel_gap_scan requires our Channels canvas items first");
+    if (competitorChannels.length === 0) throw new Error("channel_gap_scan requires competitor Channels research first");
+
+    const routes = await this.loadModelRoutes(job.account_id, ["skill_run", "research_verify"]);
+    const route = requiredRoute(routes, job.account_id, "skill_run", "skill_run");
+    const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
+    const modelResult = await runModelStep(
+      `channel_gap_scan artifact (${route.provider}/${route.model_name})`,
+      () => this.runnerForRoute(route).run({
+        model: route.model_name,
+        modelParams: route.params ?? undefined,
+        maxTurns: 12,
+        maxBudgetUsd: budgetForRoute(route),
+        prompt: channelGapPrompt(ownChannels, competitorChannels),
+        systemPrompt: "You rank channel gaps from competitor channel evidence. Use effort and impact scores from 1 to 5. Return JSON only.",
+        mcpServers: {},
+        allowedTools: [],
+      }),
+    );
+    const artifact = parseChannelGapArtifact(modelResult.resultText);
+    if (!artifact) throw new Error("channel_gap_scan produced unparseable output; refusing to write an artifact");
+    const checked = await this.verifyArtifactClaims(job, verifyRoute, artifact.gaps.map((row) => ({
+      claim: `${row.channel}: ${row.competitor_evidence}`,
+      excerpt: competitorExcerpt(competitorChannels, row.competitor),
+    })).slice(0, 4), "channel_gap_scan");
+
+    await this.writeSkillArtifact(job, {
+      skillKey: "relay.channel_gap_scan",
+      title: `Channel gap scan - ${artifact.gaps.length} ranked channels`,
+      bodyMd: artifact.bodyMd,
+      payload: { gaps: artifact.gaps, spot_check: checked },
+      evidenceIds: unique(competitorChannels.flatMap((item) => item.evidenceIds)),
+      inputs: { sections: ["channels"], competitor_items: competitorChannels.length },
+    });
+    await this.markRunCompleted(job, "Channel gap scan completed", {
+      skill_key: "relay.channel_gap_scan",
+      gaps: artifact.gaps.length,
+      spot_check_confirmed: checked.confirmed,
+    });
+  }
+
+  private async runChannelEconomics(job: AgentJob): Promise<void> {
+    const ownChannels = await this.loadOwnSectionItems(job.account_id, "channels");
+    const competitorChannels = await this.loadCompetitorSectionItems(job.account_id, "channels");
+    if (ownChannels.length === 0) throw new Error("channel_economics requires our Channels canvas items first");
+    if (competitorChannels.length === 0) throw new Error("channel_economics requires competitor Channels research first");
+
+    const routes = await this.loadModelRoutes(job.account_id, ["skill_run", "research_verify"]);
+    const route = requiredRoute(routes, job.account_id, "skill_run", "skill_run");
+    const verifyRoute = requiredRoute(routes, job.account_id, "research_verify", "research_verify");
+    const modelResult = await runModelStep(
+      `channel_economics artifact (${route.provider}/${route.model_name})`,
+      () => this.runnerForRoute(route).run({
+        model: route.model_name,
+        modelParams: route.params ?? undefined,
+        maxTurns: 12,
+        maxBudgetUsd: budgetForRoute(route),
+        prompt: channelEconomicsPrompt(ownChannels, competitorChannels),
+        systemPrompt: "You infer CAC posture only from public channel signals. Unknown values must be exactly 'unknown — not published'. Return JSON only.",
+        mcpServers: {},
+        allowedTools: [],
+      }),
+    );
+    const artifact = parseChannelEconomicsArtifact(modelResult.resultText);
+    if (!artifact) throw new Error("channel_economics produced unparseable output; refusing to write an artifact");
+    const checked = await this.verifyArtifactClaims(job, verifyRoute, artifact.channels.map((row) => ({
+      claim: `${row.channel}: ${row.public_signal}`,
+      excerpt: competitorExcerpt(competitorChannels, row.competitor),
+    })).slice(0, 4), "channel_economics");
+
+    await this.writeSkillArtifact(job, {
+      skillKey: "relay.channel_economics",
+      title: `Channel economics - ${artifact.channels.length} channel${artifact.channels.length === 1 ? "" : "s"}`,
+      bodyMd: artifact.bodyMd,
+      payload: { channels: artifact.channels, unknown_note: "unknown — not published", spot_check: checked },
+      evidenceIds: unique(competitorChannels.flatMap((item) => item.evidenceIds)),
+      inputs: { sections: ["channels"], competitor_items: competitorChannels.length },
+    });
+    await this.markRunCompleted(job, "Channel economics completed", {
+      skill_key: "relay.channel_economics",
+      channels: artifact.channels.length,
+      spot_check_confirmed: checked.confirmed,
+    });
+  }
+
   private async loadCompetitors(accountId: string): Promise<Array<{ id: string; name: string; website_url: string | null }>> {
     const { data, error } = await this.deps.client
       .from("companies")
@@ -184,6 +417,32 @@ export class SkillRunHandler {
       .limit(8);
     if (error) throw new Error(`Failed to load competitors: ${error.message}`);
     return (data ?? []) as Array<{ id: string; name: string; website_url: string | null }>;
+  }
+
+  private async loadOwnSectionItems(accountId: string, sectionKey: SectionKey): Promise<CanvasItemSource[]> {
+    const { data, error } = await this.deps.client
+      .from("canvas_section_versions")
+      .select("section_key, items, created_at")
+      .eq("account_id", accountId)
+      .is("competitor_id", null)
+      .eq("section_key", sectionKey)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) throw new Error(`Failed to load ${SECTION_LABELS[sectionKey]} items: ${error.message}`);
+    return flattenCanvasItems(data ?? [], sectionKey);
+  }
+
+  private async loadCompetitorSectionItems(accountId: string, sectionKey: SectionKey): Promise<CanvasItemSource[]> {
+    const { data, error } = await this.deps.client
+      .from("canvas_section_versions")
+      .select("section_key, competitor_id, items, created_at, companies!canvas_section_versions_competitor_id_fkey(name)")
+      .eq("account_id", accountId)
+      .not("competitor_id", "is", null)
+      .eq("section_key", sectionKey)
+      .order("created_at", { ascending: false })
+      .limit(24);
+    if (error) throw new Error(`Failed to load competitor ${SECTION_LABELS[sectionKey]} items: ${error.message}`);
+    return flattenCanvasItems(data ?? [], sectionKey);
   }
 
   private async loadOwnRevenueItems(accountId: string): Promise<string[]> {
@@ -228,6 +487,72 @@ export class SkillRunHandler {
       .single();
     if (error) throw new Error(`Failed to write evidence: ${error.message}`);
     return data.id;
+  }
+
+  private async writeEvidenceCandidate(job: AgentJob, input: EvidenceCandidate, skillKey: string): Promise<string> {
+    const excerpt = input.excerpt ?? "";
+    const sourceUrl = input.sourceUrl ?? `${skillKey}:${input.title}`;
+    const { data: existing } = await this.deps.client
+      .from("evidence_items")
+      .select("id")
+      .eq("account_id", job.account_id)
+      .eq("source_url", sourceUrl)
+      .eq("excerpt", excerpt)
+      .limit(1)
+      .maybeSingle();
+    if (existing?.id) return existing.id as string;
+    const { data, error } = await this.deps.client
+      .from("evidence_items")
+      .insert({
+        account_id: job.account_id,
+        title: input.title,
+        source_type: input.sourceType,
+        source_name: input.sourceName ?? null,
+        source_url: sourceUrl,
+        excerpt,
+        metadata: { ...(input.metadata ?? {}), skill_key: skillKey },
+        created_by_agent_run_id: job.agent_run_id,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(`Failed to write skill evidence: ${error.message}`);
+    return data.id;
+  }
+
+  private async writeSkillArtifact(job: AgentJob, artifact: SkillArtifactWrite): Promise<void> {
+    const { error } = await this.deps.client.from("skill_artifacts").insert({
+      account_id: job.account_id,
+      skill_key: artifact.skillKey,
+      title: artifact.title,
+      body_md: artifact.bodyMd,
+      payload: artifact.payload,
+      evidence_ids: artifact.evidenceIds,
+      inputs: artifact.inputs,
+      agent_run_id: job.agent_run_id,
+    });
+    if (error) throw new Error(`Failed to write skill artifact: ${error.message}`);
+  }
+
+  private async verifyArtifactClaims(
+    job: AgentJob,
+    verifyRoute: ModelRoute,
+    checks: Array<{ claim: string; excerpt: string }>,
+    label: string,
+  ): Promise<{ checked: number; confirmed: number }> {
+    let confirmed = 0;
+    const usable = checks.filter((check) => check.claim.trim() && check.excerpt.trim()).slice(0, 4);
+    if (usable.length === 0) throw new Error(`${label} has no evidence-backed claims to verify`);
+    for (const check of usable) {
+      const verdict = await runModelStep(
+        `${label} verifier spot-check (${verifyRoute.provider}/${verifyRoute.model_name})`,
+        () => verifyClaimAgainstExcerpt(this.runnerForRoute(verifyRoute), verifyRoute, check.claim, check.excerpt),
+      );
+      if (verdict.status === "contradicted") {
+        throw new Error(`${label} spot-check contradicted: ${verdict.reason}`);
+      }
+      if (verdict.status === "confirmed") confirmed += 1;
+    }
+    return { checked: usable.length, confirmed };
   }
 
   private async loadModelRoutes(accountId: string, taskClasses: string[]): Promise<ModelRoute[]> {
@@ -288,6 +613,55 @@ interface PricingArtifact {
   scenarios: Array<{ name: string; description: string }>;
 }
 
+interface AvatarArtifact {
+  bodyMd: string;
+  cards: Array<{
+    segment: string;
+    who: string;
+    pains: Array<{ quote: string; interpretation: string }>;
+    buying_triggers: string[];
+    disqualifiers: string[];
+    messaging_hooks: string[];
+  }>;
+  messagingHooks: string[];
+}
+
+interface SegmentExpansionArtifact {
+  bodyMd: string;
+  opportunities: Array<{
+    segment: string;
+    competitor: string;
+    competitor_evidence: string;
+    fit_score: number;
+    fit_rationale: string;
+    recommended_probe: string;
+  }>;
+}
+
+interface ChannelGapArtifact {
+  bodyMd: string;
+  gaps: Array<{
+    channel: string;
+    competitor: string;
+    competitor_evidence: string;
+    effort: number;
+    impact: number;
+    recommendation: string;
+  }>;
+}
+
+interface ChannelEconomicsArtifact {
+  bodyMd: string;
+  channels: Array<{
+    channel: string;
+    competitor: string;
+    public_signal: string;
+    cac_posture: string;
+    confidence: number;
+    notes: string;
+  }>;
+}
+
 function pricingTeardownPrompt(sources: CompetitorPricingSource[], ownItems: string[]): string {
   const sourceBlock = sources
     .map((source, index) => `[${index}] ${source.name} (id=${source.competitorId})\n${source.excerpt.slice(0, 2500)}`)
@@ -301,6 +675,61 @@ ${own}
 
 Competitor pricing excerpts:
 ${sourceBlock}`;
+}
+
+function avatarRefinementPrompt(segments: string[], evidence: Array<{ segment: string; evidence: EvidenceCandidate }>): string {
+  return `Build ICP cards for the current Customer Segments. Return JSON only:
+{"cards":[{"segment":"...","who":"...","pains":[{"quote":"verbatim quote from evidence","interpretation":"..."}],"buying_triggers":["..."],"disqualifiers":["..."],"messaging_hooks":["..."]}],"messaging_hooks":["..."],"body_md":"## What changed\\n..."}
+
+Current segments:
+${segments.map((segment) => `- ${segment}`).join("\n")}
+
+Evidence:
+${evidence.map((entry, index) => `[${index}] segment=${entry.segment}\n${entry.evidence.title}\n${entry.evidence.excerpt ?? ""}`).join("\n\n")}`;
+}
+
+function segmentExpansionPrompt(
+  ownSegments: CanvasItemSource[],
+  competitorSegments: CanvasItemSource[],
+  resources: CanvasItemSource[],
+  activities: CanvasItemSource[],
+): string {
+  return `Find adjacent customer segments competitors serve that our Customer Segments do not mention. Score fit from 1 to 5 using our Key Resources and Key Activities. Return JSON only:
+{"opportunities":[{"segment":"...","competitor":"...","competitor_evidence":"short evidence-backed phrase","fit_score":4,"fit_rationale":"...","recommended_probe":"..."}],"body_md":"## Expansion shortlist\\n..."}
+
+Our current segments:
+${formatItems(ownSegments)}
+
+Our Key Resources:
+${formatItems(resources)}
+
+Our Key Activities:
+${formatItems(activities)}
+
+Competitor customer segments:
+${formatItems(competitorSegments)}`;
+}
+
+function channelGapPrompt(ownChannels: CanvasItemSource[], competitorChannels: CanvasItemSource[]): string {
+  return `Compare competitor channels against ours. Rank channel gaps by effort and impact, 1 to 5. Return JSON only:
+{"gaps":[{"channel":"...","competitor":"...","competitor_evidence":"short evidence-backed phrase","effort":2,"impact":5,"recommendation":"..."}],"body_md":"## Channel gaps\\n..."}
+
+Our channels:
+${formatItems(ownChannels)}
+
+Competitor channels:
+${formatItems(competitorChannels)}`;
+}
+
+function channelEconomicsPrompt(ownChannels: CanvasItemSource[], competitorChannels: CanvasItemSource[]): string {
+  return `Estimate CAC posture per channel only from public channel signals. If spend, CAC, conversion, or efficiency is not explicitly published, use exactly "unknown — not published". Return JSON only:
+{"channels":[{"channel":"...","competitor":"...","public_signal":"evidence-backed public signal","cac_posture":"paid-heavy|partner-led|organic-led|unknown — not published","confidence":0.55,"notes":"..."}],"body_md":"## Channel economics\\n..."}
+
+Our channels:
+${formatItems(ownChannels)}
+
+Competitor channel evidence:
+${formatItems(competitorChannels)}`;
 }
 
 export function parsePricingArtifact(text: string, sources: CompetitorPricingSource[]): PricingArtifact | null {
@@ -348,6 +777,117 @@ export function parsePricingArtifact(text: string, sources: CompetitorPricingSou
   };
 }
 
+export function parseAvatarArtifact(text: string, allowedSegments: string[]): AvatarArtifact | null {
+  const parsed = parseJsonObject(text);
+  if (!parsed) return null;
+  const allowed = new Set(allowedSegments);
+  const cards = Array.isArray(parsed.cards)
+    ? parsed.cards.flatMap((entry) => {
+        const record = asRecord(entry);
+        const segment = readString(record.segment);
+        const who = readString(record.who);
+        if (!segment || !who || !allowed.has(segment)) return [];
+        const pains = Array.isArray(record.pains)
+          ? record.pains.flatMap((pain) => {
+              const painRecord = asRecord(pain);
+              const quote = readString(painRecord.quote);
+              const interpretation = readString(painRecord.interpretation);
+              return quote && interpretation ? [{ quote, interpretation }] : [];
+            })
+          : [];
+        if (pains.length === 0) return [];
+        return [{
+          segment,
+          who,
+          pains,
+          buying_triggers: toStringArray(record.buying_triggers),
+          disqualifiers: toStringArray(record.disqualifiers),
+          messaging_hooks: toStringArray(record.messaging_hooks),
+        }];
+      })
+    : [];
+  const bodyMd = readString(parsed.body_md);
+  if (cards.length === 0 || !bodyMd) return null;
+  return { bodyMd, cards, messagingHooks: toStringArray(parsed.messaging_hooks) };
+}
+
+export function parseSegmentExpansionArtifact(text: string): SegmentExpansionArtifact | null {
+  const parsed = parseJsonObject(text);
+  if (!parsed) return null;
+  const opportunities = Array.isArray(parsed.opportunities)
+    ? parsed.opportunities.flatMap((entry) => {
+        const row = asRecord(entry);
+        const segment = readString(row.segment);
+        const competitor = readString(row.competitor);
+        const competitorEvidence = readString(row.competitor_evidence);
+        const fitRationale = readString(row.fit_rationale);
+        const recommendedProbe = readString(row.recommended_probe);
+        if (!segment || !competitor || !competitorEvidence || !fitRationale || !recommendedProbe) return [];
+        return [{
+          segment,
+          competitor,
+          competitor_evidence: competitorEvidence,
+          fit_score: boundedScore(row.fit_score),
+          fit_rationale: fitRationale,
+          recommended_probe: recommendedProbe,
+        }];
+      })
+    : [];
+  const bodyMd = readString(parsed.body_md);
+  return opportunities.length > 0 && bodyMd ? { bodyMd, opportunities } : null;
+}
+
+export function parseChannelGapArtifact(text: string): ChannelGapArtifact | null {
+  const parsed = parseJsonObject(text);
+  if (!parsed) return null;
+  const gaps = Array.isArray(parsed.gaps)
+    ? parsed.gaps.flatMap((entry) => {
+        const row = asRecord(entry);
+        const channel = readString(row.channel);
+        const competitor = readString(row.competitor);
+        const competitorEvidence = readString(row.competitor_evidence);
+        const recommendation = readString(row.recommendation);
+        if (!channel || !competitor || !competitorEvidence || !recommendation) return [];
+        return [{
+          channel,
+          competitor,
+          competitor_evidence: competitorEvidence,
+          effort: boundedScore(row.effort),
+          impact: boundedScore(row.impact),
+          recommendation,
+        }];
+      })
+    : [];
+  const bodyMd = readString(parsed.body_md);
+  return gaps.length > 0 && bodyMd ? { bodyMd, gaps } : null;
+}
+
+export function parseChannelEconomicsArtifact(text: string): ChannelEconomicsArtifact | null {
+  const parsed = parseJsonObject(text);
+  if (!parsed) return null;
+  const channels = Array.isArray(parsed.channels)
+    ? parsed.channels.flatMap((entry) => {
+        const row = asRecord(entry);
+        const channel = readString(row.channel);
+        const competitor = readString(row.competitor);
+        const publicSignal = readString(row.public_signal);
+        const cacPosture = readString(row.cac_posture);
+        const notes = readString(row.notes);
+        if (!channel || !competitor || !publicSignal || !cacPosture || !notes) return [];
+        return [{
+          channel,
+          competitor,
+          public_signal: publicSignal,
+          cac_posture: cacPosture,
+          confidence: boundedConfidence(row.confidence),
+          notes,
+        }];
+      })
+    : [];
+  const bodyMd = readString(parsed.body_md);
+  return channels.length > 0 && bodyMd ? { bodyMd, channels } : null;
+}
+
 /**
  * Live incident 2026-07-05: a skill run failed with "Claude Code process
  * exited with code 1" — the SDK's CLI child died at spawn, not a model
@@ -381,8 +921,83 @@ function joinUrl(base: string, path: string): string {
   }
 }
 
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  const unfenced = text.replace(/```(?:json)?/gi, "```").replace(/```/g, "").trim();
+  const start = unfenced.indexOf("{");
+  const end = unfenced.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return asRecord(JSON.parse(unfenced.slice(start, end + 1)));
+  } catch {
+    return null;
+  }
+}
+
+function flattenCanvasItems(rows: unknown[], defaultSectionKey: SectionKey): CanvasItemSource[] {
+  return rows.flatMap((row) => {
+    const record = asRecord(row);
+    const sectionKey = (readString(record.section_key) as SectionKey | undefined) ?? defaultSectionKey;
+    const competitorId = readString(record.competitor_id) ?? null;
+    const company = asRecord(record.companies);
+    const competitorName = readString(company.name) ?? competitorId;
+    const items = Array.isArray(record.items) ? record.items : [];
+    return items.flatMap((item) => {
+      const itemRecord = asRecord(item);
+      const text = typeof item === "string" ? item : readString(itemRecord.text);
+      if (!text) return [];
+      return [{
+        sectionKey,
+        text,
+        evidenceIds: toStringArray(itemRecord.evidence_ids),
+        competitorId,
+        competitorName,
+      }];
+    });
+  });
+}
+
+function formatItems(items: CanvasItemSource[]): string {
+  return items.length > 0
+    ? items.map((item) => `- ${item.competitorName ? `${item.competitorName}: ` : ""}${item.text}`).join("\n")
+    : "- (none recorded)";
+}
+
+function evidenceForSegment(evidence: Array<{ segment: string; evidence: EvidenceCandidate }>, segment: string): string {
+  return evidence
+    .filter((entry) => entry.segment === segment)
+    .map((entry) => entry.evidence.excerpt ?? "")
+    .join("\n\n");
+}
+
+function competitorExcerpt(items: CanvasItemSource[], competitor: string): string {
+  return items
+    .filter((item) => (item.competitorName ?? "").toLowerCase() === competitor.toLowerCase())
+    .map((item) => item.text)
+    .join("\n");
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function slug(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "segment";
+}
+
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function boundedScore(value: unknown): number {
+  const score = Number(value);
+  if (!Number.isFinite(score)) return 1;
+  return Math.min(5, Math.max(1, Math.round(score)));
+}
+
+function boundedConfidence(value: unknown): number {
+  const score = Number(value);
+  if (!Number.isFinite(score)) return 0.5;
+  return Math.min(1, Math.max(0, score));
 }
 
 function budgetForRoute(route: Pick<ModelRoute, "cost_per_1k_in" | "cost_per_1k_out">): number {
