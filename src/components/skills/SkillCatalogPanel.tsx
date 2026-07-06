@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { BadgeCheck, FileText, Loader2, Play, Wrench } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { FileText, Loader2, Play, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FocusDrawer } from "@/components/overlay/FocusDrawer";
+import { ArtifactDocument } from "@/components/skills/ArtifactDocument";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 // Both tables sit beyond the generated Database type's TS2589 depth horizon —
 // documented escape hatch (src/lib/supabase-untyped.ts), explicit row types.
 import { supabaseUntyped } from "@/lib/supabase-untyped";
@@ -26,6 +27,7 @@ interface SkillArtifact {
   skill_key: string;
   title: string;
   body_md: string;
+  payload: Json;
   evidence_ids: string[];
   created_at: string;
 }
@@ -54,7 +56,7 @@ export function SkillCatalogPanel() {
         .order("sort_order", { ascending: true }),
       supabaseUntyped
         .from<SkillArtifact>("skill_artifacts")
-        .select("id, skill_key, title, body_md, evidence_ids, created_at")
+        .select("id, skill_key, title, body_md, payload, evidence_ids, created_at")
         .eq("account_id", accountId)
         .order("created_at", { ascending: false })
         .limit(10),
@@ -198,15 +200,7 @@ export function SkillCatalogPanel() {
         subtitle={openArtifact ? `${openArtifact.skill_key} · ${openArtifact.evidence_ids.length} evidence sources` : undefined}
         bodyClassName="p-4 sm:p-6"
       >
-        {openArtifact && (
-          <article className="space-y-4">
-            <Badge variant="outline" className="gap-1">
-              <BadgeCheck className="h-3 w-3" />
-              Verifier spot-checked
-            </Badge>
-            <div className="whitespace-pre-wrap text-sm leading-6 text-foreground">{openArtifact.body_md}</div>
-          </article>
-        )}
+        {openArtifact && <ArtifactDocument artifact={openArtifact} />}
       </FocusDrawer>
     </section>
   );
