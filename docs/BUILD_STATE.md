@@ -198,6 +198,27 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RF-LIVE-4/5/6 (owner live-test round 2) — FIXED (2026-07-05, reviewer-as-builder)
+
+- **RF-LIVE-4 — skill_run failed: "Claude Code process exited with code 1".** The SDK's
+  CLI child died at spawn — a process-level failure, not a model refusal (the identical
+  runner+model pair works live in the research verifier). Root cause needs worker logs
+  (Fly access) to pin; code response: every skill model step now runs through
+  `runModelStep` — ONE immediate in-place retry on process-level failures
+  (`exited with code|ENOMEM|spawn|ECONNRESET`; the job-level retry re-crawls everything
+  first, so in-place is cheaper) and step-labeled errors
+  ("pricing_teardown normalize (anthropic/claude-sonnet-5): …") so the next failure names
+  where it died. 3 new tests (worker suite 62).
+- **RF-LIVE-5 — competitor_research failed with "Firecrawl scrape failed with HTTP 403"
+  (aa.com).** This is the expected outcome for a site behind aggressive bot protection,
+  and the failure SURFACING at all is the RF-LIVE-2 fix working. Fetcher now appends
+  "— the site blocks automated crawling" to 403s so the card reads like a diagnosis, not
+  a code. A crawl-fallback strategy (e.g. Grok live search) is queued as 5B follow-up
+  work, not silently absorbed here.
+- **RF-LIVE-6 — Dashboard "Recent Reports" rows were dead.** Plain divs, no handler.
+  Now keyboard-accessible buttons navigating to `/playbooks/reports/:id` (the ReportViewer
+  page, which renders stored HTML correctly since RF-LIVE-3).
+
 ### 5B slice 2 review — RESOLVED: RF-5B2-1 fixed by the reviewer (2026-07-05)
 
 Codex's `build/phase-5b-slice-2` (commit `5deb2b7`: proposal Approve/Edit/Decline in

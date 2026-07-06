@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AgentRunRequest, AgentRunResult, AgentRunner } from "../agent/runner.js";
-import { parsePricingArtifact, SkillRunHandler } from "../jobs/skill-run.js";
+import { parsePricingArtifact, runModelStep, SkillRunHandler } from "../jobs/skill-run.js";
 import type { AgentJob } from "../queue/types.js";
 
 const SOURCES = [{
@@ -30,6 +30,34 @@ describe("parsePricingArtifact", () => {
   it("returns null for unparseable or empty output", () => {
     expect(parsePricingArtifact("not json", SOURCES)).toBeNull();
     expect(parsePricingArtifact(JSON.stringify({ matrix: [], recommendation_md: "x" }), SOURCES)).toBeNull();
+  });
+});
+
+describe("runModelStep", () => {
+  it("retries once on a process-level failure and succeeds", async () => {
+    let calls = 0;
+    const result = await runModelStep("normalize", async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("Claude Code process exited with code 1");
+      return "ok";
+    });
+    expect(result).toBe("ok");
+    expect(calls).toBe(2);
+  });
+
+  it("does not retry non-process failures and prefixes the step", async () => {
+    let calls = 0;
+    await expect(runModelStep("normalize", async () => {
+      calls += 1;
+      throw new Error("unparseable output");
+    })).rejects.toThrow(/^normalize: unparseable output/);
+    expect(calls).toBe(1);
+  });
+
+  it("reports both messages when the retry also dies", async () => {
+    await expect(runModelStep("verify", async () => {
+      throw new Error("spawn ENOMEM");
+    })).rejects.toThrow(/verify failed twice at the process level/);
   });
 });
 
