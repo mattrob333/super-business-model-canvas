@@ -285,6 +285,63 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Phase F — Forge & proof: two runnable VP skills + artifacts feed agent context (2026-07-06)
+
+Atlas's briefings kept directing at Value Propositions with no runnable skill.
+Built per the Phase F handoff (by the reviewer directly, owner request).
+
+- **forge.differentiator_audit** (worker): own VP claims vs ALL researched
+  competitors' VP claims, each classified unique / contested / table_stakes.
+  Parser enforces honesty: claims must be OUR canvas items verbatim, and a
+  non-unique verdict without a NAMED competitor + quoted evidence is dropped;
+  zero surviving rows = no artifact. Non-unique verdicts are verifier
+  spot-checked against the named competitor's own canvas text (up to 4); an
+  all-unique audit has nothing checkable and says so (checked: 0).
+- **forge.proof_gap_scan** (worker): DETERMINISTIC detection — a VP item with
+  no linked evidence_ids or an "Assumption:" label is a proof gap; the model
+  only writes one obtainable evidence source + how-to per gap (parser rejects
+  replies that drop any detected gap). Each gap lands on the Gap Register
+  (gap_type missing_data, medium, stamped business_context_version_id);
+  re-runs supersede this skill's prior open "Proof gap:" rows first
+  (gap-engine idempotency pattern). Zero gaps writes an honest "no gaps"
+  artifact with NO model call. Handoff deviation, documented: the spec said
+  "+ verifier" but deterministic DB detection has no excerpt to verify
+  against — payload carries detection: "deterministic" instead.
+- **Artifact → context wiring:** writeSkillArtifact now mirrors every artifact
+  into the owning section agent's context_sources as a summary note
+  (config.source = "skill_artifact", body capped at 1200 chars), keeping only
+  the 5 newest artifact-sourced notes per profile; user-created sources are
+  never touched. Best-effort: a failed note logs and never fails the run.
+  yield.pricing_teardown's inline artifact insert was refactored through
+  writeSkillArtifact so all six skills get the wiring; every call site now
+  declares its owning agentKey.
+- **Migration `20260707150000_phase_f_forge_skills.sql`:** flips implemented
+  for exactly the two new keys and rewrites their catalog descriptions to
+  state inputs/outputs (the tiles are the UI contract).
+- **Tests (worker suite 107 passed / 2 skipped, +7):** both skills end to end
+  against a scope-aware fake that HONORS `.in(business_context_version_id)` —
+  fixtures plant a NEWER value_propositions row from a previous company era
+  and assert it never reaches the prompt; register-row stamping + supersede;
+  the no-gaps no-model path; parser rejection of invented claims, unnamed
+  contests, and dropped gaps; context-note wiring assertions.
+- Honest scope: no frontend changes — the skills surface through the existing
+  Studio tiles/catalog once the migration flips implemented. Forge's
+  remaining catalog skill (positioning_brief) stays unimplemented.
+
+**Gate results for the Phase F commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> exit 0
+npm run lint                           -> 64 problems (46 errors, 18 warnings), within frozen <=65 ceiling
+cd worker && npx tsc --noEmit          -> exit 0
+cd worker && npx vitest run            -> 107 passed, 2 skipped
+cd worker && npm run build             -> exit 0
+cd worker && npx eslint src            -> exit 0
+UTF-8 touched-file decode              -> exit 0
+```
+
+
 ### Owner round 7 — mobile experience pass + documents join company scoping (2026-07-06)
 
 Owner mobile screenshots: Atlas opened as a 94vw sliver with content clipped
