@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileText, Loader2, Play, Wrench } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ExternalLink, FileText, Loader2, Play, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FocusDrawer } from "@/components/overlay/FocusDrawer";
@@ -275,20 +276,29 @@ export function WorkspaceActionsPanel({
           </h3>
           <div className="mt-2 space-y-1.5">
             {artifacts.map((artifact) => (
-              <button
+              <div
                 key={artifact.id}
-                type="button"
-                onClick={() => setOpenArtifact(artifact)}
-                className="flex w-full items-center justify-between gap-2 rounded-md border border-border/60 px-2.5 py-2 text-left transition-colors hover:border-primary/35 hover:bg-muted/40"
+                className="flex items-center gap-1 rounded-md border border-border/60 transition-colors hover:border-primary/35 hover:bg-muted/40"
               >
-                <span className="flex min-w-0 items-center gap-2">
-                  <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span className="truncate text-xs font-medium">{artifact.title}</span>
-                </span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">
-                  {new Date(artifact.created_at).toLocaleDateString()}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenArtifact(artifact)}
+                  className="flex min-w-0 flex-1 items-center justify-between gap-2 px-2.5 py-2 text-left"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="truncate text-xs font-medium">{artifact.title}</span>
+                  </span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {new Date(artifact.created_at).toLocaleDateString()}
+                  </span>
+                </button>
+                <Button asChild size="icon" variant="ghost" className="mr-1 h-7 w-7 shrink-0" title="Open full page">
+                  <Link to={`/artifacts/${artifact.id}`}>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              </div>
             ))}
           </div>
         </div>
@@ -305,7 +315,19 @@ export function WorkspaceActionsPanel({
         subtitle={openArtifact ? `${openArtifact.skill_key} · ${openArtifact.evidence_ids.length} evidence sources` : undefined}
         bodyClassName="p-4 sm:p-6"
       >
-        {openArtifact && <ArtifactDocument artifact={openArtifact} />}
+        {openArtifact && (
+          <div className="space-y-3">
+            <div className="artifact-print-actions flex justify-end">
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link to={`/artifacts/${openArtifact.id}`}>
+                  <ExternalLink className="h-4 w-4" />
+                  Open full page
+                </Link>
+              </Button>
+            </div>
+            <ArtifactDocument artifact={openArtifact} />
+          </div>
+        )}
       </FocusDrawer>
     </section>
   );

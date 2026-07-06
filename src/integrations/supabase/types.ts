@@ -519,6 +519,7 @@ export type Database = {
           name: string
           slug: string | null
           runtime_config: Json | null
+          brand_color: string | null
           created_at: string
           updated_at: string
         }
@@ -527,6 +528,7 @@ export type Database = {
           name: string
           slug?: string | null
           runtime_config?: Json | null
+          brand_color?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -535,6 +537,7 @@ export type Database = {
           name?: string
           slug?: string | null
           runtime_config?: Json | null
+          brand_color?: string | null
           created_at?: string
           updated_at?: string
         }
