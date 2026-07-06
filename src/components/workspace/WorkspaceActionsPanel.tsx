@@ -234,7 +234,7 @@ export function WorkspaceActionsPanel({
         onOpenChange={(open) => {
           if (!open) setOpenArtifact(null);
         }}
-        size="reading"
+        size="focus"
         eyebrow="Skill artifact"
         title={openArtifact?.title ?? "Artifact"}
         subtitle={openArtifact ? `${openArtifact.skill_key} · ${openArtifact.evidence_ids.length} evidence sources` : undefined}
