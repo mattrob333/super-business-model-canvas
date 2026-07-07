@@ -8,6 +8,7 @@ import {
   Building2,
   Database,
   FileText,
+  Globe2,
   Grid3X3,
   LayoutDashboard,
   Search,
@@ -50,6 +51,7 @@ interface ArtifactEntry {
 }
 
 const PAGES = [
+  { label: "War Room", icon: Globe2, path: "/war-room" },
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Canvas", icon: Grid3X3, path: "/canvas" },
   { label: "Gap Register", icon: AlertTriangle, path: "/gaps" },
