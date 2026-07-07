@@ -285,6 +285,42 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### HOTFIX — worker fleet was down: crash-looping job loop + no restart policy (2026-07-07)
+
+Owner report: skill runs and chats stuck "pending", no artifact, agent showed
+"in a run" forever. Diagnose (new queue-state step) found BOTH worker
+machines STOPPED since 01:06Z.
+
+- **Root cause 1 (code):** JobLoop.runForever let any claimNext/complete
+  exception escape — one transient "TypeError: fetch failed" against
+  Supabase killed the whole process (seen at 21:29Z in logs). Fixed: a failed
+  poll cycle logs and backs off; regression test proves a throwing claim
+  never rejects runForever (job-loop suite 5 passing).
+- **Root cause 2 (infra):** worker fly.toml had no restart policy; Fly's
+  default on-failure gives up after repeated crashes and parks machines
+  stopped — the queue then starves silently. Added [[restart]] policy
+  "always" (a background poller must always come back).
+- **Diagnose upgrade:** push-triggered workflow now includes a read-only job
+  queue-state dump executed on the worker machine (statuses/attempts/
+  truncated errors only; the service key never leaves the machine).
+- Owner-visible effect after deploy: machines start, the queued pricing
+  teardown + chats get claimed and complete. Remaining UX from the report
+  (thread not re-selected on return, run-queue rows not clickable, Run
+  button double-fire) queued for the next slice with Phase G integration.
+- Honest scope note: this branch also carries Phase G WIP (six builder-agent
+  skill modules + tests, UNWIRED dead code until the integration PR flips
+  the registry; they compile and their tests pass — full worker suite 165).
+
+**Gate results for the hotfix commit:**
+```
+cd worker && npx tsc --noEmit  -> exit 0
+cd worker && npx vitest run    -> 165 passed, 2 skipped
+cd worker && npm run build     -> exit 0
+frontend untouched             -> last green (app tsc 0, build 0, lint 64)
+UTF-8 touched-file decode      -> exit 0
+```
+
+
 ### Autonomy round — scheduled-loop tick hardened, nightly Atlas briefing seeded (2026-07-07)
 
 Goal: the system works while the owner sleeps. The pg_cron -> edge-function

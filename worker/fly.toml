@@ -10,6 +10,12 @@ primary_region = "iad"
 kill_signal = "SIGINT"
 kill_timeout = "30s"
 
+# Restart forever: the default on-failure policy gives up after repeated
+# crashes and leaves machines STOPPED (live incident 2026-07-07 — the queue
+# then starves silently). A background poller must always come back.
+[[restart]]
+  policy = "always"
+
 [build]
   dockerfile = "Dockerfile"
 

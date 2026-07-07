@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SkillRunHandler } from "../../jobs/skill-run.js";
-import { parsePositioningBriefArtifact, runPositioningBrief } from "../../jobs/skills/positioning-brief.js";
+import { parsePositioningBriefArtifact, positioningBriefPrompt, runPositioningBrief } from "../../jobs/skills/positioning-brief.js";
 import { makeFakeFeedRunner, makeSkillJob, ScriptedSkillRunner, SkillFakeClient } from "./harness.js";
 
 const OWN_CLAIM = "Only platform with evidence-cited canvases";
@@ -38,11 +38,6 @@ function briefOutput(): string {
       pillar: "Proof over opinion",
       grounded_in: OWN_CLAIM,
       segment_language: "I can show investors where every claim comes from.",
-    }, {
-      // Not a verbatim canvas claim — the parser must drop this pillar.
-      pillar: "Invented pillar",
-      grounded_in: "A claim the canvas never made",
-      segment_language: "Sounds great but nobody said it.",
     }],
     tone_notes: "Confident, evidence-first, no hype.",
     body_md: "## Positioning brief\nFor seed-stage SaaS founders who need proof before buying...",
@@ -70,7 +65,6 @@ describe("forge.positioning_brief", () => {
       for_segment: "Seed-stage SaaS founders",
       category: "AI business-model canvas platform",
     });
-    // The invented pillar is dropped; only the verbatim-grounded one ships.
     expect(payload.pillars).toEqual([expect.objectContaining({ grounded_in: OWN_CLAIM })]);
     expect(payload.tone_notes).toBe("Confident, evidence-first, no hype.");
     expect(payload.verification).toBe("parser_grounded_pillars");
@@ -109,18 +103,18 @@ describe("forge.positioning_brief", () => {
     expect(client.inserts.filter((entry) => entry.table === "skill_artifacts")).toHaveLength(0);
   });
 
-  it("refuses to write an artifact when every pillar is invented", async () => {
+  it("refuses to write an artifact when any pillar is invented", async () => {
     const client = new SkillFakeClient();
     seedRequiredSections(client);
-    const invented = JSON.stringify({
-      statement: {
-        for_segment: "s", who_need: "n", category: "c",
-        key_differentiator: "d", unlike_alternative: "u", because_proof: "p",
-      },
-      pillars: [{ pillar: "Made up", grounded_in: "A claim the canvas never made", segment_language: "x" }],
-      tone_notes: "t",
-      body_md: "## Positioning brief\n...",
+    const output = JSON.parse(briefOutput()) as Record<string, unknown>;
+    // One grounded pillar plus one invented one: the whole parse must fail —
+    // dropping the invented pillar would still leave its claim in body_md.
+    (output.pillars as unknown[]).push({
+      pillar: "Invented pillar",
+      grounded_in: "A claim the canvas never made",
+      segment_language: "Sounds great but nobody said it.",
     });
+    const invented = JSON.stringify(output);
     const handler = makeHandler(client, new ScriptedSkillRunner(invented, "{}"));
     await expect(handler.runSkillModule(runPositioningBrief, makeSkillJob("forge.positioning_brief")))
       .rejects.toThrow(/unparseable/);
