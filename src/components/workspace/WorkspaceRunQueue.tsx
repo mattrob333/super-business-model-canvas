@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Activity as ActivityIcon, AlertTriangle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { AgentRunDetailDialog } from "@/components/AgentRunDetailDialog";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Spec 02 zone 3 (bottom) — the run queue, first piece of the actions panel:
  * this agent's recent + in-flight runs from agent_runs, polled while anything
- * is active. Skills/Templates/Frameworks tabs land with the actions-panel
- * slice; nothing fake is rendered meanwhile.
+ * is active. Each row opens the full run detail (input, output, error,
+ * timings) — the owner must never have to guess what a run actually was.
  */
 
 interface RunRow {
@@ -41,6 +42,7 @@ export function WorkspaceRunQueue({
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  const [detailRunId, setDetailRunId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,34 +94,48 @@ export function WorkspaceRunQueue({
       ) : (
         <ul className="mt-3 space-y-2">
           {runs.map((run) => (
-            <li key={run.id} className="rounded-md border border-border/60 p-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
-                  {run.status === "running" ? (
-                    <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />
-                  ) : run.status === "failed" || run.status === "timeout" ? (
-                    <AlertTriangle className="h-3 w-3 shrink-0 text-destructive" />
-                  ) : (
-                    <ActivityIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="truncate">{run.run_type ?? "run"}</span>
-                </span>
-                <Badge variant="outline" className={`shrink-0 text-[10px] ${STATUS_CLASS[run.status] ?? ""}`}>
-                  {run.status}
-                </Badge>
-              </div>
-              {(run.summary || run.error) && (
-                <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-                  {run.error ?? run.summary}
+            <li key={run.id}>
+              <button
+                type="button"
+                onClick={() => setDetailRunId(run.id)}
+                className="w-full rounded-md border border-border/60 p-2 text-left transition-colors hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
+                    {run.status === "running" ? (
+                      <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />
+                    ) : run.status === "failed" || run.status === "timeout" ? (
+                      <AlertTriangle className="h-3 w-3 shrink-0 text-destructive" />
+                    ) : (
+                      <ActivityIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="truncate">{run.run_type ?? "run"}</span>
+                  </span>
+                  <Badge variant="outline" className={`shrink-0 text-[10px] ${STATUS_CLASS[run.status] ?? ""}`}>
+                    {run.status}
+                  </Badge>
+                </div>
+                {(run.summary || run.error) && (
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                    {run.error ?? run.summary}
+                  </p>
+                )}
+                <p className="mt-1 text-[10px] text-muted-foreground/70">
+                  {new Date(run.created_at).toLocaleString()}
                 </p>
-              )}
-              <p className="mt-1 text-[10px] text-muted-foreground/70">
-                {new Date(run.created_at).toLocaleString()}
-              </p>
+              </button>
             </li>
           ))}
         </ul>
       )}
+
+      <AgentRunDetailDialog
+        runId={detailRunId}
+        open={detailRunId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailRunId(null);
+        }}
+      />
     </section>
   );
 }
