@@ -285,6 +285,43 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Full-page War Room shipped (spec 12 §6) — one Atlas, two surfaces (2026-07-07)
+
+Owner asked "is the full-page War Room available yet?" two rounds ago — now
+it is, built on the dock's proven machinery rather than beside it.
+
+- **Extraction, no forks:** the dock's briefing state (profile resolve,
+  company-keyed briefing load, request + poll, seen tracking, skill title)
+  moved verbatim into `useAtlasBriefing`; BriefingCard/CoverageBoard/
+  DirectiveCard moved verbatim into `BriefingCard.tsx`. AtlasDock slimmed to
+  layout + open-state; behavior unchanged (pulse, Esc, focus, default-open,
+  full-screen mobile).
+- **/war-room page:** renders outside the AppShell with its own h-14 top bar
+  (back to canvas, Atlas identity + active company, refresh). Desktop: the
+  State of the Union sits in a sticky-scroll 380px left rail beside a
+  full-height chat — the briefing stays in view while you work the thread.
+  Below lg: the briefing rides at the top of the chat scroll, exactly the
+  dock's full-screen mobile pattern. Same "War Room" workspace thread as the
+  dock (find-or-create by title in AtlasChat) — one conversation, two doors.
+  Entering the page marks the briefing seen (clears the dock pulse).
+- **Entry points:** a Maximize button in the dock header, and a "War Room"
+  entry at the top of the Cmd/Ctrl+K palette's Pages group. Route is lazy
+  inside RequireAuth like the agent rooms.
+- Honest scope: worker untouched (suite last green 107 passed / 2 skipped);
+  DirectiveCard's delegation handoff works from the page because it already
+  used absolute navigation + sessionStorage.
+
+**Gate results for the War Room commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> exit 0
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+worker untouched                       -> last green 107 passed / 2 skipped
+UTF-8 touched-file decode              -> exit 0
+```
+
+
 ### Phase F — Forge & proof: two runnable VP skills + artifacts feed agent context (2026-07-06)
 
 Atlas's briefings kept directing at Value Propositions with no runnable skill.
