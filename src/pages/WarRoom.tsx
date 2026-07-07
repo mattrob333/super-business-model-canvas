@@ -30,6 +30,7 @@ export default function WarRoom() {
     briefingError,
     refreshing,
     refreshError,
+    refreshStalled,
     skillTitle,
     markSeen,
     requestBriefing,
@@ -48,6 +49,7 @@ export default function WarRoom() {
       error={briefingError}
       refreshing={refreshing}
       refreshError={refreshError}
+      refreshStalled={refreshStalled}
       briefing={briefing}
       skillTitle={skillTitle}
       canRequest={Boolean(profileId)}

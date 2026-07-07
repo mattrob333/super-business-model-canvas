@@ -151,7 +151,7 @@ export function SidebarNavContent({ onNavigate }: { onNavigate?: () => void }) {
       {/* The owner's logo files own the top-left corner (navy BMC in light
           mode, white in dark) — h-14 matches TopBar so the header borders
           align. The company switcher sits one step below. */}
-      <div className="flex h-14 shrink-0 items-center border-b px-4">
+      <div className="flex h-14 shrink-0 items-center justify-center border-b px-4">
         <img src={logoLight} alt="Super BMC" className="h-8 w-auto dark:hidden" />
         <img src={logoDark} alt="Super BMC" className="hidden h-8 w-auto dark:block" />
       </div>

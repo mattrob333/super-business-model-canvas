@@ -29,6 +29,7 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
     briefingError,
     refreshing,
     refreshError,
+    refreshStalled,
     skillTitle,
     hasUnseen,
     markSeen,
@@ -195,6 +196,7 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
                 error={briefingError}
                 refreshing={refreshing}
                 refreshError={refreshError}
+                refreshStalled={refreshStalled}
                 briefing={briefing}
                 skillTitle={skillTitle}
                 canRequest={Boolean(profileId)}
@@ -209,6 +211,7 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
               error={briefingError}
               refreshing={refreshing}
               refreshError={refreshError}
+                refreshStalled={refreshStalled}
               briefing={briefing}
               skillTitle={skillTitle}
               canRequest={Boolean(profileId)}

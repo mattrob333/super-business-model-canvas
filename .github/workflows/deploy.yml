@@ -40,3 +40,24 @@ jobs:
         run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      # flyctl deploy UPDATES stopped machines without STARTING them — a
+      # parked fleet stays parked through any number of green deploys (live
+      # incident 2026-07-07: worker down ~6h across 7 "successful" deploys;
+      # every queued briefing/chat/skill sat pending). Deploy is not done
+      # until a non-standby machine is actually running.
+      - name: Ensure worker machines are started
+        working-directory: worker
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          for id in $(flyctl machine list --json | jq -r '.[] | select(((.config.standbys // []) | length) == 0 and .state != "started") | .id'); do
+            echo "Starting stopped machine $id"
+            flyctl machine start "$id" || true
+          done
+          sleep 10
+          flyctl machine list
+          count=$(flyctl machine list --json | jq '[.[] | select(((.config.standbys // []) | length) == 0 and .state == "started")] | length')
+          if [ "$count" -lt 1 ]; then
+            echo "::error::No started (non-standby) worker machines after deploy — the job queue would starve silently."
+            exit 1
+          fi

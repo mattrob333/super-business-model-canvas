@@ -63,6 +63,10 @@ export function useAtlasBriefing() {
   const [briefingError, setBriefingError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  // True when the requested run has sat PENDING (never claimed) well past
+  // normal pickup — the honest signal that the engine is busy or down, not
+  // that the briefing is "almost ready".
+  const [refreshStalled, setRefreshStalled] = useState(false);
   const [seenId, setSeenId] = useState<string | null>(null);
   const [skillTitle, setSkillTitle] = useState<string | null>(null);
   const disposedRef = useRef(false);
@@ -199,6 +203,7 @@ export function useAtlasBriefing() {
   const pollBriefingRun = useCallback((runId: string, attempt: number) => {
     if (attempt >= RUN_POLL_MAX_ATTEMPTS) {
       setRefreshing(false);
+      setRefreshStalled(false);
       setRefreshError("Atlas is taking longer than expected. The run continues in the background. Check back shortly.");
       return;
     }
@@ -207,10 +212,14 @@ export function useAtlasBriefing() {
       .then((status) => {
         if (disposedRef.current) return;
         if (!status || status.status === "pending" || status.status === "running") {
+          // Still pending (never claimed) after ~45s means the engine hasn't
+          // picked it up — say so instead of spinning silently.
+          setRefreshStalled(status?.status === "pending" && attempt >= 15);
           pollTimer.current = setTimeout(() => pollBriefingRun(runId, attempt + 1), RUN_POLL_INTERVAL_MS);
           return;
         }
         setRefreshing(false);
+        setRefreshStalled(false);
         if (status.status === "completed") {
           void loadBriefing().then((loadedId) => {
             if (disposedRef.current) return;
@@ -233,6 +242,7 @@ export function useAtlasBriefing() {
   const requestBriefing = useCallback(async () => {
     if (!accountId || !profileId || refreshing) return;
     setRefreshError(null);
+    setRefreshStalled(false);
     setRefreshing(true);
     try {
       const { runId } = await getAgentRuntime(accountId).startRun({
@@ -260,6 +270,7 @@ export function useAtlasBriefing() {
     briefingError,
     refreshing,
     refreshError,
+    refreshStalled,
     skillTitle,
     hasUnseen: Boolean(briefing && briefing.runId !== seenId),
     markSeen,

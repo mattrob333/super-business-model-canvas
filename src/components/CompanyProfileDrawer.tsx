@@ -3,6 +3,7 @@ import {
   BookOpen,
   Briefcase,
   Check,
+  ChevronDown,
   ExternalLink,
   Pencil,
   Plus,
@@ -75,6 +76,10 @@ const markdownComponents = {
  */
 export function CompanyProfileDrawer({ data, onUpdate }: CompanyProfileDrawerProps) {
   const [open, setOpen] = useState(false);
+  // Inline expansion under the company header (owner directive 2026-07-07):
+  // the subtle link toggles the overview card in place; the drawer stays the
+  // home of editing and the AI assistant.
+  const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [editedData, setEditedData] = useState(data);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -243,12 +248,71 @@ export function CompanyProfileDrawer({ data, onUpdate }: CompanyProfileDrawerPro
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-primary"
       >
         <BookOpen className="h-3.5 w-3.5" />
         <span>Business overview</span>
+        <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
       </button>
+
+      {expanded && (
+        <div className="mt-3 rounded-lg border border-border bg-muted/20 p-4 text-left animate-in fade-in slide-in-from-top-1 duration-200">
+          <p className="max-w-3xl text-sm leading-relaxed text-foreground/90">{data.description}</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {data.productsServices.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Products &amp; services
+                </p>
+                <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-foreground/85">
+                  {data.productsServices.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {data.keyExecutives.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Key executives
+                </p>
+                <ul className="mt-1.5 space-y-1 text-sm text-foreground/85">
+                  {data.keyExecutives.map((executive) => (
+                    <li key={`${executive.name}:${executive.role}`}>
+                      <span className="font-medium">{executive.name}</span>
+                      <span className="text-muted-foreground"> — {executive.role}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border/70 pt-3">
+            {data.website && (
+              <a
+                href={data.website.startsWith("http") ? data.website : `https://${data.website}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary underline-offset-2 hover:underline"
+              >
+                <ExternalLink className="h-3 w-3" />
+                {data.website}
+              </a>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => setOpen(true)}
+            >
+              <Pencil className="h-3 w-3" />
+              Edit &amp; refine with AI
+            </Button>
+          </div>
+        </div>
+      )}
 
       <FocusDrawer
         open={open}

@@ -285,6 +285,47 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### HOTFIX 2 + ATLAS UX — deploys leave the fleet parked; first-run copilot honesty (2026-07-07)
+
+Owner report: "Get your first briefing" spun 3+ minutes with nothing.
+Diagnose run: **both machines STOPPED, no app log lines since 21:35Z the
+previous day** — `flyctl deploy` UPDATES stopped machines but never STARTS
+them, so seven consecutive green deploys (including the "fleet hotfix")
+shipped code onto a parked fleet. The restart policy can't help a machine
+that never starts. My earlier "deploy succeeded so the queue drains" claim
+was wrong — I verified the workflow conclusion, not the machine state.
+
+- **deploy.yml:** after the worker deploy, start every stopped non-standby
+  machine and FAIL the deploy loudly if none is running afterwards — a green
+  deploy now means a running worker, not just a pushed image.
+- **Briefing honesty (useAtlasBriefing + BriefingCard):** a run still
+  PENDING (never claimed) after ~45s now surfaces "the engine hasn't picked
+  this up — it finishes in the background" instead of an endless spinner;
+  empty state rewritten as a real first-run welcome ("Your first State of
+  the Union" + what Atlas reads) instead of "Atlas hasn't briefed you yet".
+- **AtlasChat welcome:** empty thread opens with Atlas introducing itself
+  (rendered client-side, never written to the thread) above the prompt
+  chips; a last-message-from-user thread with no run in flight shows
+  "Atlas never replied to this one" + an Ask again button that re-runs the
+  thread without duplicating the message.
+- **Design cleanups (owner):** sidebar logo centered; "Business overview"
+  link under the company title now toggles an INLINE card expanding
+  downward (description, products/services, executives, website) with
+  "Edit & refine with AI" opening the existing drawer.
+- Known next (owner report, next slice): workspace threads are NOT
+  company-scoped — old companies' chats surface in the new company's rooms;
+  rooms should open fresh with a proper thread-history list.
+
+**Gate results for this commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+worker untouched                       -> last green (tsc 0, vitest 175, build 0, eslint 0)
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### DOCUMENT EXPERIENCE 1 — Phase G exhibits + visible sources (2026-07-07)
 
 Owner directive: NotebookLM-grade documents, no audio. Slice 1 of the

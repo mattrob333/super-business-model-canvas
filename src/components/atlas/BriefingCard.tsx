@@ -22,6 +22,7 @@ export function BriefingCard({
   error,
   refreshing,
   refreshError,
+  refreshStalled = false,
   briefing,
   skillTitle,
   canRequest,
@@ -31,6 +32,8 @@ export function BriefingCard({
   error: string | null;
   refreshing: boolean;
   refreshError: string | null;
+  /** The requested run has sat unclaimed well past normal pickup. */
+  refreshStalled?: boolean;
   briefing: LoadedBriefing | null;
   skillTitle: string | null;
   canRequest: boolean;
@@ -91,17 +94,26 @@ export function BriefingCard({
             <AtlasIcon className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-sm font-semibold">Atlas hasn’t briefed you yet</p>
+            <p className="text-sm font-semibold">Your first State of the Union</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              One read of where you stand, what data exists, and the single move to make first.
+              Atlas reads your whole canvas, your competitors, and your Gap Register — then hands
+              you one clear read of where you stand and the single move to make first.
             </p>
           </div>
           <Button size="sm" className="h-8 gap-1.5" disabled={refreshing || !canRequest} onClick={onRequest}>
             {refreshing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Get your first briefing
+            {refreshing ? "Briefing in progress" : "Get your first briefing"}
           </Button>
-          {refreshing && (
-            <p className="text-[11px] text-muted-foreground">Usually under a minute.</p>
+          {refreshing && !refreshStalled && (
+            <p className="text-[11px] text-muted-foreground">
+              Reading your canvas, competitors, and gaps — usually under a minute.
+            </p>
+          )}
+          {refreshing && refreshStalled && (
+            <p className="rounded-md bg-warning/10 px-2.5 py-1.5 text-[11px] leading-relaxed text-warning" role="status">
+              The analysis engine hasn't picked this up yet — it may be busy or restarting. Your
+              briefing will finish in the background; it appears here when ready.
+            </p>
           )}
           {refreshError && (
             <p className="text-xs leading-relaxed text-destructive" role="alert">
