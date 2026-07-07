@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { getAgentRuntime } from "@/lib/agent-runtime";
 import { useAuth } from "@/hooks/useAuth";
+import { loadCompanyScope } from "@/lib/company-scope";
 import { ATLAS } from "@/lib/atlas";
 
 /**
@@ -75,21 +76,23 @@ export function AtlasChat({
     [],
   );
 
-  // Find the existing War Room thread; creation waits for the first send so
-  // an idle dock never writes rows.
+  // Find the existing War Room thread FOR THE ACTIVE COMPANY (each company
+  // era gets its own — a previous company's strategy chat must never bleed
+  // in); creation waits for the first send so an idle dock never writes rows.
   useEffect(() => {
     let cancelled = false;
     setThreadLoaded(false);
     (async () => {
-      const { data, error } = await supabaseUntyped
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      let query = supabaseUntyped
         .from<ThreadRow>("workspace_threads")
         .select("id, title, created_at")
         .eq("account_id", accountId)
         .eq("agent_profile_id", agentProfileId)
         .eq("archived", false)
-        .eq("title", THREAD_TITLE)
-        .order("created_at", { ascending: true })
-        .limit(1);
+        .eq("title", THREAD_TITLE);
+      if (scope) query = query.in("business_context_version_id", scope.contextIds);
+      const { data, error } = await query.order("created_at", { ascending: false }).limit(1);
       if (cancelled) return;
       if (error) setChatError(error.message);
       setThreadId(data?.[0]?.id ?? null);
@@ -139,13 +142,16 @@ export function AtlasChat({
 
   const ensureThread = useCallback(async (): Promise<string> => {
     if (threadId) return threadId;
-    // Select-back verifies the insert actually landed before we hang a run on it.
+    // Stamped to the active company era; select-back verifies the insert
+    // actually landed before we hang a run on it.
+    const scope = await loadCompanyScope(accountId).catch(() => null);
     const { data, error } = await supabaseUntyped
       .from<ThreadRow>("workspace_threads")
       .insert({
         account_id: accountId,
         agent_profile_id: agentProfileId,
         title: THREAD_TITLE,
+        business_context_version_id: scope?.activeContextId ?? null,
         created_by: user?.id ?? null,
       })
       .select("id, title, created_at")

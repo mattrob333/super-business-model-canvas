@@ -101,27 +101,10 @@ const SUGGESTED_PROMPTS: Record<string, string[]> = {
   ],
 };
 
-// Last-active thread per room, so leaving a workspace and coming back lands
-// in the same conversation. localStorage can throw (private mode) — never
-// let remembering a thread break the chat.
-function lastThreadKey(accountId: string, agentProfileId: string): string {
-  return `sbmc:last-thread:${accountId}:${agentProfileId}`;
-}
-
-function readLastThreadId(accountId: string, agentProfileId: string): string | null {
-  try {
-    return localStorage.getItem(lastThreadKey(accountId, agentProfileId));
-  } catch {
-    return null;
-  }
-}
-
-function writeLastThreadId(accountId: string, agentProfileId: string, threadId: string): void {
-  try {
-    localStorage.setItem(lastThreadKey(accountId, agentProfileId), threadId);
-  } catch {
-    // best-effort only
-  }
+/** New threads take their name from the opening message, like any chat app. */
+function threadTitleFrom(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > 48 ? `${clean.slice(0, 47).trimEnd()}…` : clean || "New chat";
 }
 
 export function WorkspaceThread({
@@ -170,26 +153,21 @@ export function WorkspaceThread({
     let cancelled = false;
     setThreadsLoaded(false);
     (async () => {
-      const { data } = await supabaseUntyped
+      // Company-scoped like every other read (owner finding 2026-07-07: a
+      // previous company's thread surfaced in the new company's room).
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      let query = supabaseUntyped
         .from<ThreadRow>("workspace_threads")
         .select("id, title, created_at")
         .eq("account_id", accountId)
         .eq("agent_profile_id", agentProfileId)
-        .eq("archived", false)
-        .order("created_at", { ascending: true })
-        .limit(30);
+        .eq("archived", false);
+      if (scope) query = query.in("business_context_version_id", scope.contextIds);
+      const { data } = await query.order("created_at", { ascending: false }).limit(30);
       if (cancelled) return;
       setThreads(data ?? []);
-      // Re-select the thread the owner was last in (leaving the room and
-      // coming back showed an empty chat — the live conversation is usually
-      // the NEWEST thread, and we were defaulting to the oldest). Fallback:
-      // most recent thread.
-      const remembered = readLastThreadId(accountId, agentProfileId);
-      setActiveThreadId((current) => {
-        if (current) return current;
-        if (remembered && data?.some((thread) => thread.id === remembered)) return remembered;
-        return data?.[data.length - 1]?.id ?? null;
-      });
+      // Entering a room always opens a FRESH chat (owner directive
+      // 2026-07-07) — past conversations live one click away in History.
       setThreadsLoaded(true);
     })();
     return () => {
@@ -206,10 +184,6 @@ export function WorkspaceThread({
       .limit(200);
     setMessages(data ?? []);
   }, []);
-
-  useEffect(() => {
-    if (activeThreadId) writeLastThreadId(accountId, agentProfileId, activeThreadId);
-  }, [accountId, agentProfileId, activeThreadId]);
 
   useEffect(() => {
     if (!activeThreadId) {
@@ -235,20 +209,24 @@ export function WorkspaceThread({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, awaitingReply]);
 
-  const ensureThread = useCallback(async (): Promise<string> => {
+  const ensureThread = useCallback(async (titleHint?: string): Promise<string> => {
     if (activeThreadId) return activeThreadId;
+    // Threads are stamped to the active company era so they never surface
+    // under a different company (best-effort: a scope failure stamps null).
+    const scope = await loadCompanyScope(accountId).catch(() => null);
     const { data, error } = await supabaseUntyped
       .from<ThreadRow>("workspace_threads")
       .insert({
         account_id: accountId,
         agent_profile_id: agentProfileId,
-        title: "General",
+        title: titleHint ? threadTitleFrom(titleHint) : "New chat",
+        business_context_version_id: scope?.activeContextId ?? null,
         created_by: user?.id ?? null,
       })
       .select("id, title, created_at")
       .single();
     if (error || !data) throw new Error(error?.message ?? "Failed to create thread");
-    setThreads((prev) => [...prev, data]);
+    setThreads((prev) => [data, ...prev]);
     setActiveThreadId(data.id);
     return data.id;
   }, [accountId, agentProfileId, activeThreadId, user]);
@@ -287,7 +265,7 @@ export function WorkspaceThread({
     setChatError(null);
     setRuntimeOffline(false);
     try {
-      const threadId = threadIdOverride ?? await ensureThread();
+      const threadId = threadIdOverride ?? await ensureThread(trimmed);
       const { error: messageError } = await supabaseUntyped.from("workspace_messages").insert({
         thread_id: threadId,
         role: "user",
@@ -333,18 +311,20 @@ export function WorkspaceThread({
       autoSentRef.current = true;
       void (async () => {
         try {
+          const scope = await loadCompanyScope(accountId).catch(() => null);
           const { data, error } = await supabaseUntyped
             .from<ThreadRow>("workspace_threads")
             .insert({
               account_id: accountId,
               agent_profile_id: agentProfileId,
               title: initialThreadTitle,
+              business_context_version_id: scope?.activeContextId ?? null,
               created_by: user?.id ?? null,
             })
             .select("id, title, created_at")
             .single();
           if (error || !data) throw new Error(error?.message ?? "Failed to open the directive thread");
-          setThreads((prev) => [...prev, data]);
+          setThreads((prev) => [data, ...prev]);
           setActiveThreadId(data.id);
           await sendMessage(initialPrompt, data.id);
         } catch (sendError) {
@@ -366,13 +346,15 @@ export function WorkspaceThread({
   }, [composerPrefill, onComposerPrefillConsumed]);
 
   const createThread = useCallback(async () => {
-    const title = newThreadTitle.trim() || "New topic";
+    const title = newThreadTitle.trim() || "New chat";
+    const scope = await loadCompanyScope(accountId).catch(() => null);
     const { data, error } = await supabaseUntyped
       .from<ThreadRow>("workspace_threads")
       .insert({
         account_id: accountId,
         agent_profile_id: agentProfileId,
         title,
+        business_context_version_id: scope?.activeContextId ?? null,
         created_by: user?.id ?? null,
       })
       .select("id, title, created_at")
@@ -381,7 +363,7 @@ export function WorkspaceThread({
       setChatError(error?.message ?? "Failed to create thread");
       return;
     }
-    setThreads((prev) => [...prev, data]);
+    setThreads((prev) => [data, ...prev]);
     setActiveThreadId(data.id);
     setNewThreadTitle("");
     setThreadPopoverOpen(false);
@@ -550,17 +532,31 @@ export function WorkspaceThread({
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Thread
+            Chat
           </span>
           <Popover open={threadPopoverOpen} onOpenChange={setThreadPopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1.5 font-semibold">
-                {activeThread?.title ?? "General"}
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <Button variant="ghost" size="sm" className="max-w-[16rem] gap-1.5 font-semibold sm:max-w-xs">
+                <span className="truncate">{activeThread?.title ?? "New chat"}</span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-72 p-2">
-              <div className="space-y-0.5">
+            <PopoverContent align="start" className="w-80 p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveThreadId(null);
+                  setThreadPopoverOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted/60"
+              >
+                <MessageSquarePlus className="h-3.5 w-3.5 text-primary" />
+                New chat
+              </button>
+              <p className="mb-1 mt-2 border-t border-border px-2 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                History
+              </p>
+              <div className="max-h-64 space-y-0.5 overflow-y-auto">
                 {threads.map((thread) => (
                   <button
                     key={thread.id}
@@ -569,22 +565,22 @@ export function WorkspaceThread({
                       setActiveThreadId(thread.id);
                       setThreadPopoverOpen(false);
                     }}
-                    className={`block w-full truncate rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                    className={`block w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
                       thread.id === activeThreadId ? "bg-muted font-medium" : "hover:bg-muted/60"
                     }`}
                   >
-                    {thread.title ?? "Untitled thread"}
+                    <span className="block truncate">{thread.title ?? "Untitled chat"}</span>
+                    <span className="block text-[10px] text-muted-foreground/70">
+                      {new Date(thread.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </span>
                   </button>
                 ))}
                 {threads.length === 0 && (
                   <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                    No threads yet. Your first message opens "General".
+                    No chats with {entry.callsign} for this company yet.
                   </p>
                 )}
               </div>
-              <p className="mt-2 border-t border-border pt-2 text-[11px] leading-relaxed text-muted-foreground">
-                Threads are separate conversations with {entry.callsign}; start a new one for a distinct question or workflow.
-              </p>
               <form
                 className="mt-2 flex gap-1.5 border-t border-border pt-2"
                 onSubmit={(event) => {
@@ -595,7 +591,7 @@ export function WorkspaceThread({
                 <Input
                   value={newThreadTitle}
                   onChange={(event) => setNewThreadTitle(event.target.value)}
-                  placeholder="New thread topic..."
+                  placeholder="Named chat (optional)…"
                   className="h-8 text-xs"
                 />
                 <Button type="submit" size="sm" variant="outline" className="h-8 gap-1 px-2">

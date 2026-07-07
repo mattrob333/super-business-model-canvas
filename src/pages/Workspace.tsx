@@ -58,6 +58,16 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
   const [gapPrompt, setGapPrompt] = useState<string | null>(null);
   useEffect(() => {
     if (!gapId || !accountId) return;
+    // One-shot per gap per tab: rooms now open on a FRESH thread, so the old
+    // "only send into an empty thread" guard would re-fire this brief on
+    // every refresh of a ?gap= URL.
+    try {
+      const key = `sbmc:gap-sent:${gapId}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      // Blocked storage: fall through — worst case is a duplicate brief.
+    }
     let cancelled = false;
     (async () => {
       const { data } = await supabase
