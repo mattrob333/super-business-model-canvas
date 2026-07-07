@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Lightbulb, Loader2, RefreshCw, Send } from "lucide-react";
+import { ArrowRight, Lightbulb, Loader2, RefreshCw, Send } from "lucide-react";
+import { parseAtlasActions } from "@/lib/atlas-actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
@@ -370,12 +372,39 @@ export function AtlasChat({
 }
 
 function AtlasMessage({ message }: { message: MessageRow }) {
+  const navigate = useNavigate();
   const text = typeof message.content?.text === "string" ? message.content.text : null;
 
   if (message.role === "agent") {
+    const { clean, actions } = parseAtlasActions(text ?? "");
     return (
-      <div className="prose prose-sm prose-slate min-w-0 max-w-none break-words dark:prose-invert [&_p]:my-2.5 [&_p]:leading-relaxed [&_li]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_strong]:font-semibold [&_strong]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-base [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3]:text-sm [&_h4]:mt-3 [&_h4]:mb-1 [&_h4]:text-sm [&_pre]:my-2 [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:rounded-md [&_pre]:bg-muted/40 [&_pre]:p-2.5 [&_pre]:text-xs [&_code]:break-words">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text ?? ""}</ReactMarkdown>
+      <div>
+        <div className="prose prose-sm prose-slate min-w-0 max-w-none break-words dark:prose-invert [&_p]:my-2.5 [&_p]:leading-relaxed [&_li]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_strong]:font-semibold [&_strong]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-base [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3]:text-sm [&_h4]:mt-3 [&_h4]:mb-1 [&_h4]:text-sm [&_pre]:my-2 [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:rounded-md [&_pre]:bg-muted/40 [&_pre]:p-2.5 [&_pre]:text-xs [&_code]:break-words">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{clean}</ReactMarkdown>
+        </div>
+        {actions.map((action) => (
+          <Button
+            key={`${message.id}:${action.room}:${action.label}`}
+            size="sm"
+            className="mt-2 gap-1.5"
+            onClick={() => {
+              // Same delegation contract as the briefing CTA: stash the
+              // directive, open the room, the agent acknowledges the task.
+              try {
+                sessionStorage.setItem(
+                  "atlas:handoff",
+                  JSON.stringify({ room: action.room, action: action.action, skillTitle: action.skillTitle }),
+                );
+              } catch {
+                // Blocked storage: the room still opens, just without the brief.
+              }
+              navigate(`/workspace/${action.room}?from=atlas`);
+            }}
+          >
+            {action.label}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        ))}
       </div>
     );
   }
