@@ -75,6 +75,9 @@ describe("BMC MCP tools", () => {
       filters: [
         ["account_id", "account-1"],
         ["competitor_id", "11111111-1111-4111-8111-111111111111"],
+        // Company scoping: competitor reads are confined to the active
+        // company's context chain (empty fake account -> empty chain).
+        ["in:business_context_version_id", []],
       ],
     });
     await expect(tools.search_web.handler({ query: "Acme pricing" }))

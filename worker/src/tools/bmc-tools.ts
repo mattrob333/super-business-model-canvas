@@ -86,6 +86,21 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
         });
       }
 
+      // The context id is model-supplied — verify it belongs to this account
+      // before writing (service-role client: account scoping in code is the
+      // only tenant boundary).
+      const { data: contextRow, error: contextError } = await client
+        .from("business_context_versions")
+        .select("id")
+        .eq("account_id", ctx.accountId)
+        .eq("id", args.business_context_version_id)
+        .limit(1)
+        .maybeSingle();
+      if (contextError) return toolError(`write_section_items failed: ${contextError.message}`);
+      if (!contextRow) {
+        return toolError("DENIED: business_context_version_id does not belong to this account.");
+      }
+
       const { data, error } = await client
         .from("canvas_section_versions")
         .insert({
@@ -207,14 +222,19 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
 
   const readCompetitorCanvas = tool(
     "read_competitor_canvas",
-    "Read the latest account-scoped competitor canvas versions.",
+    "Read the latest competitor canvas versions. Always scoped to the active company.",
     { competitor_id: z.string().uuid() },
     async (args) => {
+      // Company scoping: like read_canvas, competitor reads are confined to
+      // the active company's context chain — a previously analyzed company's
+      // competitors must never surface in this one (owner bug 2026-07-06).
+      const scope = await loadCompanyScope(client, ctx.accountId);
       const { data, error } = await client
         .from("canvas_section_versions")
         .select("id, competitor_id, section_key, section_title, items, notes, confidence, freshness_status, last_verified_at, created_at")
         .eq("account_id", ctx.accountId)
         .eq("competitor_id", args.competitor_id)
+        .in("business_context_version_id", scope.contextIds)
         .order("created_at", { ascending: false });
 
       if (error) return toolError(`read_competitor_canvas failed: ${error.message}`);
