@@ -353,6 +353,9 @@ export default function Gaps() {
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="text-2xl font-semibold mt-2">{stats.total}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Everything on the register, including resolved and dismissed
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -365,6 +368,9 @@ export default function Gaps() {
             </div>
             <p className="text-2xl font-semibold mt-2 text-destructive">
               {stats.critical}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Critical-severity gaps on the register, any status
             </p>
           </CardContent>
         </Card>
@@ -379,6 +385,9 @@ export default function Gaps() {
             <p className="text-2xl font-semibold mt-2 text-primary">
               {stats.inProgress}
             </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Gaps you have marked as being worked
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -391,6 +400,9 @@ export default function Gaps() {
             </div>
             <p className="text-2xl font-semibold mt-2 text-success">
               {stats.resolved}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Gaps your canvas now answers
             </p>
           </CardContent>
         </Card>

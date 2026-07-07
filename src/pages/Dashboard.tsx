@@ -309,7 +309,7 @@ const Dashboard = () => {
                 : "No evidence collected"
           }
           icon={Shield}
-          hint="Source excerpts collected from web crawls, documents, and live search. Every verified canvas item cites at least one — more evidence means more of your strategy is backed by something checkable."
+          hint="Source excerpts collected from web crawls, documents, and live search. Every verified canvas item cites at least one — more evidence means more of your strategy is backed by something checkable. Counted across your whole workspace, including any previously analyzed companies."
         />
       </div>
 
@@ -319,6 +319,11 @@ const Dashboard = () => {
             <Building2 className="h-4 w-4 text-muted-foreground" />
             Competitor Watch
           </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Threat Index is computed by the gap engine: how many of your nine canvas
+            sections a competitor&rsquo;s gaps touch, weighted up if they beat you on pricing.
+            Higher means a broader threat.
+          </p>
         </CardHeader>
         <CardContent>
           {loading ? (

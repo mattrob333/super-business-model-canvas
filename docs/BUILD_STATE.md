@@ -285,6 +285,44 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### GOAL PHASES 4+5 — chat rendering fixed at the root; every number honest (2026-07-07)
+
+**Phase 4 (chat polish):** root cause of the "wall of text" found —
+@tailwindcss/typography is in package.json but was NEVER registered in
+tailwind.config.ts, so every `prose` class in the app is inert. New shared
+renderer src/components/chat/AgentMarkdown.tsx styles every element
+explicitly with semantic tokens (heading hierarchy, restored list markers,
+bordered scrollable GFM tables, quiet blockquotes, code chips, real bold),
+light+dark automatic; used by BOTH Atlas and the room agents. Seven dead-end
+error states now say what happened and what to do next (history load,
+message refresh, failed/cancelled runs, send failures, directive handoff).
+Known follow-ups (documented, untouched): registering the typography plugin
+would globally change 5 other prose surfaces — its own slice; WorkspaceThread
+lacks Atlas's "Ask again" recovery; runtimeOffline misclassifies DB errors.
+
+**Phase 5 (honest numbers):** full metric audit across Dashboard, Gaps,
+Agents, Activity, workspace surfaces. Most metrics REAL and untouched.
+Fabrications removed: useCanvasSectionRun.ts DELETED (488 lines of dead code
+that generated Math.random() confidence and mock canvas items, persisted as
+"fresh"); canvas-version-bridge's hardcoded 0.4 confidence -> null (UI
+renders "No confidence score"; freshness "unverified" is the honest signal);
+GroundingWizardDrawer no longer averages a 0.6 filler into section
+confidence. Honesty labels added: Evidence Coverage marked account-wide
+(evidence_items lacks a context column — company scoping needs a schema
+change); Threat Index formula explainer; Gaps stat-card explainers.
+Needs backend to be real (kept honest meanwhile): per-company evidence
+coverage; Threat Index momentum (worker placeholder, disclosed in inputs).
+
+**Gate results for the Phases 4+5 commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+worker untouched                       -> last green (tsc 0, vitest 382, build 0, eslint 0)
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### GOAL PHASES 2+3 — verification pass clean; document experience complete (2026-07-07)
 
 **Phase 2 (verification, no code changes needed):** integration sweep after

@@ -57,9 +57,13 @@ export async function bridgeAnalysisToCanvasVersions(input: BridgeInput): Promis
     competitor_id: null,
     section_key: section.sectionKey,
     section_title: CANVAS_SECTION_LABELS[section.sectionKey],
-    items: section.items.map((text) => ({ text, confidence: 0.4 })) as Json,
+    // Honest numbers: a bridged import has no measured confidence — writing a
+    // placeholder (formerly 0.4) rendered as a fake "40% confidence" in the
+    // canvas. Null renders as "No confidence score" until an agent run or the
+    // grounding wizard produces a real one.
+    items: section.items.map((text) => ({ text, confidence: null })) as Json,
     notes: section.notes,
-    confidence: 0.4,
+    confidence: null,
     freshness_status: "unverified" as const,
     created_by: input.userId,
   }));
