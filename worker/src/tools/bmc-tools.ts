@@ -275,7 +275,18 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
         .maybeSingle();
       if (skillError) return toolError(`run_skill failed: ${skillError.message}`);
       if (!skill || !skill.implemented) {
-        return toolError(`DENIED: '${args.skill_key}' is not an implemented skill. Only offer skills from your room's catalog.`);
+        // Self-correcting denial: name the room's REAL keys so the model's
+        // next call succeeds instead of guessing again (live incident
+        // 2026-07-07: Vault guessed keys, gave up, hand-wrote the audit).
+        const { data: valid } = await client
+          .from("skill_catalog")
+          .select("skill_key")
+          .eq("agent_key", `agent_${ctx.ownSectionKey}`)
+          .eq("implemented", true);
+        const keys = (valid ?? []).map((row: { skill_key: string }) => row.skill_key);
+        return toolError(
+          `DENIED: '${args.skill_key}' is not an implemented skill. Your room's exact runnable keys: ${keys.length > 0 ? keys.join(", ") : "none yet"}.`,
+        );
       }
       if (skill.agent_key !== `agent_${ctx.ownSectionKey}`) {
         return toolError(`DENIED: '${args.skill_key}' belongs to another room. Direct the user to that agent's workspace instead.`);

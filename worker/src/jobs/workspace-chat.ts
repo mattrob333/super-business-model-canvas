@@ -115,9 +115,18 @@ export class WorkspaceChatHandler {
       ? { items: [], notes: null }
       : await this.loadCanvasSection(job.account_id, sectionKey, scope);
     const companyBrief = await this.loadCompanyBrief(job.account_id, scope);
+    // Section agents must know their own runnable skills BY EXACT KEY —
+    // without the list, agents guessed keys, got denied by run_skill, and
+    // "ran" the skill manually as a wall of chat text (live incident
+    // 2026-07-07, Vault/moat audit).
+    const roomSkills = isOrchestrator
+      ? []
+      : (await loadImplementedSkills(this.deps.client)).filter(
+          (skill) => skill.agent_key === `agent_${sectionKey}`,
+        );
     const systemPrompt = isOrchestrator
       ? buildAtlasChatSystemPrompt(profile, contextSources, companyBrief, await this.loadAtlasBoard(job.account_id, scope))
-      : buildChatSystemPrompt(profile, sectionKey, contextSources, canvasSnapshot, companyBrief);
+      : buildChatSystemPrompt(profile, sectionKey, contextSources, canvasSnapshot, companyBrief, roomSkills);
 
     await this.markRunRunning(job, profile, modelRoute, { threadId: thread.id, messageCount: messages.length });
 
@@ -337,15 +346,19 @@ function buildChatSystemPrompt(
   contextSources: ContextSource[] = [],
   canvas: CanvasSectionSnapshot = { items: [], notes: null },
   brief: CompanyBrief | null = null,
+  roomSkills: ImplementedSkill[] = [],
 ): string {
   const sectionLabel = SECTION_LABELS[sectionKey];
   const base = profile.system_instructions?.trim() || `You are ${profile.display_name ?? profile.agent_key}, a strategy workspace agent for ${sectionLabel}.`;
   const sourceBlock = formatContextSources(contextSources);
+  const skillBlock = roomSkills.length > 0
+    ? `\n\nYour room's runnable skills — call run_skill with the EXACT key, never a guessed or paraphrased one:\n${roomSkills.map((skill) => `- ${skill.skill_key} — "${skill.title}"`).join("\n")}`
+    : "\n\nYour room has no runnable skills yet — never claim to run one, and never invent a skill key.";
   return `${base}
 
 You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data beyond what is below instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied. Never paste raw JSON, tool output, or code blocks of data into a reply — always translate findings into plain language.
 
-When the user asks you to run one of your room's skills (or agrees to your suggestion to run one), call the run_skill tool — do not merely describe what the skill would produce. One skill run per reply. After the call succeeds, tell the user the run has started, that it takes a few minutes, and that the document will land on this room's shelf. Never claim a skill ran without calling the tool.
+When the user asks you to run one of your room's skills (or agrees to your suggestion to run one), call the run_skill tool — do not merely describe what the skill would produce. One skill run per reply. After the call succeeds, keep the reply SHORT: confirm the run started, say it takes a few minutes, and that the finished document lands on this room's shelf. Do NOT perform the skill's analysis manually in chat — the run produces the document; a hand-rolled wall of text in its place is a failure. If run_skill denies the call, tell the user honestly what was denied and why instead of improvising the analysis.${skillBlock}
 
 ${DATA_GAP_PROTOCOL}${formatCompanyBrief(brief)}${formatCanvasSnapshot(sectionLabel, canvas)}${sourceBlock}`;
 }
@@ -379,6 +392,12 @@ Doctrine (binding):
 - Every directive carries its why: what completing it unlocks strategically.
 
 You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Never paste raw JSON, tool output, or code blocks of data into a reply — always translate findings into plain language.
+
+Action button: when your single directed action sends the user to a section agent's room (with or without a named skill), end the reply with EXACTLY ONE fenced block so the app can render a real button. Format — a code fence whose language is the word action, containing one JSON object:
+\`\`\`action
+{"room":"<section_key from the skills list>","action":"<the directive as one imperative sentence>","skill_key":"<implemented skill key or null>","skill_title":"<that skill's title or null>","label":"<short button label, e.g. 'Run Differentiator audit with Forge'>"}
+\`\`\`
+Rules: nothing after the block; only rooms/skills from the lists below; omit the block entirely when the next step is NOT a room visit (e.g. you need an answer from the user). This is the ONLY JSON exception to the no-raw-JSON rule, and the user never sees it — the app replaces it with a button.
 
 ${DATA_GAP_PROTOCOL}${formatCompanyBrief(brief)}
 

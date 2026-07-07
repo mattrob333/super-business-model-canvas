@@ -285,6 +285,42 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### ATLAS ACTION BUTTONS + SECTION AGENTS LEARN THEIR SKILL KEYS (2026-07-07)
+
+Two owner reports in one slice:
+
+- **Atlas chat renders real buttons (a2ui-style):** the Atlas chat prompt
+  now emits at most ONE fenced action block ({room, action, skill_key,
+  skill_title, label}) when its directed move is a room visit. The frontend
+  (parseAtlasActions in src/lib/atlas-actions.ts) strips the block from the
+  markdown and renders a button that stashes the existing atlas:handoff
+  contract and opens the room — the same delegation flow as the briefing
+  CTA, now available from any reply. Defensive parse: invalid room/malformed
+  JSON drops the fence silently; the prose always reads clean.
+- **Vault's wall-of-text moat audit, root-caused:** section agents were
+  never told their skills' EXACT keys — Vault guessed, run_skill denied
+  every guess, and the model "ran" the audit as chat text. Fixes: (a) the
+  section-agent chat prompt now lists the room's implemented skills by
+  exact key; (b) run_skill's unimplemented-key denial names the room's real
+  keys (self-correcting retry); (c) prompt doctrine: after a successful
+  run_skill the reply stays SHORT, and hand-rolling a skill's analysis in
+  chat is named a failure; a denied call is reported honestly.
+- Rich-text/streaming chat polish acknowledged as future work (owner:
+  "we're gonna work on that later").
+
+**Gate results for this commit:**
+```
+cd worker && npx tsc --noEmit          -> exit 0
+cd worker && npx vitest run            -> 175 passed, 2 skipped
+cd worker && npm run build             -> exit 0
+cd worker && npx eslint src            -> exit 0
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### THREAD COMPANY SCOPING + CHAT-APP HISTORY (2026-07-07)
 
 Owner finding: a previous company's chat thread (Dealroom.co gap work)
