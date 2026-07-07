@@ -285,6 +285,55 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### GOAL PHASES 2+3 — verification pass clean; document experience complete (2026-07-07)
+
+**Phase 2 (verification, no code changes needed):** integration sweep after
+Phase 1 — every feed cacheKey carries a company component (build_vs_buy
+varies by activity: market-level evidence keyed by subject, house
+precedent); every module's writeSkillArtifact agentKey matches its room (an
+artifact can never land on the wrong shelf); catalog↔dispatch parity is
+exactly 27/27 with zero orphans either direction. Combined with Phase 1's
+embedded 2-reviewers-per-skill pass and the 382-test suite, no fixes
+required.
+
+**Phase 3 (document experience):** four agents built in isolated files; I
+reviewed and wired by hand.
+
+- **14 bespoke exhibits** in three grouped pairs (goal-payloads-market/
+  competition/resilience .ts + GoalExhibits*.tsx): monetization gaps ranked
+  table, WTP per-segment signal cards, watering-holes table, message-market
+  before/after blocks, partner-outreach drafts with a "never sent
+  automatically" approval banner, churn theme clusters (own vs competitor
+  chips), advocacy playbook cards, ecosystem moves table, operational
+  benchmark rows with honest no-public-signal states, velocity cards with
+  the evidence-too-thin state, single-point risk register (severity dot
+  meters, amber 4+ rows), talent-radar hiring cards, cost benchmark with
+  archetype norms explicitly labeled "model knowledge", efficiency vendor
+  shortlist. All parsers defensive (null -> markdown fallback); field names
+  verified against the worker modules.
+- **One dispatch point** (GoalExhibitDispatch.tsx) keeps ArtifactDocument a
+  renderer, not a switchboard; verifier line comes free via the generic
+  payload.spot_check fallback.
+- **Public share page now shows sources:** shared-artifact edge fn returns
+  the artifact's evidence rows (STRICT column allowlist
+  id/title/excerpt/source_url/source_name, account-scoped, citation order,
+  degrades to [] on failure — never a 500); SharedArtifactPage parses
+  defensively and passes them to the document.
+- Honest scope: inline [n] citation markers in body text deferred (requires
+  coordinated prompt changes across 20 worker modules — revisit as its own
+  slice); print/PDF polish unchanged.
+
+**Gate results for the Phase 3 commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+esbuild parse shared-artifact/index.ts -> exit 0 (Deno fn; deno check proxy-blocked)
+worker untouched                       -> last green (tsc 0, vitest 382, build 0, eslint 0)
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### GOAL PHASE 1 — all 27 catalog skills are now real (2026-07-07)
 
 Per docs/GOAL_FINISH_LINE.md (owner: "finish out this app… with a team of

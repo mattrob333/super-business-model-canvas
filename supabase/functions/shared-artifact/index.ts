@@ -32,13 +32,15 @@ serve(async (req) => {
 
     const { data: artifact, error: artifactError } = await adminClient
       .from("skill_artifacts")
-      .select("account_id, title, body_md, payload, created_at")
+      .select("account_id, title, body_md, payload, evidence_ids, created_at")
       .eq("id", share.artifact_id)
       .maybeSingle();
     if (artifactError) throw artifactError;
     if (!artifact) return json({ error: "Shared artifact not found" }, 404);
 
-    const [{ data: account }, { data: company }] = await Promise.all([
+    const evidenceIds: string[] = Array.isArray(artifact.evidence_ids) ? artifact.evidence_ids : [];
+
+    const [{ data: account }, { data: company }, sources] = await Promise.all([
       adminClient
         .from("accounts")
         .select("brand_color")
@@ -53,6 +55,7 @@ serve(async (req) => {
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      loadSources(adminClient, artifact.account_id, evidenceIds),
     ]);
 
     return json({
@@ -66,11 +69,40 @@ serve(async (req) => {
         brandColor: account?.brand_color ?? null,
         logoUrl: company?.logo_url ?? null,
       },
+      sources,
     });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
   }
 });
+
+/**
+ * The document's grounding: the evidence items its claims stand on, in the
+ * artifact's citation order. This is a PUBLIC endpoint — expose only
+ * id/title/excerpt/source_url/source_name, never metadata or other columns.
+ * A failure here degrades to an empty list rather than breaking the share.
+ */
+async function loadSources(
+  adminClient: ReturnType<typeof createClient>,
+  accountId: string,
+  evidenceIds: string[],
+): Promise<unknown[]> {
+  if (evidenceIds.length === 0) return [];
+  try {
+    const { data, error } = await adminClient
+      .from("evidence_items")
+      .select("id, title, excerpt, source_url, source_name")
+      .eq("account_id", accountId)
+      .in("id", evidenceIds);
+    if (error) throw error;
+    // Preserve the artifact's evidence order — it is citation order.
+    const byId = new Map((data ?? []).map((source) => [source.id, source]));
+    return evidenceIds.flatMap((id) => byId.get(id) ?? []);
+  } catch (error) {
+    console.error("shared-artifact: failed to load sources", error);
+    return [];
+  }
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

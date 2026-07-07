@@ -4,7 +4,7 @@ import { Loader2, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { ArtifactDocument, type ArtifactRecord } from "@/components/skills/ArtifactDocument";
+import { ArtifactDocument, type ArtifactRecord, type ArtifactSource } from "@/components/skills/ArtifactDocument";
 import type { ArtifactBrandInfo } from "@/lib/artifact-brand";
 
 interface SharedArtifactResponse {
@@ -15,12 +15,41 @@ interface SharedArtifactResponse {
     created_at: string;
   };
   brand: ArtifactBrandInfo;
+  sources?: unknown;
+}
+
+function isOptionalString(value: unknown): value is string | null | undefined {
+  return value == null || typeof value === "string";
+}
+
+/**
+ * The edge function response crosses a trust boundary — validate each source's
+ * shape and drop anything malformed rather than letting it reach the document.
+ */
+function parseSources(value: unknown): ArtifactSource[] {
+  if (!Array.isArray(value)) return [];
+  const sources: ArtifactSource[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) continue;
+    const { id, title, excerpt, source_url, source_name } = item as Record<string, unknown>;
+    if (typeof id !== "string" || typeof title !== "string") continue;
+    if (!isOptionalString(excerpt) || !isOptionalString(source_url) || !isOptionalString(source_name)) continue;
+    sources.push({
+      id,
+      title,
+      excerpt: excerpt ?? null,
+      source_url: source_url ?? null,
+      source_name: source_name ?? null,
+    });
+  }
+  return sources;
 }
 
 export default function SharedArtifactPage() {
   const { token } = useParams();
   const [artifact, setArtifact] = useState<ArtifactRecord | null>(null);
   const [brand, setBrand] = useState<ArtifactBrandInfo>({ brandColor: null, logoUrl: null });
+  const [sources, setSources] = useState<ArtifactSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -48,6 +77,7 @@ export default function SharedArtifactPage() {
           created_at: data.artifact.created_at,
         });
         setBrand(data.brand ?? { brandColor: null, logoUrl: null });
+        setSources(parseSources(data.sources));
       }
       setLoading(false);
     })();
@@ -84,7 +114,7 @@ export default function SharedArtifactPage() {
         </Button>
       </div>
       <main className="mx-auto max-w-[900px]">
-        <ArtifactDocument artifact={artifact} brand={brand} publicFooter />
+        <ArtifactDocument artifact={artifact} brand={brand} sources={sources} publicFooter />
       </main>
     </div>
   );

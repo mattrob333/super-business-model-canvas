@@ -19,6 +19,7 @@ import {
   SupplyChainExhibit,
   UnitEconomicsExhibit,
 } from "@/components/skills/PhaseGExhibits";
+import { GoalExhibitDispatch } from "@/components/skills/GoalExhibitDispatch";
 
 export interface ArtifactRecord {
   id?: string;
@@ -177,6 +178,7 @@ export function ArtifactDocument({
         {supplyChain && <SupplyChainExhibit supplyChain={supplyChain} />}
         {lifecycle && <LifecycleMapExhibit lifecycle={lifecycle} />}
         {buildVsBuy && <BuildVsBuyExhibit buildVsBuy={buildVsBuy} />}
+        <GoalExhibitDispatch skillKey={artifact.skill_key} payload={artifact.payload} />
 
         <section className="prose prose-slate max-w-none prose-headings:tracking-tight prose-h2:mt-6 prose-h2:text-base prose-p:leading-relaxed">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.body_md}</ReactMarkdown>
