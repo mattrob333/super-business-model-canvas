@@ -249,7 +249,9 @@ export function GroundingWizardDrawer({
         section_title: CANVAS_SECTION_LABELS[current.sectionKey],
         items: nextItems as unknown as Json,
         notes: "Grounded by the owner via the grounding wizard.",
-        confidence: average(nextItems.map((item) => item.confidence ?? 0.6)),
+        // Honest numbers: average only items that have a measured confidence —
+        // filling unknowns with a made-up 0.6 inflated the section score.
+        confidence: average(nextItems.flatMap((item) => (typeof item.confidence === "number" ? [item.confidence] : []))),
         freshness_status: "fresh",
         last_verified_at: new Date().toISOString(),
         groundedness_score: nextItems.length === 0 ? 0 : Math.round((groundedCount / nextItems.length) * 10000) / 10000,
