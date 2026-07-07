@@ -285,6 +285,61 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### GOAL PHASE 6 — final QA + security sweep: GOAL COMPLETE (2026-07-07)
+
+Final phase of docs/GOAL_FINISH_LINE.md. Two auditors (worker tenancy sweep,
+frontend/RLS audit) + my integration.
+
+- **Worker tenancy sweep (3 confirmed, all fixed, suite 382 green):**
+  read_competitor_canvas chat tool missed the company-era filter (the exact
+  owner-reported bleed class) — now scoped; write_section_items trusted a
+  model-supplied business_context_version_id — now ownership-verified;
+  knowledge-jobs stamped a payload context id unverified — now
+  verifiedBusinessContextId(). Secrets audit clean (keys never reach
+  user-visible strings). Ambiguous items documented, untouched.
+- **RLS hardening (migration 20260707200000):** CRITICAL —
+  account_members INSERT let any authenticated user join ANY account whose
+  uuid leaked (full cross-tenant takeover incl. credentials/storage); now
+  bootstrap-only self-insert (empty account) via a SECURITY DEFINER
+  account_has_members(). HIGH — self-service role escalation via
+  account_members UPDATE: policy dropped (service-role only). HIGH —
+  agent_profiles INSERT/UPDATE accepted account_id NULL, letting anyone
+  rewrite the GLOBAL template agents' system prompts: writes now require
+  owned non-null account (frontend already treats templates read-only).
+  LOW — data_feeds/feed_cache SELECT now authenticated-only (was
+  anon-readable for global rows).
+- **Frontend QA:** 2 crash guards fixed (Playbooks unguarded JSON access);
+  1 dead admin link found (/admin/frameworks/:id/preview has no route —
+  admin-only surface, documented not fixed); every table verified to have
+  RLS enabled with a SELECT path for its intended reader.
+
+**GOAL COMPLETE against docs/GOAL_FINISH_LINE.md** — 27/27 skills real;
+every artifact type renders as a deliverable with sources (in-app AND public
+share); chat renders rich with no dead ends; every number computed or
+removed; deploys fail unless a worker machine runs; no known company bleed
+(threads were the last, plus this phase's competitor-canvas tool fix);
+gates green on every merge. **Honest leftovers (out of scope or needs
+owner/backend):** Tier-1 feeds await API keys; true chat streaming; inline
+[n] body citations (20-module prompt change); typography plugin
+registration (global visual change, own slice); per-company evidence
+coverage + Threat Index momentum need schema/worker work; multi-user
+invites need an invite RPC (self-join is now bootstrap-only);
+migrations-vs-schema.sql DELETE-policy divergence worth reconciling; admin
+frameworks preview route.
+
+**Gate results for the Phase 6 commit:**
+```
+cd worker && npx tsc --noEmit          -> exit 0
+cd worker && npx vitest run            -> 382 passed, 2 skipped
+cd worker && npm run build             -> exit 0
+cd worker && npx eslint src            -> exit 0
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### GOAL PHASES 4+5 — chat rendering fixed at the root; every number honest (2026-07-07)
 
 **Phase 4 (chat polish):** root cause of the "wall of text" found —
