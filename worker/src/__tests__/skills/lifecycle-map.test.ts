@@ -163,7 +163,17 @@ describe("parseLifecycleMapArtifact", () => {
     stages[1].competitor_motions = [{ competitor: "MadeUpCo", motion: "MadeUpCo does invented things." }];
     const parsed = parseLifecycleMapArtifact(lifecycleOutput(stages), COMPETITORS);
     expect(parsed?.stages[1]?.competitor_motions).toEqual([]);
+    // The gap claim was backed only by the fabricated motion — it cannot ship.
+    expect(parsed?.stages[1]?.gap).toBe(false);
     expect(parsed?.stages[2]?.competitor_motions).toHaveLength(1);
+    expect(parsed?.stages[2]?.gap).toBe(true);
+  });
+
+  it("forces gap=false when the model claims a gap with no competitor motions at all", () => {
+    const stages = lifecycleStages();
+    stages[0].gap = true; // discover has an empty competitor_motions array
+    const parsed = parseLifecycleMapArtifact(lifecycleOutput(stages), COMPETITORS);
+    expect(parsed?.stages[0]?.gap).toBe(false);
   });
 
   it("returns null when a stage is missing or shuffled", () => {

@@ -122,15 +122,64 @@ describe("forge.positioning_brief", () => {
   });
 });
 
+describe("positioningBriefPrompt", () => {
+  const ownClaims = [{ sectionKey: "value_propositions" as const, text: OWN_CLAIM, evidenceIds: [] }];
+  const segments = [{ sectionKey: "customer_segments" as const, text: "Seed-stage SaaS founders", evidenceIds: [] }];
+  const differentiatorAudit = {
+    title: "Differentiator audit — Acme Robotics",
+    body_md: "## Audit",
+    payload: { defensible_claims: ["evidence-cited canvases"] },
+  };
+  const avatarRefinement = {
+    title: "Avatar refinement — Acme Robotics",
+    body_md: "## Avatar",
+    payload: { segment_voice: "show me the receipts" },
+  };
+
+  it("includes prior artifacts labeled as prior analyses, each under its own skill's label", () => {
+    const prompt = positioningBriefPrompt("Acme Robotics", ownClaims, segments, differentiatorAudit, avatarRefinement);
+    expect(prompt).toContain(
+      `Prior analysis — differentiator audit (${differentiatorAudit.title}):\n${JSON.stringify(differentiatorAudit.payload)}`,
+    );
+    expect(prompt).toContain(
+      `Prior analysis — avatar refinement (${avatarRefinement.title}):\n${JSON.stringify(avatarRefinement.payload)}`,
+    );
+    expect(prompt).not.toContain("No prior analyses available yet.");
+  });
+
+  it("includes only the prior artifact that exists", () => {
+    const prompt = positioningBriefPrompt("Acme Robotics", ownClaims, segments, null, avatarRefinement);
+    expect(prompt).toContain("Prior analysis — avatar refinement");
+    expect(prompt).not.toContain("Prior analysis — differentiator audit");
+    expect(prompt).not.toContain("No prior analyses available yet.");
+  });
+
+  it("says no prior analyses are available when both are null", () => {
+    const prompt = positioningBriefPrompt("Acme Robotics", ownClaims, segments, null, null);
+    expect(prompt).toContain("No prior analyses available yet.");
+    expect(prompt).not.toContain("Prior analysis —");
+  });
+});
+
 describe("parsePositioningBriefArtifact", () => {
   const allowed = [OWN_CLAIM, OWN_ASSUMPTION];
 
-  it("parses a valid brief and drops non-verbatim pillars", () => {
+  it("parses a valid brief", () => {
     const parsed = parsePositioningBriefArtifact(briefOutput(), allowed);
     expect(parsed?.pillars).toHaveLength(1);
     expect(parsed?.pillars[0]).toMatchObject({ grounded_in: OWN_CLAIM });
     expect(parsed?.statement.because_proof).toContain("unproven");
     expect(parsed?.toneNotes).toBe("Confident, evidence-first, no hype.");
+  });
+
+  it("returns null when any pillar is not a verbatim canvas claim", () => {
+    const output = JSON.parse(briefOutput()) as Record<string, unknown>;
+    (output.pillars as unknown[]).push({
+      pillar: "Invented pillar",
+      grounded_in: "A claim the canvas never made",
+      segment_language: "x",
+    });
+    expect(parsePositioningBriefArtifact(JSON.stringify(output), allowed)).toBeNull();
   });
 
   it("returns null when a statement slot is blank", () => {

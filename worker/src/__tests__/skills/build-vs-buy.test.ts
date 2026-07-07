@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SkillRunHandler } from "../../jobs/skill-run.js";
 import { parseBuildVsBuyArtifact, runBuildVsBuy, type ActivityExcerpt } from "../../jobs/skills/build-vs-buy.js";
 import { makeFakeFeedRunner, makeSkillJob, ScriptedSkillRunner, SkillFakeClient } from "./harness.js";
+import { SKILL_REGISTRY } from "../../jobs/skills/index.js";
 
 const ACTIVITIES = ["Concierge onboarding", "In-house payroll processing"];
 
@@ -70,6 +71,10 @@ function makeHandler(client: SkillFakeClient, runner: ScriptedSkillRunner): Skil
 }
 
 describe("tempo.build_vs_buy", () => {
+  it("is registered in SKILL_REGISTRY so SkillRunHandler can dispatch it", () => {
+    expect(SKILL_REGISTRY.get("tempo.build_vs_buy")).toBe(runBuildVsBuy);
+  });
+
   it("classifies activities from feed evidence and writes a verified artifact stamped to the active company", async () => {
     const client = new SkillFakeClient();
     seedInputs(client);
