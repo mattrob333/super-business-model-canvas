@@ -285,6 +285,44 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### THREAD COMPANY SCOPING + CHAT-APP HISTORY (2026-07-07)
+
+Owner finding: a previous company's chat thread (Dealroom.co gap work)
+surfaced inside the new company's Customer Segments room — workspace_threads
+had NO company scoping. Plus a UX directive: entering a section should open
+a clean chat, with history one click away "like a professional AI chat app".
+
+- **Migration 20260707180000:** workspace_threads gains
+  business_context_version_id + index. Legacy NULL threads become invisible
+  (clean per-company history) rather than bleeding across companies.
+- **Scoped reads:** WorkspaceThread's thread list and AtlasChat's War Room
+  thread lookup filter by the active company's context chain; every thread
+  creation site (first send, named chat, Atlas directive, War Room) stamps
+  scope.activeContextId.
+- **Fresh chat on entry:** rooms no longer auto-select a thread (the
+  last-thread localStorage re-select from earlier today is superseded by
+  the owner's directive); the composer opens clean with the room's prompt
+  suggestions.
+- **History picker:** the thread dropdown is now "Chat: New chat ▾" with a
+  New chat action, a dated, scrollable History list (newest first), and an
+  optional named-chat form. New threads are titled from their first message
+  (truncated), not "General".
+- **Guard:** ?gap= arrivals get a per-tab one-shot (sessionStorage) — the
+  old "only send into an empty thread" protection no longer holds when
+  every entry IS an empty thread.
+- Honest scope: War Room remains one thread per company (title "War Room");
+  messages table needs no change (messages hang off threads).
+
+**Gate results for the thread-scoping commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+worker untouched                       -> last green (tsc 0, vitest 175, build 0, eslint 0)
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### HOTFIX 2 + ATLAS UX — deploys leave the fleet parked; first-run copilot honesty (2026-07-07)
 
 Owner report: "Get your first briefing" spun 3+ minutes with nothing.
