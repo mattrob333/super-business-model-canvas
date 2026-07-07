@@ -65,6 +65,7 @@ export function WorkspaceActionsPanel({
   const [runningRun, setRunningRun] = useState<SkillRunState | null>(null);
   const [tileErrors, setTileErrors] = useState<Record<string, string>>({});
   const pollTimer = useRef<ReturnType<typeof setTimeout>>();
+  const startingRef = useRef(false);
 
   useEffect(() => () => clearTimeout(pollTimer.current), []);
 
@@ -178,7 +179,11 @@ export function WorkspaceActionsPanel({
   }, [accountId, loadArtifacts, skills, toast]);
 
   const runSkill = useCallback(async (skill: CatalogSkill) => {
-    if (!skill.implemented || runningRun) return;
+    // startingRef is the synchronous half of the guard: runningRun is React
+    // state, so a fast double-click passes the null check twice before the
+    // re-render lands — that enqueued two identical runs in production.
+    if (!skill.implemented || runningRun || startingRef.current) return;
+    startingRef.current = true;
     setTileErrors((prev) => ({ ...prev, [skill.skill_key]: "" }));
     try {
       const contextVersionId = await ensureBusinessContext();
@@ -210,6 +215,8 @@ export function WorkspaceActionsPanel({
         description: error instanceof Error ? error.message : "Try again.",
         variant: "destructive",
       });
+    } finally {
+      startingRef.current = false;
     }
   }, [accountId, agentProfileId, ensureBusinessContext, pollSkillRun, runningRun, toast, user]);
 

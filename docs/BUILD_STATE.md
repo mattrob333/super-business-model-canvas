@@ -285,6 +285,35 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### WORKSPACE UX — the rest of the owner's live bug report (2026-07-07)
+
+The worker-fleet hotfix fixed WHY runs stuck pending; this slice fixes the
+three UX failures the same report surfaced:
+
+- **Chat gone on return:** WorkspaceThread defaulted to the OLDEST thread
+  (ascending order, first row) — coming back to a room hid the live
+  conversation. Now it re-selects the last-active thread per room
+  (localStorage, best-effort) and falls back to the newest thread.
+- **Run-queue rows not clickable:** each row is now a button opening
+  AgentRunDetailDialog (full input/output/error/timings) — the owner can see
+  what a run actually was without leaving the room.
+- **Run double-fire:** the Studio Run guard was React state only; two fast
+  clicks both passed the null check before the re-render and enqueued two
+  identical runs (observed live). Added a synchronous ref guard released in
+  finally.
+- Honest scope: run_skill chat tool (agents enqueue their own skills from
+  chat) is the next slice.
+
+**Gate results for the workspace UX commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+worker untouched                       -> last green (tsc 0, vitest 172, build 0, eslint 0)
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### PHASE G — six skills built by an orchestrated agent team, reviewed and shipped (2026-07-07)
 
 Owner directive: "plan the next build phase with a team of subagents … you

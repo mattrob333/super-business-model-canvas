@@ -101,6 +101,29 @@ const SUGGESTED_PROMPTS: Record<string, string[]> = {
   ],
 };
 
+// Last-active thread per room, so leaving a workspace and coming back lands
+// in the same conversation. localStorage can throw (private mode) — never
+// let remembering a thread break the chat.
+function lastThreadKey(accountId: string, agentProfileId: string): string {
+  return `sbmc:last-thread:${accountId}:${agentProfileId}`;
+}
+
+function readLastThreadId(accountId: string, agentProfileId: string): string | null {
+  try {
+    return localStorage.getItem(lastThreadKey(accountId, agentProfileId));
+  } catch {
+    return null;
+  }
+}
+
+function writeLastThreadId(accountId: string, agentProfileId: string, threadId: string): void {
+  try {
+    localStorage.setItem(lastThreadKey(accountId, agentProfileId), threadId);
+  } catch {
+    // best-effort only
+  }
+}
+
 export function WorkspaceThread({
   accountId,
   agentProfileId,
@@ -157,7 +180,16 @@ export function WorkspaceThread({
         .limit(30);
       if (cancelled) return;
       setThreads(data ?? []);
-      setActiveThreadId((current) => current ?? data?.[0]?.id ?? null);
+      // Re-select the thread the owner was last in (leaving the room and
+      // coming back showed an empty chat — the live conversation is usually
+      // the NEWEST thread, and we were defaulting to the oldest). Fallback:
+      // most recent thread.
+      const remembered = readLastThreadId(accountId, agentProfileId);
+      setActiveThreadId((current) => {
+        if (current) return current;
+        if (remembered && data?.some((thread) => thread.id === remembered)) return remembered;
+        return data?.[data.length - 1]?.id ?? null;
+      });
       setThreadsLoaded(true);
     })();
     return () => {
@@ -174,6 +206,10 @@ export function WorkspaceThread({
       .limit(200);
     setMessages(data ?? []);
   }, []);
+
+  useEffect(() => {
+    if (activeThreadId) writeLastThreadId(accountId, agentProfileId, activeThreadId);
+  }, [accountId, agentProfileId, activeThreadId]);
 
   useEffect(() => {
     if (!activeThreadId) {
