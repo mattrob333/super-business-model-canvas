@@ -56,6 +56,7 @@ export function useAtlasBriefing() {
   const { accountId } = useAccountId();
   const { user } = useAuth();
   const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileDescription, setProfileDescription] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [briefing, setBriefing] = useState<LoadedBriefing | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(true);
@@ -90,7 +91,7 @@ export function useAtlasBriefing() {
     (async () => {
       const { data, error } = await supabase
         .from("agent_profiles")
-        .select("id, account_id")
+        .select("id, account_id, description")
         .eq("agent_key", "orchestrator")
         .or(`account_id.eq.${accountId},account_id.is.null`)
         .order("account_id", { ascending: false, nullsFirst: false })
@@ -101,6 +102,7 @@ export function useAtlasBriefing() {
         return;
       }
       setProfileId(data[0].id);
+      setProfileDescription(data[0].description ?? null);
     })();
     return () => {
       cancelled = true;
@@ -251,6 +253,7 @@ export function useAtlasBriefing() {
   return {
     accountId,
     profileId,
+    profileDescription,
     profileError,
     briefing,
     briefingLoading,
