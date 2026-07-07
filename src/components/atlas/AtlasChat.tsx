@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { ArrowRight, Lightbulb, Loader2, RefreshCw, Send } from "lucide-react";
 import { parseAtlasActions } from "@/lib/atlas-actions";
+import { AgentMarkdown } from "@/components/chat/AgentMarkdown";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
@@ -96,7 +95,11 @@ export function AtlasChat({
       if (scope) query = query.in("business_context_version_id", scope.contextIds);
       const { data, error } = await query.order("created_at", { ascending: false }).limit(1);
       if (cancelled) return;
-      if (error) setChatError(error.message);
+      if (error) {
+        setChatError(
+          `Couldn't load the War Room thread: ${error.message}. Reload the page to try again.`,
+        );
+      }
       setThreadId(data?.[0]?.id ?? null);
       setThreadLoaded(true);
     })();
@@ -114,7 +117,9 @@ export function AtlasChat({
       .limit(100);
     if (error) {
       // Keep whatever is already on screen; an honest error beats a silent wipe.
-      setChatError(error.message);
+      setChatError(
+        `Couldn't refresh the conversation: ${error.message}. Your messages are safe — reload the page to try again.`,
+      );
       return;
     }
     setMessages(data ?? []);
@@ -183,7 +188,11 @@ export function AtlasChat({
         if (status.status === "completed") {
           void loadMessages(thread);
         } else {
-          setChatError(status.error ?? `Run ${status.status}. Send the message again to retry.`);
+          setChatError(
+            status.error
+              ? `${ATLAS.name} hit an error: ${status.error} — use “Ask again” below to retry, or check the Activity page for details.`
+              : `The run ended (${status.status}) without a reply. Use “Ask again” below to retry, or check the Activity page.`,
+          );
         }
       })
       .catch(() => {
@@ -220,7 +229,11 @@ export function AtlasChat({
       setAwaitingReply(true);
       pollRun(runId, thread, 0);
     } catch (error) {
-      setChatError(error instanceof Error ? error.message : "Runtime unreachable");
+      setChatError(
+        error instanceof Error
+          ? `Couldn't send that: ${error.message}. Try again in a moment.`
+          : "Couldn't reach the agent runtime. Check your connection and try again in a moment.",
+      );
     } finally {
       setSending(false);
     }
@@ -244,7 +257,11 @@ export function AtlasChat({
       setAwaitingReply(true);
       pollRun(runId, threadId, 0);
     } catch (error) {
-      setChatError(error instanceof Error ? error.message : "Runtime unreachable");
+      setChatError(
+        error instanceof Error
+          ? `Couldn't restart the reply: ${error.message}. Try “Ask again” in a moment.`
+          : "Couldn't reach the agent runtime. Check your connection and try “Ask again” in a moment.",
+      );
     }
   }, [accountId, agentProfileId, awaitingReply, pollRun, sending, threadId, user]);
 
@@ -329,9 +346,12 @@ export function AtlasChat({
       </div>
 
       {chatError && (
-        <p className="px-4 pb-2 text-xs leading-relaxed text-destructive" role="alert">
+        <div
+          className="mx-4 mb-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive"
+          role="alert"
+        >
           {chatError}
-        </p>
+        </div>
       )}
 
       {/* Composer — pinned to the panel bottom; the column scrolls behind it */}
@@ -379,9 +399,7 @@ function AtlasMessage({ message }: { message: MessageRow }) {
     const { clean, actions } = parseAtlasActions(text ?? "");
     return (
       <div>
-        <div className="prose prose-sm prose-slate min-w-0 max-w-none break-words dark:prose-invert [&_p]:my-2.5 [&_p]:leading-relaxed [&_li]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_strong]:font-semibold [&_strong]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-base [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3]:text-sm [&_h4]:mt-3 [&_h4]:mb-1 [&_h4]:text-sm [&_pre]:my-2 [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:rounded-md [&_pre]:bg-muted/40 [&_pre]:p-2.5 [&_pre]:text-xs [&_code]:break-words">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{clean}</ReactMarkdown>
-        </div>
+        <AgentMarkdown text={clean} />
         {actions.map((action) => (
           <Button
             key={`${message.id}:${action.room}:${action.label}`}

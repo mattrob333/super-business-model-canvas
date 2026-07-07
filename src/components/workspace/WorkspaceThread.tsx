@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { CheckCircle2, ChevronDown, Lightbulb, Loader2, MessageSquarePlus, Pencil, Send, WifiOff, XCircle } from "lucide-react";
+import { AgentMarkdown } from "@/components/chat/AgentMarkdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -163,8 +162,15 @@ export function WorkspaceThread({
         .eq("agent_profile_id", agentProfileId)
         .eq("archived", false);
       if (scope) query = query.in("business_context_version_id", scope.contextIds);
-      const { data } = await query.order("created_at", { ascending: false }).limit(30);
+      const { data, error } = await query.order("created_at", { ascending: false }).limit(30);
       if (cancelled) return;
+      if (error) {
+        // History failing to load must not read as "no chats": say so, and
+        // point at what still works.
+        setChatError(
+          `Couldn't load chat history: ${error.message}. You can still start a new chat below, or reload the page to try again.`,
+        );
+      }
       setThreads(data ?? []);
       // Entering a room always opens a FRESH chat (owner directive
       // 2026-07-07) — past conversations live one click away in History.
@@ -176,12 +182,19 @@ export function WorkspaceThread({
   }, [accountId, agentProfileId]);
 
   const loadMessages = useCallback(async (threadId: string) => {
-    const { data } = await supabaseUntyped
+    const { data, error } = await supabaseUntyped
       .from<MessageRow>("workspace_messages")
       .select("id, role, kind, content, created_at")
       .eq("thread_id", threadId)
       .order("created_at", { ascending: true })
       .limit(200);
+    if (error) {
+      // Keep whatever is already on screen; an honest error beats a silent wipe.
+      setChatError(
+        `Couldn't refresh the conversation: ${error.message}. Your messages are safe — reload the page to try again.`,
+      );
+      return;
+    }
     setMessages(data ?? []);
   }, []);
 
@@ -250,7 +263,11 @@ export function WorkspaceThread({
         if (status.status === "completed") {
           void loadMessages(threadId);
         } else {
-          setChatError(status.error ?? `Run ${status.status}. Send the message again to retry.`);
+          setChatError(
+            status.error
+              ? `${entry.callsign} hit an error: ${status.error} — send your message again to retry, or check the Activity page for details.`
+              : `The run ended (${status.status}) without a reply. Send your message again to retry, or check the Activity page.`,
+          );
         }
       })
       .catch(() => {
@@ -290,7 +307,11 @@ export function WorkspaceThread({
       // The runtime being unreachable is the spec'd degraded state; the human
       // message (if written) stays in the durable thread either way.
       setRuntimeOffline(true);
-      setChatError(error instanceof Error ? error.message : "Runtime unreachable");
+      setChatError(
+        error instanceof Error
+          ? `${error.message}. Try sending again in a moment — anything already sent stays on the thread.`
+          : "Couldn't reach the agent runtime. Check your connection and try sending again.",
+      );
     } finally {
       setSending(false);
     }
@@ -328,7 +349,11 @@ export function WorkspaceThread({
           setActiveThreadId(data.id);
           await sendMessage(initialPrompt, data.id);
         } catch (sendError) {
-          setChatError(sendError instanceof Error ? sendError.message : "Could not deliver the directive");
+          setChatError(
+            `Couldn't deliver the directive from Atlas${
+              sendError instanceof Error ? `: ${sendError.message}` : ""
+            }. Head back to the War Room and try the handoff again, or just ask ${entry.callsign} directly below.`,
+          );
         }
       })();
       return;
@@ -337,7 +362,7 @@ export function WorkspaceThread({
     autoSentRef.current = true;
     if (messages.length > 0) return;
     void sendMessage(initialPrompt);
-  }, [initialPrompt, initialThreadTitle, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage, accountId, agentProfileId, user]);
+  }, [initialPrompt, initialThreadTitle, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage, accountId, agentProfileId, user, entry.callsign]);
 
   useEffect(() => {
     if (!composerPrefill) return;
@@ -360,7 +385,9 @@ export function WorkspaceThread({
       .select("id, title, created_at")
       .single();
     if (error || !data) {
-      setChatError(error?.message ?? "Failed to create thread");
+      setChatError(
+        `Couldn't create the chat${error ? `: ${error.message}` : ""}. Try again in a moment.`,
+      );
       return;
     }
     setThreads((prev) => [data, ...prev]);
@@ -790,9 +817,7 @@ function MessageCard({
           <Icon className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 max-w-[85%] px-0.5 py-1">
-          <div className="prose prose-sm prose-slate min-w-0 max-w-none break-words dark:prose-invert [&_p]:my-2.5 [&_p]:leading-relaxed [&_li]:my-1 [&_ul]:my-2 [&_ol]:my-2 [&_strong]:font-semibold [&_strong]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-base [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-[15px] [&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3]:text-sm [&_h4]:mt-3 [&_h4]:mb-1 [&_h4]:text-sm [&_pre]:my-2 [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:rounded-md [&_pre]:bg-muted/40 [&_pre]:p-2.5 [&_pre]:text-xs [&_code]:break-words">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{text ?? ""}</ReactMarkdown>
-          </div>
+          <AgentMarkdown text={text ?? ""} />
         </div>
       </div>
     );
