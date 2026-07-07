@@ -285,6 +285,40 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### RUN_SKILL CHAT TOOL — agents execute their skills instead of describing them (2026-07-07)
+
+Closes the owner's "two paths" question: chatting "run the pricing teardown"
+used to produce words while only the Studio button produced the artifact.
+Section agents now carry a run_skill MCP tool in workspace chat:
+
+- **Own room only:** the catalog row's agent_key must match the agent's
+  section; other rooms' skills get an explicit "direct the user to that
+  agent's workspace" denial. Unimplemented keys are denied by the catalog
+  flag, and accounts with no analyzed company get an honest denial.
+- **Durable like every run:** the tool inserts a pending agent_runs row +
+  queued agent_jobs row (trigger_type cascade, input records
+  requested_by_run_id); if the job insert fails the run is marked failed —
+  never a pending run with no job behind it (the exact stuck state from the
+  fleet incident).
+- **One skill run per reply** (closure flag, resets each turn) and the
+  prompt doctrine requires the agent to say the run started and where the
+  document lands — never claim a skill ran without the tool call.
+- Atlas deliberately does NOT get the tool (allowSkillRuns false): it
+  directs the user to the right room, per spec 12 doctrine.
+- Tests: registration gating, happy-path run+job inserts (payload carries
+  skill_key + active business_context_version_id), one-per-reply refusal,
+  other-room/unimplemented/no-company denials (worker suite 175).
+
+**Gate results for the run_skill commit:**
+```
+cd worker && npx tsc --noEmit  -> exit 0
+cd worker && npx vitest run    -> 175 passed, 2 skipped
+cd worker && npm run build     -> exit 0
+cd worker && npx eslint src    -> exit 0
+frontend untouched             -> last green (app/node tsc 0, build 0, lint 64)
+UTF-8 touched-file decode      -> encoding clean, exit 0
+```
+
 ### WORKSPACE UX — the rest of the owner's live bug report (2026-07-07)
 
 The worker-fleet hotfix fixed WHY runs stuck pending; this slice fixes the

@@ -136,6 +136,10 @@ export class WorkspaceChatHandler {
           ownSectionKey: sectionKey,
           agentProfileId: profile.id,
           proposalMode: true,
+          // Section agents may launch their own room's implemented skills
+          // from chat ("run that pricing teardown" actually runs it). Atlas
+          // directs the user to the right room instead of running skills.
+          allowSkillRuns: !isOrchestrator,
           xaiApiKey: this.deps.xaiApiKey,
           firecrawlApiKey: this.deps.firecrawlApiKey,
           fredApiKey: this.deps.fredApiKey,
@@ -340,6 +344,8 @@ function buildChatSystemPrompt(
   return `${base}
 
 You are replying in a workspace chat. Be concise, practical, and cite uncertainty. Use tools for account data beyond what is below instead of inventing facts. If you propose canvas changes, use proposal-mode tool calls rather than claiming changes were applied. Never paste raw JSON, tool output, or code blocks of data into a reply — always translate findings into plain language.
+
+When the user asks you to run one of your room's skills (or agrees to your suggestion to run one), call the run_skill tool — do not merely describe what the skill would produce. One skill run per reply. After the call succeeds, tell the user the run has started, that it takes a few minutes, and that the document will land on this room's shelf. Never claim a skill ran without calling the tool.
 
 ${DATA_GAP_PROTOCOL}${formatCompanyBrief(brief)}${formatCanvasSnapshot(sectionLabel, canvas)}${sourceBlock}`;
 }

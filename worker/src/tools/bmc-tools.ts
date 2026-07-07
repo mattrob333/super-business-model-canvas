@@ -12,6 +12,8 @@ export interface ToolContext {
   ownSectionKey: SectionKey;
   agentProfileId: string;
   proposalMode: boolean;
+  /** When true (workspace chat, section agents only) the agent may enqueue its own room's implemented skills. */
+  allowSkillRuns?: boolean;
   xaiApiKey?: string;
   firecrawlApiKey?: string;
   fredApiKey?: string;
@@ -253,10 +255,104 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
     { annotations: { readOnlyHint: true } },
   );
 
+  // One skill run per reply: the closure lives for one chat turn, so this
+  // flag resets naturally on the next message. An agent that fires several
+  // skills at once floods the queue and the owner's activity feed.
+  let skillRunStartedThisReply = false;
+
+  const runSkill = tool(
+    "run_skill",
+    "Start one of YOUR OWN room's implemented skills as a background run. The finished document lands on the workspace shelf in a few minutes. Limit: one skill run per reply, and you must tell the user the run has started.",
+    { skill_key: z.string().min(1) },
+    async (args) => {
+      if (skillRunStartedThisReply) {
+        return toolError("DENIED: one skill run per reply. Report the run you already started and let it finish.");
+      }
+      const { data: skill, error: skillError } = await client
+        .from("skill_catalog")
+        .select("skill_key, agent_key, title, implemented")
+        .eq("skill_key", args.skill_key)
+        .maybeSingle();
+      if (skillError) return toolError(`run_skill failed: ${skillError.message}`);
+      if (!skill || !skill.implemented) {
+        return toolError(`DENIED: '${args.skill_key}' is not an implemented skill. Only offer skills from your room's catalog.`);
+      }
+      if (skill.agent_key !== `agent_${ctx.ownSectionKey}`) {
+        return toolError(`DENIED: '${args.skill_key}' belongs to another room. Direct the user to that agent's workspace instead.`);
+      }
+      const scope = await loadCompanyScope(client, ctx.accountId);
+      if (!scope.activeContextId) {
+        return toolError("DENIED: no analyzed company yet — the user must analyze a company before skills can run.");
+      }
+
+      const nowIso = new Date().toISOString();
+      const { data: run, error: runError } = await client
+        .from("agent_runs")
+        .insert({
+          account_id: ctx.accountId,
+          agent_profile_id: ctx.agentProfileId,
+          run_type: "skill_run",
+          trigger_type: "cascade",
+          status: "pending",
+          input: {
+            skill_key: skill.skill_key,
+            business_context_version_id: scope.activeContextId,
+            requested_by_run_id: ctx.agentRunId,
+          },
+          started_at: nowIso,
+        })
+        .select("id")
+        .single();
+      if (runError) return toolError(`run_skill failed to create the run: ${runError.message}`);
+
+      const { error: jobError } = await client.from("agent_jobs").insert({
+        account_id: ctx.accountId,
+        kind: "skill_run",
+        payload: {
+          skill_key: skill.skill_key,
+          business_context_version_id: scope.activeContextId,
+          agentProfileId: ctx.agentProfileId,
+        },
+        status: "queued",
+        agent_run_id: run.id,
+        run_after: nowIso,
+      });
+      if (jobError) {
+        // Never leave a pending run with no job behind it — that is the exact
+        // stuck-forever state the owner already hit once.
+        await client
+          .from("agent_runs")
+          .update({ status: "failed", error: `enqueue failed: ${jobError.message}`, completed_at: new Date().toISOString() })
+          .eq("id", run.id)
+          .eq("account_id", ctx.accountId);
+        return toolError(`run_skill failed to enqueue the job: ${jobError.message}`);
+      }
+
+      skillRunStartedThisReply = true;
+      return toolResult({
+        run_id: run.id,
+        skill_key: skill.skill_key,
+        title: skill.title,
+        status: "queued",
+        note: "Tell the user the run has started, that it takes a few minutes, and that the finished document will appear on this room's shelf and in the run queue.",
+      });
+    },
+  );
+
   return createSdkMcpServer({
     name: "bmc",
     version: "1.0.0",
-    tools: [readCanvas, writeSectionItems, logEvidence, openGap, postInsight, readCompetitorCanvas, searchWeb, firecrawlScrape],
+    tools: [
+      readCanvas,
+      writeSectionItems,
+      logEvidence,
+      openGap,
+      postInsight,
+      readCompetitorCanvas,
+      searchWeb,
+      firecrawlScrape,
+      ...(ctx.allowSkillRuns ? [runSkill] : []),
+    ],
   });
 }
 

@@ -102,9 +102,68 @@ describe("BMC MCP tools", () => {
       notes: "",
     })).resolves.toMatchObject({ isError: true });
   });
+
+  it("does not register run_skill unless the context allows it", () => {
+    const tools = registeredTools(new FakeSupabaseClient().asSupabase());
+    expect(tools.run_skill).toBeUndefined();
+  });
+
+  it("run_skill enqueues an own-room implemented skill as a durable run + job, once per reply", async () => {
+    const client = new FakeSupabaseClient();
+    client.tableRows.skill_catalog = [
+      { skill_key: "forge.positioning_brief", agent_key: "agent_value_propositions", title: "Positioning brief", implemented: true },
+    ];
+    client.tableRows.business_context_versions = [
+      { id: "ctx-1", company_name: "Acme", website: null, created_at: "2026-01-02T00:00:00Z" },
+    ];
+    const tools = registeredTools(client.asSupabase(), { allowSkillRuns: true });
+
+    await expect(tools.run_skill.handler({ skill_key: "forge.positioning_brief" }))
+      .resolves.toMatchObject({ structuredContent: { run_id: "inserted-id", skill_key: "forge.positioning_brief", status: "queued" } });
+
+    const runInsert = client.operations.find((op) => op.table === "agent_runs" && op.insert);
+    expect(runInsert?.insert).toMatchObject({
+      account_id: "account-1",
+      agent_profile_id: "profile-1",
+      run_type: "skill_run",
+      trigger_type: "cascade",
+      status: "pending",
+    });
+    const jobInsert = client.operations.find((op) => op.table === "agent_jobs" && op.insert);
+    expect(jobInsert?.insert).toMatchObject({
+      account_id: "account-1",
+      kind: "skill_run",
+      status: "queued",
+      agent_run_id: "inserted-id",
+      payload: { skill_key: "forge.positioning_brief", business_context_version_id: "ctx-1" },
+    });
+
+    // One skill run per reply: the second call in the same turn is refused.
+    await expect(tools.run_skill.handler({ skill_key: "forge.positioning_brief" }))
+      .resolves.toMatchObject({ isError: true });
+  });
+
+  it("run_skill refuses other rooms' skills, unimplemented skills, and no-company accounts", async () => {
+    const client = new FakeSupabaseClient();
+    client.tableRows.skill_catalog = [
+      { skill_key: "relay.channel_gap_scan", agent_key: "agent_channels", title: "Channel gap scan", implemented: true },
+      { skill_key: "forge.future_skill", agent_key: "agent_value_propositions", title: "Future", implemented: false },
+      { skill_key: "forge.positioning_brief", agent_key: "agent_value_propositions", title: "Positioning brief", implemented: true },
+    ];
+    const tools = registeredTools(client.asSupabase(), { allowSkillRuns: true });
+
+    await expect(tools.run_skill.handler({ skill_key: "relay.channel_gap_scan" }))
+      .resolves.toMatchObject({ isError: true });
+    await expect(tools.run_skill.handler({ skill_key: "forge.future_skill" }))
+      .resolves.toMatchObject({ isError: true });
+    // Implemented + own-room, but no analyzed company (empty context chain).
+    await expect(tools.run_skill.handler({ skill_key: "forge.positioning_brief" }))
+      .resolves.toMatchObject({ isError: true });
+    expect(client.operations.some((op) => op.table === "agent_runs" && op.insert)).toBe(false);
+  });
 });
 
-function registeredTools(client: never): Record<string, RegisteredTool> {
+function registeredTools(client: never, ctxOverrides: Partial<ToolContext> = {}): Record<string, RegisteredTool> {
   const feedCalls: Array<Record<string, unknown>> = [];
   const ctx: ToolContext = {
     accountId: "account-1",
@@ -112,6 +171,7 @@ function registeredTools(client: never): Record<string, RegisteredTool> {
     ownSectionKey: "value_propositions",
     agentProfileId: "profile-1",
     proposalMode: true,
+    ...ctxOverrides,
     feedRunner: {
       async refresh(request: Record<string, unknown>) {
         feedCalls.push(request);
@@ -136,6 +196,9 @@ class FakeSupabaseClient {
     filters: Array<[string, unknown]>;
     insert?: Record<string, unknown>;
   }> = [];
+
+  /** Seed rows per table for reads (maybeSingle / awaited selects). */
+  public tableRows: Record<string, Array<Record<string, unknown>>> = {};
 
   asSupabase(): never {
     return this as never;
@@ -197,8 +260,30 @@ class FakeQuery {
     return Promise.resolve({ data: { id: "inserted-id" }, error: null });
   }
 
+  maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: null }> {
+    this.client.operations.push({
+      table: this.table,
+      filters: [...this.filters],
+      insert: this.insertValue ?? undefined,
+    });
+    return Promise.resolve({ data: this.matchingRows()[0] ?? null, error: null });
+  }
+
   then(resolve: (value: { data: Array<Record<string, unknown>>; error: null }) => void): void {
-    this.client.operations.push({ table: this.table, filters: [...this.filters] });
-    resolve({ data: [], error: null });
+    this.client.operations.push({
+      table: this.table,
+      filters: [...this.filters],
+      insert: this.insertValue ?? undefined,
+    });
+    resolve({ data: this.matchingRows(), error: null });
+  }
+
+  private matchingRows(): Array<Record<string, unknown>> {
+    const rows = this.client.tableRows[this.table] ?? [];
+    return rows.filter((row) =>
+      this.filters.every(([column, value]) =>
+        column.includes(":") || !(column in row) || row[column] === value,
+      ),
+    );
   }
 }
