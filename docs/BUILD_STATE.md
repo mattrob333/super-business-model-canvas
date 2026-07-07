@@ -285,6 +285,45 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### WAR ROOM REBUILD — Atlas gets the full room chassis (2026-07-07)
+
+Owner verdict on the first War Room: "leaves a lot to be desired… I would
+like Atlas War Room to be at least as good as the other agents' workspaces,
+so you can use the same scaffolding." Rebuilt /war-room on the exact section
+room chassis (12-col grid, same panels, same mobile collapse behavior):
+
+- **Top bar:** WorkspaceTopBar generalized to a `room` prop
+  (section key | "atlas") — Atlas's door plate + the same Rooms switcher.
+  Bonus fix: the switcher's War Room entry was still DISABLED with "Coming
+  with Phase 6" even though the page shipped — now live and marked active.
+- **Left rail:** new AtlasIdentityCard (same anatomy as AgentIdentityCard:
+  live run status, settings button into the shared AgentSettingsSheet, scope
+  line), ContextSourcesPanel and WorkspaceRunQueue on the orchestrator
+  profile — Atlas's "more context files" and activity get the same panels
+  as every room.
+- **Center:** the shared AtlasChat thread, full height (mobile keeps the
+  briefing at the top of the chat scroll).
+- **Right rail (Atlas's Studio):** the State of the Union briefing card plus
+  the new WarRoomShelf — the ten most recent skill artifacts from ALL rooms
+  (company-scoped via loadCompanyScope), each attributed to its agent by
+  skill-key prefix and opening the full document page. The chief strategist
+  sees everything the team produces.
+- MobileCollapse extracted from Workspace.tsx into a shared component (one
+  mobile behavior for every room).
+- Honest scope: Atlas has no run-skill Studio tiles (it directs rooms rather
+  than running skills, per spec 12 doctrine); briefing history and richer
+  Atlas workflows can layer on later.
+
+**Gate results for the War Room commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+worker untouched                       -> last green (tsc 0, vitest 175, build 0, eslint 0)
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### RUN_SKILL CHAT TOOL — agents execute their skills instead of describing them (2026-07-07)
 
 Closes the owner's "two paths" question: chatting "run the pricing teardown"

@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +16,7 @@ import {
 import { AGENT_ROSTER } from "@/lib/agent-roster";
 import { AgentIdentityCard, type AgentRunSnapshot } from "@/components/workspace/AgentIdentityCard";
 import { ContextSourcesPanel } from "@/components/workspace/ContextSourcesPanel";
+import { MobileCollapse } from "@/components/workspace/MobileCollapse";
 import { SectionCanvasPanel } from "@/components/workspace/SectionCanvasPanel";
 import { WorkspaceActionsPanel } from "@/components/workspace/WorkspaceActionsPanel";
 import { WorkspaceRunQueue } from "@/components/workspace/WorkspaceRunQueue";
@@ -198,7 +197,7 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
 
   return (
     <div className="flex h-screen flex-col bg-grid-subtle">
-      <WorkspaceTopBar sectionKey={sectionKey} />
+      <WorkspaceTopBar room={sectionKey} />
 
       {profileError || !accountId || !profile ? (
         <div className="flex flex-1 items-center justify-center p-6">
@@ -271,32 +270,5 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * Below md the room's supporting panels fold behind slim summary rows so the
- * conversation leads (the mobile room was five panels of preamble before the
- * chat). Desktop renders children untouched.
- */
-function MobileCollapse({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const isMobile = useIsMobile();
-  if (!isMobile) return <>{children}</>;
-  return (
-    <details className="group" open={defaultOpen}>
-      <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg border border-border bg-card px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-sm [&::-webkit-details-marker]:hidden">
-        {title}
-        <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-      </summary>
-      <div className="mt-2">{children}</div>
-    </details>
   );
 }

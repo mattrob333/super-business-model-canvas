@@ -10,14 +10,15 @@ import {
 import { AGENT_ROSTER, ATLAS } from "@/lib/agent-roster";
 
 /**
- * Slim top bar for the full-screen workspace rooms (spec 02 "Route & entry"):
- * back to canvas, the current agent's door plate, and the 9-dot switcher —
- * a mini BMC map for jumping between rooms without returning to the canvas.
- * The War Room is the visually distinct tenth stop, disabled until Phase 6.
+ * Slim top bar for the full-screen rooms (spec 02 "Route & entry"): back to
+ * canvas, the current agent's door plate, and the room switcher — a mini BMC
+ * map for jumping between rooms without returning to the canvas. The War Room
+ * is the tenth stop: same bar, Atlas's door plate ("atlas" room key).
  */
-export function WorkspaceTopBar({ sectionKey }: { sectionKey: CanvasSectionKey }) {
+export function WorkspaceTopBar({ room }: { room: CanvasSectionKey | "atlas" }) {
   const navigate = useNavigate();
-  const current = AGENT_ROSTER[sectionKey];
+  const isAtlas = room === "atlas";
+  const current = isAtlas ? ATLAS : AGENT_ROSTER[room];
   const CurrentIcon = current.icon;
 
   return (
@@ -36,9 +37,9 @@ export function WorkspaceTopBar({ sectionKey }: { sectionKey: CanvasSectionKey }
           <CurrentIcon className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 leading-tight">
-          <p className="truncate text-sm font-semibold">{current.callsign}</p>
+          <p className="truncate text-sm font-semibold">{isAtlas ? "War Room" : current.callsign}</p>
           <p className="truncate text-[10px] text-muted-foreground">
-            {CANVAS_SECTION_LABELS[sectionKey]}
+            {isAtlas ? `${ATLAS.callsign} · ${ATLAS.role}` : CANVAS_SECTION_LABELS[room]}
           </p>
         </div>
       </div>
@@ -59,7 +60,7 @@ export function WorkspaceTopBar({ sectionKey }: { sectionKey: CanvasSectionKey }
               {CANVAS_SECTION_KEYS.map((key) => {
                 const entry = AGENT_ROSTER[key];
                 const Icon = entry.icon;
-                const active = key === sectionKey;
+                const active = key === room;
                 return (
                   <button
                     key={key}
@@ -85,16 +86,17 @@ export function WorkspaceTopBar({ sectionKey }: { sectionKey: CanvasSectionKey }
             <div className="mt-1 border-t border-border pt-1">
               <button
                 type="button"
-                disabled
-                title="The War Room opens with Atlas in Phase 6"
-                className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-md px-2 py-1.5 text-left opacity-50"
+                onClick={() => navigate("/war-room")}
+                className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors ${
+                  isAtlas ? "bg-muted" : "hover:bg-muted/60"
+                }`}
               >
                 <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ring-1 ${ATLAS.avatarClass}`}>
                   <ATLAS.icon className="h-3 w-3" />
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-medium">{ATLAS.callsign} — War Room</span>
-                  <span className="block truncate text-[10px] text-muted-foreground">Coming with Phase 6</span>
+                  <span className="block truncate text-[10px] text-muted-foreground">{ATLAS.role}</span>
                 </span>
               </button>
             </div>
