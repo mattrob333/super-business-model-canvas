@@ -122,4 +122,32 @@ describe("JobLoop", () => {
     await expect(loop.runOnce()).resolves.toBe(false);
     expect(repository.reaped).toBe(true);
   });
+
+  it("survives a claim failure — one bad poll must never kill the loop (live incident 2026-07-07)", async () => {
+    class FlakyRepository extends MemoryRepository {
+      public calls = 0;
+
+      async claimNext(workerId: string, options: ClaimOptions): Promise<AgentJob | null> {
+        void workerId;
+        void options;
+        this.calls += 1;
+        if (this.calls === 1) throw new Error("TypeError: fetch failed");
+        return null;
+      }
+    }
+
+    const repository = new FlakyRepository(null);
+    const loop = new JobLoop("worker-a", repository, async () => undefined, {
+      pollIntervalMs: 1,
+      heartbeatIntervalMs: 1000,
+      staleAfterSeconds: 120,
+      defaultMaxAttempts: 3,
+    });
+
+    // Stop after a few cycles; if the first throw escaped, runForever rejects
+    // and this await would reject with "fetch failed".
+    setTimeout(() => loop.stop(), 20);
+    await expect(loop.runForever()).resolves.toBeUndefined();
+    expect(repository.calls).toBeGreaterThan(1);
+  });
 });
