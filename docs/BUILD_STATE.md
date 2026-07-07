@@ -285,6 +285,56 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Autonomy round — scheduled-loop tick hardened, nightly Atlas briefing seeded (2026-07-07)
+
+Goal: the system works while the owner sleeps. The pg_cron -> edge-function
+scaffolding existed; auditing it found four real defects, one of them fatal.
+
+- **Fatal: every scheduled enqueue has been failing.** agent_runs.triggered_by
+  is a uuid column; the tick passed the string `scheduled_loop:<id>` — the
+  insert failed on every scheduled occurrence. Removed (the loop id rides in
+  input.scheduled_loop_id). The migration re-arms action-key loops parked as
+  error/exhausted_failures by this bug (the failures were the tick's, not
+  the loops').
+- **Silent wrong action:** an action_key the tick didn't know (including
+  atlas_briefing!) fell through to an INLINE Value Propositions section
+  analysis. Now: atlas_briefing / gap_engine / staleness_sweep /
+  feed_refresh:<key> / skill_run:<key> map to durable worker jobs; a non-null
+  unknown key fails loudly; only action_key NULL keeps the legacy inline
+  behavior (user-created prompt loops).
+- **Auth was presence-only:** any bearer could sweep all accounts' due loops
+  and force-run ANY loop by id (cross-tenant spend trigger). Now: the
+  service-role bearer sweeps; a user JWT may only Run Now one loop after an
+  account_members check. Response also reports success=false + first error
+  when a loop fails (the old shape hid failures from the Settings UI).
+- **Double-enqueue race:** claim-before-execute with compare-and-set on
+  next_run_at — overlapping ticks/Run Now can't both own an occurrence.
+  Cron math pinned to UTC getters (was host-local).
+- **Nightly briefing seeded** (20260707160000): 'Morning briefing from Atlas'
+  daily 11:00 UTC per account, provision_account_defaults extended for new
+  accounts. Backfilled rows have next_run_at NULL -> first tick runs them
+  immediately; the dock pulse lights up unprompted (scheduled briefings are
+  not auto-marked seen — exactly the wake-up-to-news behavior wanted).
+- **OPERATOR PREREQUISITE (one-time, manual):** the pg_cron job authorizes
+  from Vault. In the Supabase SQL editor verify `select jobname from cron.job;`
+  shows scheduled-loop-tick and `select name from vault.secrets;` shows
+  service_role_key; if missing, run the create_secret from
+  20260702090000_schedule_loop_tick.sql (key pasted in the SQL editor ONLY).
+- Verification: deno available locally but deno.land is proxy-blocked, so
+  remote-import typecheck is impossible here — esbuild parse clean, deno lint
+  clean except its stylistic no-URL-imports rule (the repo-wide edge pattern).
+  Response contract with ScheduledLoopsManager preserved. Frontend/worker
+  untouched.
+
+**Gate results for the autonomy commit:**
+```
+esbuild parse (edge fn)                -> exit 0
+deno lint                              -> only no-import-prefix style hits (repo-wide pattern)
+frontend/worker untouched              -> last green: app tsc 0, worker 107 passed / 2 skipped
+UTF-8 touched-file decode              -> exit 0
+```
+
+
 ### Full-page War Room shipped (spec 12 §6) — one Atlas, two surfaces (2026-07-07)
 
 Owner asked "is the full-page War Room available yet?" two rounds ago — now
