@@ -285,6 +285,43 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### DOCUMENT EXPERIENCE 1 — Phase G exhibits + visible sources (2026-07-07)
+
+Owner directive: NotebookLM-grade documents, no audio. Slice 1 of the
+document experience:
+
+- **Six bespoke exhibits** (new PhaseGExhibits.tsx + artifact-payloads.ts):
+  moat audit renders as a durability matrix with 5-dot meters and moat-class
+  chips; positioning brief as a formal statement block ("For X who Y…") with
+  grounded pillar cards; unit economics as six variable cards with
+  known/estimated/unknown status chips and "Needs you" callouts; supply
+  chain as upstream/downstream panels + scored candidates table with
+  evidence quotes; lifecycle map as stage rows (your motion vs competitor
+  motions, amber gap highlighting); build vs buy as a verdict table with
+  styled verdict chips and switching sketches. All parsers defensive — a
+  payload off contract renders nothing and the markdown body still carries
+  the content.
+- **Sources section (grounding made visible):** ArtifactDocument accepts a
+  `sources` prop; ArtifactPage loads the evidence items behind
+  evidence_ids (account-scoped, artifact citation order preserved) and the
+  document ends with numbered source cards — title, the exact excerpt the
+  analysis saw, and the outbound link when one exists.
+- Fixed two mojibake `?` separators in the document header (were middle
+  dots).
+- Honest scope (next slices): the public share page does not yet pass
+  sources (its edge function payload doesn't include evidence); inline [n]
+  citation markers in body text and real PDF export are still to come.
+
+**Gate results for the document slice commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+worker untouched                       -> last green (tsc 0, vitest 175, build 0, eslint 0)
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### WAR ROOM REBUILD — Atlas gets the full room chassis (2026-07-07)
 
 Owner verdict on the first War Room: "leaves a lot to be desired… I would

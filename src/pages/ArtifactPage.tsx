@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountId } from "@/hooks/useAccountId";
-import { ArtifactDocument, type ArtifactRecord } from "@/components/skills/ArtifactDocument";
+import { ArtifactDocument, type ArtifactRecord, type ArtifactSource } from "@/components/skills/ArtifactDocument";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { generateShareToken, loadArtifactBrand, type ArtifactBrandInfo } from "@/lib/artifact-brand";
 
@@ -29,6 +29,7 @@ export default function ArtifactPage() {
   const { accountId, loading: accountLoading } = useAccountId();
   const { toast } = useToast();
   const [artifact, setArtifact] = useState<ArtifactRow | null>(null);
+  const [sources, setSources] = useState<ArtifactSource[]>([]);
   const [share, setShare] = useState<ArtifactShareRow | null>(null);
   const [brand, setBrand] = useState<ArtifactBrandInfo>({ brandColor: null, logoUrl: null });
   const [loading, setLoading] = useState(true);
@@ -59,7 +60,7 @@ export default function ArtifactPage() {
       return;
     }
 
-    const [{ data: shareData }, brandData] = await Promise.all([
+    const [{ data: shareData }, brandData, { data: sourceData }] = await Promise.all([
       supabaseUntyped
         .from<ArtifactShareRow>("artifact_shares")
         .select("id, account_id, artifact_id, token, revoked, created_at")
@@ -68,11 +69,23 @@ export default function ArtifactPage() {
         .eq("revoked", false)
         .maybeSingle(),
       loadArtifactBrand(accountId),
+      // The document's grounding: the evidence items its claims stand on,
+      // rendered as numbered source cards under the body.
+      data.evidence_ids.length > 0
+        ? supabaseUntyped
+            .from<ArtifactSource>("evidence_items")
+            .select("id, title, excerpt, source_url, source_name")
+            .eq("account_id", accountId)
+            .in("id", data.evidence_ids)
+        : Promise.resolve({ data: [] as ArtifactSource[] }),
     ]);
 
     setArtifact(data);
     setShare(shareData ?? null);
     setBrand(brandData);
+    // Preserve the artifact's evidence order — it is citation order.
+    const byId = new Map((sourceData ?? []).map((source) => [source.id, source]));
+    setSources(data.evidence_ids.flatMap((sourceId) => byId.get(sourceId) ?? []));
     setLoading(false);
   }, [accountId, id]);
 
@@ -195,7 +208,7 @@ export default function ArtifactPage() {
         </div>
       </div>
       <main className="mx-auto max-w-[900px]">
-        <ArtifactDocument artifact={artifact} brand={brand} />
+        <ArtifactDocument artifact={artifact} brand={brand} sources={sources} />
       </main>
     </div>
   );

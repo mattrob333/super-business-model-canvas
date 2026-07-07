@@ -1,7 +1,24 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { BadgeCheck, FileText } from "lucide-react";
+import { BadgeCheck, FileText, Link as LinkIcon } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
+import {
+  asBuildVsBuyPayload,
+  asLifecyclePayload,
+  asMoatPayload,
+  asPositioningPayload,
+  asSupplyChainPayload,
+  asUnitEconomicsPayload,
+  phaseGSpotCheck,
+} from "@/components/skills/artifact-payloads";
+import {
+  BuildVsBuyExhibit,
+  LifecycleMapExhibit,
+  MoatAuditExhibit,
+  PositioningBriefExhibit,
+  SupplyChainExhibit,
+  UnitEconomicsExhibit,
+} from "@/components/skills/PhaseGExhibits";
 
 export interface ArtifactRecord {
   id?: string;
@@ -78,13 +95,24 @@ interface SpotCheck {
   confirmed: number;
 }
 
+export interface ArtifactSource {
+  id: string;
+  title: string;
+  excerpt: string | null;
+  source_url: string | null;
+  source_name: string | null;
+}
+
 export function ArtifactDocument({
   artifact,
   brand,
+  sources,
   publicFooter = false,
 }: {
   artifact: ArtifactRecord;
   brand?: ArtifactBrand;
+  /** Evidence items behind artifact.evidence_ids — rendered as numbered source cards when provided. */
+  sources?: ArtifactSource[];
   publicFooter?: boolean;
 }) {
   const pricing = artifact.skill_key === "yield.pricing_teardown" ? asPricingPayload(artifact.payload) : null;
@@ -92,7 +120,16 @@ export function ArtifactDocument({
   const expansion = artifact.skill_key === "compass.segment_expansion" ? asSegmentExpansionPayload(artifact.payload) : null;
   const channelGap = artifact.skill_key === "relay.channel_gap_scan" ? asChannelGapPayload(artifact.payload) : null;
   const economics = artifact.skill_key === "relay.channel_economics" ? asChannelEconomicsPayload(artifact.payload) : null;
-  const checks = pricing?.spot_check ?? avatar?.spot_check ?? expansion?.spot_check ?? channelGap?.spot_check ?? economics?.spot_check;
+  const moat = artifact.skill_key === "vault.moat_audit" ? asMoatPayload(artifact.payload) : null;
+  const positioning = artifact.skill_key === "forge.positioning_brief" ? asPositioningPayload(artifact.payload) : null;
+  const unitEconomics = artifact.skill_key === "ledger.unit_economics_frame" ? asUnitEconomicsPayload(artifact.payload) : null;
+  const supplyChain = artifact.skill_key === "envoy.supply_chain_map" ? asSupplyChainPayload(artifact.payload) : null;
+  const lifecycle = artifact.skill_key === "anchor.lifecycle_map" ? asLifecyclePayload(artifact.payload) : null;
+  const buildVsBuy = artifact.skill_key === "tempo.build_vs_buy" ? asBuildVsBuyPayload(artifact.payload) : null;
+  const checks =
+    pricing?.spot_check ?? avatar?.spot_check ?? expansion?.spot_check ?? channelGap?.spot_check ??
+    economics?.spot_check ?? supplyChain?.spot_check ?? lifecycle?.spot_check ?? buildVsBuy?.spot_check ??
+    phaseGSpotCheck(artifact.payload);
   const accent = validHexColor(brand?.brandColor) ?? "#f97316";
 
   return (
@@ -117,11 +154,11 @@ export function ArtifactDocument({
         <div className="mt-4 h-1 w-24 rounded-full" style={{ backgroundColor: accent }} />
         <p className="mt-1.5 text-xs text-slate-500">
           {new Date(artifact.created_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
-          {" ? "}
+          {" · "}
           {artifact.evidence_ids.length} evidence source{artifact.evidence_ids.length === 1 ? "" : "s"}
           {checks && checks.checked > 0 && (
             <>
-              {" ? "}
+              {" · "}
               verifier confirmed {checks.confirmed}/{checks.checked} spot-checks
             </>
           )}
@@ -134,10 +171,18 @@ export function ArtifactDocument({
         {expansion && <SegmentExpansionExhibit expansion={expansion} />}
         {channelGap && <ChannelGapExhibit channelGap={channelGap} />}
         {economics && <ChannelEconomicsExhibit economics={economics} />}
+        {moat && <MoatAuditExhibit moat={moat} />}
+        {positioning && <PositioningBriefExhibit positioning={positioning} />}
+        {unitEconomics && <UnitEconomicsExhibit economics={unitEconomics} />}
+        {supplyChain && <SupplyChainExhibit supplyChain={supplyChain} />}
+        {lifecycle && <LifecycleMapExhibit lifecycle={lifecycle} />}
+        {buildVsBuy && <BuildVsBuyExhibit buildVsBuy={buildVsBuy} />}
 
         <section className="prose prose-slate max-w-none prose-headings:tracking-tight prose-h2:mt-6 prose-h2:text-base prose-p:leading-relaxed">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.body_md}</ReactMarkdown>
         </section>
+
+        {sources && sources.length > 0 && <SourcesSection sources={sources} />}
       </div>
 
       <footer className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-200 pt-4 text-xs text-slate-500">
@@ -162,6 +207,66 @@ export function ArtifactDocument({
 function validHexColor(value: string | null | undefined): string | null {
   if (!value) return null;
   return /^#[0-9a-fA-F]{6}$/.test(value) ? value : null;
+}
+
+/**
+ * The grounding made visible (NotebookLM-style): every evidence item behind
+ * the document as a numbered source card — title, the exact excerpt the
+ * analysis saw, and the link when one exists. The reader can check every
+ * claim against what it stands on without leaving the page.
+ */
+function SourcesSection({ sources }: { sources: ArtifactSource[] }) {
+  return (
+    <section className="border-t border-slate-200 pt-5">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Sources ({sources.length})
+      </h2>
+      <ol className="mt-3 space-y-2.5">
+        {sources.map((source, index) => (
+          <li key={source.id} className="flex gap-3 rounded-lg border border-slate-200 p-3">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-600">
+              {index + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-slate-900">{source.title}</p>
+              {source.excerpt && (
+                <blockquote className="mt-1 border-l-2 border-slate-200 pl-2.5 text-xs italic leading-relaxed text-slate-600">
+                  "{truncate(source.excerpt, 360)}"
+                </blockquote>
+              )}
+              {source.source_url && isHttpUrl(source.source_url) && (
+                <a
+                  href={source.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1.5 inline-flex max-w-full items-center gap-1 text-xs text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline"
+                >
+                  <LinkIcon className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{source.source_name ?? hostnameOf(source.source_url)}</span>
+                </a>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
 }
 
 function PricingExhibit({ pricing }: { pricing: PricingPayload }) {
