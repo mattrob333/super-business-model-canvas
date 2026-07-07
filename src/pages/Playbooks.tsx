@@ -290,8 +290,8 @@ const Playbooks = () => {
     const hasChannels = canvas.channels?.length > 0;
     const hasValueProps = canvas.valuePropositions?.length > 0;
     const hasCompetitors =
-      (analysisData.similarCompanies?.length ?? 0) > 0 ||
-      (analysisData.competitors?.length ?? 0) > 0;
+      (analysisData?.similarCompanies?.length ?? 0) > 0 ||
+      (analysisData?.competitors?.length ?? 0) > 0;
     
     if (!hasICP) {
       addFramework(recommended, ['JTBD', 'BMC']);
@@ -362,10 +362,10 @@ const Playbooks = () => {
       valueProps: canvas.valuePropositions && canvas.valuePropositions.length > 0,
       icp: canvas.customerSegments && canvas.customerSegments.length > 0,
       channels: canvas.channels && canvas.channels.length > 0,
-      products: analysisData.company?.productsServices && analysisData.company.productsServices.length > 0,
+      products: analysisData?.company?.productsServices && analysisData.company.productsServices.length > 0,
       competitors:
-        (analysisData.similarCompanies?.length ?? 0) > 0 ||
-        (analysisData.competitors?.length ?? 0) > 0,
+        (analysisData?.similarCompanies?.length ?? 0) > 0 ||
+        (analysisData?.competitors?.length ?? 0) > 0,
     };
   };
 

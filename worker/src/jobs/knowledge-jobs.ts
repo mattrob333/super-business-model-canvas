@@ -556,8 +556,13 @@ export class KnowledgeJobHandler {
     evidenceByExcerpt: Map<string, string>,
     verifyRoute: ModelRoute,
   ): Promise<void> {
-    const contextId = readString(asRecord(job.payload).business_context_version_id ?? asRecord(job.payload).businessContextVersionId)
-      ?? await this.latestBusinessContextId(job.account_id);
+    // Payload ids are untrusted: a supplied context id must belong to the job
+    // account before rows are stamped with it (service-role client — account
+    // scoping in code is the only tenant boundary).
+    const requestedContextId = readString(asRecord(job.payload).business_context_version_id ?? asRecord(job.payload).businessContextVersionId);
+    const contextId = requestedContextId
+      ? await this.verifiedBusinessContextId(job.account_id, requestedContextId)
+      : await this.latestBusinessContextId(job.account_id);
     for (const [sectionKey, items] of Object.entries(parsed.sections)) {
       if (!isSectionKey(sectionKey) || !items || items.length === 0) continue;
       // RF-5A-2: every owner claim passes the adversarial verifier against its
@@ -596,6 +601,19 @@ export class KnowledgeJobHandler {
       });
       if (error) throw new Error(`Failed to write owner canvas section: ${error.message}`);
     }
+  }
+
+  private async verifiedBusinessContextId(accountId: string, contextId: string): Promise<string> {
+    const { data, error } = await this.deps.client
+      .from("business_context_versions")
+      .select("id")
+      .eq("account_id", accountId)
+      .eq("id", contextId)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to verify business context: ${error.message}`);
+    if (!data?.id) throw new Error("onboarding_extract business_context_version_id does not belong to the job account");
+    return data.id as string;
   }
 
   private async latestBusinessContextId(accountId: string): Promise<string> {
