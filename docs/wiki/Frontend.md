@@ -42,9 +42,16 @@ The frontend is a Vite + React + TypeScript single-page app (`src/`) built on Re
 | `/settings` | `Settings` | yes | AppShell |
 | `*` | `NotFound` | yes | no shell |
 
+Note the comment in `App.tsx`: custom routes must be added **above** the catch-all `*` route.
+
 ### Inside vs. outside the shell
 
-`AppShell` (`src/components/layout/AppShell.tsx`) is a simple chrome: `SidebarNav` on the left, `TopBar` above a scrollable `<main>` with the routed `<Outlet />`. Three kinds of pages deliberately render **outside** it:
+`AppShell` (`src/components/layout/AppShell.tsx`) is a simple chrome: `SidebarNav` on the left, `TopBar` above a scrollable `<main>` with the routed `<Outlet />`.
+
+- `TopBar` (`src/components/layout/TopBar.tsx`) hosts `GlobalSearch` (`src/components/layout/GlobalSearch.tsx`) — a Cmd/Ctrl+K command palette over "the things you actually jump between": saved companies, the nine agent rooms, pages, and the active company's documents — plus a mobile nav sheet that reuses `SidebarNavContent` from `SidebarNav`.
+- `ActiveCompanyBanner` (`src/components/layout/ActiveCompanyBanner.tsx`) appears on Dashboard/Canvas when a company analysis is loaded in session and links back to the full analysis view.
+
+Three kinds of pages deliberately render **outside** the shell:
 
 - **Agent rooms** (`/workspace/:sectionKey`, `/war-room`) — full-screen rooms per spec 02; they bring their own slim `WorkspaceTopBar` instead of the sidebar.
 - **Share pages** (`/share/:token`) — public documents; no auth, no chrome.
@@ -62,7 +69,7 @@ The frontend is a Vite + React + TypeScript single-page app (`src/`) built on Re
 
 1. **Analyze a company.** `handleAnalyze(url)` calls the `analyze-company` Supabase edge function (`supabase.functions.invoke`). Failures dig the real error out of `error.context` because `invoke` wraps non-2xx responses in a generic message. While loading, the hero (`UrlInput` + `ProcessSteps`) shows a "Researching your company" state.
 2. **Persist and bridge.** On success the payload is stored in session (`src/lib/active-analysis.ts`, `src/lib/active-workspace.ts`) and auto-saved to `saved_analyses` via `saveAnalysisRecord`, which also calls `bridgeAnalysisToCanvasVersions` (`src/lib/canvas-version-bridge.ts`) so the agents see versioned `canvas_section_versions` rows. A company-sync effect compares the loaded company's key (`companyKeyOf`) against the active scope from `src/lib/company-scope.ts` and re-bridges on a backfill or a company switch, then `invalidateCompanyScope(accountId)` — so gaps, competitors, and Atlas briefings all follow the company on screen.
-3. **Render.** A company header with `CompanyProfileDrawer` (the **business overview inline card** — editing it flows through `handleBusinessOverviewUpdate`, which merges into `analysisData.company` and auto-saves with bridge), then `EnterpriseBusinessModelCanvas` (`src/components/canvas/EnterpriseBusinessModelCanvas.tsx`) rendering the nine BMC sections. Section edits go through `handleBMCSectionUpdate`, which maps `CanvasSectionKey` → legacy camelCase keys (`key_partners` → `keyPartners`), updates `analysisData.canvas`, and auto-saves.
+3. **Render.** A company header with `CompanyProfileDrawer` (the **business overview inline card** — editing it flows through `handleBusinessOverviewUpdate`, which merges into `analysisData.company` and auto-saves with bridge), then `EnterpriseBusinessModelCanvas` (`src/components/canvas/EnterpriseBusinessModelCanvas.tsx`) rendering the nine BMC sections — composed from `CanvasGridFrame` (the classic BMC grid) and one `CanvasSectionCard` per section (`src/components/canvas/CanvasSectionCard.tsx`), with the section vocabulary defined once in `src/components/canvas/section-types.ts` (`CANVAS_SECTION_KEYS`, `CANVAS_SECTION_LABELS`, `LEGACY_SECTION_KEYS` mapping snake_case keys to the legacy camelCase analysis shape). Section edits go through `handleBMCSectionUpdate`, which maps `CanvasSectionKey` → legacy camelCase keys (`key_partners` → `keyPartners`), updates `analysisData.canvas`, and auto-saves.
 4. **Extras.** "New company" (`startFreshAnalysis`) actually clears everything; `copyToMarkdown` exports the full analysis; the `AtlasDock` mounts beside the canvas once a company exists, and the page pads its right edge (`lg:pr-[calc(clamp(440px,26vw,600px)+16px)]`) when the dock is open so Atlas shares the row instead of covering the canvas.
 
 ### Competitor landscape and research
@@ -80,7 +87,9 @@ The frontend is a Vite + React + TypeScript single-page app (`src/`) built on Re
 - **Top bar** — `WorkspaceTopBar` (`src/components/workspace/WorkspaceTopBar.tsx`): back-to-canvas link, the agent's door plate, and a **room switcher** popover (a mini BMC map listing all nine rooms plus the War Room).
 - **Left rail** — `AgentIdentityCard` (name on the door; live status from the latest run; opens `AgentSettingsSheet`), `SectionCanvasPanel` (the section's live canvas items with confidence dots, freshness desaturation, evidence popovers, and a "verify this assumption" hook that prefills the composer), `ContextSourcesPanel` (per-agent file/url/note sources in `agent_context_sources`), and `WorkspaceRunQueue` (recent + in-flight `agent_runs`, polled while active, each opening `AgentRunDetailDialog`).
 - **Center** — `WorkspaceThread`, the collaboration thread (below).
-- **Right rail** — `WorkspaceActionsPanel` (`src/components/workspace/WorkspaceActionsPanel.tsx`), the **Studio + shelf**: the top half runs the agent's signature skills from `skill_catalog` (each run is a durable agent run, polled to completion), the bottom half is the output shelf of `skill_artifacts` (company-scoped, refreshed every 30s), each opening in a `FocusDrawer` as an `ArtifactDocument`.
+- **Right rail** — `WorkspaceActionsPanel` (`src/components/workspace/WorkspaceActionsPanel.tsx`), the **Studio + shelf**:
+  - The top half lists the agent's signature skills from `skill_catalog` (filtered by `agent_key`, ordered by `sort_order`; unimplemented skills render disabled). Running one starts a durable agent run and polls it to completion with the standard 3s/100-attempt loop, surfacing per-tile errors.
+  - The bottom half is the **output shelf**: every `skill_artifact` this agent has produced for the active company (scoped via `loadCompanyScope`, refreshed every 30s so new artifacts land while the user is in the room), each opening in a `FocusDrawer` as a full `ArtifactDocument` with a link out to `/artifacts/:id`. The work product stays in the room instead of hiding on the Dashboard.
 
 The room resolves its agent profile with the RF-4-13 precedence pattern: an account-scoped `agent_profiles` row wins over the global template (`account_id.eq.{id}` OR `account_id.is.null`, ordered account-first). Section items use the same fallback order as the canvas page: versioned `canvas_section_versions` items first (via `useCanvasEvidence`), else the legacy analysis strings from `getActiveAnalysisCanvas` — restoring the session pointer from the latest `saved_analyses` row if a fresh tab landed without one.
 
@@ -141,7 +150,11 @@ Agent messages with `kind: "proposal"` render as a proposal card with **Approve 
 
 Atlas is the orchestrator agent (`agent_key: "orchestrator"`, identity in `src/lib/atlas.ts`), reachable from two surfaces that share all their machinery:
 
-- **`AtlasDock`** (`src/components/atlas/AtlasDock.tsx`) — a collapsible right-edge dock mounted on the canvas page. Collapsed, it is a slim vertical tab with an unseen-briefing pulse; expanded, it holds the `BriefingCard` and the `AtlasChat` thread beside the canvas. Open state persists in `localStorage` (`atlas:dock-open`, default open on desktop); the chat mounts lazily on first expand and stays mounted.
+- **`AtlasDock`** (`src/components/atlas/AtlasDock.tsx`) — a collapsible right-edge dock mounted on the canvas page. Collapsed, it is a slim vertical tab with an unseen-briefing pulse; expanded, it holds the `BriefingCard` and the `AtlasChat` thread beside the canvas ("Atlas is not a tenth room"). Behaviors worth knowing:
+  - Open state persists in `localStorage` (`atlas:dock-open`) and defaults **open on desktop** (`window.innerWidth >= 1024`) — Atlas is a copilot, not a drawer.
+  - The chat mounts lazily on first expand and stays mounted after, so a collapsed dock costs zero thread queries but reopening keeps its state.
+  - Focus follows the dock (into the aside on expand, back to the edge tab on collapse), and Escape collapses it only when the dock actually holds focus.
+  - Opening the dock with a briefing on screen calls `markSeen()`, clearing the pulse — seen is per-briefing, not per-visit.
 - **`WarRoom`** (`src/pages/WarRoom.tsx`) — the full-page War Room on the *same chassis* as the section rooms: `WorkspaceTopBar room="atlas"`, left rail with `AtlasIdentityCard` + `ContextSourcesPanel` + `WorkspaceRunQueue`, `AtlasChat` in the center, and Atlas's Studio on the right — the `BriefingCard` plus `WarRoomShelf` (`src/components/atlas/WarRoomShelf.tsx`), the cross-room document shelf showing recent `skill_artifacts` from every room, attributed by the `<callsign>.<skill>` key prefix.
 
 ### `useAtlasBriefing` — `src/components/atlas/useAtlasBriefing.ts`
@@ -152,7 +165,7 @@ One hook, shared by both surfaces: resolves the orchestrator profile (account-sc
 
 `BriefingCard` (`src/components/atlas/BriefingCard.tsx`) renders the State of the Union: headline, deltas, position, coverage board, **one** directed move (the directive), and watchouts. The directive's CTA and Atlas's in-chat action buttons share the same delegation contract:
 
-- **Worker side** (`src/lib/atlas-actions.ts` documents the contract): Atlas's chat replies may embed a fenced ` ```action ` block containing JSON — `{ room, action, skill_title?, label? }`.
+- **Worker side** (`src/lib/atlas-actions.ts` documents the contract): Atlas's chat replies may embed a fenced ```` ```action ```` block containing JSON — `{ room, action, skill_title?, label? }`.
 - **Frontend side**: `parseAtlasActions(text)` strips every fence from the prose (malformed blocks are silently dropped, the reply reads clean either way), validates `room` against `CANVAS_SECTION_KEYS`, and returns typed `AtlasChatAction`s. `AtlasChat` renders each as a button that **stashes the directive in `sessionStorage` under `atlas:handoff`** and navigates to `/workspace/<room>?from=atlas`. The room (`Workspace.tsx`) consumes the stash one-shot (read + remove — a refresh finds nothing and sends nothing), verifies `handoff.room === sectionKey`, and hands `WorkspaceThread` an `initialPrompt` + `initialThreadTitle: "Directive from Atlas"` that opens a **fresh thread** and auto-sends the delegation for the agent to acknowledge. `BriefingCard`'s directive CTA uses the identical stash-and-navigate path.
 
 `AtlasChat` (`src/components/atlas/AtlasChat.tsx`) is the same durable-run chat loop as `WorkspaceThread` — user message insert, `workspace_chat` run, poll until the reply lands — but with a single company-scoped thread titled "War Room" per company era (found on mount, created lazily on first send) and deliberately no auto-send machinery: Atlas speaks only when spoken to.
@@ -181,6 +194,7 @@ Loads the artifact from `skill_artifacts` scoped to the caller's `account_id`, t
 
 1. **Create** — `createShare` inserts an `artifact_shares` row with a `generateShareToken()` token; the share URL is `${origin}/share/${token}`. **Revoke** flips `revoked: true` (with a select-back verifying the update matched a row).
 2. **Public read** — `/share/:token` (`SharedArtifactPage.tsx`, outside auth and shell) calls the **`shared-artifact` edge function** (`supabase/functions/shared-artifact/`) with the token; the function resolves the non-revoked share server-side and returns `{ artifact, brand, sources }`. The response crosses a trust boundary, so `parseSources` validates each source's shape and drops anything malformed. The page renders the same `ArtifactDocument` with `publicFooter`.
+3. **Print / PDF** — both the internal and public pages wrap the document in `artifact-print-root` / `artifact-print-actions` classes and offer a Print/PDF button that just calls `window.print()`; the paper styling of `ArtifactDocument` is what makes the printout presentable.
 
 ---
 
@@ -218,3 +232,20 @@ const status = await getAgentRuntime(accountId).getRunStatus(runId);
 ```
 
 Implementations of this loop: `WorkspaceThread.pollRun`, `AtlasChat`'s poll, `useAtlasBriefing.pollBriefingRun` (which additionally flags `refreshStalled` when a run sits *pending* — never claimed — past ~15 polls), `WorkspaceActionsPanel`'s skill runs, and `useCompetitorResearch` (which derives state from the `agent_runs` row itself so in-flight runs survive reloads).
+
+---
+
+## Quick file index
+
+| Concern | Key files |
+|---|---|
+| Entry, recovery | `src/main.tsx`, `src/components/AppErrorBoundary.tsx` |
+| Routing, shell | `src/App.tsx`, `src/components/layout/AppShell.tsx`, `SidebarNav.tsx`, `TopBar.tsx`, `GlobalSearch.tsx` |
+| Canvas & analysis | `src/pages/Analysis.tsx`, `src/pages/Canvas.tsx`, `src/components/canvas/*`, `src/lib/canvas-version-bridge.ts`, `src/lib/active-analysis.ts` |
+| Competitors | `src/components/CompetitiveLandscape.tsx`, `src/hooks/useCompetitorResearch.ts`, `src/pages/CompetitorCanvas.tsx` |
+| Workspace rooms | `src/pages/Workspace.tsx`, `src/components/workspace/*` (thread, top bar, identity, section canvas, context sources, run queue, actions panel) |
+| Atlas / War Room | `src/pages/WarRoom.tsx`, `src/components/atlas/*` (dock, chat, briefing card, shelf, `useAtlasBriefing.ts`), `src/lib/atlas.ts`, `src/lib/atlas-actions.ts` |
+| Chat rendering | `src/components/chat/AgentMarkdown.tsx` |
+| Documents | `src/components/skills/ArtifactDocument.tsx`, `artifact-payloads.ts`, `PhaseGExhibits.tsx`, `GoalExhibitDispatch.tsx`, `src/pages/ArtifactPage.tsx`, `src/pages/SharedArtifactPage.tsx`, `src/lib/artifact-brand.ts` |
+| Company scoping | `src/lib/company-scope.ts` (mirror of `worker/src/db/company-scope.ts`) |
+| Runtime client | `src/lib/agent-runtime/index.ts`, `live-runtime.ts`, `config.ts`, `model-routing.ts` |
