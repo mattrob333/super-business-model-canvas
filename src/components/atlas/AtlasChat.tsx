@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Lightbulb, Loader2, Send } from "lucide-react";
+import { Lightbulb, Loader2, RefreshCw, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
@@ -218,6 +218,31 @@ export function AtlasChat({
     }
   }, [accountId, agentProfileId, awaitingReply, ensureThread, loadMessages, pollRun, sending, user]);
 
+  // Recovery for a message Atlas never answered (page left mid-run, engine
+  // restart, failed run): re-run the thread WITHOUT duplicating the user
+  // message — the chat job replays the whole thread anyway.
+  const retryReply = useCallback(async () => {
+    if (!threadId || sending || awaitingReply) return;
+    setChatError(null);
+    try {
+      const { runId } = await getAgentRuntime(accountId).startRun({
+        agentProfileId,
+        accountId,
+        runType: "workspace_chat",
+        triggerType: "manual",
+        triggeredBy: user?.id ?? null,
+        input: { thread_id: threadId },
+      });
+      setAwaitingReply(true);
+      pollRun(runId, threadId, 0);
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : "Runtime unreachable");
+    }
+  }, [accountId, agentProfileId, awaitingReply, pollRun, sending, threadId, user]);
+
+  const lastMessage = messages[messages.length - 1];
+  const unanswered = Boolean(lastMessage && lastMessage.role === "user" && !awaitingReply && !sending);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
@@ -236,11 +261,24 @@ export function AtlasChat({
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : messages.length === 0 && !awaitingReply ? (
-          <div className="space-y-2">
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Ask the strategist who reads all nine sections, your competitors, and the Gap
-              Register.
-            </p>
+          <div className="space-y-3">
+            {/* Atlas introduces itself — rendered, never written to the
+                thread, so the real conversation starts with the user. */}
+            <div className="flex items-start gap-2.5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/40">
+                <ATLAS.icon className="h-3.5 w-3.5" />
+              </span>
+              <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-2.5 text-sm leading-relaxed">
+                <p>
+                  I'm <strong>{ATLAS.name}</strong>, your chief strategist. I read your whole
+                  canvas, your competitors, and your Gap Register — and my job is to hand you
+                  the one move that matters most right now.
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Start with your briefing above, or ask me anything below.
+                </p>
+              </div>
+            </div>
             <div className="space-y-1.5">
               {ATLAS_PROMPTS.map((prompt) => (
                 <button
@@ -264,6 +302,15 @@ export function AtlasChat({
               <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Atlas is thinking. This can take a minute…
+              </div>
+            )}
+            {unanswered && (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                <span>Atlas never replied to this one.</span>
+                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => void retryReply()}>
+                  <RefreshCw className="h-3 w-3" />
+                  Ask again
+                </Button>
               </div>
             )}
             <div ref={bottomRef} />
