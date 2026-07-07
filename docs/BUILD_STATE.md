@@ -285,6 +285,53 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### GOAL PHASE 1 — all 27 catalog skills are now real (2026-07-07)
+
+Per docs/GOAL_FINISH_LINE.md (owner: "finish out this app… with a team of
+agents"). A 48-agent workflow built the final 14 skills (one builder per
+skill in isolated files, correctness + honesty reviewers each, fixers for
+every confirmed medium+ finding); I reviewed and integrated by hand.
+
+- **New skills live:** yield.monetization_gaps, yield.wtp_signals,
+  envoy.partner_outreach, envoy.ecosystem_watch, relay.watering_holes,
+  compass.message_market_fit, anchor.churn_signal_audit,
+  anchor.advocacy_engine_scan, tempo.operational_benchmark,
+  tempo.velocity_watch, vault.single_point_scan, vault.talent_radar,
+  ledger.cost_benchmark, ledger.efficiency_scan. Registry now carries all
+  20 module skills (plus 7 built-ins = 27/27 catalog keys implemented — no
+  more permanent "Coming" tiles).
+- **Team findings fixed before ship (8 clean, 6 fixed):** partner_outreach
+  (existing-partner candidates now excluded in code with honest empty
+  error); operational_benchmark, velocity_watch, cost_benchmark (same
+  class: dedupe-before-grounding let a fabricated duplicate row's narrative
+  ship in body_md — grounding now runs on every row); single_point_scan
+  (severity coercion); talent_radar (cacheKey now includes the competitor
+  set that defines the query).
+- **My integration finds:** (1) toolkit writeEvidence hardcoded
+  metadata.skill_key "yield.pricing_teardown" for EVERY skill's evidence
+  since Phase B — now tags the actual running skill; (2) a fixer wrote a
+  literal NUL byte into single-point-scan.ts as a map-key separator (file
+  read as binary) — replaced with the \\u0000 escape.
+- **Catalog migration** 20260707190000_goal_phase1_skills.sql flips
+  implemented for the 14 keys with honest consumes/produces descriptions.
+- Honest scope: exhibits for the 14 new payload shapes are Goal Phase 3
+  (documents render via markdown + sources meanwhile); partner_outreach's
+  "approvals queue" is the artifact itself (status
+  drafts_awaiting_owner_approval) — no send mechanism exists by design.
+
+**Gate results for the Phase 1 commit:**
+```
+cd worker && npx tsc --noEmit          -> exit 0
+cd worker && npx vitest run            -> 382 passed, 2 skipped
+cd worker && npm run build             -> exit 0
+cd worker && npx eslint src            -> exit 0
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### ATLAS ACTION BUTTONS + SECTION AGENTS LEARN THEIR SKILL KEYS (2026-07-07)
 
 Two owner reports in one slice:

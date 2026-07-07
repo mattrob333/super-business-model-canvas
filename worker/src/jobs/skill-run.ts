@@ -626,6 +626,9 @@ export class SkillRunHandler {
   }
 
   private async writeEvidence(job: AgentJob, input: { title: string; sourceUrl: string; excerpt: string }): Promise<string> {
+    // Tag evidence with the skill that actually gathered it — this method
+    // predates the registry and hardcoded the first skill's key for years.
+    const evidenceSkillKey = readString(asRecord(job.payload).skill_key ?? asRecord(job.payload).skillKey) ?? "skill_run";
     const { data: existing } = await this.deps.client
       .from("evidence_items")
       .select("id")
@@ -643,7 +646,7 @@ export class SkillRunHandler {
         source_type: "website",
         source_url: input.sourceUrl,
         excerpt: input.excerpt,
-        metadata: { skill_key: "yield.pricing_teardown" },
+        metadata: { skill_key: evidenceSkillKey },
         created_by_agent_run_id: job.agent_run_id,
       })
       .select("id")
