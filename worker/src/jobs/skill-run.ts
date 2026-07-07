@@ -9,6 +9,8 @@ import type { EvidenceCandidate, FeedRuntimeConfig } from "../feeds/types.js";
 import type { AgentJob } from "../queue/types.js";
 import { chooseModelRoute } from "./canvas-section-analysis.js";
 import { verifyClaimAgainstExcerpt } from "./company-research.js";
+import { SKILL_REGISTRY } from "./skills/index.js";
+import type { CanvasItemSource, ModelRoute, SkillArtifactWrite, SkillToolkit } from "./skills/toolkit.js";
 
 /**
  * Spec 10: the skill_run pipeline. One job kind, a registry of skill
@@ -18,42 +20,12 @@ import { verifyClaimAgainstExcerpt } from "./company-research.js";
  * loudly — the catalog's `implemented` flag is the UI's source of truth.
  */
 
-interface ModelRoute {
-  account_id?: string | null;
-  route_key?: string | null;
-  task_class?: string | null;
-  provider: string;
-  model_name: string;
-  params?: Record<string, unknown> | null;
-  cost_per_1k_in: number | null;
-  cost_per_1k_out: number | null;
-}
-
 interface CompetitorPricingSource {
   competitorId: string;
   name: string;
   pricingUrl: string;
   excerpt: string;
   evidenceId: string;
-}
-
-interface CanvasItemSource {
-  sectionKey: SectionKey;
-  text: string;
-  evidenceIds: string[];
-  competitorId?: string | null;
-  competitorName?: string | null;
-}
-
-interface SkillArtifactWrite {
-  skillKey: string;
-  /** Owning section agent — the artifact summary lands in this agent's context sources. */
-  agentKey: string;
-  title: string;
-  bodyMd: string;
-  payload: Record<string, unknown>;
-  evidenceIds: string[];
-  inputs: Record<string, unknown>;
 }
 
 export interface SkillRunDependencies extends FeedRuntimeConfig {
@@ -110,6 +82,14 @@ export class SkillRunHandler {
     }
     if (skillKey === "forge.proof_gap_scan") {
       await this.runProofGapScan(job, scope);
+      return;
+    }
+    // Phase G: standalone skill modules register in skills/index.ts and run
+    // against the toolkit — same helpers, same invariants, zero shared-file
+    // churn per new skill.
+    const registered = SKILL_REGISTRY.get(skillKey);
+    if (registered) {
+      await registered(this.toolkit(), job, scope);
       return;
     }
     throw new Error(`skill ${skillKey} is not implemented in the worker (catalog implemented flag must stay false)`);
@@ -700,6 +680,59 @@ export class SkillRunHandler {
       .single();
     if (error) throw new Error(`Failed to write skill evidence: ${error.message}`);
     return data.id;
+  }
+
+  /**
+   * Test seam + registry executor: run a standalone skill module with this
+   * handler's toolkit (same scope resolution as handle()).
+   */
+  async runSkillModule(skillRun: (toolkit: SkillToolkit, job: AgentJob, scope: CompanyScope) => Promise<void>, job: AgentJob): Promise<void> {
+    const scope = await loadCompanyScope(this.deps.client, job.account_id);
+    await skillRun(this.toolkit(), job, scope);
+  }
+
+  private async loadLatestArtifact(accountId: string, scope: CompanyScope, skillKey: string): Promise<{ title: string; body_md: string; payload: Record<string, unknown> } | null> {
+    const { data, error } = await this.deps.client
+      .from("skill_artifacts")
+      .select("title, body_md, payload")
+      .eq("account_id", accountId)
+      .eq("skill_key", skillKey)
+      .in("business_context_version_id", scope.contextIds)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`Failed to load latest ${skillKey} artifact: ${error.message}`);
+    return (data ?? null) as { title: string; body_md: string; payload: Record<string, unknown> } | null;
+  }
+
+  /** The toolkit hands registered skill modules the SAME private helpers the built-ins use. */
+  private toolkit(): SkillToolkit {
+    return {
+      client: this.deps.client,
+      loadOwnSectionItems: (accountId, sectionKey, scope) => this.loadOwnSectionItems(accountId, sectionKey, scope),
+      loadCompetitorSectionItems: (accountId, sectionKey, scope) => this.loadCompetitorSectionItems(accountId, sectionKey, scope),
+      loadCompetitors: (accountId, scope) => this.loadCompetitors(accountId, scope),
+      refreshFeed: (request) => this.feedRunner.refresh(request),
+      loadModelRoutes: (accountId, taskClasses) => this.loadModelRoutes(accountId, taskClasses),
+      loadLatestArtifact: (accountId, scope, skillKey) => this.loadLatestArtifact(accountId, scope, skillKey),
+      requiredRoute,
+      budgetForRoute,
+      runModel: (stepLabel, route, request) =>
+        runModelStep(stepLabel, () => this.runnerForRoute(route).run({
+          ...request,
+          model: route.model_name,
+          modelParams: route.params ?? undefined,
+        })),
+      verifyArtifactClaims: (job, verifyRoute, checks, label) => this.verifyArtifactClaims(job, verifyRoute, checks, label),
+      writeEvidence: (job, input) => this.writeEvidence(job, input),
+      writeSkillArtifact: (job, scope, artifact) => this.writeSkillArtifact(job, scope, artifact),
+      markRunCompleted: (job, summary, output) => this.markRunCompleted(job, summary, output),
+      parseJsonObject,
+      formatItems,
+      competitorExcerpt,
+      unique,
+      truncateText,
+    };
   }
 
   private async writeSkillArtifact(job: AgentJob, scope: CompanyScope, artifact: SkillArtifactWrite): Promise<void> {
