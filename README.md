@@ -3,7 +3,8 @@
 AI-powered strategy workspace built around a living Business Model Canvas. Enter a company URL, generate a full BMC and competitive landscape in about 60 seconds — then work the strategy with a team of ten AI agents: nine domain experts (one per BMC section) and **Atlas**, a chief-strategist orchestrator that reads all nine, runs playbook cascades, and keeps a ranked "what to do next" agenda.
 
 **Live site:** [superbmc.com](https://superbmc.com)  
-**Repository:** [github.com/mattrob333/super-business-model-canvas](https://github.com/mattrob333/super-business-model-canvas)
+**Repository:** [github.com/mattrob333/super-business-model-canvas](https://github.com/mattrob333/super-business-model-canvas)  
+**Codebase wiki:** [docs/wiki/Home.md](./docs/wiki/Home.md) — architecture, frontend, worker, skills, data model, operations
 
 ---
 
