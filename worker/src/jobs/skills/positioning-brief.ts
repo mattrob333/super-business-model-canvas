@@ -146,18 +146,21 @@ export function parsePositioningBriefArtifact(text: string, allowedClaims: strin
   if (!forSegment || !whoNeed || !category || !keyDifferentiator || !unlikeAlternative || !becauseProof) return null;
 
   // Pillars must be grounded in OUR claims verbatim — the model may not
-  // paraphrase the canvas into something it never said.
+  // paraphrase the canvas into something it never said. One ungrounded
+  // pillar rejects the whole parse: silently dropping it from the payload
+  // would still leave its narrative in body_md, shipping the invented claim
+  // to the owner under a label that implies grounding.
   const allowed = new Set(allowedClaims);
-  const pillars: PositioningPillar[] = Array.isArray(parsed.pillars)
-    ? parsed.pillars.flatMap((entry) => {
-        const row = asRecord(entry);
-        const pillar = readString(row.pillar);
-        const groundedIn = readString(row.grounded_in);
-        const segmentLanguage = readString(row.segment_language);
-        if (!pillar || !groundedIn || !segmentLanguage || !allowed.has(groundedIn)) return [];
-        return [{ pillar, grounded_in: groundedIn, segment_language: segmentLanguage }];
-      })
-    : [];
+  if (!Array.isArray(parsed.pillars)) return null;
+  const pillars: PositioningPillar[] = [];
+  for (const entry of parsed.pillars) {
+    const row = asRecord(entry);
+    const pillar = readString(row.pillar);
+    const groundedIn = readString(row.grounded_in);
+    const segmentLanguage = readString(row.segment_language);
+    if (!pillar || !groundedIn || !segmentLanguage || !allowed.has(groundedIn)) return null;
+    pillars.push({ pillar, grounded_in: groundedIn, segment_language: segmentLanguage });
+  }
   const bodyMd = readString(parsed.body_md);
   if (pillars.length === 0 || !bodyMd) return null;
   return {
