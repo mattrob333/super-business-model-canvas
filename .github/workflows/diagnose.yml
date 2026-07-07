@@ -31,3 +31,29 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           timeout 45 flyctl logs -a super-bmc-worker --no-tail || true
+      # Read-only queue state, executed ON the worker machine (the service
+      # key already lives there as an env var and never leaves it). Prints
+      # job/run statuses, attempts, and truncated errors — no key material.
+      - name: Job queue state (last 20 jobs + open runs)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          cat > /tmp/queue-state.js <<'EOF'
+          const url = process.env.SUPABASE_URL;
+          const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          async function q(path) {
+            const res = await fetch(url + "/rest/v1/" + path, { headers: { apikey: key, Authorization: "Bearer " + key } });
+            if (!res.ok) throw new Error(path + " -> " + res.status + " " + (await res.text()).slice(0, 200));
+            return res.json();
+          }
+          (async () => {
+            console.log("--- agent_jobs (newest 20) ---");
+            const jobs = await q("agent_jobs?select=id,kind,status,attempts,max_attempts,run_after,locked_at,heartbeat_at,claimed_by,last_error,created_at&order=created_at.desc&limit=20");
+            for (const j of jobs) console.log(JSON.stringify({ ...j, last_error: (j.last_error || "").slice(0, 240) }));
+            console.log("--- agent_runs still pending/running (newest 20) ---");
+            const runs = await q("agent_runs?select=id,run_type,status,error,created_at,started_at&status=in.(pending,running)&order=created_at.desc&limit=20");
+            for (const r of runs) console.log(JSON.stringify({ ...r, error: (r.error || "").slice(0, 240) }));
+          })().catch((e) => { console.error(String(e)); process.exit(1); });
+          EOF
+          B64=$(base64 -w0 /tmp/queue-state.js)
+          flyctl ssh console -a super-bmc-worker -C "node -e \"eval(Buffer.from('$B64','base64').toString())\"" || true
