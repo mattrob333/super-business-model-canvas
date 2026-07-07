@@ -96,6 +96,25 @@ describe("envoy.supply_chain_map", () => {
       .toMatchObject({ status: "completed", output: { skill_key: "envoy.supply_chain_map", candidates: 2, spot_check_confirmed: 2 } });
   });
 
+  it("scopes the feed cache key to the analyzed company so a re-analyzed account never reuses stale excerpts", async () => {
+    const client = new SkillFakeClient();
+    seedInputs(client);
+    const runner = new ScriptedSkillRunner(mapOutput(), JSON.stringify({ status: "confirmed", reason: "supported" }));
+    const seen: string[] = [];
+    const inner = feedFixtures() as { refresh(request: { cacheKey?: string; feedKey: string }): Promise<unknown> };
+    const spyingFeedRunner = {
+      async refresh(request: { cacheKey?: string; feedKey: string }) {
+        seen.push(request.cacheKey ?? "");
+        return inner.refresh(request);
+      },
+    } as never;
+    const handler = new SkillRunHandler({ client: client.asSupabase(), runner, feedRunner: spyingFeedRunner });
+    await handler.runSkillModule(runSupplyChainMap, makeSkillJob("envoy.supply_chain_map"));
+    // Without the company slug, switching companies within the feed TTL would
+    // serve the previous company's cached supply-chain excerpts.
+    expect(seen).toEqual(["supply_chain_map:account-1:acme-robotics"]);
+  });
+
   it("never lets the previous company's key partners reach the prompt", async () => {
     const client = new SkillFakeClient();
     seedInputs(client);

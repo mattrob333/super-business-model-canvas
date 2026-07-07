@@ -285,6 +285,56 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### PHASE G — six skills built by an orchestrated agent team, reviewed and shipped (2026-07-07)
+
+Owner directive: "plan the next build phase with a team of subagents … you
+orchestrate the team and review their work." Ran a 22-agent workflow: 6
+builders (one skill each, isolated files, shared toolkit/harness prepped in
+advance), 12 adversarial reviewers (correctness + honesty per skill), fixers
+for every confirmed medium/high finding. I then reviewed the modules myself
+and did the integration by hand.
+
+- **New skills live (one per room):** vault.moat_audit, forge.positioning_brief,
+  ledger.unit_economics_frame, envoy.supply_chain_map, anchor.lifecycle_map,
+  tempo.build_vs_buy — each a standalone module in worker/src/jobs/skills/
+  using the SkillToolkit, registered in SKILL_REGISTRY, with its own test
+  file run through SkillRunHandler.runSkillModule and the shared harness
+  (cross-company trap fixtures included in every suite).
+- **Review findings fixed before ship (the team's + mine):**
+  - supply_chain_map's grok feed cacheKey lacked a company component — a
+    24h-TTL cache would have served the previous company's excerpts after a
+    company switch (the exact cross-pollination class Matt keeps catching).
+    Now `supply_chain_map:${account}:${slug(company)}`.
+  - positioning_brief silently dropped ungrounded pillars, letting body_md
+    diverge from payload; any ungrounded pillar now rejects the whole parse.
+  - lifecycle_map could ship gap=true with zero surviving competitor motions;
+    gap now requires at least one verified motion.
+  - build_vs_buy was dead code (not registered); registry now carries all six.
+  - Old "rejects unimplemented skills" test used vault.moat_audit as its
+    unknown key — switched to a genuinely unknown key.
+- **Catalog migration** 20260707170000_phase_g_skills.sql flips implemented
+  for the six keys with honest consumes/produces descriptions (same contract
+  as Phases B/F: base upsert never flips implemented).
+- Honest scope: skills with no external excerpts declare parser-level
+  verification (e.g. "parser_grounded_pillars") instead of faking a verifier
+  pass; supply_chain_map and build_vs_buy spot-check ≤4 claims against real
+  excerpts. Owner UX items from the live bug report (thread re-select,
+  clickable run rows, Run double-fire guard) are the next slice, then the
+  run_skill chat tool.
+
+**Gate results for the Phase G commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                         -> green
+npm run lint                          -> 64 problems, within frozen <=65 ceiling
+cd worker && npx tsc --noEmit         -> exit 0
+cd worker && npx vitest run           -> 172 passed, 2 skipped
+cd worker && npm run build            -> exit 0
+cd worker && npx eslint src           -> exit 0
+UTF-8 touched-file decode             -> encoding clean, exit 0
+```
+
 ### HOTFIX — worker fleet was down: crash-looping job loop + no restart policy (2026-07-07)
 
 Owner report: skill runs and chats stuck "pending", no artifact, agent showed

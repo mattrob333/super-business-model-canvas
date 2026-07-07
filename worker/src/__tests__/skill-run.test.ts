@@ -132,7 +132,7 @@ describe("SkillRunHandler", () => {
 
   it("rejects unimplemented skills loudly", async () => {
     const client = new FakeClient();
-    await expect(makeHandler(client).handle(makeJob({ payload: { skill_key: "vault.moat_audit" } })))
+    await expect(makeHandler(client).handle(makeJob({ payload: { skill_key: "nowhere.not_a_real_skill" } })))
       .rejects.toThrow(/not implemented/);
   });
 

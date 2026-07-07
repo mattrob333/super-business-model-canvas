@@ -153,7 +153,12 @@ export function parseLifecycleMapArtifact(text: string, competitorNames: string[
               return [{ competitor, motion }];
             })
           : [];
-        return [{ stage: stage as LifecycleStage, your_motion: yourMotion, competitor_motions: motions, gap: row.gap, recommendation }];
+        // gap=true is only meaningful when at least one verifiable competitor
+        // motion survives — a gap whose entire backing was dropped as
+        // fabricated (or never provided) would ship an unverifiable claim
+        // into the title and stage_gaps count, so it is forced to false.
+        const gap = row.gap && motions.length > 0;
+        return [{ stage: stage as LifecycleStage, your_motion: yourMotion, competitor_motions: motions, gap, recommendation }];
       })
     : [];
   const bodyMd = readString(parsed.body_md);

@@ -47,7 +47,10 @@ export const runSupplyChainMap: SkillRun = async (toolkit, job, scope) => {
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
     feedKey: "grok_live_search",
-    cacheKey: `supply_chain_map:${job.account_id}`,
+    // Company-scoped: without the company slug, re-analyzing to a different
+    // company within the feed TTL would serve the previous company's cached
+    // excerpts (cross-company contamination).
+    cacheKey: `supply_chain_map:${job.account_id}:${slug(companyName)}`,
     companyName,
     query: `${companyName} industry supply chain upstream suppliers downstream distribution channel partners ecosystem`,
   });
@@ -192,6 +195,11 @@ function boundedScore(value: unknown): number {
   const score = Number(value);
   if (!Number.isFinite(score)) return 1;
   return Math.min(5, Math.max(1, Math.round(score)));
+}
+
+// Mirror of skill-run.ts's slug — feed cache keys must be stable per company.
+function slug(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "company";
 }
 
 function readString(value: unknown): string | undefined {
