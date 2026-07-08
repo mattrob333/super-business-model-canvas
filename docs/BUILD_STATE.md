@@ -438,6 +438,70 @@ and for the xAI leg to actually be migrated — both done below.
   it still only looks up `grok_live_search`. This branch's worker code has
   NOT been deployed yet — safe to deploy whenever, the migration already
   covers it.
+### SEARCH PROVIDER RESILIENCE — Exa + Firecrawl replace dead xAI Live Search (2026-07-08, PR #120 — SUPERSEDED)
+
+> Landed on main independently while the fuller branch above was in review;
+> the branch supersedes it (adds the `web_search` rename, the xAI Agent
+> Tools leg with x_search, and per-task recency filters) — kept for history.
+
+Root cause confirmed via the new `[grok_live_search]` logging (owner
+re-ran supply_chain_map after the previous fix deployed): xAI retired Live
+Search on 2026-01-12 — every call returned `HTTP 410 "Live search is
+deprecated. Please switch to the Agent Tools API"`. No model override could
+have fixed this; the API itself is gone. Owner asked what the most
+resilient search tool would be and added an `EXA_API_KEY` Fly secret.
+
+- `worker/src/feeds/fetchers.ts`: the single xAI-only fetcher is replaced
+  with a **provider chain** — Exa Search (semantic search, full page text,
+  built for evidence-with-citations) tried first, Firecrawl Search (its
+  scrape key already existed on the worker) as automatic fallback. The
+  feedKey stays `"grok_live_search"` on purpose — ~15 skill modules and the
+  `run_skill` chat tool reference it by that literal string, and it is now
+  just a cache/lookup key, not an instruction to call Grok. Each provider
+  attempt logs its outcome (`[web_search] ok provider=... hits=...` /
+  `[web_search] <provider> failed: ...`); a provider returning HTTP-ok with
+  zero usable url/text is treated as a miss and the chain tries the next
+  provider — closes the same silent-empty-success bug fixed for Grok
+  earlier today, now enforced per-provider. Only degrades (with every
+  provider's failure reason) if all configured providers fail or none are
+  configured. xAI's replacement Agent Tools API is a candidate future leg,
+  not built — Live Search's HTTP 410 killed the old integration outright,
+  there was nothing to migrate in place.
+- `exaApiKey` plumbed through the same 4 sites as the earlier `xaiModel`
+  fix: env.ts → index.ts → FeedRuntimeConfig (all FeedRunner construction
+  sites inherit structurally) and ToolContext → bmc-tools/workspace-
+  chat/canvas-section-analysis, so chat-triggered searches get the same
+  fallback.
+- Considered and rejected Exa's Agent API (async job + polling, built for
+  open-ended multi-hop list-building, `effort: "auto"` has no fixed price)
+  — wrong shape for a single evidence-gathering call inside a job the
+  queue already retries, and cost is unbounded per-call. The plain Exa
+  Search API (`POST /search`, synchronous, ~$7/1,000 calls) is what's
+  wired in.
+- Tests rewritten for the new chain: Exa-first when both configured,
+  Firecrawl-only fallback, Exa-empty-results falls through to Firecrawl,
+  all-providers-fail degrades with combined reasons, no-provider-configured
+  degrades with a clear message. New fixtures `exa-search.json` /
+  `firecrawl-search.json`; the dead `grok-live-search.json` fixture removed.
+
+**Gate results for this commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+cd worker && npx tsc --noEmit          -> exit 0
+cd worker && npx vitest run            -> 385 passed, 2 skipped
+cd worker && npm run build             -> green
+cd worker && npx eslint src            -> exit 0
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
+HONEST SCOPE: Exa/Firecrawl responses are exercised against hand-written
+fixtures matching each API's documented schema — not yet exercised against
+the live APIs from this session (the keys live in Fly secrets). Next
+supply_chain_map re-run (or any search-backed skill) is the live
+confirmation; the `[web_search]` logs will show which provider answered.
 
 ### OWNER ROUND — Grok feed diagnosis, dashboard company leak, company switcher, on-demand State of the Union (2026-07-08)
 

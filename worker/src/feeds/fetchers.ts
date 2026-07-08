@@ -209,8 +209,14 @@ async function runFirecrawlSearch(config: FeedRuntimeConfig, fetcher: FetchLike,
     return { provider: "firecrawl_search", outcome: "failed", reason: `HTTP ${response.status}${body ? ` — ${body.slice(0, 160)}` : ""}` };
   }
   const payload = await response.json() as Record<string, unknown>;
-  const data = payload.data as Record<string, unknown> | undefined;
-  const web = Array.isArray(data?.web) ? data.web as Record<string, unknown>[] : [];
+  // Firecrawl has shipped both shapes: v2 docs show {data: {web: [...]}},
+  // earlier responses were a flat {data: [...]}. Accept either.
+  const data = payload.data;
+  const web = Array.isArray(data)
+    ? data as Record<string, unknown>[]
+    : Array.isArray((data as Record<string, unknown> | undefined)?.web)
+      ? (data as Record<string, unknown>).web as Record<string, unknown>[]
+      : [];
   const evidence = web
     .map((item, index): EvidenceCandidate | null => {
       const url = readString(item.url);
