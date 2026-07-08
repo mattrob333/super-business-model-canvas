@@ -16,11 +16,16 @@ export function useAccountId() {
   const { user, loading: authLoading } = useAuth();
   const [accountId, setAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Key the lookup on the user id, never the user object: auth token
+  // refreshes may deliver a new object for the same user, and re-entering the
+  // loading state here unmounted whole pages mid-session (owner finding
+  // 2026-07-08).
+  const userId = user?.id ?? null;
 
   useEffect(() => {
     if (authLoading) return;
 
-    if (!user) {
+    if (!userId) {
       setAccountId(null);
       setLoading(false);
       return;
@@ -34,7 +39,7 @@ export function useAccountId() {
         const { data, error } = await supabase
           .from("account_members")
           .select("account_id")
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .order("created_at", { ascending: true })
           .limit(1)
           .maybeSingle();
@@ -59,7 +64,7 @@ export function useAccountId() {
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading]);
+  }, [userId, authLoading]);
 
   return { accountId, loading: authLoading || loading };
 }

@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { ExternalLink, MessageCircle, Building2, Loader2, Radar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
