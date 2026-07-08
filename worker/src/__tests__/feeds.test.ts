@@ -57,8 +57,46 @@ describe("feed fetchers", () => {
     const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
     const requestInit = fetchMock.mock.calls[0]?.[1];
     expect(JSON.parse(String(requestInit?.body))).toMatchObject({
+      model: "grok-4-fast",
       search_parameters: { mode: "on", return_citations: true },
     });
+  });
+
+  it("sends the configured XAI_MODEL override to Grok", async () => {
+    const fetch = fixtureFetch("grok-live-search.json");
+    const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", xaiModel: "grok-next", fetch });
+
+    await fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" });
+
+    const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ model: "grok-next" });
+  });
+
+  it("degrades Grok responses that carry no content and no citations instead of reporting ok", async () => {
+    const fetch = vi.fn(async () => new Response(
+      JSON.stringify({ choices: [{ message: { role: "assistant", content: "" } }] }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    ));
+    const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", fetch });
+
+    await expect(fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" }))
+      .resolves.toMatchObject({
+        health: "degraded",
+        error: expect.stringContaining("no content and no citations"),
+      });
+  });
+
+  it("surfaces the Grok error body when the API rejects the request", async () => {
+    const fetch = vi.fn(async () => new Response(
+      JSON.stringify({ error: "The model grok-4-fast does not exist" }),
+      { status: 404 },
+    ));
+    const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", fetch });
+
+    const result = await fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" });
+    expect(result).toMatchObject({ health: "degraded" });
+    expect(result?.error).toContain("HTTP 404");
+    expect(result?.error).toContain("does not exist");
   });
 
   it("normalizes FRED fixtures into API evidence and metrics", async () => {

@@ -15,6 +15,7 @@ export interface ToolContext {
   /** When true (workspace chat, section agents only) the agent may enqueue its own room's implemented skills. */
   allowSkillRuns?: boolean;
   xaiApiKey?: string;
+  xaiModel?: string;
   firecrawlApiKey?: string;
   fredApiKey?: string;
   googleTrendsApiKey?: string;
@@ -390,6 +391,7 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
 function feedConfigFromContext(ctx: ToolContext): FeedRuntimeConfig {
   return {
     xaiApiKey: ctx.xaiApiKey,
+    xaiModel: ctx.xaiModel,
     firecrawlApiKey: ctx.firecrawlApiKey,
     fredApiKey: ctx.fredApiKey,
     googleTrendsApiKey: ctx.googleTrendsApiKey,

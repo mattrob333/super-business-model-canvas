@@ -35,6 +35,7 @@ export interface CanvasSectionAnalysisDependencies {
   client: SupabaseClient;
   runner?: AgentRunner;
   xaiApiKey?: string;
+  xaiModel?: string;
   firecrawlApiKey?: string;
   fredApiKey?: string;
   googleTrendsApiKey?: string;
@@ -77,6 +78,7 @@ export class CanvasSectionAnalysisHandler {
       agentProfileId: profile.id,
       proposalMode: true,
       xaiApiKey: this.deps.xaiApiKey,
+      xaiModel: this.deps.xaiModel,
       firecrawlApiKey: this.deps.firecrawlApiKey,
       fredApiKey: this.deps.fredApiKey,
       googleTrendsApiKey: this.deps.googleTrendsApiKey,

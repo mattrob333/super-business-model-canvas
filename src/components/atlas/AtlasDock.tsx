@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Maximize2, RefreshCw, X } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ChevronDown, ChevronRight, Maximize2, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ATLAS } from "@/lib/atlas";
@@ -17,6 +18,9 @@ import { safeGet, safeSet, useAtlasBriefing } from "@/components/atlas/useAtlasB
  */
 
 const DOCK_OPEN_KEY = "atlas:dock-open";
+// Dock-only, per-account: whether the State of the Union card is expanded.
+// The War Room always shows the full card — this key never applies there.
+const briefingOpenKey = (accountId: string) => `atlas:briefing-open:${accountId}`;
 
 export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const navigate = useNavigate();
@@ -70,10 +74,39 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
     if (next) setEverOpened(true);
   }, []);
 
-  // Reading the briefing clears the pulse — seen is per-briefing, not per-visit.
+  // The briefing card starts COLLAPSED in the dock (owner 2026-07-08: "the
+  // state of the union needs to go away at some point... something you can
+  // run when you need an overall update"). The slim bar expands on click and
+  // the preference persists per account. Two states override the preference
+  // by design, without persisting: no briefing yet (the first-run welcome /
+  // auto-briefing flow must stay visible) and an unseen briefing (it
+  // announces itself expanded; collapsing it again is a click away).
+  const [briefingOpen, setBriefingOpen] = useState(false);
   useEffect(() => {
-    if (open && briefing) markSeen();
-  }, [open, briefing, markSeen]);
+    if (!accountId) return;
+    setBriefingOpen(safeGet(briefingOpenKey(accountId)) === "true");
+  }, [accountId]);
+  useEffect(() => {
+    // Also covers the briefing-error card — a hidden failure helps nobody.
+    if (!briefingLoading && !briefing) setBriefingOpen(true);
+  }, [briefingLoading, briefing]);
+  useEffect(() => {
+    if (hasUnseen) setBriefingOpen(true);
+  }, [hasUnseen]);
+  const setBriefingOpenPersist = useCallback(
+    (next: boolean) => {
+      setBriefingOpen(next);
+      if (accountId) safeSet(briefingOpenKey(accountId), String(next));
+    },
+    [accountId],
+  );
+
+  // Reading the briefing clears the pulse — seen is per-briefing, not
+  // per-visit, and "read" now means the card itself is expanded in the open
+  // dock, not merely that the dock is open with the briefing collapsed.
+  useEffect(() => {
+    if (open && briefingOpen && briefing) markSeen();
+  }, [open, briefingOpen, briefing, markSeen]);
 
   // Move focus with the dock: into the aside on expand, back to the edge tab
   // on collapse. Skips the initial render so page load never steals focus.
@@ -112,6 +145,25 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
   if (!accountId) return null;
 
   const AtlasIcon = ATLAS.icon;
+
+  // One slot, two mounts (chat header on desktop flow, plain scroll fallback)
+  // — both viewports get the same collapsible briefing.
+  const briefingSlot = (
+    <CollapsibleBriefing
+      expanded={briefingOpen}
+      onToggle={() => setBriefingOpenPersist(!briefingOpen)}
+      hasUnseen={hasUnseen}
+      loading={briefingLoading}
+      error={briefingError}
+      refreshing={refreshing}
+      refreshError={refreshError}
+      refreshStalled={refreshStalled}
+      briefing={briefing}
+      skillTitle={skillTitle}
+      canRequest={Boolean(profileId)}
+      onRequest={() => void requestBriefing()}
+    />
+  );
 
   return (
     <>
@@ -227,39 +279,91 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
             </p>
           </div>
         ) : everOpened && profileId ? (
-          <AtlasChat
-            accountId={accountId}
-            agentProfileId={profileId}
-            briefingSlot={
-              <BriefingCard
-                loading={briefingLoading}
-                error={briefingError}
-                refreshing={refreshing}
-                refreshError={refreshError}
-                refreshStalled={refreshStalled}
-                briefing={briefing}
-                skillTitle={skillTitle}
-                canRequest={Boolean(profileId)}
-                onRequest={() => void requestBriefing()}
-              />
-            }
-          />
+          <AtlasChat accountId={accountId} agentProfileId={profileId} briefingSlot={briefingSlot} />
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
-            <BriefingCard
-              loading={briefingLoading}
-              error={briefingError}
-              refreshing={refreshing}
-              refreshError={refreshError}
-                refreshStalled={refreshStalled}
-              briefing={briefing}
-              skillTitle={skillTitle}
-              canRequest={Boolean(profileId)}
-              onRequest={() => void requestBriefing()}
-            />
-          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">{briefingSlot}</div>
         )}
       </aside>
     </>
+  );
+}
+
+/**
+ * Dock-only chrome around the shared BriefingCard: collapsed it is a slim bar
+ * (Atlas icon, title, relative age, unseen pulse, chevron) with a Refresh
+ * button — the "run when you need an overall update" action; expanded it
+ * renders the untouched card inline below the same bar. The War Room keeps
+ * using BriefingCard directly, always in full.
+ */
+function CollapsibleBriefing({
+  expanded,
+  onToggle,
+  hasUnseen,
+  ...card
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  hasUnseen: boolean;
+} & ComponentProps<typeof BriefingCard>) {
+  const AtlasIcon = ATLAS.icon;
+  // Same timestamp rule as the card itself: trust payload.generated_at only
+  // when it parses; the run row's created_at is the fallback.
+  const generatedAt = card.briefing
+    ? !Number.isNaN(Date.parse(card.briefing.payload.generated_at))
+      ? card.briefing.payload.generated_at
+      : card.briefing.createdAt
+    : null;
+
+  return (
+    <div className="shrink-0">
+      <div className="flex items-center gap-1 rounded-lg border border-border bg-card pr-1 shadow-sm">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Collapse" : "Expand"} the State of the Union briefing`}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-2.5 pl-3 pr-1 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <AtlasIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            State of the Union
+          </span>
+          {/* Expanded, the card right below shows the same timestamp. */}
+          {!expanded && generatedAt && (
+            <span className="min-w-0 truncate text-[10px] text-muted-foreground">
+              {formatDistanceToNow(new Date(generatedAt), { addSuffix: true })}
+            </span>
+          )}
+          {hasUnseen && (
+            <span
+              className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+              aria-label="New briefing available"
+            />
+          )}
+          <ChevronDown
+            className={cn(
+              "ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
+              expanded && "rotate-180",
+            )}
+          />
+        </button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={card.onRequest}
+          disabled={card.refreshing || !card.canRequest}
+          aria-label="Refresh briefing"
+          title="Refresh briefing"
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5", card.refreshing && "animate-spin")} />
+        </Button>
+      </div>
+      {expanded && (
+        <div className="mt-2">
+          <BriefingCard {...card} />
+        </div>
+      )}
+    </div>
   );
 }

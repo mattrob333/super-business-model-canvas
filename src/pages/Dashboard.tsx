@@ -121,7 +121,20 @@ const Dashboard = () => {
         .eq("account_id", accountId)
         .in("status", ["open", "acknowledged", "in_progress"]);
       if (scope) gapsQuery = gapsQuery.in("business_context_version_id", scope.contextIds);
-      const [gapsRes, evidenceRes, contextRes, runsRes, loopsRes, reportsRes, threatRes] =
+      // metric_snapshots carries no company column, so Competitor Watch is
+      // scoped through the competitor entities themselves: only companies rows
+      // stamped with the active company's context chain may surface threat
+      // cards (owner bug 2026-07-08: the Salesforce workspace showed threat
+      // cards from previously analyzed companies' competitors).
+      const scopedCompetitorsQuery = scope
+        ? supabase
+            .from("companies")
+            .select("id")
+            .eq("account_id", accountId)
+            .eq("is_competitor", true)
+            .in("business_context_version_id", scope.contextIds)
+        : Promise.resolve({ data: null, error: null });
+      const [gapsRes, evidenceRes, contextRes, runsRes, loopsRes, reportsRes, threatRes, scopedCompetitorsRes] =
         await Promise.all([
           gapsQuery,
           supabase
@@ -166,6 +179,7 @@ const Dashboard = () => {
             // Window sized so one frequently re-scored competitor cannot evict
             // the others before the latest-per-competitor dedupe below (RF-4-8).
             .limit(100),
+          scopedCompetitorsQuery,
         ]);
 
       // Each section degrades independently — a failed query shows its empty state
@@ -193,6 +207,14 @@ const Dashboard = () => {
           ? []
           : ((reportsRes.data ?? []) as unknown as DashboardReport[]),
       );
+      // Null only when scope resolution failed (scoping then degrades open,
+      // like the gaps query above); with a scope, a failed/empty entity query
+      // yields an empty set and no cross-company card can leak through.
+      const scopedCompetitorIds = scope
+        ? new Set(
+            (scopedCompetitorsRes.error ? [] : scopedCompetitorsRes.data ?? []).map((row) => row.id),
+          )
+        : null;
       const seenCompetitors = new Set<string>();
       setCompetitorThreats(
         threatRes.error
@@ -201,6 +223,7 @@ const Dashboard = () => {
               const inputs = (row.inputs ?? {}) as Record<string, unknown>;
               const competitorId = typeof inputs.competitor_id === "string" ? inputs.competitor_id : "";
               if (!competitorId || seenCompetitors.has(competitorId)) return [];
+              if (scopedCompetitorIds && !scopedCompetitorIds.has(competitorId)) return [];
               seenCompetitors.add(competitorId);
               return [{
                 competitorId,
