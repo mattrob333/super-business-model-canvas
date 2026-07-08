@@ -54,6 +54,7 @@ export default function WarRoom() {
       skillTitle={skillTitle}
       canRequest={Boolean(profileId)}
       onRequest={() => void requestBriefing()}
+      hideWarRoomCta
     />
   );
 

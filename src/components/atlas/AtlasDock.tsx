@@ -130,7 +130,11 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
           // Below lg Atlas is a FULL-SCREEN chat (owner directive 2026-07-06:
           // "full screen chat or not open" — a 94vw sliver clipped content and
           // left a useless strip of canvas). Desktop keeps the side-dock width.
-          "fixed inset-y-0 right-0 z-40 flex w-full lg:w-[clamp(440px,26vw,600px)] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
+          // h-dvh (inset-y-0 kept as the no-dvh fallback) tracks the mobile
+          // browser chrome so the composer at the flex bottom stays visible;
+          // max-w + overflow-x-hidden stop any child from pushing past the
+          // screen edge. Desktop metrics are unchanged (100dvh === 100vh).
+          "fixed inset-y-0 right-0 z-40 flex h-dvh w-full max-w-[100vw] flex-col overflow-x-hidden border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:w-[clamp(440px,26vw,600px)]",
           open ? "translate-x-0" : "invisible translate-x-full",
         )}
         aria-hidden={!open}

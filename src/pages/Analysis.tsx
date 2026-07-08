@@ -24,6 +24,7 @@ import {
 } from "@/lib/active-analysis";
 import { bridgeAnalysisToCanvasVersions } from "@/lib/canvas-version-bridge";
 import { companyKeyOf, invalidateCompanyScope, loadCompanyScope } from "@/lib/company-scope";
+import { getAgentRuntime } from "@/lib/agent-runtime";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Save, Search, ChevronUp, ArrowRight, Loader2, Sparkles } from "lucide-react";
@@ -55,6 +56,10 @@ const AUTO_RESEARCH_TOP_N = 3;
 
 function autoResearchStorageKey(analysisId: string): string {
   return `sbmc:auto-competitor-research:${analysisId}`;
+}
+
+function autoBriefingStorageKey(analysisId: string): string {
+  return `sbmc:auto-briefing:${analysisId}`;
 }
 
 function domainLabelFromUrl(url: string): string {
@@ -159,6 +164,61 @@ const Analysis = () => {
       }
     })();
   }, [accountId, similarCompanies, competitorStateFor, startCompetitorResearch, toast]);
+
+  // Synchronous half of the once-per-analysis auto-briefing guard (same
+  // shape as autoResearchRef above).
+  const autoBriefingRef = useRef(false);
+
+  /**
+   * Auto-first-briefing: the moment a fresh analysis is saved and bridged,
+   * enqueue ONE atlas_briefing run so the State of the Union is already
+   * waiting when the user first opens the dock or the War Room. Mirrors
+   * useAtlasBriefing.requestBriefing's enqueue (orchestrator profile resolved
+   * with the same account-over-template precedence, then
+   * startRun({ runType: "atlas_briefing", triggerType: "manual" })) — done
+   * directly here because this page doesn't mount that hook. One-shot per
+   * saved analysis id; silent failure (the research toast already fired, and
+   * the dock's "Get your first briefing" button remains the fallback).
+   */
+  const maybeAutoRequestFirstBriefing = useCallback((analysisId: string | null) => {
+    if (!analysisId || !accountId || autoBriefingRef.current) return;
+    const storageKey = autoBriefingStorageKey(analysisId);
+    try {
+      if (localStorage.getItem(storageKey)) return;
+    } catch {
+      return; // storage unavailable — skip rather than risk repeat enqueues
+    }
+    autoBriefingRef.current = true;
+    try {
+      localStorage.setItem(storageKey, new Date().toISOString());
+    } catch {
+      // The in-memory ref still prevents a same-session repeat.
+    }
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("agent_profiles")
+          .select("id")
+          .eq("agent_key", "orchestrator")
+          .or(`account_id.eq.${accountId},account_id.is.null`)
+          .order("account_id", { ascending: false, nullsFirst: false })
+          .limit(1);
+        if (error || !data?.[0]) {
+          throw new Error(error?.message ?? "No Atlas profile found. Run the seed migration.");
+        }
+        await getAgentRuntime(accountId).startRun({
+          agentProfileId: data[0].id,
+          accountId,
+          runType: "atlas_briefing",
+          triggerType: "manual",
+          triggeredBy: user?.id ?? null,
+          input: {},
+        });
+      } catch (briefingError) {
+        console.warn("Auto first briefing failed:", briefingError);
+      }
+    })();
+  }, [accountId, user]);
 
   const saveAnalysisRecord = useCallback(async (
     nextAnalysisData: Record<string, unknown>,
@@ -449,15 +509,17 @@ const Analysis = () => {
           });
           persistActiveAnalysis(analysisData, savedId);
           // Fresh analysis is saved and bridged — kick off the top-3
-          // competitor auto-chain (one-shot per saved analysis id).
+          // competitor auto-chain and Atlas's first briefing (each a
+          // one-shot per saved analysis id).
           maybeAutoResearchTopCompetitors(savedId);
+          maybeAutoRequestFirstBriefing(savedId);
         } catch (error) {
           console.error('Initial auto-save error:', error);
         }
       };
       autoSave();
     }
-  }, [hasAnalyzed, analysisData, user, isNewAnalysis, saveAnalysisRecord, maybeAutoResearchTopCompetitors]);
+  }, [hasAnalyzed, analysisData, user, isNewAnalysis, saveAnalysisRecord, maybeAutoResearchTopCompetitors, maybeAutoRequestFirstBriefing]);
 
   const handleBMCSectionUpdate = (sectionKey: CanvasSectionKey, updatedData: { items: string[]; notes: string }) => {
     const legacyKeyMap: Record<CanvasSectionKey, string> = {
