@@ -179,19 +179,19 @@ export const CompetitiveLandscape = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-3 w-full gap-1.5"
+                  className="mt-3 w-full min-w-0 gap-1.5 overflow-hidden"
                   disabled={!ready || research.status === "starting" || research.status === "queued"}
                   onClick={() => startResearch(competitor)}
                 >
                   {research.status === "starting" ? (
                     <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Starting research…
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                      <span className="truncate">Starting research…</span>
                     </>
                   ) : research.status === "queued" ? (
                     <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Researching — takes a few minutes
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                      <span className="truncate">Researching — a few minutes</span>
                     </>
                   ) : research.status === "error" ? (
                     <>
