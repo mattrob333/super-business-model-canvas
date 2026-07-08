@@ -45,6 +45,7 @@ export interface FeedFetcher {
 export interface FeedRuntimeConfig {
   firecrawlApiKey?: string;
   xaiApiKey?: string;
+  xaiModel?: string;
   fredApiKey?: string;
   googleTrendsApiKey?: string;
   githubToken?: string;

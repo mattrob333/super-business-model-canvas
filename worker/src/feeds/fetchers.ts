@@ -67,6 +67,14 @@ function firecrawlScrapeFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): 
   };
 }
 
+/**
+ * Overridable via the XAI_MODEL Fly secret so a retired/renamed model id can
+ * be flipped without a code deploy. Live incident 2026-07-08: skills failed
+ * with "could not retrieve industry evidence" and the diagnose logs contained
+ * ZERO grok lines — this fetcher failed silently. It now logs every outcome.
+ */
+const DEFAULT_GROK_MODEL = "grok-4-fast";
+
 function grokLiveSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): FeedFetcher {
   return {
     feedKey: "grok_live_search",
@@ -75,6 +83,7 @@ function grokLiveSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): F
       const query = input.query ?? readString(input.config.query) ?? input.companyName;
       if (!query) return degraded("grok_live_search", "No query configured for Grok live search");
 
+      const model = config.xaiModel ?? DEFAULT_GROK_MODEL;
       const response = await fetcher("https://api.x.ai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -82,7 +91,7 @@ function grokLiveSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): F
           authorization: `Bearer ${config.xaiApiKey}`,
         },
         body: JSON.stringify({
-          model: "grok-4.3",
+          model,
           messages: [
             { role: "system", content: "Search the live web and return concise sourced snippets." },
             { role: "user", content: query },
@@ -91,10 +100,23 @@ function grokLiveSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): F
           stream: false,
         }),
       });
-      if (!response.ok) return degraded("grok_live_search", `Grok search failed with HTTP ${response.status}`);
+      if (!response.ok) {
+        const body = (await response.text().catch(() => "")).slice(0, 300);
+        console.error(`[grok_live_search] HTTP ${response.status} from api.x.ai (model=${model})${body ? ` body=${body}` : ""}`);
+        return degraded("grok_live_search", `Grok search failed with HTTP ${response.status} (model=${model})${body ? ` — ${body.slice(0, 160)}` : ""}`);
+      }
       const payload = await response.json() as Record<string, unknown>;
       const content = readString((((payload.choices as unknown[])?.[0] as Record<string, unknown> | undefined)?.message as Record<string, unknown> | undefined)?.content);
       const citations = extractCitationUrls(payload);
+      // A 200 with nothing in it used to come back health "ok" with an empty
+      // excerpt, which skills filtered to zero evidence — the failure surfaced
+      // rooms away as "could not retrieve industry evidence". Call it what it
+      // is at the source.
+      if (!content?.trim() && citations.length === 0) {
+        console.warn(`[grok_live_search] empty response (model=${model}) — no content and no citations for query=${JSON.stringify(query)}`);
+        return degraded("grok_live_search", `Grok returned no content and no citations (model=${model}) — check XAI_MODEL and live-search availability`);
+      }
+      console.log(`[grok_live_search] ok model=${model} citations=${citations.length} contentChars=${content?.length ?? 0}`);
       const evidence = citations.length > 0
         ? citations.map((url, index) => ({
             title: `Live search: ${query} (${index + 1})`,

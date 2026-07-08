@@ -81,6 +81,7 @@ export interface WorkspaceChatDependencies {
   client: SupabaseClient;
   runner?: AgentRunner;
   xaiApiKey?: string;
+  xaiModel?: string;
   firecrawlApiKey?: string;
   fredApiKey?: string;
   googleTrendsApiKey?: string;
@@ -150,6 +151,7 @@ export class WorkspaceChatHandler {
           // directs the user to the right room instead of running skills.
           allowSkillRuns: !isOrchestrator,
           xaiApiKey: this.deps.xaiApiKey,
+          xaiModel: this.deps.xaiModel,
           firecrawlApiKey: this.deps.firecrawlApiKey,
           fredApiKey: this.deps.fredApiKey,
           googleTrendsApiKey: this.deps.googleTrendsApiKey,

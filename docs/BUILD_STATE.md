@@ -285,6 +285,72 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### OWNER ROUND — Grok feed diagnosis, dashboard company leak, company switcher, on-demand State of the Union (2026-07-08)
+
+Owner reports: supply_chain_map failed with "could not retrieve industry
+evidence — check the Grok search feed"; the dashboard's Competitor Watch
+showed threat cards from previously analyzed companies inside the Salesforce
+workspace; no way to switch back to an earlier company; the State of the
+Union should be on-demand, not permanent. (The research-button spinner
+overflow from the same round already shipped in PR #116.)
+
+- **Grok live-search fetcher made diagnosable (worker):** the diagnose run
+  for the failing skill contained ZERO grok/xai lines — the fetcher failed
+  silently. Root-cause candidates: the hardcoded `model: "grok-4.3"`
+  404-ing into a silent degraded, or a 200 with empty content/citations
+  that still returned health "ok" with an empty excerpt (which skills
+  filter to zero evidence → the honest throw rooms away). Fixes in
+  worker/src/feeds/fetchers.ts: model is now `XAI_MODEL` env override
+  (Fly-secret flippable, no code deploy) defaulting to `grok-4-fast`;
+  non-OK responses log status + body snippet and carry the body into the
+  degraded reason; a 200 with no content AND no citations is now
+  `degraded`, not "ok"; every outcome logs a `[grok_live_search]` line so
+  the next diagnose shows the truth. `xaiModel` plumbed through
+  env.ts → index.ts → FeedRuntimeConfig (dispatcher/skill-run/company-
+  research/knowledge-jobs/feed-refresh inherit structurally) and through
+  ToolContext → bmc-tools/workspace-chat/canvas-section-analysis. 3 new
+  fetcher tests (model override, empty-200 → degraded, error body
+  surfaced). HONEST SCOPE: the live root cause is CONFIRMED only after the
+  next diagnose reads the new log lines — the key lives in Fly secrets, so
+  this could not be exercised from the repo.
+- **Competitor Watch company leak (agent, reviewed):** metric_snapshots has
+  no company column, so Dashboard's threat query surfaced every
+  competitor ever scored. Now scoped through the entities: a parallel
+  companies query restricted to scope.contextIds gates threat cards
+  (fail-closed when a scope exists; degrades open only if scope resolution
+  itself fails, matching the gaps query). Swept Dashboard's other reads —
+  gaps/reports already scoped; evidence/loops/runs are account-level by
+  design.
+- **Company switcher (agent, reviewed):** the workspace dropdown lists up
+  to 8 previously analyzed companies (distinct eras from
+  business_context_versions grouped by the same domain-else-name key the
+  scope resolver uses). Switching clones that company's newest context row
+  forward (version_number = max+1) so it becomes the active era with its
+  full history in scope, then invalidateCompanyScope + session-pointer
+  rehydration (same shape as MyAnalyses.loadAnalysis, cleared first),
+  toast, navigate /canvas. Double-insert guarded by ref.
+- **On-demand State of the Union (agent, reviewed):** dock-only
+  CollapsibleBriefing wrapper — slim bar (icon, title, relative age,
+  unseen pulse, chevron) + Refresh icon wired to requestBriefing.
+  Expanded card is the untouched BriefingCard. Per-account persistence
+  (atlas:briefing-open:<accountId>), auto-expanded when no briefing yet
+  (first-run flow + errors stay visible) or on an unseen briefing;
+  markSeen now requires the card expanded, not merely the dock open. War
+  Room unchanged.
+
+**Gate results for this commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+cd worker && npx tsc --noEmit          -> exit 0
+cd worker && npx vitest run            -> 385 passed, 2 skipped
+cd worker && npm run build             -> green
+cd worker && npx eslint src            -> exit 0
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### ATLAS FIRST-RUN + MOBILE DOCK (2026-07-08)
 
 Owner-approved onboarding design + two mobile reports, built by two agents,
