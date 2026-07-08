@@ -16,13 +16,13 @@ function feedFixtures() {
       title: "Plant-ops forum pricing thread",
       excerpt: EXCERPTS[0],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       sourceUrl: "https://forum.example/plant-ops-pricing",
     }, {
       title: "Hobbyist review roundup",
       excerpt: EXCERPTS[1],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       // No sourceUrl — the skill must fall back to the feed name.
     }],
   });

@@ -285,7 +285,219 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
-### SEARCH PROVIDER RESILIENCE — Exa + Firecrawl replace dead xAI Live Search (2026-07-08)
+### OWNER ROUND — section-first room headers, button press feedback, one-competitor audit diagnosis (2026-07-08, evening)
+
+Owner reports: room headers lead with agent callsigns ("Envoy") nobody
+recognizes instead of the canvas section; the Studio Run button gives no
+click feedback and invited double clicks; a differentiator audit compared
+against only one competitor.
+
+- **Section-first wayfinding (`WorkspaceTopBar.tsx`):** the door plate and
+  every Rooms-switcher entry now lead with the section label ("Key
+  Partners") with the agent as descriptor ("Envoy · Head of Alliances").
+  The identity card inside the room keeps its agent-first framing — that
+  card's job is the persona; the header's job is wayfinding.
+- **Button press feedback, root fix (`ui/button.tsx`):** the base Button
+  had no `active:` style anywhere in the app — clicks looked like nothing
+  happened. Added `active:scale-[0.97]` with the full `transition` utility
+  (the old `transition-colors` would not animate transform); the link
+  variant opts out (`active:scale-100`). Plus the Studio-specific gap
+  (`WorkspaceActionsPanel.tsx`): between click and the "Running" state sat
+  1-2 network calls with zero visual change — `startingRef` silently
+  guarded the double enqueue but the button read as dead. A synchronous
+  `startingKey` state now flips the tile to a spinner + "Starting…" in the
+  same tick as the click.
+- **One-competitor audit — diagnosed against live data, mostly not a code
+  bug:** the audit reads ALL competitors' value_propositions rows within
+  the company scope (verified: `loadCompetitorSectionItems` filters only
+  on `competitor_id is not null` + scope chain, limit 24, and both Wesco
+  contexts share the wesco.com era key). Live DB showed the audit ran when
+  W.W. Grainger was the ONLY researched Wesco competitor; Graybar, Rexel,
+  and Sonepar were researched ~18 hours later. A re-run now sees all four.
+  The REAL defect found on the way: three of the four competitor research
+  runs "completed" having verified evidence for only 1-2 of 9 sections
+  (Sonepar 1, Rexel 2, Grainger 1 vs Graybar 8) with the flat summary
+  "Research completed with evidence-linked canvas updates" — silent
+  partial coverage. `company-research.ts` now reports
+  `sections_covered` in the run output and the summary says either
+  "evidence-linked updates in N of 9 canvas sections" or, below 5, a thin-
+  coverage warning naming the consequence (skills comparing this company
+  work from partial data).
+- **Branch reconciliation:** PR #120 (an independent, minimal Exa->
+  Firecrawl chain keyed `grok_live_search`) landed on main while this
+  branch was in review. Merged main in; the branch's fuller implementation
+  (web_search rename + migration, xAI Agent Tools leg with x_search,
+  per-task recency) supersedes it. Kept #120's flat-array Firecrawl
+  response tolerance by accepting BOTH `{data: {web: []}}` and
+  `{data: []}` shapes in the parser.
+- Gates: worker typecheck/tests (393 passed / 2 skipped)/build/eslint all
+  green; root tsc exit 0, build green, lint 64 (frozen baseline); UTF-8
+  decode clean.
+- HONEST SCOPE: why Sonepar/Rexel/Grainger crawls yielded so few verified
+  sections needs a live look at their run outputs (likely 403-ish crawl
+  blocks on distributor sites + sparse public claims); the coverage
+  summary makes it visible from the Activity feed either way. The owner
+  should re-run the Differentiator audit — all four Wesco competitors now
+  have researched value_propositions rows.
+
+### OWNER ROUND — company switcher doesn't switch the canvas + search-logic pass (2026-07-08, later)
+
+Owner reports: picking another company in the sidebar dropdown left the old
+company's canvas on screen. Owner also confirmed `EXA_API_KEY` is now on the
+worker app and asked for a full search-logic pass: is Exa the right first
+choice everywhere, and does every search-consuming step use the best tool
+for its task?
+
+- **Switcher fix (one line, `src/components/layout/AccountSwitcher.tsx`):**
+  `switchToCompany` wrote the new session pointers then called
+  `navigate("/canvas")` — a same-route no-op when the user is already ON
+  /canvas (the common case: the switcher is most useful while looking at a
+  canvas). The canvas (Analysis.tsx) only reads `loadedAnalysis`/
+  `activeAnalysis` in a mount-only effect, so nothing re-rendered. Fix:
+  `window.location.assign("/canvas")` — the exact hard-load pattern
+  `startNewCompany` in the same file already uses for the same reason
+  ("no stale component state can keep the old company on screen"). All
+  pointers are sessionStorage-backed, so they survive the reload.
+- **Search-logic pass, conclusions:**
+  1. *Exa-first is right for all evidence retrieval* (the 11 search skills,
+     avatar_refinement, company-research backfill/403-fallback, agents'
+     `search_web` tool) — semantic search returning full page text is the
+     evidence contract. Already the chain order; no change.
+  2. *Exa-first is wrong for the conversational edge functions*
+     (`strategy-coach-chat`, `competitor-chat`, `analyze-company`,
+     `research-competitors`): they embed search inside the LLM call via
+     xAI's Responses API — the current supported product, not the retired
+     one — and swapping to Exa would mean building a separate RAG pipeline
+     for no chat-quality gain. Unchanged, decision recorded here.
+  3. *The chain treated every query identically*, but skills have two
+     search shapes: WATCH skills (launches, partnerships, hiring) need
+     fresh results — a two-year-old "recent launch" corrupts the artifact —
+     while MINING skills (communities, industry structure, review language)
+     are evergreen and a published-date filter would drop undated pages and
+     starve sparse queries.
+- **Implemented — per-task search options** (`recencyDays`,
+  `searchCategory: "news" | "company"`) on `FeedRefreshRequest`/
+  `FeedRunInput`, mapped per provider: Exa gets `category` +
+  `startPublishedDate` (with a one-shot unfiltered retry when the filtered
+  query returns nothing — stale evidence beats a dead skill); Firecrawl gets
+  the coarse `tbs` bucket (`qdr:d/w/m/y`, rounded up); xAI gets neither (no
+  verified per-request contract) but its leg now passes
+  `tools: [{web_search}, {x_search}]` — X-native signal (partnership
+  announcements, launch chatter) is xAI's one advantage over the other legs,
+  contract verified against docs.x.ai (x_search is a first-class Agent
+  Tools type; Grok picks which tools to invoke per query).
+  Applied: velocity_watch 90d+news, ecosystem_watch 180d+news, talent_radar
+  180d, operational_benchmark 180d, churn_signal_audit 365d. Deliberately
+  UNSET on watering_holes / supply_chain_map / wtp_signals / efficiency_scan
+  / build_vs_buy / advocacy_engine_scan / avatar_refinement / research
+  backfill+fallback (evergreen or sparse). The agents' `search_web` MCP tool
+  gained an optional `recency_days` arg, folded into its cache key so
+  fresh-only and all-time answers never cross-serve.
+- Tests: 3 new fetcher cases (Exa category/date mapping with window bounds,
+  filtered-empty -> unfiltered retry asserting the second body has no
+  filters, Firecrawl tbs bucket) + x_search added to the existing xAI
+  request-shape assertion. Worker suite 393 passed / 2 skipped.
+- Gates: worker typecheck/build/eslint exit 0; root `npx tsc` exit 0; root
+  build green; root lint 64 problems (frozen baseline); UTF-8 decode check
+  on touched files exit 0.
+- HONEST SCOPE: the switcher fix is code-path verified (the no-op-navigate
+  root cause is structural); confirming the live click-through needs the
+  deploy + an owner check. The recency windows (90/180/365) are judgment
+  calls — tunable per skill in one line each if live artifacts skew too
+  sparse or too stale.
+
+### `grok_live_search` -> `web_search` provider chain + xAI Agent Tools API migration (2026-07-08)
+
+The new `[grok_live_search]` logging (previous entry) paid off immediately: Matt's
+re-run showed `HTTP 410 from api.x.ai body={"error":"Live search is deprecated.
+Please switch to the Agent Tools API"}` on all 3 attempts. xAI retired Live Search
+on 2026-01-12 — every search-backed skill had been silently broken since, and no
+model-name fix could have addressed it. This landed in two rounds in the same
+session: first the provider chain (Exa/Firecrawl/xAI, xAI leg still on the dead
+endpoint), then Matt asked for the feed to be renamed (it's no longer Grok-only)
+and for the xAI leg to actually be migrated — both done below.
+
+- **The feed is now `web_search`, not `grok_live_search`** (`worker/src/feeds/
+  fetchers.ts`), a provider chain rather than a single vendor call: Exa
+  (semantic search, full page text) -> Firecrawl search (same key that already
+  powers page scraping, new `/v2/search` leg alongside the existing scrape) ->
+  xAI, now actually on their Responses/Agent-Tools API. Each leg is tried in
+  order; the first with real evidence wins; every attempt logs a `[web_search]`
+  line (`ok via <provider>` or `<provider> failed: <reason>`). Legs auto-detect
+  from configured keys, so the chain upgrades itself the moment a
+  higher-priority key lands — no code change needed to adopt Exa.
+  Renamed everywhere it was referenced: all 11 skill files' `feedKey` and their
+  user-facing "check the Grok search feed" error strings (the exact text Matt
+  saw on `supply_chain_map`), `company-research.ts`, `skill-run.ts`,
+  `bmc-tools.ts`'s `search_web` MCP tool description, test fixtures/mocks, and
+  `docs/wiki/Worker.md` / `Skills.md`.
+- **Renaming a feed key is not cosmetic**: `FeedRunner.loadFeed` throws
+  `Data feed not configured: <key>` when no matching `data_feeds` row exists —
+  every skill using `web_search` would hard-fail without a matching row. New
+  migration `20260708190000_web_search_feed_key.sql` INSERTs a `web_search`
+  row; it deliberately does NOT rename/delete the old `grok_live_search` row,
+  so it's safe to apply in any order relative to the code deploy — a rename-in-
+  place would break a worker still running old code (which still looks up
+  `grok_live_search`) if the migration landed first. Mirrored into
+  `supabase/schema.sql` (fresh installs only seed `web_search`) and
+  `scripts/verify-schema.sql`'s expected-feed-key list.
+- **xAI leg migrated off the dead Live Search endpoint** to the Responses API
+  (`POST /v1/responses`, `tools: [{type: "web_search"}]`, `instructions` +
+  `input` instead of a messages array) — the same contract already proven in
+  production by `supabase/functions/_shared/grok-client.ts` (`buildResponsesBody`
+  / `extractResponsesText`), confirmed by reading that file rather than
+  guessing from xAI's docs (which 403'd through the sandbox proxy). Citations
+  come back as a top-level `citations` array of `{url, title, snippet}` (or
+  bare URL strings), so each citation now becomes its own evidence item with
+  its own excerpt instead of every citation sharing one blob of shared text —
+  a strictly better evidence shape than the old scheme. Default model bumped
+  `grok-4-fast` -> `grok-4.3` to match the canonical model in
+  `supabase/functions/_shared/xai-models.ts` (still overridable via the
+  `XAI_MODEL` Fly secret). Checked the rest of the repo for other Live-Search-
+  style callers (`search_parameters` / raw `/v1/chat/completions`); found only
+  `agent-run/index.ts` and `_shared/llm-client.ts` calling plain chat
+  completions with no web search involved — nothing else needed migrating.
+- **New `EXA_API_KEY`** plumbed `env.ts` -> `index.ts` -> `FeedRuntimeConfig`
+  (dispatcher/skill-run/company-research/knowledge-jobs/feed-refresh inherit
+  structurally) and through `ToolContext` -> `bmc-tools`/`workspace-chat`/
+  `canvas-section-analysis`, mirroring the existing `xaiApiKey` wiring exactly.
+  Added to the `ops.yml` `sync-secrets` job and `DEPLOY.md`'s secrets table.
+- Tests: `worker/src/__tests__/feeds.test.ts` — Exa success, Firecrawl-search
+  success, xAI Responses API success (one evidence item per citation, model
+  override, empty-response degrade, error-body surfaced), chain stops at the
+  first provider with evidence, falls back to Firecrawl when Exa returns zero
+  usable results, degrades with every configured provider's reason when all
+  legs fail. Fixtures: `exa-search.json`, `firecrawl-search.json`,
+  `xai-responses-search.json` (replaces the deleted `grok-live-search.json`).
+  Renamed `feedKey`/mock strings across the 11 skill test files,
+  `company-research.test.ts`, `bmc-tools.test.ts`, `skill-run.test.ts`.
+- Gates: worker `npx vitest run` 390 passed / 2 skipped; worker `npm run
+  typecheck` exit 0; worker `npm run build` exit 0; worker `npx eslint src`
+  exit 0; root `npx tsc -p tsconfig.app.json --noEmit` exit 0; root `npm run
+  build` exit 0; root `npm run lint` exits 1 with the known frozen baseline of
+  64 problems (46 errors, 18 warnings), unchanged, within the <=65 ceiling;
+  UTF-8 decode check on touched files exit 0.
+- HONEST SCOPE / found this round: Matt's Fly secrets screenshot showed
+  `EXA_API_KEY` added to the **`super-bmc-web`** app (the frontend), not
+  **`super-bmc-worker`** (the background job worker — the only app that reads
+  this code path). That's why it never appeared in the `worker-diagnose`
+  Ops-Action secret list. Matt needs to add it to `super-bmc-worker` instead
+  (`flyctl secrets set EXA_API_KEY=<key> -a super-bmc-worker`, or the Fly
+  dashboard on the worker app).
+- `20260708190000_web_search_feed_key.sql` was applied live via Supabase MCP
+  to project `mehhuxzamnpxnkbrslls` (recorded as version `20260708194255` —
+  repo filename intentionally left as-authored per this file's established
+  convention for MCP-applied migrations, e.g. `schedule_loop_tick` above).
+  Verified both `grok_live_search` and `web_search` rows now exist in
+  `data_feeds`; the currently-deployed (pre-rename) worker is unaffected since
+  it still only looks up `grok_live_search`. This branch's worker code has
+  NOT been deployed yet — safe to deploy whenever, the migration already
+  covers it.
+### SEARCH PROVIDER RESILIENCE — Exa + Firecrawl replace dead xAI Live Search (2026-07-08, PR #120 — SUPERSEDED)
+
+> Landed on main independently while the fuller branch above was in review;
+> the branch supersedes it (adds the `web_search` rename, the xAI Agent
+> Tools leg with x_search, and per-task recency filters) — kept for history.
 
 Root cause confirmed via the new `[grok_live_search]` logging (owner
 re-ran supply_chain_map after the previous fix deployed): xAI retired Live

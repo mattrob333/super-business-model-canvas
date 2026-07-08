@@ -5,7 +5,7 @@ import type { CanvasItemSource, SkillRun } from "./toolkit.js";
  * envoy.ecosystem_watch — the Key Partners room's competitor-ecosystem radar:
  * watch for competitor partnership announcements (integrations, alliances,
  * channel deals) and turn each observed move into a counter-partner
- * suggestion for us. The moves are grounded in live evidence (Grok search
+ * suggestion for us. The moves are grounded in live evidence (web search
  * over the researched competitors' partnership announcements), never in the
  * model's own market knowledge — every move must name one of OUR researched
  * competitors exactly and quote one of the retrieved excerpts verbatim
@@ -47,19 +47,23 @@ export const runEcosystemWatch: SkillRun = async (toolkit, job, scope) => {
   const companyName = scope.companyName ?? "";
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     // Company-scoped: without the company slug, re-analyzing to a different
     // company within the feed TTL would serve the previous company's cached
     // competitor-partnership excerpts (cross-company contamination).
     cacheKey: `ecosystem_watch:${job.account_id}:${slug(companyName)}`,
     companyName,
     query: `${competitorNames.join(", ")} partnership announcement integration alliance`,
+    // Partnership moves stay strategically relevant a bit longer than
+    // launches, but a years-old alliance is not an "observed move".
+    recencyDays: 180,
+    searchCategory: "news",
   });
   const sources = feed.health === "ok"
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
     : [];
   if (sources.length === 0) {
-    throw new Error("ecosystem_watch could not retrieve competitor partnership evidence — check the Grok search feed");
+    throw new Error("ecosystem_watch could not retrieve competitor partnership evidence — check the web search feed");
   }
 
   // Every excerpt that feeds the prompt lands on the evidence ledger first —
@@ -68,7 +72,7 @@ export const runEcosystemWatch: SkillRun = async (toolkit, job, scope) => {
   for (const source of sources) {
     evidenceIds.push(await toolkit.writeEvidence(job, {
       title: `${companyName || "ecosystem watch"} competitor partnership source`,
-      sourceUrl: source.sourceUrl ?? "grok_live_search",
+      sourceUrl: source.sourceUrl ?? "web_search",
       excerpt: source.excerpt ?? "",
     }));
   }

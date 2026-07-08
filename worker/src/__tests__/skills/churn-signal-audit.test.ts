@@ -16,13 +16,13 @@ function feedFixtures() {
       title: "Acme Robotics review complaints",
       excerpt: EXCERPTS[0],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       sourceUrl: "https://reviews.example/acme-robotics",
     }, {
       title: "RivalCo churn chatter",
       excerpt: EXCERPTS[1],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       // No sourceUrl — the skill must fall back to the feed name.
     }],
   });

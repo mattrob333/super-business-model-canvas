@@ -2457,7 +2457,7 @@ create policy "feed_cache_select_account"
 insert into public.data_feeds (account_id, feed_key, name, kind, tier, cadence, ttl_seconds, health, cost_class, config)
 values
   (null, 'firecrawl_scrape', 'Firecrawl page scrape', 'scrape', 'T1', 'weekly', 604800, 'degraded', 'metered', '{"targets":["pricing","careers","changelog","reviews","press"]}'::jsonb),
-  (null, 'grok_live_search', 'Grok live search', 'search', 'T2', 'daily', 86400, 'degraded', 'metered', '{}'::jsonb),
+  (null, 'web_search', 'Web search (Exa -> Firecrawl -> xAI)', 'search', 'T2', 'daily', 86400, 'degraded', 'metered', '{}'::jsonb),
   (null, 'fred_series', 'FRED macro series', 'api', 'T1', 'monthly', 2592000, 'degraded', 'free', '{"series":["FEDFUNDS","CPIAUCSL","UMCSENT"]}'::jsonb),
   (null, 'google_trends', 'Google Trends interest', 'api', 'T2', 'weekly', 604800, 'degraded', 'free', '{}'::jsonb),
   (null, 'gdelt_count', 'GDELT news count', 'api', 'T2', 'weekly', 604800, 'degraded', 'free', '{}'::jsonb),

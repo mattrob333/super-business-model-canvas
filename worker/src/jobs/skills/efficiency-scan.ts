@@ -5,7 +5,7 @@ import type { CanvasItemSource, SkillRun } from "./toolkit.js";
  * ledger.efficiency_scan — the Cost Structure room's vendor hunt: for the
  * cost drivers we have actually named on our own canvas, which vendors and
  * tooling attack them, with adoption evidence. Live evidence comes from a
- * Grok search over "<our top cost driver texts> software vendors tools
+ * web search over "<our top cost driver texts> software vendors tools
  * reduce cost" — never from the model's own vendor memory: every row must
  * name one of OUR cost drivers VERBATIM and quote one of the retrieved
  * excerpts VERBATIM (parser-enforced, one ungrounded row rejects the whole
@@ -46,7 +46,7 @@ export const runEfficiencyScan: SkillRun = async (toolkit, job, scope) => {
   const topDrivers = costs.slice(0, 4).map((item) => item.text);
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     // Company-scoped: without the company slug, re-analyzing to a different
     // company within the feed TTL would serve the previous company's cached
     // vendor excerpts (cross-company contamination).
@@ -58,7 +58,7 @@ export const runEfficiencyScan: SkillRun = async (toolkit, job, scope) => {
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
     : [];
   if (sources.length === 0) {
-    throw new Error("efficiency_scan could not retrieve vendor evidence — check the Grok search feed");
+    throw new Error("efficiency_scan could not retrieve vendor evidence — check the web search feed");
   }
 
   // Every excerpt that feeds the prompt lands on the evidence ledger first —
@@ -67,7 +67,7 @@ export const runEfficiencyScan: SkillRun = async (toolkit, job, scope) => {
   for (const source of sources) {
     feedEvidenceIds.push(await toolkit.writeEvidence(job, {
       title: `${companyName} efficiency-scan source`,
-      sourceUrl: source.sourceUrl ?? "grok_live_search",
+      sourceUrl: source.sourceUrl ?? "web_search",
       excerpt: source.excerpt ?? "",
     }));
   }

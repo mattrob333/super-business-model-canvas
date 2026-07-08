@@ -17,13 +17,13 @@ function feedFixtures() {
       title: "RivalCo careers page roundup",
       excerpt: EXCERPTS[0],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       sourceUrl: "https://jobs.example/rivalco-openings",
     }, {
       title: "RivalCo sales hiring",
       excerpt: EXCERPTS[1],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       // No sourceUrl — the skill must fall back to the feed name.
     }],
   });

@@ -1,0 +1,27 @@
+{
+  "id": "resp_123",
+  "output": [
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Acme announced a new enterprise analytics product in June 2026."
+        }
+      ]
+    }
+  ],
+  "citations": [
+    {
+      "url": "https://news.example/acme-analytics",
+      "title": "Acme launches enterprise analytics suite",
+      "snippet": "Acme announced a new enterprise analytics product in June 2026, aimed at mid-market data teams."
+    },
+    {
+      "url": "https://acme.example/blog/enterprise-analytics",
+      "title": "Acme blog: enterprise analytics deep dive",
+      "snippet": "The new suite includes real-time dashboards and a query builder for non-technical users."
+    }
+  ]
+}

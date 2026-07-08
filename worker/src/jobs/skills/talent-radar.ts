@@ -5,7 +5,7 @@ import type { CanvasItemSource, SkillRun } from "./toolkit.js";
  * vault.talent_radar — the Key Resources room's hiring radar: what functions
  * the researched competitors are hiring for right now, read as investment
  * signal ahead of any announcement. Every competitor comes back exactly once:
- * either the excerpts show hiring — grounded in live evidence (Grok search
+ * either the excerpts show hiring — grounded in live evidence (web search
  * over the competitors' job postings and careers pages), never in the
  * model's own market knowledge, with the competitor named EXACTLY from our
  * researched list and every hiring signal carrying an evidence_quote copied
@@ -90,7 +90,7 @@ export const runTalentRadar: SkillRun = async (toolkit, job, scope) => {
   const companyName = scope.companyName ?? "";
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     // Scoped to the company AND the competitor set: the query subject is the
     // competitor list, and FeedRunner serves cache hits by cache key alone —
     // without the competitor slug, adding a competitor within the feed TTL
@@ -100,12 +100,15 @@ export const runTalentRadar: SkillRun = async (toolkit, job, scope) => {
     cacheKey: `talent_radar:${job.account_id}:${slug(companyName)}:${slug(competitorNames.join("-"))}`,
     companyName,
     query: `${competitorNames.join(", ")} hiring jobs careers roles engineering sales data AI`,
+    // Hiring is a NOW signal — filled or expired postings are noise. No
+    // category: job posts and careers pages are not "news".
+    recencyDays: 180,
   });
   const sources = feed.health === "ok"
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
     : [];
   if (sources.length === 0) {
-    throw new Error("talent_radar could not retrieve competitor hiring evidence — check the Grok search feed");
+    throw new Error("talent_radar could not retrieve competitor hiring evidence — check the web search feed");
   }
 
   // Every excerpt that feeds the prompt lands on the evidence ledger first —
@@ -114,7 +117,7 @@ export const runTalentRadar: SkillRun = async (toolkit, job, scope) => {
   for (const source of sources) {
     evidenceIds.push(await toolkit.writeEvidence(job, {
       title: `${companyName || "talent radar"} competitor hiring source`,
-      sourceUrl: source.sourceUrl ?? "grok_live_search",
+      sourceUrl: source.sourceUrl ?? "web_search",
       excerpt: source.excerpt ?? "",
     }));
   }

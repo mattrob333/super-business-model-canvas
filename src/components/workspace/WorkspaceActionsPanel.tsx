@@ -102,6 +102,14 @@ export function WorkspaceActionsPanel({
   const [openArtifact, setOpenArtifact] = useState<SkillArtifact | null>(null);
   const [loading, setLoading] = useState(true);
   const [runningRun, setRunningRun] = useState<SkillRunState | null>(null);
+  /**
+   * Set synchronously on click, before the enqueue round-trip: the gap
+   * between click and setRunningRun is 1-2 network calls with ZERO visual
+   * change, which read as "the button didn't work" and invited double
+   * clicks (owner finding 2026-07-08 — startingRef already guarded the
+   * double enqueue, but silently).
+   */
+  const [startingKey, setStartingKey] = useState<string | null>(null);
   const [tileErrors, setTileErrors] = useState<Record<string, string>>({});
   const pollTimer = useRef<ReturnType<typeof setTimeout>>();
   const startingRef = useRef(false);
@@ -269,6 +277,7 @@ export function WorkspaceActionsPanel({
     // without researched competitors would only burn tokens and fail.
     if (REQUIRES_COMPETITOR_RESEARCH.has(skill.skill_key) && hasCompetitorResearch === false) return;
     startingRef.current = true;
+    setStartingKey(skill.skill_key);
     setTileErrors((prev) => ({ ...prev, [skill.skill_key]: "" }));
     try {
       const contextVersionId = await ensureBusinessContext();
@@ -302,6 +311,7 @@ export function WorkspaceActionsPanel({
       });
     } finally {
       startingRef.current = false;
+      setStartingKey(null);
     }
   }, [accountId, agentProfileId, ensureBusinessContext, hasCompetitorResearch, pollSkillRun, runningRun, toast, user]);
 
@@ -353,23 +363,25 @@ export function WorkspaceActionsPanel({
                   size="sm"
                   className="mt-3 h-8 w-full gap-1.5"
                   variant={skill.implemented && !needsCompetitorResearch ? "default" : "outline"}
-                  disabled={!skill.implemented || runningRun !== null || needsCompetitorResearch}
+                  disabled={!skill.implemented || runningRun !== null || startingKey !== null || needsCompetitorResearch}
                   onClick={() => void runSkill(skill)}
                 >
-                  {runningRun?.skillKey === skill.skill_key ? (
+                  {startingKey === skill.skill_key || runningRun?.skillKey === skill.skill_key ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : needsCompetitorResearch ? (
                     <Lock className="h-3.5 w-3.5" />
                   ) : (
                     <Play className="h-3.5 w-3.5" />
                   )}
-                  {runningRun?.skillKey === skill.skill_key
-                    ? "Running"
-                    : needsCompetitorResearch
-                      ? "Needs competitor research first"
-                      : skill.implemented
-                        ? "Run"
-                        : "Coming"}
+                  {startingKey === skill.skill_key
+                    ? "Starting…"
+                    : runningRun?.skillKey === skill.skill_key
+                      ? "Running"
+                      : needsCompetitorResearch
+                        ? "Needs competitor research first"
+                        : skill.implemented
+                          ? "Run"
+                          : "Coming"}
                 </Button>
                 {needsCompetitorResearch && (
                   <Button

@@ -19,13 +19,13 @@ function feedFixtures() {
       title: "RivalCo referral program coverage",
       excerpt: EXCERPTS[0],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       sourceUrl: "https://news.example/rivalco-referral",
     }, {
       title: "RivalCo champions summit recap",
       excerpt: EXCERPTS[1],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       // No sourceUrl — the skill must fall back to the feed name.
     }],
   });

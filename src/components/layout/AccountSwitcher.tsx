@@ -178,8 +178,11 @@ export function AccountSwitcher() {
       }
       setActiveWorkspaceName(name);
 
-      toast({ title: `Switched to ${name}` });
-      navigate("/canvas");
+      // Hard-load like startNewCompany: navigate("/canvas") is a no-op when
+      // the user is already ON /canvas (same route, no remount), and the
+      // canvas only reads its session pointers in a mount effect — the old
+      // company stayed on screen (owner finding 2026-07-08).
+      window.location.assign("/canvas");
     } catch (error) {
       toast({
         title: "Failed to switch company",

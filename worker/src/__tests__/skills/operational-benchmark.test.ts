@@ -23,13 +23,13 @@ function feedFixtures() {
       title: "RivalCo engineering hiring spree",
       excerpt: EXCERPTS[0],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       sourceUrl: "https://news.example/rivalco-hiring",
     }, {
       title: "RivalCo ship velocity",
       excerpt: EXCERPTS[1],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       // No sourceUrl — the skill must fall back to the feed name.
     }],
   });

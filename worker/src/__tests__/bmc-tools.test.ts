@@ -85,7 +85,7 @@ describe("BMC MCP tools", () => {
     await expect(tools.firecrawl_scrape.handler({ url: "https://example.com" }))
       .resolves.toMatchObject({ structuredContent: { degraded: false, health: "ok" } });
     expect((tools as unknown as { __feedCalls: Array<Record<string, unknown>> }).__feedCalls).toMatchObject([
-      { accountId: "account-1", feedKey: "grok_live_search", query: "Acme pricing" },
+      { accountId: "account-1", feedKey: "web_search", query: "Acme pricing" },
       { accountId: "account-1", feedKey: "firecrawl_scrape", companyUrl: "https://example.com" },
     ]);
   });

@@ -71,7 +71,7 @@ export const runAdvocacyEngineScan: SkillRun = async (toolkit, job, scope) => {
 
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     // Company-scoped: without the company slug, re-analyzing to a different
     // company within the feed TTL would serve the previous company's cached
     // advocacy excerpts (cross-company contamination).
@@ -83,7 +83,7 @@ export const runAdvocacyEngineScan: SkillRun = async (toolkit, job, scope) => {
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
     : [];
   if (sources.length === 0) {
-    throw new Error("advocacy_engine_scan could not retrieve advocacy evidence — check the Grok search feed");
+    throw new Error("advocacy_engine_scan could not retrieve advocacy evidence — check the web search feed");
   }
 
   // Every excerpt that feeds the prompt lands on the evidence ledger first —
@@ -92,7 +92,7 @@ export const runAdvocacyEngineScan: SkillRun = async (toolkit, job, scope) => {
   for (const source of sources) {
     evidenceIds.push(await toolkit.writeEvidence(job, {
       title: `${companyName} advocacy engine source`,
-      sourceUrl: source.sourceUrl ?? "grok_live_search",
+      sourceUrl: source.sourceUrl ?? "web_search",
       excerpt: source.excerpt ?? "",
     }));
   }

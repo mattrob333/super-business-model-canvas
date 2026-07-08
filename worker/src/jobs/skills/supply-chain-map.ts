@@ -5,7 +5,7 @@ import type { CanvasItemSource, SkillRun } from "./toolkit.js";
  * envoy.supply_chain_map — a supply-chain map for the Key Partners room:
  * where the analyzed company sits between upstream suppliers and downstream
  * distribution, plus concrete partnership candidates with a 1–5 fit score.
- * The map is grounded in live industry evidence (Grok search over the
+ * The map is grounded in live industry evidence (web search over the
  * company's supply chain), never in the model's own market knowledge — every
  * candidate must quote one of the retrieved excerpts verbatim
  * (parser-enforced) and the top candidates are verifier-spot-checked against
@@ -46,7 +46,7 @@ export const runSupplyChainMap: SkillRun = async (toolkit, job, scope) => {
 
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     // Company-scoped: without the company slug, re-analyzing to a different
     // company within the feed TTL would serve the previous company's cached
     // excerpts (cross-company contamination).
@@ -58,7 +58,7 @@ export const runSupplyChainMap: SkillRun = async (toolkit, job, scope) => {
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
     : [];
   if (sources.length === 0) {
-    throw new Error("supply_chain_map could not retrieve industry evidence — check the Grok search feed");
+    throw new Error("supply_chain_map could not retrieve industry evidence — check the web search feed");
   }
 
   // Every excerpt that feeds the prompt lands on the evidence ledger first —
@@ -67,7 +67,7 @@ export const runSupplyChainMap: SkillRun = async (toolkit, job, scope) => {
   for (const source of sources) {
     evidenceIds.push(await toolkit.writeEvidence(job, {
       title: `${companyName} supply-chain source`,
-      sourceUrl: source.sourceUrl ?? "grok_live_search",
+      sourceUrl: source.sourceUrl ?? "web_search",
       excerpt: source.excerpt ?? "",
     }));
   }
