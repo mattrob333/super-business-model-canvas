@@ -6,7 +6,7 @@ import type { CanvasItemSource, SkillRun } from "./toolkit.js";
  * the researched competitors have shipped recently (launches, changelog
  * entries, release announcements) turned into a they-are-outshipping-you
  * read. Every competitor comes back exactly once: either the excerpts show
- * recent shipping — grounded in live evidence (Grok search over the
+ * recent shipping — grounded in live evidence (web search over the
  * competitors' launch and changelog signals), never in the model's own
  * market knowledge, with the competitor named EXACTLY from our researched
  * list and every observation carrying an evidence_quote copied VERBATIM
@@ -65,7 +65,7 @@ export const runVelocityWatch: SkillRun = async (toolkit, job, scope) => {
   const companyName = scope.companyName ?? "";
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     // Cache-key identity must cover everything the query depends on: the
     // company slug (re-analyzing to a different company within the feed TTL
     // must not serve the previous company's cached excerpts) AND the
@@ -81,7 +81,7 @@ export const runVelocityWatch: SkillRun = async (toolkit, job, scope) => {
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
     : [];
   if (sources.length === 0) {
-    throw new Error("velocity_watch could not retrieve competitor launch evidence — check the Grok search feed");
+    throw new Error("velocity_watch could not retrieve competitor launch evidence — check the web search feed");
   }
 
   // Every excerpt that feeds the prompt lands on the evidence ledger first —
@@ -90,7 +90,7 @@ export const runVelocityWatch: SkillRun = async (toolkit, job, scope) => {
   for (const source of sources) {
     evidenceIds.push(await toolkit.writeEvidence(job, {
       title: `${companyName || "velocity watch"} competitor launch source`,
-      sourceUrl: source.sourceUrl ?? "grok_live_search",
+      sourceUrl: source.sourceUrl ?? "web_search",
       excerpt: source.excerpt ?? "",
     }));
   }

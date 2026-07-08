@@ -46,7 +46,7 @@ GitHub → repo → Settings → Secrets and variables → Actions → **New rep
 | `XAI_API_KEY` | console.x.ai |
 | `FIRECRAWL_API_KEY` | firecrawl.dev |
 | `CREDENTIALS_ENCRYPTION_KEY` | run `openssl rand -base64 32` |
-| `EXA_API_KEY` *(optional)* | exa.ai — primary leg of the `grok_live_search` provider chain (semantic search + full page text); falls back to Firecrawl search, then xAI, when unset |
+| `EXA_API_KEY` *(optional)* | exa.ai — primary leg of the `web_search` provider chain (semantic search + full page text); falls back to Firecrawl search, then the xAI Agent Tools API, when unset |
 | `FRED_API_KEY` *(optional)* | fred.stlouisfed.org (free) |
 | `GOOGLE_TRENDS_API_KEY` *(optional)* | serpapi.com |
 | `GH_FEED_TOKEN` *(optional)* | GitHub PAT for the repo-stats feed (name avoids the reserved `GITHUB_TOKEN`) |

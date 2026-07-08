@@ -3,7 +3,7 @@ import type { CanvasItemSource, SkillRun } from "./toolkit.js";
 
 /**
  * yield.wtp_signals — willingness-to-pay signals for the Revenue Streams
- * room. Mines live review language about price (Grok search over
+ * room. Mines live review language about price (web search over
  * "<company> reviews pricing worth the money ...") and reads, for EVERY one
  * of our Customer Segments, whether the reviews suggest we are underpriced,
  * overpriced, aligned — or honestly "unknown" when the excerpts never speak
@@ -46,7 +46,7 @@ export const runWtpSignals: SkillRun = async (toolkit, job, scope) => {
 
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     // Company-scoped: without the company slug, re-analyzing to a different
     // company within the feed TTL would serve the previous company's cached
     // review excerpts (cross-company contamination).
@@ -58,7 +58,7 @@ export const runWtpSignals: SkillRun = async (toolkit, job, scope) => {
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
     : [];
   if (sources.length === 0) {
-    throw new Error("wtp_signals could not retrieve pricing review evidence — check the Grok search feed");
+    throw new Error("wtp_signals could not retrieve pricing review evidence — check the web search feed");
   }
 
   // Every excerpt that feeds the prompt lands on the evidence ledger first —
@@ -67,7 +67,7 @@ export const runWtpSignals: SkillRun = async (toolkit, job, scope) => {
   for (const source of sources) {
     evidenceIds.push(await toolkit.writeEvidence(job, {
       title: `${companyName} pricing review source`,
-      sourceUrl: source.sourceUrl ?? "grok_live_search",
+      sourceUrl: source.sourceUrl ?? "web_search",
       excerpt: source.excerpt ?? "",
     }));
   }

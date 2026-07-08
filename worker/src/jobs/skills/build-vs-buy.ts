@@ -5,7 +5,7 @@ import type { CanvasItemSource, SkillRun } from "./toolkit.js";
  * tempo.build_vs_buy — "build vs buy" for the Key Activities room: for each
  * of our Key Activities, is there a managed service or SaaS platform that
  * already does this, and should we keep building it in-house? Verdicts are
- * grounded in live market evidence (Grok search per activity), never in the
+ * grounded in live market evidence (web search per activity), never in the
  * model's own market knowledge — every named alternative must quote one of
  * that activity's retrieved excerpts verbatim (parser-enforced) and the top
  * alternative claims are verifier-spot-checked against the excerpt that
@@ -57,7 +57,7 @@ export const runBuildVsBuy: SkillRun = async (toolkit, job, scope) => {
   for (const activity of considered) {
     const feed = await toolkit.refreshFeed({
       accountId: job.account_id,
-      feedKey: "grok_live_search",
+      feedKey: "web_search",
       cacheKey: `build_vs_buy:${job.account_id}:${slug(activity.text)}`,
       companyName: activity.text,
       query: `managed service or SaaS platform that provides "${activity.text}" build vs buy`,
@@ -70,14 +70,14 @@ export const runBuildVsBuy: SkillRun = async (toolkit, job, scope) => {
       // first — the artifact's evidence_ids must point at what the model saw.
       evidenceIds.push(await toolkit.writeEvidence(job, {
         title: `${activity.text} — market alternative source`,
-        sourceUrl: item.sourceUrl ?? "grok_live_search",
+        sourceUrl: item.sourceUrl ?? "web_search",
         excerpt,
       }));
       excerpts.push({ activity: activity.text, excerpt });
     }
   }
   if (excerpts.length === 0) {
-    throw new Error("build_vs_buy could not retrieve market evidence for any activity — check the Grok search feed");
+    throw new Error("build_vs_buy could not retrieve market evidence for any activity — check the web search feed");
   }
 
   const routes = await toolkit.loadModelRoutes(job.account_id, ["skill_run", "research_verify"]);

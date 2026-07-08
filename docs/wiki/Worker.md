@@ -263,7 +263,7 @@ closed over `ctx.accountId` — the model never chooses the tenant.
 | `open_gap` | Insert into `gaps` | Stamped with account + active context id from company scope. |
 | `post_insight` | Insert into `insights` | Stamped with account/profile/run. |
 | `read_competitor_canvas` | Latest competitor canvas per section | Account **and** active-company context chain — the era filter was missing until the Phase 6 tenancy sweep (the exact owner-reported bleed class). |
-| `search_web` | Live web search via the cached `grok_live_search` feed | Cache key `tool:search_web:<query>`; degrades gracefully when `XAI_API_KEY` unset. |
+| `search_web` | Live web search via the cached `web_search` feed (Exa -> Firecrawl -> xAI provider chain) | Cache key `tool:search_web:<query>`; degrades gracefully only when none of `EXA_API_KEY`/`FIRECRAWL_API_KEY`/`XAI_API_KEY` are set. |
 | `firecrawl_scrape` | Scrape a URL via the cached `firecrawl_scrape` feed | Cache key `tool:firecrawl_scrape:<url>`; degrades when unset. |
 | `run_skill` | Enqueue a `skill_run` job + pending `agent_runs` row | Registered **only** when `ctx.allowSkillRuns` (section-agent chat, never Atlas). Rules below. |
 
@@ -319,7 +319,8 @@ The worker's Supabase client uses the **service-role key, which bypasses RLS ent
   with `health = 'ok'` and `expires_at` in the future. Writes get `ttl_seconds` from the feed
   when healthy, or a short **300 s TTL when degraded/failing** so failures retry soon.
 - **Fetchers** (`fetchers.ts`), keyed by `feed_key`: `firecrawl_scrape` (Firecrawl v2 scrape),
-  `grok_live_search` (xAI live search), `fred_series` (FRED observations → metrics),
+  `web_search` (provider chain: Exa semantic search -> Firecrawl search -> xAI Agent Tools API,
+  first provider with real evidence wins), `fred_series` (FRED observations → metrics),
   `google_trends` (SerpAPI engine), `gdelt_count` (no key needed), `github_repo_stats`. Every
   fetcher returns `degraded(...)` instead of throwing when its API key is missing or the
   upstream call fails — tools and jobs surface `health`/`error` rather than crashing the run.

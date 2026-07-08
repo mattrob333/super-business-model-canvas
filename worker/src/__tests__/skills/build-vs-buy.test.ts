@@ -20,14 +20,14 @@ function feedFixtures() {
       title: "Onboarding services roundup",
       excerpt: EXCERPTS[0].excerpt,
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       sourceUrl: "https://market.example/onboarding-services",
     }],
     "build_vs_buy:account-1:in-house-payroll-processing": [{
       title: "Payroll platforms compared",
       excerpt: EXCERPTS[1].excerpt,
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       // No sourceUrl — the skill must fall back to the feed name.
     }],
   });

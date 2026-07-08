@@ -59,7 +59,7 @@ export interface SkillToolkit {
   /** The active company's researched competitor entities. */
   loadCompetitors(accountId: string, scope: CompanyScope): Promise<Array<{ id: string; name: string; website_url: string | null }>>;
 
-  /** Cached feed fetch (firecrawl_scrape, grok_live_search, ...). */
+  /** Cached feed fetch (firecrawl_scrape, web_search, ...). */
   refreshFeed(request: FeedRefreshRequest): Promise<FeedRunResult>;
 
   /** Model routes for the given task classes (account overrides win). */

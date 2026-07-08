@@ -318,7 +318,7 @@ function makeSkillHandler(
             title: "Founder community thread",
             excerpt: "Seed-stage SaaS founders say onboarding is too slow and they need proof before buying.",
             sourceType: "social",
-            sourceName: "Grok Live Search",
+            sourceName: "Web Search",
             sourceUrl: "https://community.example/founders",
           }],
           metrics: [],

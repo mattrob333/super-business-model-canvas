@@ -17,13 +17,13 @@ function feedFixtures() {
       title: "RivalCo v4.0 launch",
       excerpt: EXCERPTS[0],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       sourceUrl: "https://news.example/rivalco-v4",
     }, {
       title: "RivalCo changelog",
       excerpt: EXCERPTS[1],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       // No sourceUrl — the skill must fall back to the feed name.
     }],
   });

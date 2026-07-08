@@ -14,13 +14,13 @@ function feedFixtures() {
       title: "Robotics industry supply chain overview",
       excerpt: EXCERPTS[0],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       sourceUrl: "https://industry.example/robotics-supply-chain",
     }, {
       title: "Robotics distribution landscape",
       excerpt: EXCERPTS[1],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       // No sourceUrl — the skill must fall back to the feed name.
     }],
   });

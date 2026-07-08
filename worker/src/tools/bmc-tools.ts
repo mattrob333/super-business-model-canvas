@@ -247,12 +247,12 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
 
   const searchWeb = tool(
     "search_web",
-    "Search the live web through the cached Grok feed when configured. Gracefully degrades when unset.",
+    "Search the live web through the cached web search feed when configured. Gracefully degrades when unset.",
     { query: z.string().min(1) },
     async (args) => {
       const result = await feedRunner.refresh({
         accountId: ctx.accountId,
-        feedKey: "grok_live_search",
+        feedKey: "web_search",
         cacheKey: `tool:search_web:${args.query}`,
         query: args.query,
       });

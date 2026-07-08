@@ -200,7 +200,7 @@ export class CompanyResearchHandler {
     for (const batch of batches) {
       const result = await this.feedRunner.refresh({
         accountId: job.account_id,
-        feedKey: "grok_live_search",
+        feedKey: "web_search",
         cacheKey: `${subject.cacheKey}:web_backfill:${batch.join(",")}`,
         companyName: subject.targetName,
         query: backfillQuery(subject.targetName, batch),
@@ -276,18 +276,18 @@ export class CompanyResearchHandler {
     if (blocked) {
       const fallback = await this.feedRunner.refresh({
         accountId,
-        feedKey: "grok_live_search",
-        cacheKey: `${subject.cacheKey}:grok_fallback`,
+        feedKey: "web_search",
+        cacheKey: `${subject.cacheKey}:web_search_fallback`,
         companyName: subject.targetName,
         query: `${subject.targetName} business model products pricing revenue`,
       });
       if (fallback.health === "ok" && fallback.evidence.length > 0) {
         return {
-          payload: { fallback: "grok_live_search", firecrawl_errors: errors, payload: fallback.payload },
+          payload: { fallback: "web_search", firecrawl_errors: errors, payload: fallback.payload },
           evidence: capEvidenceBytes(dedupeEvidence(fallback.evidence), 4_000).slice(0, 8),
         };
       }
-      errors.push(`grok_live_search fallback failed: ${fallback.error ?? fallback.health}`);
+      errors.push(`web_search fallback failed: ${fallback.error ?? fallback.health}`);
     }
 
     throw new Error(`${subject.runType} crawl failed: ${errors[0] ?? "no evidence returned"}`);

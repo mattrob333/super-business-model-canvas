@@ -213,10 +213,10 @@ describe("CompanyResearchHandler", () => {
       "https://rival.example/case-studies",
       "https://rival.example/careers",
     ]);
-    expect(calls.filter((call) => call.feedKey === "grok_live_search").length).toBeLessThanOrEqual(2);
+    expect(calls.filter((call) => call.feedKey === "web_search").length).toBeLessThanOrEqual(2);
   });
 
-  it("falls back to Grok live search when Firecrawl is blocked by HTTP 403", async () => {
+  it("falls back to web search when Firecrawl is blocked by HTTP 403", async () => {
     const client = new CompanyResearchFakeClient();
     const calls: string[] = [];
     const runner = new ScriptedRunner([
@@ -238,7 +238,7 @@ describe("CompanyResearchHandler", () => {
             evidence: [{
               title: "Live search RivalCo",
               sourceType: "news" as const,
-              sourceName: "Grok Live Search",
+              sourceName: "Web Search",
               sourceUrl: "https://news.example/rivalco",
               excerpt: "RivalCo sells enterprise subscriptions and product analytics.",
               metadata: { query: request.query },
@@ -251,11 +251,11 @@ describe("CompanyResearchHandler", () => {
 
     await handler.handleCompetitor(makeCompetitorJob());
 
-    expect(calls).toContain("grok_live_search");
+    expect(calls).toContain("web_search");
     expect(runner.requests[0]?.prompt).toContain("Live search RivalCo");
     expect(client.inserts.find((insert) => insert.table === "evidence_items")?.value).toMatchObject({
       source_type: "news",
-      source_name: "Grok Live Search",
+      source_name: "Web Search",
     });
   });
 
@@ -280,14 +280,14 @@ describe("CompanyResearchHandler", () => {
       feedRunner: {
         async refresh(request: { feedKey: string; query?: string; companyUrl?: string }) {
           calls.push(request);
-          if (request.feedKey === "grok_live_search") {
+          if (request.feedKey === "web_search") {
             return {
               health: "ok" as const,
               payload: { search: true },
               evidence: [{
                 title: "Live search RivalCo business model",
                 sourceType: "news" as const,
-                sourceName: "Grok Live Search",
+                sourceName: "Web Search",
                 sourceUrl: "https://news.example/rivalco-business",
                 excerpt: "RivalCo sells enterprise subscriptions and is hiring sales leaders.",
                 metadata: {},
@@ -314,9 +314,9 @@ describe("CompanyResearchHandler", () => {
 
     await handler.handleCompetitor(makeCompetitorJob());
 
-    expect(calls.filter((call) => call.feedKey === "grok_live_search")).toHaveLength(2);
+    expect(calls.filter((call) => call.feedKey === "web_search")).toHaveLength(2);
     const backfillEvidence = client.inserts.find((insert) =>
-      insert.table === "evidence_items" && insert.value.source_name === "Grok Live Search");
+      insert.table === "evidence_items" && insert.value.source_name === "Web Search");
     expect(backfillEvidence?.value.metadata).toMatchObject({ source_kind: "web_search_backfill" });
     const revenueInsert = client.inserts.find((insert) =>
       insert.table === "canvas_section_versions" && insert.value.section_key === "revenue_streams");
@@ -367,7 +367,7 @@ describe("CompanyResearchHandler", () => {
 
     await handler.handleCompetitor(makeCompetitorJob());
 
-    expect(calls.some((call) => call.feedKey === "grok_live_search")).toBe(false);
+    expect(calls.some((call) => call.feedKey === "web_search")).toBe(false);
   });
 
   it("leaves uncovered sections empty when web backfill extracts no claims", async () => {
@@ -386,11 +386,11 @@ describe("CompanyResearchHandler", () => {
             health: "ok" as const,
             payload: {},
             evidence: [{
-              title: request.feedKey === "grok_live_search" ? "Search found nothing useful" : request.companyUrl ?? "crawl",
-              sourceType: request.feedKey === "grok_live_search" ? "news" as const : "website" as const,
-              sourceName: request.feedKey === "grok_live_search" ? "Grok Live Search" : "Firecrawl",
+              title: request.feedKey === "web_search" ? "Search found nothing useful" : request.companyUrl ?? "crawl",
+              sourceType: request.feedKey === "web_search" ? "news" as const : "website" as const,
+              sourceName: request.feedKey === "web_search" ? "Web Search" : "Firecrawl",
               sourceUrl: request.companyUrl,
-              excerpt: request.feedKey === "grok_live_search" ? "No clear business model claims." : "RivalCo sells through partners.",
+              excerpt: request.feedKey === "web_search" ? "No clear business model claims." : "RivalCo sells through partners.",
               metadata: {},
             }],
             metrics: [],
@@ -420,7 +420,7 @@ describe("CompanyResearchHandler", () => {
             metrics: [],
             error: request.feedKey === "firecrawl_scrape"
               ? "Firecrawl scrape failed with HTTP 403"
-              : "Grok search failed with HTTP 500",
+              : "Web search failed with HTTP 500",
           };
         },
       },

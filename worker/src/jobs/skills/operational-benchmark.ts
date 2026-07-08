@@ -7,7 +7,7 @@ import type { SkillRun } from "./toolkit.js";
  * (what they launch) as proxies for where they actually invest, benchmarked
  * against OUR Key Activities canvas. Every one of our activities comes back
  * exactly once as a gap row: either a competitor visibly invests there —
- * grounded in live evidence (Grok search over the researched competitors'
+ * grounded in live evidence (web search over the researched competitors'
  * hiring and launch signals), never in the model's own market knowledge,
  * with the activity quoted VERBATIM from our canvas, the competitor named
  * EXACTLY from our researched list, and an evidence_quote copied verbatim
@@ -59,7 +59,7 @@ export const runOperationalBenchmark: SkillRun = async (toolkit, job, scope) => 
   const companyName = scope.companyName ?? "";
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     // Company-scoped: without the company slug, re-analyzing to a different
     // company within the feed TTL would serve the previous company's cached
     // hiring/launch excerpts (cross-company contamination).
@@ -71,7 +71,7 @@ export const runOperationalBenchmark: SkillRun = async (toolkit, job, scope) => 
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
     : [];
   if (sources.length === 0) {
-    throw new Error("operational_benchmark could not retrieve competitor hiring and launch evidence — check the Grok search feed");
+    throw new Error("operational_benchmark could not retrieve competitor hiring and launch evidence — check the web search feed");
   }
 
   // Every excerpt that feeds the prompt lands on the evidence ledger first —
@@ -80,7 +80,7 @@ export const runOperationalBenchmark: SkillRun = async (toolkit, job, scope) => 
   for (const source of sources) {
     evidenceIds.push(await toolkit.writeEvidence(job, {
       title: `${companyName || "operational benchmark"} competitor operations source`,
-      sourceUrl: source.sourceUrl ?? "grok_live_search",
+      sourceUrl: source.sourceUrl ?? "web_search",
       excerpt: source.excerpt ?? "",
     }));
   }

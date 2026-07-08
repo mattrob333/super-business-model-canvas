@@ -212,7 +212,7 @@ export class SkillRunHandler {
     for (const segment of segments.slice(0, 6)) {
       const result = await this.feedRunner.refresh({
         accountId: job.account_id,
-        feedKey: "grok_live_search",
+        feedKey: "web_search",
         cacheKey: `avatar_refinement:${job.account_id}:${slug(segment.text)}`,
         companyName: segment.text,
         query: `${segment.text} reviews community forum pain points buying triggers objections`,

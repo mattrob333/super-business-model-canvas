@@ -19,13 +19,13 @@ function feedFixtures() {
       title: "Cloud cost optimization vendors",
       excerpt: EXCERPTS[0],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       sourceUrl: "https://industry.example/cloud-cost-tools",
     }, {
       title: "QA automation adoption report",
       excerpt: EXCERPTS[1],
       sourceType: "social",
-      sourceName: "Grok Live Search",
+      sourceName: "Web Search",
       // No sourceUrl — the skill must fall back to the feed name.
     }],
   });

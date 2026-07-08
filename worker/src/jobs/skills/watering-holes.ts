@@ -5,7 +5,7 @@ import type { CanvasItemSource, SkillRun } from "./toolkit.js";
  * relay.watering_holes — where the ICP already congregates, for the Channels
  * room: ranked communities/forums/events ("watering holes") with a concrete,
  * norm-respecting entry strategy per hole. The map is grounded in live
- * community evidence (Grok search over the segments' hangouts), never in the
+ * community evidence (web search over the segments' hangouts), never in the
  * model's own market knowledge — every hole must quote one of the retrieved
  * excerpts verbatim AND name one of our Customer Segments items verbatim
  * (parser-enforced; one ungrounded hole rejects the whole parse), and the top
@@ -48,7 +48,7 @@ export const runWateringHoles: SkillRun = async (toolkit, job, scope) => {
   const segmentDescriptions = segments.map((item) => item.text).join("; ");
   const feed = await toolkit.refreshFeed({
     accountId: job.account_id,
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     // Company-scoped: without the company slug, re-analyzing to a different
     // company within the feed TTL would serve the previous company's cached
     // community excerpts (cross-company contamination).
@@ -60,7 +60,7 @@ export const runWateringHoles: SkillRun = async (toolkit, job, scope) => {
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
     : [];
   if (sources.length === 0) {
-    throw new Error("watering_holes could not retrieve community evidence — check the Grok search feed");
+    throw new Error("watering_holes could not retrieve community evidence — check the web search feed");
   }
 
   // Every excerpt that feeds the prompt lands on the evidence ledger first —
@@ -69,7 +69,7 @@ export const runWateringHoles: SkillRun = async (toolkit, job, scope) => {
   for (const source of sources) {
     evidenceIds.push(await toolkit.writeEvidence(job, {
       title: `${companyName} watering-hole source`,
-      sourceUrl: source.sourceUrl ?? "grok_live_search",
+      sourceUrl: source.sourceUrl ?? "web_search",
       excerpt: source.excerpt ?? "",
     }));
   }

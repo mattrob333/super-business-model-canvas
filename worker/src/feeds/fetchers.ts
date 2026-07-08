@@ -19,7 +19,7 @@ export function createFeedFetchers(config: FeedRuntimeConfig = {}): Map<string, 
   const fetcher = withTimeout(config.fetch ?? fetch, config.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS);
   const fetchers: FeedFetcher[] = [
     firecrawlScrapeFetcher(config, fetcher),
-    grokLiveSearchFetcher(config, fetcher),
+    webSearchFetcher(config, fetcher),
     fredSeriesFetcher(config, fetcher),
     googleTrendsFetcher(config, fetcher),
     gdeltCountFetcher(fetcher),
@@ -77,46 +77,49 @@ interface SearchLegResult {
 
 /**
  * xAI killed Live Search on 2026-01-12 (HTTP 410 "Live search is deprecated"
- * — confirmed via the [grok_live_search] logging added for the 2026-07-08
+ * — confirmed via the [web_search] logging added for the 2026-07-08
  * diagnose). Every search-backed skill was silently broken since, so this is
  * now a provider chain rather than a single vendor call: Exa (semantic
  * search, full page text) -> Firecrawl search (same key that already powers
- * page scraping) -> xAI (kept as a last-resort leg; still useful for X-native
- * signal once migrated off the dead Live Search endpoint). The feed key stays
- * `grok_live_search` so every skill call site and the data_feeds row are
- * untouched — only what answers the key changes. Each leg is tried in order
- * and the first with real evidence wins; every attempt logs a
- * `[grok_live_search]` line so a diagnose run shows exactly which providers
- * were tried and why they did or didn't return evidence.
+ * page scraping) -> xAI, migrated onto their Responses/Agent-Tools API
+ * (`/v1/responses` + `tools: [{type: "web_search"}]`) rather than the dead
+ * Live Search endpoint — same contract `supabase/functions/_shared/grok-
+ * client.ts` already uses in production. Each leg is tried in order and the
+ * first with real evidence wins; every attempt logs a `[web_search]` line so
+ * a diagnose run shows exactly which providers were tried and why they did
+ * or didn't return evidence. Renamed from `grok_live_search` (2026-07-08,
+ * same session) because Grok is no longer the default or only provider —
+ * required a matching `data_feeds` migration since `FeedRunner.loadFeed`
+ * throws on an unregistered feed key.
  */
-function grokLiveSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): FeedFetcher {
+function webSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): FeedFetcher {
   return {
-    feedKey: "grok_live_search",
+    feedKey: "web_search",
     async run(input) {
       const query = input.query ?? readString(input.config.query) ?? input.companyName;
-      if (!query) return degraded("grok_live_search", "No query configured for web search");
+      if (!query) return degraded("web_search", "No query configured for web search");
 
       const legs: Array<() => Promise<SearchLegResult>> = [];
       if (config.exaApiKey) legs.push(() => runExaSearch(config, fetcher, input, query));
       if (config.firecrawlApiKey) legs.push(() => runFirecrawlSearch(config, fetcher, input, query));
-      if (config.xaiApiKey) legs.push(() => runGrokSearch(config, fetcher, query));
+      if (config.xaiApiKey) legs.push(() => runXaiAgentSearch(config, fetcher, query));
 
       if (legs.length === 0) {
-        return degraded("grok_live_search", "No search provider configured — set EXA_API_KEY, FIRECRAWL_API_KEY, or XAI_API_KEY");
+        return degraded("web_search", "No search provider configured — set EXA_API_KEY, FIRECRAWL_API_KEY, or XAI_API_KEY");
       }
 
       const failures: string[] = [];
       for (const leg of legs) {
         const result = await leg();
         if (result.outcome === "ok" && result.evidence && result.evidence.length > 0) {
-          console.log(`[grok_live_search] ok via ${result.provider} evidence=${result.evidence.length}`);
+          console.log(`[web_search] ok via ${result.provider} evidence=${result.evidence.length}`);
           return { health: "ok", payload: result.payload ?? {}, evidence: result.evidence, metrics: [] };
         }
         const reason = result.reason ?? "no evidence returned";
-        console.warn(`[grok_live_search] ${result.provider} failed: ${reason}`);
+        console.warn(`[web_search] ${result.provider} failed: ${reason}`);
         failures.push(`${result.provider}: ${reason}`);
       }
-      return degraded("grok_live_search", failures.join(" | "));
+      return degraded("web_search", failures.join(" | "));
     },
   };
 }
@@ -202,18 +205,28 @@ async function runFirecrawlSearch(config: FeedRuntimeConfig, fetcher: FetchLike,
 
 /**
  * Overridable via the XAI_MODEL Fly secret so a retired/renamed model id can
- * be flipped without a code deploy. Live incident 2026-07-08: skills failed
- * with "could not retrieve industry evidence" and the diagnose logs contained
- * ZERO grok lines — this fetcher failed silently. It now logs every outcome.
- * Kept as the chain's last-resort leg: xAI retired this Live Search endpoint
- * on 2026-01-12 (HTTP 410), so it degrades until migrated to their Agent
- * Tools API — harmless today since Exa/Firecrawl answer first.
+ * be flipped without a code deploy. Matches the canonical model in
+ * `supabase/functions/_shared/xai-models.ts` (XAI_CHAT_MODEL) — the previous
+ * default `grok-4-fast` predated that rename.
  */
-const DEFAULT_GROK_MODEL = "grok-4-fast";
+const DEFAULT_XAI_MODEL = "grok-4.3";
 
-async function runGrokSearch(config: FeedRuntimeConfig, fetcher: FetchLike, query: string): Promise<SearchLegResult> {
-  const model = config.xaiModel ?? DEFAULT_GROK_MODEL;
-  const response = await fetcher("https://api.x.ai/v1/chat/completions", {
+/**
+ * xAI's Live Search (`search_parameters` on /v1/chat/completions) returned
+ * HTTP 410 "Live search is deprecated. Please switch to the Agent Tools API"
+ * as of 2026-01-12 — confirmed live via the [web_search] diagnose logging.
+ * This now calls the replacement Responses API (`/v1/responses` with
+ * `tools: [{type: "web_search"}]`), the same contract already proven in
+ * production by `supabase/functions/_shared/grok-client.ts`'s
+ * `buildResponsesBody`/`extractResponsesText`. Citations come back as a
+ * top-level `citations` array of `{url, title, snippet}` (or bare URL
+ * strings on older responses) rather than the old scheme's flat URL list, so
+ * each citation becomes its own evidence item with its own excerpt instead
+ * of every citation sharing one blob of text.
+ */
+async function runXaiAgentSearch(config: FeedRuntimeConfig, fetcher: FetchLike, query: string): Promise<SearchLegResult> {
+  const model = config.xaiModel ?? DEFAULT_XAI_MODEL;
+  const response = await fetcher("https://api.x.ai/v1/responses", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -221,47 +234,82 @@ async function runGrokSearch(config: FeedRuntimeConfig, fetcher: FetchLike, quer
     },
     body: JSON.stringify({
       model,
-      messages: [
-        { role: "system", content: "Search the live web and return concise sourced snippets." },
-        { role: "user", content: query },
-      ],
-      search_parameters: { mode: "on", return_citations: true },
+      instructions: "Search the live web and return concise sourced snippets.",
+      input: query,
+      tools: [{ type: "web_search" }],
+      reasoning: { effort: "low" },
       stream: false,
     }),
   });
   if (!response.ok) {
     const body = (await response.text().catch(() => "")).slice(0, 300);
-    console.error(`[grok_live_search] HTTP ${response.status} from api.x.ai (model=${model})${body ? ` body=${body}` : ""}`);
+    console.error(`[web_search] HTTP ${response.status} from api.x.ai/v1/responses (model=${model})${body ? ` body=${body}` : ""}`);
     return { provider: "xai", outcome: "failed", reason: `HTTP ${response.status} (model=${model})${body ? ` — ${body.slice(0, 160)}` : ""}` };
   }
   const payload = await response.json() as Record<string, unknown>;
-  const content = readString((((payload.choices as unknown[])?.[0] as Record<string, unknown> | undefined)?.message as Record<string, unknown> | undefined)?.content);
-  const citations = extractCitationUrls(payload);
+  const text = extractResponsesOutputText(payload);
+  const citations = extractXaiCitations(payload);
   // A 200 with nothing in it used to come back health "ok" with an empty
   // excerpt, which skills filtered to zero evidence — the failure surfaced
   // rooms away as "could not retrieve industry evidence". Call it what it
   // is at the source.
-  if (!content?.trim() && citations.length === 0) {
-    console.warn(`[grok_live_search] empty response (model=${model}) — no content and no citations for query=${JSON.stringify(query)}`);
-    return { provider: "xai", outcome: "failed", reason: `no content and no citations (model=${model}) — check XAI_MODEL and live-search availability` };
+  if (!text.trim() && citations.length === 0) {
+    console.warn(`[web_search] empty response (model=${model}) — no output text and no citations for query=${JSON.stringify(query)}`);
+    return { provider: "xai", outcome: "failed", reason: `no output text and no citations (model=${model}) — check XAI_MODEL and web_search tool availability` };
   }
   const evidence: EvidenceCandidate[] = citations.length > 0
-    ? citations.map((url, index) => ({
-        title: `Live search: ${query} (${index + 1})`,
+    ? citations.map((citation, index) => ({
+        title: citation.title ?? `Web search: ${query} (${index + 1})`,
         sourceType: "news",
-        sourceName: "Grok Live Search",
-        sourceUrl: url,
-        excerpt: content,
-        metadata: { feedKey: "grok_live_search", query, provider: "xai" },
+        sourceName: "xAI Agent Search",
+        sourceUrl: citation.url,
+        excerpt: citation.snippet ?? text,
+        metadata: { feedKey: "web_search", query, provider: "xai" },
       }))
     : [{
-        title: `Live search: ${query}`,
+        title: `Web search: ${query}`,
         sourceType: "news",
-        sourceName: "Grok Live Search",
-        excerpt: content,
-        metadata: { feedKey: "grok_live_search", query, provider: "xai" },
+        sourceName: "xAI Agent Search",
+        excerpt: text,
+        metadata: { feedKey: "web_search", query, provider: "xai" },
       }];
   return { provider: "xai", outcome: "ok", evidence, payload };
+}
+
+function extractResponsesOutputText(payload: Record<string, unknown>): string {
+  const output = Array.isArray(payload.output) ? payload.output as Record<string, unknown>[] : [];
+  let text = "";
+  for (const item of output) {
+    if (item.type !== "message") continue;
+    const content = Array.isArray(item.content) ? item.content as Record<string, unknown>[] : [];
+    for (const block of content) {
+      if (block.type === "output_text" && typeof block.text === "string") text += block.text;
+    }
+  }
+  return text;
+}
+
+interface XaiCitation {
+  url: string;
+  title?: string;
+  snippet?: string;
+}
+
+function extractXaiCitations(payload: Record<string, unknown>): XaiCitation[] {
+  if (!Array.isArray(payload.citations)) return [];
+  const citations: XaiCitation[] = [];
+  for (const item of payload.citations) {
+    if (typeof item === "string") {
+      citations.push({ url: item });
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const url = readString(record.url) ?? readString(record.source_url);
+    if (!url) continue;
+    citations.push({ url, title: readString(record.title), snippet: readString(record.snippet) });
+  }
+  return citations;
 }
 
 function fredSeriesFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): FeedFetcher {
@@ -431,34 +479,6 @@ export function cleanMarkdownExcerpt(markdown: string, maxLength: number): strin
 
 function readStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length > 0) : [];
-}
-
-function extractCitationUrls(payload: Record<string, unknown>): string[] {
-  const urls = new Set<string>();
-  collectCitationUrls(payload.citations, urls);
-  const choices = payload.choices;
-  if (Array.isArray(choices)) {
-    for (const choice of choices) {
-      if (!choice || typeof choice !== "object") continue;
-      collectCitationUrls((choice as { citations?: unknown }).citations, urls);
-      const message = (choice as { message?: unknown }).message;
-      if (message && typeof message === "object") collectCitationUrls((message as { citations?: unknown }).citations, urls);
-    }
-  }
-  return [...urls];
-}
-
-function collectCitationUrls(value: unknown, urls: Set<string>): void {
-  if (!Array.isArray(value)) return;
-  for (const item of value) {
-    const url = typeof item === "string"
-      ? item
-      : item && typeof item === "object"
-        ? readString((item as { url?: unknown; source_url?: unknown }).url)
-          ?? readString((item as { url?: unknown; source_url?: unknown }).source_url)
-        : undefined;
-    if (url) urls.add(url);
-  }
 }
 
 function latestTrendValue(payload: Record<string, unknown>, keyword: string): number | null {

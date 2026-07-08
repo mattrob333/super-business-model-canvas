@@ -11,7 +11,7 @@ describe("feed fetchers", () => {
 
     await expect(fetchers.get("firecrawl_scrape")?.run(baseInput("firecrawl_scrape")))
       .resolves.toMatchObject({ health: "degraded", error: "FIRECRAWL_API_KEY is not configured" });
-    await expect(fetchers.get("grok_live_search")?.run(baseInput("grok_live_search")))
+    await expect(fetchers.get("web_search")?.run(baseInput("web_search")))
       .resolves.toMatchObject({
         health: "degraded",
         error: "No search provider configured — set EXA_API_KEY, FIRECRAWL_API_KEY, or XAI_API_KEY",
@@ -40,63 +40,66 @@ describe("feed fetchers", () => {
     expect(result?.evidence[0]?.excerpt).toContain("Pro plan for $29");
   });
 
-  it("normalizes Grok live-search fixtures into news evidence", async () => {
-    const fetch = fixtureFetch("grok-live-search.json");
+  it("normalizes xAI Agent Search (Responses API) fixtures into news evidence, one item per citation", async () => {
+    const fetch = fixtureFetch("xai-responses-search.json");
     const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", fetch });
 
-    const result = await fetchers.get("grok_live_search")?.run({
-      ...baseInput("grok_live_search"),
+    const result = await fetchers.get("web_search")?.run({
+      ...baseInput("web_search"),
       query: "Acme analytics",
     });
 
     expect(result).toMatchObject({
       health: "ok",
       evidence: [
-        { title: "Live search: Acme analytics (1)", sourceType: "news", sourceName: "Grok Live Search", sourceUrl: "https://news.example/acme-analytics" },
-        { title: "Live search: Acme analytics (2)", sourceType: "news", sourceName: "Grok Live Search", sourceUrl: "https://acme.example/blog/enterprise-analytics" },
+        { title: "Acme launches enterprise analytics suite", sourceType: "news", sourceName: "xAI Agent Search", sourceUrl: "https://news.example/acme-analytics" },
+        { title: "Acme blog: enterprise analytics deep dive", sourceType: "news", sourceName: "xAI Agent Search", sourceUrl: "https://acme.example/blog/enterprise-analytics" },
       ],
     });
-    expect(result?.evidence[0]?.excerpt).toContain("enterprise analytics product");
+    expect(result?.evidence[0]?.excerpt).toContain("mid-market data teams");
+    expect(result?.evidence[1]?.excerpt).toContain("query builder");
     const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.x.ai/v1/responses");
     const requestInit = fetchMock.mock.calls[0]?.[1];
     expect(JSON.parse(String(requestInit?.body))).toMatchObject({
-      model: "grok-4-fast",
-      search_parameters: { mode: "on", return_citations: true },
+      model: "grok-4.3",
+      input: "Acme analytics",
+      tools: [{ type: "web_search" }],
     });
   });
 
-  it("sends the configured XAI_MODEL override to Grok", async () => {
-    const fetch = fixtureFetch("grok-live-search.json");
+  it("sends the configured XAI_MODEL override to the Responses API", async () => {
+    const fetch = fixtureFetch("xai-responses-search.json");
     const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", xaiModel: "grok-next", fetch });
 
-    await fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" });
+    await fetchers.get("web_search")?.run({ ...baseInput("web_search"), query: "Acme analytics" });
 
     const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ model: "grok-next" });
   });
 
-  it("degrades Grok responses that carry no content and no citations instead of reporting ok", async () => {
+  it("degrades xAI Responses API replies that carry no output text and no citations instead of reporting ok", async () => {
     const fetch = vi.fn(async () => new Response(
-      JSON.stringify({ choices: [{ message: { role: "assistant", content: "" } }] }),
+      JSON.stringify({ output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "" }] }] }),
       { status: 200, headers: { "content-type": "application/json" } },
     ));
     const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", fetch });
 
-    await expect(fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" }))
+    await expect(fetchers.get("web_search")?.run({ ...baseInput("web_search"), query: "Acme analytics" }))
       .resolves.toMatchObject({
         health: "degraded",
-        error: expect.stringContaining("no content and no citations"),
+        error: expect.stringContaining("no output text and no citations"),
       });
   });
 
-  it("surfaces the Grok error body when the API rejects the request", async () => {
+  it("surfaces the xAI error body when the Responses API rejects the request", async () => {
     const fetch = vi.fn(async () => new Response(
-      JSON.stringify({ error: "The model grok-4-fast does not exist" }),
+      JSON.stringify({ error: "The model grok-4.3 does not exist" }),
       { status: 404 },
     ));
     const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", fetch });
 
-    const result = await fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" });
+    const result = await fetchers.get("web_search")?.run({ ...baseInput("web_search"), query: "Acme analytics" });
     expect(result).toMatchObject({ health: "degraded" });
     expect(result?.error).toContain("HTTP 404");
     expect(result?.error).toContain("does not exist");
@@ -106,8 +109,8 @@ describe("feed fetchers", () => {
     const fetch = fixtureFetch("exa-search.json");
     const fetchers = createFeedFetchers({ exaApiKey: "exa-key", fetch });
 
-    const result = await fetchers.get("grok_live_search")?.run({
-      ...baseInput("grok_live_search"),
+    const result = await fetchers.get("web_search")?.run({
+      ...baseInput("web_search"),
       query: "Acme analytics",
     });
 
@@ -130,8 +133,8 @@ describe("feed fetchers", () => {
     const fetch = fixtureFetch("firecrawl-search.json");
     const fetchers = createFeedFetchers({ firecrawlApiKey: "firecrawl-key", fetch });
 
-    const result = await fetchers.get("grok_live_search")?.run({
-      ...baseInput("grok_live_search"),
+    const result = await fetchers.get("web_search")?.run({
+      ...baseInput("web_search"),
       query: "Acme analytics",
     });
 
@@ -154,7 +157,7 @@ describe("feed fetchers", () => {
     });
     const fetchers = createFeedFetchers({ exaApiKey: "exa-key", firecrawlApiKey: "firecrawl-key", xaiApiKey: "xai-key", fetch });
 
-    const result = await fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" });
+    const result = await fetchers.get("web_search")?.run({ ...baseInput("web_search"), query: "Acme analytics" });
 
     expect(result?.health).toBe("ok");
     expect(result?.evidence[0]?.sourceName).toBe("Exa");
@@ -173,7 +176,7 @@ describe("feed fetchers", () => {
     });
     const fetchers = createFeedFetchers({ exaApiKey: "exa-key", firecrawlApiKey: "firecrawl-key", fetch });
 
-    const result = await fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" });
+    const result = await fetchers.get("web_search")?.run({ ...baseInput("web_search"), query: "Acme analytics" });
 
     expect(result?.health).toBe("ok");
     expect(result?.evidence[0]?.sourceName).toBe("Firecrawl Search");
@@ -184,7 +187,7 @@ describe("feed fetchers", () => {
     const fetch = vi.fn(async () => new Response("nope", { status: 500 }));
     const fetchers = createFeedFetchers({ exaApiKey: "exa-key", firecrawlApiKey: "firecrawl-key", xaiApiKey: "xai-key", fetch });
 
-    const result = await fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" });
+    const result = await fetchers.get("web_search")?.run({ ...baseInput("web_search"), query: "Acme analytics" });
 
     expect(result?.health).toBe("degraded");
     expect(result?.error).toContain("exa:");

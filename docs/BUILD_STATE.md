@@ -285,58 +285,93 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
-### Search-provider fallback chain replaces the single xAI dependency (2026-07-08)
+### `grok_live_search` -> `web_search` provider chain + xAI Agent Tools API migration (2026-07-08)
 
 The new `[grok_live_search]` logging (previous entry) paid off immediately: Matt's
 re-run showed `HTTP 410 from api.x.ai body={"error":"Live search is deprecated.
 Please switch to the Agent Tools API"}` on all 3 attempts. xAI retired Live Search
 on 2026-01-12 — every search-backed skill had been silently broken since, and no
-model-name fix could have addressed it.
+model-name fix could have addressed it. This landed in two rounds in the same
+session: first the provider chain (Exa/Firecrawl/xAI, xAI leg still on the dead
+endpoint), then Matt asked for the feed to be renamed (it's no longer Grok-only)
+and for the xAI leg to actually be migrated — both done below.
 
-- **`grok_live_search` is now a provider chain, not a single vendor call**
-  (`worker/src/feeds/fetchers.ts`): Exa (semantic search, full page text) ->
-  Firecrawl search (same key that already powers page scraping, new `/v2/search`
-  leg alongside the existing scrape) -> xAI (kept as a last-resort leg; still
-  degrades honestly on the dead endpoint until migrated to their Agent Tools API,
-  which is harmless since Exa/Firecrawl answer first). The feed key, its
-  `data_feeds` row, and all 11 skill call sites are untouched — only what answers
-  the key changed. Each leg is tried in order; the first with real evidence wins;
-  every attempt logs a `[grok_live_search]` line (`ok via <provider>` or
-  `<provider> failed: <reason>`) so a diagnose run shows exactly what was tried.
-  Legs auto-detect from configured keys, so the chain runs today on whichever of
-  `EXA_API_KEY` / `FIRECRAWL_API_KEY` / `XAI_API_KEY` are set and upgrades itself
-  the moment a higher-priority key lands — no code change needed to adopt Exa.
+- **The feed is now `web_search`, not `grok_live_search`** (`worker/src/feeds/
+  fetchers.ts`), a provider chain rather than a single vendor call: Exa
+  (semantic search, full page text) -> Firecrawl search (same key that already
+  powers page scraping, new `/v2/search` leg alongside the existing scrape) ->
+  xAI, now actually on their Responses/Agent-Tools API. Each leg is tried in
+  order; the first with real evidence wins; every attempt logs a `[web_search]`
+  line (`ok via <provider>` or `<provider> failed: <reason>`). Legs auto-detect
+  from configured keys, so the chain upgrades itself the moment a
+  higher-priority key lands — no code change needed to adopt Exa.
+  Renamed everywhere it was referenced: all 11 skill files' `feedKey` and their
+  user-facing "check the Grok search feed" error strings (the exact text Matt
+  saw on `supply_chain_map`), `company-research.ts`, `skill-run.ts`,
+  `bmc-tools.ts`'s `search_web` MCP tool description, test fixtures/mocks, and
+  `docs/wiki/Worker.md` / `Skills.md`.
+- **Renaming a feed key is not cosmetic**: `FeedRunner.loadFeed` throws
+  `Data feed not configured: <key>` when no matching `data_feeds` row exists —
+  every skill using `web_search` would hard-fail without a matching row. New
+  migration `20260708190000_web_search_feed_key.sql` INSERTs a `web_search`
+  row; it deliberately does NOT rename/delete the old `grok_live_search` row,
+  so it's safe to apply in any order relative to the code deploy — a rename-in-
+  place would break a worker still running old code (which still looks up
+  `grok_live_search`) if the migration landed first. Mirrored into
+  `supabase/schema.sql` (fresh installs only seed `web_search`) and
+  `scripts/verify-schema.sql`'s expected-feed-key list.
+- **xAI leg migrated off the dead Live Search endpoint** to the Responses API
+  (`POST /v1/responses`, `tools: [{type: "web_search"}]`, `instructions` +
+  `input` instead of a messages array) — the same contract already proven in
+  production by `supabase/functions/_shared/grok-client.ts` (`buildResponsesBody`
+  / `extractResponsesText`), confirmed by reading that file rather than
+  guessing from xAI's docs (which 403'd through the sandbox proxy). Citations
+  come back as a top-level `citations` array of `{url, title, snippet}` (or
+  bare URL strings), so each citation now becomes its own evidence item with
+  its own excerpt instead of every citation sharing one blob of shared text —
+  a strictly better evidence shape than the old scheme. Default model bumped
+  `grok-4-fast` -> `grok-4.3` to match the canonical model in
+  `supabase/functions/_shared/xai-models.ts` (still overridable via the
+  `XAI_MODEL` Fly secret). Checked the rest of the repo for other Live-Search-
+  style callers (`search_parameters` / raw `/v1/chat/completions`); found only
+  `agent-run/index.ts` and `_shared/llm-client.ts` calling plain chat
+  completions with no web search involved — nothing else needed migrating.
 - **New `EXA_API_KEY`** plumbed `env.ts` -> `index.ts` -> `FeedRuntimeConfig`
   (dispatcher/skill-run/company-research/knowledge-jobs/feed-refresh inherit
   structurally) and through `ToolContext` -> `bmc-tools`/`workspace-chat`/
   `canvas-section-analysis`, mirroring the existing `xaiApiKey` wiring exactly.
-  Added to the `ops.yml` `sync-secrets` job and `DEPLOY.md`'s secrets table as
-  optional, alongside the other feed keys.
-- Tests: 6 new cases in `worker/src/__tests__/feeds.test.ts` — Exa success,
-  Firecrawl-search success, chain stops at the first provider with evidence
-  (Exa configured -> Firecrawl/xAI never called), falls back to Firecrawl when
-  Exa returns zero usable results, and degrades with every configured provider's
-  reason when all legs fail. New fixtures `exa-search.json`,
-  `firecrawl-search.json`. Updated the "no keys configured" degrade-message
-  assertion for the new chain-level message.
-- Gates: worker `npx vitest run src/__tests__/feeds.test.ts` 19 passed; worker
-  `npm test` 390 passed / 2 skipped; worker `npm run typecheck` exit 0; worker
-  `npm run build` exit 0; worker `npx eslint src` exit 0; root `npx tsc -p
-  tsconfig.app.json --noEmit` exit 0; root `npm run build` exit 0; root `npm run
-  lint` exits 1 with the known frozen baseline of 64 problems (46 errors, 18
-  warnings), unchanged, within the <=65 ceiling; UTF-8 decode check on touched
-  files exit 0.
-- HONEST SCOPE: Matt added `EXA_API_KEY` to Fly directly (not through the
-  `ops.yml` GitHub-secrets sync path) and asked for confirmation. This session
-  had no `flyctl`/`FLY_API_TOKEN` and the GitHub App integration returned 403
-  on `workflow_dispatch` for the `worker-diagnose`/`sync-secrets` Ops jobs, so
-  the key's presence on Fly could not be verified from the repo — Matt should
-  confirm via `flyctl secrets list -a super-bmc-worker` or the Fly dashboard,
-  or run Actions -> Ops -> `worker-diagnose` himself. The xAI-to-Agent-Tools-API
-  migration mentioned as a stretch goal was deliberately NOT done this pass —
-  the last-resort leg already degrades honestly and correctly, and guessing at
-  an unverified request contract for a leg that only fires when both better
-  providers fail was not worth the risk.
+  Added to the `ops.yml` `sync-secrets` job and `DEPLOY.md`'s secrets table.
+- Tests: `worker/src/__tests__/feeds.test.ts` — Exa success, Firecrawl-search
+  success, xAI Responses API success (one evidence item per citation, model
+  override, empty-response degrade, error-body surfaced), chain stops at the
+  first provider with evidence, falls back to Firecrawl when Exa returns zero
+  usable results, degrades with every configured provider's reason when all
+  legs fail. Fixtures: `exa-search.json`, `firecrawl-search.json`,
+  `xai-responses-search.json` (replaces the deleted `grok-live-search.json`).
+  Renamed `feedKey`/mock strings across the 11 skill test files,
+  `company-research.test.ts`, `bmc-tools.test.ts`, `skill-run.test.ts`.
+- Gates: worker `npx vitest run` 390 passed / 2 skipped; worker `npm run
+  typecheck` exit 0; worker `npm run build` exit 0; worker `npx eslint src`
+  exit 0; root `npx tsc -p tsconfig.app.json --noEmit` exit 0; root `npm run
+  build` exit 0; root `npm run lint` exits 1 with the known frozen baseline of
+  64 problems (46 errors, 18 warnings), unchanged, within the <=65 ceiling;
+  UTF-8 decode check on touched files exit 0.
+- HONEST SCOPE / found this round: Matt's Fly secrets screenshot showed
+  `EXA_API_KEY` added to the **`super-bmc-web`** app (the frontend), not
+  **`super-bmc-worker`** (the background job worker — the only app that reads
+  this code path). That's why it never appeared in the `worker-diagnose`
+  Ops-Action secret list. Matt needs to add it to `super-bmc-worker` instead
+  (`flyctl secrets set EXA_API_KEY=<key> -a super-bmc-worker`, or the Fly
+  dashboard on the worker app).
+- `20260708190000_web_search_feed_key.sql` was applied live via Supabase MCP
+  to project `mehhuxzamnpxnkbrslls` (recorded as version `20260708194255` —
+  repo filename intentionally left as-authored per this file's established
+  convention for MCP-applied migrations, e.g. `schedule_loop_tick` above).
+  Verified both `grok_live_search` and `web_search` rows now exist in
+  `data_feeds`; the currently-deployed (pre-rename) worker is unaffected since
+  it still only looks up `grok_live_search`. This branch's worker code has
+  NOT been deployed yet — safe to deploy whenever, the migration already
+  covers it.
 
 ### OWNER ROUND — Grok feed diagnosis, dashboard company leak, company switcher, on-demand State of the Union (2026-07-08)
 
