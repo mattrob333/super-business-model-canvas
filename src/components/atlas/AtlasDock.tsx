@@ -38,16 +38,21 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
 
   // Atlas is a copilot, not a drawer: default OPEN on desktop (the canvas
   // shares the row with it) unless the user has explicitly closed it before.
+  // Below lg the dock is a full-screen takeover, so it must NEVER auto-open
+  // (owner bug 2026-07-08: the canvas showed for ~2s, then a persisted
+  // dock-open state hijacked the screen) — mobile opens only from a tap.
   const [open, setOpen] = useState(() => {
+    if (typeof window === "undefined" || window.innerWidth < 1024) return false;
     const stored = safeGet(DOCK_OPEN_KEY);
     if (stored !== null) return stored === "true";
-    return typeof window !== "undefined" && window.innerWidth >= 1024;
+    return true;
   });
   // The chat mounts lazily on first expand and stays mounted after, so a
   // collapsed dock costs zero thread queries but reopening keeps its state.
   const [everOpened, setEverOpened] = useState(open);
   const asideRef = useRef<HTMLElement>(null);
   const tabRef = useRef<HTMLButtonElement>(null);
+  const pillRef = useRef<HTMLButtonElement>(null);
 
   // Mirror open state to the parent — including the persisted value on mount —
   // so the page can yield overlapping fixed UI to the dock.
@@ -57,7 +62,11 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
 
   const setOpenPersist = useCallback((next: boolean) => {
     setOpen(next);
-    safeSet(DOCK_OPEN_KEY, String(next));
+    // Persist only the desktop preference — mobile always starts closed, and
+    // a phone session must not flip the saved desktop state.
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      safeSet(DOCK_OPEN_KEY, String(next));
+    }
     if (next) setEverOpened(true);
   }, []);
 
@@ -73,8 +82,15 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
     if (prevOpenRef.current === open) return;
     prevOpenRef.current = open;
     const frame = requestAnimationFrame(() => {
-      if (open) asideRef.current?.focus();
-      else tabRef.current?.focus();
+      if (open) {
+        asideRef.current?.focus();
+        return;
+      }
+      // Two collapsed triggers exist (mobile pill / desktop edge tab) —
+      // return focus to whichever one this viewport actually shows.
+      const desktop =
+        typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+      (desktop ? tabRef : pillRef).current?.focus();
     });
     return () => cancelAnimationFrame(frame);
   }, [open]);
@@ -99,26 +115,46 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
 
   return (
     <>
-      {/* Collapsed tab — slim, vertically centered on the right edge */}
+      {/* Collapsed triggers — the Canvas/Atlas toggle. Below lg: a floating
+          pill above the safe area (the full-screen chat's X is the way back).
+          lg and up: the slim tab on the right edge, unchanged. */}
       {!open && (
-        <button
-          ref={tabRef}
-          type="button"
-          onClick={() => setOpenPersist(true)}
-          className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-lg border border-r-0 border-border bg-card px-1.5 py-3 shadow-md transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`Open ${ATLAS.name}, your ${ATLAS.role}`}
-        >
-          <AtlasIcon className="h-4 w-4 text-primary" />
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground [writing-mode:vertical-rl]">
-            {ATLAS.name}
-          </span>
-          {hasUnseen && (
-            <span
-              className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
-              aria-label="New briefing available"
-            />
-          )}
-        </button>
+        <>
+          <button
+            ref={pillRef}
+            type="button"
+            onClick={() => setOpenPersist(true)}
+            className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 shadow-lg transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+            aria-label={`Open ${ATLAS.name}, your ${ATLAS.role}`}
+          >
+            <AtlasIcon className="h-4 w-4 text-primary" />
+            <span className="text-xs font-semibold">{ATLAS.name}</span>
+            {hasUnseen && (
+              <span
+                className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+                aria-label="New briefing available"
+              />
+            )}
+          </button>
+          <button
+            ref={tabRef}
+            type="button"
+            onClick={() => setOpenPersist(true)}
+            className="fixed right-0 top-1/2 z-40 hidden -translate-y-1/2 flex-col items-center gap-2 rounded-l-lg border border-r-0 border-border bg-card px-1.5 py-3 shadow-md transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex"
+            aria-label={`Open ${ATLAS.name}, your ${ATLAS.role}`}
+          >
+            <AtlasIcon className="h-4 w-4 text-primary" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground [writing-mode:vertical-rl]">
+              {ATLAS.name}
+            </span>
+            {hasUnseen && (
+              <span
+                className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+                aria-label="New briefing available"
+              />
+            )}
+          </button>
+        </>
       )}
 
       {/* Expanded dock — kept mounted so the slide transition runs both ways;
@@ -130,7 +166,11 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
           // Below lg Atlas is a FULL-SCREEN chat (owner directive 2026-07-06:
           // "full screen chat or not open" — a 94vw sliver clipped content and
           // left a useless strip of canvas). Desktop keeps the side-dock width.
-          "fixed inset-y-0 right-0 z-40 flex w-full lg:w-[clamp(440px,26vw,600px)] flex-col border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none",
+          // h-dvh (inset-y-0 kept as the no-dvh fallback) tracks the mobile
+          // browser chrome so the composer at the flex bottom stays visible;
+          // max-w + overflow-x-hidden stop any child from pushing past the
+          // screen edge. Desktop metrics are unchanged (100dvh === 100vh).
+          "fixed inset-y-0 right-0 z-40 flex h-dvh w-full max-w-[100vw] flex-col overflow-x-hidden border-l border-border bg-card shadow-2xl transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:w-[clamp(440px,26vw,600px)]",
           open ? "translate-x-0" : "invisible translate-x-full",
         )}
         aria-hidden={!open}

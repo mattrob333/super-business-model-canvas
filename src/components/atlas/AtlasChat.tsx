@@ -1,23 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Lightbulb, Loader2, RefreshCw, Send } from "lucide-react";
+import { ArrowRight, History, Lightbulb, Loader2, MessageSquarePlus, RefreshCw, Send } from "lucide-react";
 import { parseAtlasActions } from "@/lib/atlas-actions";
 import { AgentMarkdown } from "@/components/chat/AgentMarkdown";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { getAgentRuntime } from "@/lib/agent-runtime";
 import { useAuth } from "@/hooks/useAuth";
+import { useDataRichness } from "@/hooks/useDataRichness";
 import { loadCompanyScope } from "@/lib/company-scope";
 import { ATLAS } from "@/lib/atlas";
 
 /**
- * The War Room thread, dock edition (spec 12 §6): one durable
- * workspace_threads conversation with the orchestrator profile, shared later
- * with the full-screen War Room. Same durable-run chat loop as
- * WorkspaceThread — user message insert, workspace_chat run, poll until the
- * reply lands — but deliberately without the gap auto-send machinery: Atlas
- * speaks only when spoken to here.
+ * The War Room chat (spec 12 §6), shared by the dock and the full-screen War
+ * Room. Same durable-run chat loop as WorkspaceThread — user message insert,
+ * workspace_chat run, poll until the reply lands — but deliberately without
+ * the gap auto-send machinery: Atlas speaks only when spoken to here.
+ *
+ * Thread model matches the section rooms: arriving always opens a FRESH chat
+ * (the greeting + suggested openers), the first message names the thread, and
+ * past conversations — including legacy "War Room"-titled threads — live one
+ * click away in the History popover.
  */
 
 interface ThreadRow {
@@ -34,9 +39,15 @@ interface MessageRow {
   created_at: string;
 }
 
-const THREAD_TITLE = "War Room";
 const RUN_POLL_INTERVAL_MS = 3_000;
 const RUN_POLL_MAX_ATTEMPTS = 100; // ~5 minutes
+const HISTORY_LIMIT = 15;
+
+/** New threads take their name from the opening message, like any chat app. */
+function threadTitleFrom(text: string): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > 48 ? `${clean.slice(0, 47).trimEnd()}…` : clean || "New chat";
+}
 
 /** Cross-company openers — Atlas reads all nine sections, so the prompts do too. */
 const ATLAS_PROMPTS = [
@@ -44,6 +55,20 @@ const ATLAS_PROMPTS = [
   "What single move matters most this week?",
   "Where am I losing to competitors right now?",
   "What information are you missing to steer better, and how do I get it?",
+];
+
+/** Openers for a board rich enough to talk strategy from day one. */
+const RICH_PROMPTS = [
+  "Give me the state of the union.",
+  "Where am I most exposed to competitors right now?",
+  "What single move matters most this week?",
+];
+
+/** Openers for a thin board — Atlas coaches ground truth in, first. */
+const SPARSE_PROMPTS = [
+  "Interview me — ask what you need to know about my business.",
+  "What should a company at my stage prove first?",
+  "Help me get my documents and knowledge in.",
 ];
 
 export function AtlasChat({
@@ -57,8 +82,10 @@ export function AtlasChat({
   briefingSlot?: React.ReactNode;
 }) {
   const { user } = useAuth();
+  const richness = useDataRichness(accountId);
   const [threadId, setThreadId] = useState<string | null>(null);
-  const [threadLoaded, setThreadLoaded] = useState(false);
+  const [threads, setThreads] = useState<ThreadRow[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [draft, setDraft] = useState("");
@@ -77,12 +104,16 @@ export function AtlasChat({
     [],
   );
 
-  // Find the existing War Room thread FOR THE ACTIVE COMPANY (each company
-  // era gets its own — a previous company's strategy chat must never bleed
-  // in); creation waits for the first send so an idle dock never writes rows.
+  // Load recent Atlas threads FOR THE ACTIVE COMPANY (each company era keeps
+  // its own — a previous company's strategy chat must never bleed in) to fill
+  // the History popover. Arriving never auto-opens one: the chat starts fresh
+  // (greeting + openers), and thread creation waits for the first send so an
+  // idle dock never writes rows. Legacy "War Room"-titled threads stay
+  // reachable here — they are ordinary threads for the same profile in scope.
   useEffect(() => {
     let cancelled = false;
-    setThreadLoaded(false);
+    setThreads([]);
+    setThreadId(null);
     (async () => {
       const scope = await loadCompanyScope(accountId).catch(() => null);
       let query = supabaseUntyped
@@ -90,18 +121,18 @@ export function AtlasChat({
         .select("id, title, created_at")
         .eq("account_id", accountId)
         .eq("agent_profile_id", agentProfileId)
-        .eq("archived", false)
-        .eq("title", THREAD_TITLE);
+        .eq("archived", false);
       if (scope) query = query.in("business_context_version_id", scope.contextIds);
-      const { data, error } = await query.order("created_at", { ascending: false }).limit(1);
+      const { data, error } = await query.order("created_at", { ascending: false }).limit(HISTORY_LIMIT);
       if (cancelled) return;
       if (error) {
+        // History failing to load must not read as "no chats": say so, and
+        // point at what still works.
         setChatError(
-          `Couldn't load the War Room thread: ${error.message}. Reload the page to try again.`,
+          `Couldn't load chat history: ${error.message}. You can still start a new chat below, or reload the page to try again.`,
         );
       }
-      setThreadId(data?.[0]?.id ?? null);
-      setThreadLoaded(true);
+      setThreads(data ?? []);
     })();
     return () => {
       cancelled = true;
@@ -147,23 +178,25 @@ export function AtlasChat({
     bottomRef.current?.scrollIntoView({ block: "nearest" });
   }, [messages, awaitingReply]);
 
-  const ensureThread = useCallback(async (): Promise<string> => {
+  const ensureThread = useCallback(async (titleHint?: string): Promise<string> => {
     if (threadId) return threadId;
-    // Stamped to the active company era; select-back verifies the insert
-    // actually landed before we hang a run on it.
+    // Named from the opening message like every other room; stamped to the
+    // active company era; select-back verifies the insert actually landed
+    // before we hang a run on it.
     const scope = await loadCompanyScope(accountId).catch(() => null);
     const { data, error } = await supabaseUntyped
       .from<ThreadRow>("workspace_threads")
       .insert({
         account_id: accountId,
         agent_profile_id: agentProfileId,
-        title: THREAD_TITLE,
+        title: titleHint ? threadTitleFrom(titleHint) : "New chat",
         business_context_version_id: scope?.activeContextId ?? null,
         created_by: user?.id ?? null,
       })
       .select("id, title, created_at")
       .single();
     if (error || !data) throw new Error(error?.message ?? "Failed to create the War Room thread");
+    setThreads((prev) => [data, ...prev]);
     setThreadId(data.id);
     return data.id;
   }, [accountId, agentProfileId, threadId, user]);
@@ -207,7 +240,7 @@ export function AtlasChat({
     setSending(true);
     setChatError(null);
     try {
-      const thread = await ensureThread();
+      const thread = await ensureThread(trimmed);
       const { error: messageError } = await supabaseUntyped.from("workspace_messages").insert({
         thread_id: thread,
         role: "user",
@@ -269,35 +302,96 @@ export function AtlasChat({
   const unanswered = Boolean(lastMessage && lastMessage.role === "user" && !awaitingReply && !sending);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4">
       {briefingSlot}
       <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           War Room
         </h3>
-        <span className="text-[10px] text-muted-foreground">with {ATLAS.name}</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground">with {ATLAS.name}</span>
+          <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground"
+                aria-label="Chat history"
+                title="Chat history"
+              >
+                <History className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setThreadId(null);
+                  setHistoryOpen(false);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted/60"
+              >
+                <MessageSquarePlus className="h-3.5 w-3.5 text-primary" />
+                New chat
+              </button>
+              <p className="mb-1 mt-2 border-t border-border px-2 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                History
+              </p>
+              <div className="max-h-64 space-y-0.5 overflow-y-auto">
+                {threads.map((thread) => (
+                  <button
+                    key={thread.id}
+                    type="button"
+                    onClick={() => {
+                      setThreadId(thread.id);
+                      setHistoryOpen(false);
+                    }}
+                    className={`block w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                      thread.id === threadId ? "bg-muted font-medium" : "hover:bg-muted/60"
+                    }`}
+                  >
+                    <span className="block truncate">{thread.title ?? "Untitled chat"}</span>
+                    <span className="block text-[10px] text-muted-foreground/70">
+                      {new Date(thread.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </span>
+                  </button>
+                ))}
+                {threads.length === 0 && (
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                    No chats with {ATLAS.name} for this company yet.
+                  </p>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Messages — natural height inside the dock's single scroll column */}
       <div className="flex-1 py-3">
-        {!threadLoaded || loadingMessages ? (
+        {loadingMessages ? (
           <div className="flex justify-center py-6">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : messages.length === 0 && !awaitingReply ? (
           <div className="space-y-3">
             {/* Atlas introduces itself — rendered, never written to the
-                thread, so the real conversation starts with the user. */}
+                thread, so the real conversation starts with the user. The
+                copy adapts to the board: a rich board gets the strategist,
+                a thin one gets the onboarding coach. */}
             <div className="flex items-start gap-2.5">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/40">
                 <ATLAS.icon className="h-3.5 w-3.5" />
               </span>
-              <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-2.5 text-sm leading-relaxed">
+              <div className="min-w-0 rounded-lg border border-border bg-muted/30 px-3.5 py-2.5 text-sm leading-relaxed">
                 <p>
-                  I'm <strong>{ATLAS.name}</strong>, your chief strategist. I read your whole
-                  canvas, your competitors, and your Gap Register — and my job is to hand you
-                  the one move that matters most right now.
+                  I'm <strong>{ATLAS.name}</strong>, your chief strategist.{" "}
+                  {richness === "rich"
+                    ? "I've read your canvas and your competitive field is loading. My job: hand you the one move that matters most right now."
+                    : richness === "sparse"
+                      ? "Public data on your company is thin — normal at your stage, and it means YOU are my best source. Let's build your ground truth together."
+                      : "I read your whole canvas, your competitors, and your Gap Register — and my job is to hand you the one move that matters most right now."}
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
                   Start with your briefing above, or ask me anything below.
@@ -305,7 +399,7 @@ export function AtlasChat({
               </div>
             </div>
             <div className="space-y-1.5">
-              {ATLAS_PROMPTS.map((prompt) => (
+              {(richness === "rich" ? RICH_PROMPTS : richness === "sparse" ? SPARSE_PROMPTS : ATLAS_PROMPTS).map((prompt) => (
                 <button
                   key={prompt}
                   type="button"
@@ -374,7 +468,7 @@ export function AtlasChat({
             }}
             placeholder={`Message ${ATLAS.name}…`}
             rows={1}
-            className="max-h-40 min-h-[38px] flex-1 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none focus-visible:ring-0"
+            className="max-h-40 min-h-[38px] min-w-0 flex-1 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none focus-visible:ring-0"
           />
           <Button
             type="submit"
@@ -404,7 +498,10 @@ function AtlasMessage({ message }: { message: MessageRow }) {
           <Button
             key={`${message.id}:${action.room}:${action.label}`}
             size="sm"
-            className="mt-2 gap-1.5"
+            // h-auto/min-h + whitespace-normal: agent-written labels wrap
+            // inside the chat column instead of nowrap-overflowing the screen
+            // on mobile. Fitting labels render at the same 36px as before.
+            className="mt-2 h-auto min-h-9 max-w-full gap-1.5 whitespace-normal py-1.5 text-left"
             onClick={() => {
               // Same delegation contract as the briefing CTA: stash the
               // directive, open the room, the agent acknowledges the task.
@@ -429,7 +526,7 @@ function AtlasMessage({ message }: { message: MessageRow }) {
 
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] break-words rounded-lg bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
+      <div className="min-w-0 max-w-[85%] break-words rounded-lg bg-muted px-3.5 py-2.5 text-sm leading-relaxed">
         {text ?? JSON.stringify(message.content)}
       </div>
     </div>

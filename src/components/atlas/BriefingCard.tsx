@@ -27,6 +27,7 @@ export function BriefingCard({
   skillTitle,
   canRequest,
   onRequest,
+  hideWarRoomCta = false,
 }: {
   loading: boolean;
   error: string | null;
@@ -38,6 +39,8 @@ export function BriefingCard({
   skillTitle: string | null;
   canRequest: boolean;
   onRequest: () => void;
+  /** True on the War Room page itself — no point advertising the room you're in. */
+  hideWarRoomCta?: boolean;
 }) {
   const navigate = useNavigate();
   const AtlasIcon = ATLAS.icon;
@@ -199,6 +202,21 @@ export function BriefingCard({
           navigate(`/workspace/${room}?from=atlas`);
         }}
       />
+
+      {/* Off the War Room page, the briefing also opens the room where the
+          full conversation with Atlas lives (the directive CTA stays intact
+          above — this is the second button on the primary CTA row). */}
+      {!hideWarRoomCta && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-2 h-8 w-full gap-1.5"
+          onClick={() => navigate("/war-room")}
+        >
+          <span className="min-w-0 truncate">Review this in the War Room</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      )}
 
       {payload.watchouts.length > 0 && (
         <ul className="mt-3 space-y-1.5">
