@@ -273,6 +273,7 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
               initialThreadTitle={atlasPrompt ? "Directive from Atlas" : null}
               composerPrefill={composerPrefill}
               onComposerPrefillConsumed={() => setComposerPrefill(null)}
+              onInitialPromptConsumed={handleInitialPromptConsumed}
             />
           </main>
 

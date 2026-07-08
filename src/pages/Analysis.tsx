@@ -13,6 +13,7 @@ import { FloatingCTA } from "@/components/FloatingCTA";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { useAccountId } from "@/hooks/useAccountId";
+import { useCompetitorResearch } from "@/hooks/useCompetitorResearch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { clearActiveWorkspaceName, setActiveWorkspaceName } from "@/lib/active-workspace";
@@ -49,6 +50,13 @@ function persistActiveAnalysis(
   });
 }
 
+/** Auto-research cost control: only the analysis's top competitors, once. */
+const AUTO_RESEARCH_TOP_N = 3;
+
+function autoResearchStorageKey(analysisId: string): string {
+  return `sbmc:auto-competitor-research:${analysisId}`;
+}
+
 function domainLabelFromUrl(url: string): string {
   try {
     const hostname = new URL(url).hostname.replace(/^www\./i, "");
@@ -81,6 +89,73 @@ const Analysis = () => {
   const [analyzingLabel, setAnalyzingLabel] = useState<string | undefined>();
   const resultsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // The analysis's suggested competitors, in the order the analysis ranked
+  // them — the auto-chain researches the first AUTO_RESEARCH_TOP_N of these.
+  const similarCompanies: Array<{ name: string; website: string; description?: string }> =
+    Array.isArray(analysisData?.similarCompanies)
+      ? analysisData.similarCompanies.filter(
+          (competitor: unknown): competitor is { name: string; website: string; description?: string } =>
+            Boolean(
+              competitor &&
+                typeof competitor === "object" &&
+                typeof (competitor as { name?: unknown }).name === "string" &&
+                ((competitor as { name: string }).name.trim().length > 0),
+            ),
+        )
+      : [];
+  const { stateFor: competitorStateFor, startResearch: startCompetitorResearch } =
+    useCompetitorResearch(similarCompanies);
+
+  // Synchronous half of the once-per-analysis guard: localStorage is the
+  // durable one-shot, the ref stops a double-fire within the same render
+  // cycle before the storage write is observable.
+  const autoResearchRef = useRef(false);
+
+  /**
+   * Auto-chain (owner problem 2026-07-08): after the initial analysis lands,
+   * competitor-dependent skills still fail with "requires competitor research
+   * first" until someone researches a competitor by hand. So once the fresh
+   * analysis is saved, automatically enqueue research for the TOP 3
+   * competitors — not all of them (cost control) — exactly once per saved
+   * analysis (localStorage one-shot keyed on the analysis id).
+   */
+  const maybeAutoResearchTopCompetitors = useCallback((analysisId: string | null) => {
+    if (!analysisId || !accountId || autoResearchRef.current) return;
+    const storageKey = autoResearchStorageKey(analysisId);
+    try {
+      if (localStorage.getItem(storageKey)) return;
+    } catch {
+      return; // storage unavailable — skip rather than risk repeat enqueues
+    }
+    // Only competitors that are genuinely untouched: researched, in-flight
+    // and previously-errored cards are never auto-enqueued.
+    const candidates = similarCompanies
+      .filter((competitor) => {
+        const state = competitorStateFor(competitor);
+        return !state.researched && state.status === "idle";
+      })
+      .slice(0, AUTO_RESEARCH_TOP_N);
+    if (candidates.length === 0) return;
+    autoResearchRef.current = true;
+    try {
+      localStorage.setItem(storageKey, new Date().toISOString());
+    } catch {
+      // The in-memory ref still prevents a same-session repeat.
+    }
+    toast({
+      title: "Competitor research started",
+      description:
+        "Researching your top 3 competitors in the background — skills that need competitive data unlock when it lands.",
+    });
+    void (async () => {
+      // Sequential enqueue; the worker queue serializes the actual runs and
+      // startResearch surfaces per-card state on the Industry landscape.
+      for (const competitor of candidates) {
+        await startCompetitorResearch(competitor);
+      }
+    })();
+  }, [accountId, similarCompanies, competitorStateFor, startCompetitorResearch, toast]);
 
   const saveAnalysisRecord = useCallback(async (
     nextAnalysisData: Record<string, unknown>,
@@ -370,13 +445,16 @@ const Analysis = () => {
             summaryPrefix: "URL analysis",
           });
           persistActiveAnalysis(analysisData, savedId);
+          // Fresh analysis is saved and bridged — kick off the top-3
+          // competitor auto-chain (one-shot per saved analysis id).
+          maybeAutoResearchTopCompetitors(savedId);
         } catch (error) {
           console.error('Initial auto-save error:', error);
         }
       };
       autoSave();
     }
-  }, [hasAnalyzed, analysisData, user, isNewAnalysis, saveAnalysisRecord]);
+  }, [hasAnalyzed, analysisData, user, isNewAnalysis, saveAnalysisRecord, maybeAutoResearchTopCompetitors]);
 
   const handleBMCSectionUpdate = (sectionKey: CanvasSectionKey, updatedData: { items: string[]; notes: string }) => {
     const legacyKeyMap: Record<CanvasSectionKey, string> = {
