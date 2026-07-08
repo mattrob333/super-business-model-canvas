@@ -285,6 +285,61 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### OWNER ROUND — section-first room headers, button press feedback, one-competitor audit diagnosis (2026-07-08, evening)
+
+Owner reports: room headers lead with agent callsigns ("Envoy") nobody
+recognizes instead of the canvas section; the Studio Run button gives no
+click feedback and invited double clicks; a differentiator audit compared
+against only one competitor.
+
+- **Section-first wayfinding (`WorkspaceTopBar.tsx`):** the door plate and
+  every Rooms-switcher entry now lead with the section label ("Key
+  Partners") with the agent as descriptor ("Envoy · Head of Alliances").
+  The identity card inside the room keeps its agent-first framing — that
+  card's job is the persona; the header's job is wayfinding.
+- **Button press feedback, root fix (`ui/button.tsx`):** the base Button
+  had no `active:` style anywhere in the app — clicks looked like nothing
+  happened. Added `active:scale-[0.97]` with the full `transition` utility
+  (the old `transition-colors` would not animate transform); the link
+  variant opts out (`active:scale-100`). Plus the Studio-specific gap
+  (`WorkspaceActionsPanel.tsx`): between click and the "Running" state sat
+  1-2 network calls with zero visual change — `startingRef` silently
+  guarded the double enqueue but the button read as dead. A synchronous
+  `startingKey` state now flips the tile to a spinner + "Starting…" in the
+  same tick as the click.
+- **One-competitor audit — diagnosed against live data, mostly not a code
+  bug:** the audit reads ALL competitors' value_propositions rows within
+  the company scope (verified: `loadCompetitorSectionItems` filters only
+  on `competitor_id is not null` + scope chain, limit 24, and both Wesco
+  contexts share the wesco.com era key). Live DB showed the audit ran when
+  W.W. Grainger was the ONLY researched Wesco competitor; Graybar, Rexel,
+  and Sonepar were researched ~18 hours later. A re-run now sees all four.
+  The REAL defect found on the way: three of the four competitor research
+  runs "completed" having verified evidence for only 1-2 of 9 sections
+  (Sonepar 1, Rexel 2, Grainger 1 vs Graybar 8) with the flat summary
+  "Research completed with evidence-linked canvas updates" — silent
+  partial coverage. `company-research.ts` now reports
+  `sections_covered` in the run output and the summary says either
+  "evidence-linked updates in N of 9 canvas sections" or, below 5, a thin-
+  coverage warning naming the consequence (skills comparing this company
+  work from partial data).
+- **Branch reconciliation:** PR #120 (an independent, minimal Exa->
+  Firecrawl chain keyed `grok_live_search`) landed on main while this
+  branch was in review. Merged main in; the branch's fuller implementation
+  (web_search rename + migration, xAI Agent Tools leg with x_search,
+  per-task recency) supersedes it. Kept #120's flat-array Firecrawl
+  response tolerance by accepting BOTH `{data: {web: []}}` and
+  `{data: []}` shapes in the parser.
+- Gates: worker typecheck/tests (393 passed / 2 skipped)/build/eslint all
+  green; root tsc exit 0, build green, lint 64 (frozen baseline); UTF-8
+  decode clean.
+- HONEST SCOPE: why Sonepar/Rexel/Grainger crawls yielded so few verified
+  sections needs a live look at their run outputs (likely 403-ish crawl
+  blocks on distributor sites + sparse public claims); the coverage
+  summary makes it visible from the Activity feed either way. The owner
+  should re-run the Differentiator audit — all four Wesco competitors now
+  have researched value_propositions rows.
+
 ### OWNER ROUND — company switcher doesn't switch the canvas + search-logic pass (2026-07-08, later)
 
 Owner reports: picking another company in the sidebar dropdown left the old

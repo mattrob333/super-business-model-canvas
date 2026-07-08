@@ -168,11 +168,19 @@ export class CompanyResearchHandler {
     if (subject.runType === "competitor_research" && subject.competitorId) {
       await this.enqueueGapEngine(job, subject.competitorId);
     }
+    // The summary must carry coverage: three of today's four competitor runs
+    // "completed" having filled 1-2 of 9 sections, and the flat success
+    // message hid it until a downstream skill surprised the owner with a
+    // one-competitor comparison (owner finding 2026-07-08).
+    const sectionsCovered = new Set(
+      allVerified.filter((claim) => claim.status !== "contradicted").map((claim) => claim.sectionKey),
+    ).size;
     await this.markRunCompleted(job, {
       run_type: subject.runType,
       company_url: subject.targetUrl,
       competitor_id: subject.competitorId,
       evidence_count: feedResult.evidence.length + new Set(backfillVerified.map((claim) => claim.evidenceId)).size,
+      sections_covered: sectionsCovered,
       claims: allVerified.map((claim) => ({
         section_key: claim.sectionKey,
         text: claim.text,
@@ -180,7 +188,7 @@ export class CompanyResearchHandler {
         confidence: earnedConfidence(claim),
       })),
       escalation_rate: escalated ? 1 : 0,
-    });
+    }, sectionsCovered);
   }
 
   private async backfillMissingSections(
@@ -593,12 +601,15 @@ ${evidencePrompt(evidence)}`,
     if (error) throw new Error(`Failed to mark company research run running: ${error.message}`);
   }
 
-  private async markRunCompleted(job: AgentJob, output: Record<string, unknown>): Promise<void> {
+  private async markRunCompleted(job: AgentJob, output: Record<string, unknown>, sectionsCovered: number): Promise<void> {
     if (!job.agent_run_id) return;
+    const coverage = `${sectionsCovered} of 9 canvas sections`;
     const { error } = await this.deps.client.from("agent_runs").update({
       status: "completed",
       output,
-      summary: "Research completed with evidence-linked canvas updates.",
+      summary: sectionsCovered >= 5
+        ? `Research completed — evidence-linked updates in ${coverage}.`
+        : `Research completed with thin coverage — verified evidence found for only ${coverage}. Sources may block crawling or publish little; skills comparing this company will be working from partial data.`,
       completed_at: new Date().toISOString(),
       error: null,
     }).eq("id", job.agent_run_id).eq("account_id", job.account_id);

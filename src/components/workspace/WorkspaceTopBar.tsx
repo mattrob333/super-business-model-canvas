@@ -37,9 +37,13 @@ export function WorkspaceTopBar({ room }: { room: CanvasSectionKey | "atlas" }) 
           <CurrentIcon className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 leading-tight">
-          <p className="truncate text-sm font-semibold">{isAtlas ? "War Room" : current.callsign}</p>
+          {/* Section first: "Key Partners" is what the user recognizes; the
+              agent callsign is flavor, not wayfinding (owner ask 2026-07-08). */}
+          <p className="truncate text-sm font-semibold">
+            {isAtlas ? "War Room" : CANVAS_SECTION_LABELS[room]}
+          </p>
           <p className="truncate text-[10px] text-muted-foreground">
-            {isAtlas ? `${ATLAS.callsign} · ${ATLAS.role}` : CANVAS_SECTION_LABELS[room]}
+            {isAtlas ? `${ATLAS.callsign} · ${ATLAS.role}` : `${current.callsign} · ${current.role}`}
           </p>
         </div>
       </div>
@@ -74,9 +78,9 @@ export function WorkspaceTopBar({ room }: { room: CanvasSectionKey | "atlas" }) 
                       <Icon className="h-3 w-3" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-xs font-medium">{entry.callsign}</span>
+                      <span className="block truncate text-xs font-medium">{CANVAS_SECTION_LABELS[key]}</span>
                       <span className="block truncate text-[10px] text-muted-foreground">
-                        {CANVAS_SECTION_LABELS[key]}
+                        {entry.callsign} · {entry.role}
                       </span>
                     </span>
                   </button>
