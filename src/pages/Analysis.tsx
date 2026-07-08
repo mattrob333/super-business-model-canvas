@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { UrlInput } from "@/components/UrlInput";
 import { CompanyProfileDrawer } from "@/components/CompanyProfileDrawer";
@@ -92,18 +92,21 @@ const Analysis = () => {
 
   // The analysis's suggested competitors, in the order the analysis ranked
   // them — the auto-chain researches the first AUTO_RESEARCH_TOP_N of these.
-  const similarCompanies: Array<{ name: string; website: string; description?: string }> =
-    Array.isArray(analysisData?.similarCompanies)
-      ? analysisData.similarCompanies.filter(
-          (competitor: unknown): competitor is { name: string; website: string; description?: string } =>
-            Boolean(
-              competitor &&
-                typeof competitor === "object" &&
-                typeof (competitor as { name?: unknown }).name === "string" &&
-                ((competitor as { name: string }).name.trim().length > 0),
-            ),
-        )
-      : [];
+  const similarCompanies = useMemo<Array<{ name: string; website: string; description?: string }>>(
+    () =>
+      Array.isArray(analysisData?.similarCompanies)
+        ? analysisData.similarCompanies.filter(
+            (competitor: unknown): competitor is { name: string; website: string; description?: string } =>
+              Boolean(
+                competitor &&
+                  typeof competitor === "object" &&
+                  typeof (competitor as { name?: unknown }).name === "string" &&
+                  ((competitor as { name: string }).name.trim().length > 0),
+              ),
+          )
+        : [],
+    [analysisData],
+  );
   const { stateFor: competitorStateFor, startResearch: startCompetitorResearch } =
     useCompetitorResearch(similarCompanies);
 

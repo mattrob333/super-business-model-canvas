@@ -41,6 +41,8 @@ export const CompetitiveLandscape = ({
     const research = stateFor(competitor);
     return !research.researched && research.status !== "starting" && research.status !== "queued";
   });
+  const allResearched =
+    competitors.length > 0 && competitors.every((competitor) => stateFor(competitor).researched);
 
   const handleResearchAll = async () => {
     if (researchAllRef.current || !ready || unresearched.length === 0) return;
@@ -93,9 +95,11 @@ export const CompetitiveLandscape = ({
             ) : (
               <>
                 <Radar className="h-3.5 w-3.5" />
-                {unresearched.length === 0
-                  ? "All competitors researched"
-                  : `Research all competitors (${unresearched.length})`}
+                {unresearched.length > 0
+                  ? `Research all competitors (${unresearched.length})`
+                  : allResearched
+                    ? "All competitors researched"
+                    : "Research queued"}
               </>
             )}
           </Button>
