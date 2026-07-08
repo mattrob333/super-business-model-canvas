@@ -30,6 +30,24 @@ export const CANVAS_SECTION_LABELS: Record<CanvasSectionKey, string> = {
 };
 
 /**
+ * One plain-language sentence per room stating the WORK done there — shown
+ * beside the section name in the room header. BMC jargon ("Key Partners")
+ * means nothing to a first-time user; every screen must say what to do on
+ * it (owner directive 2026-07-08).
+ */
+export const CANVAS_SECTION_PURPOSES: Record<CanvasSectionKey, string> = {
+  key_partners: "Map the suppliers, alliances, and partnerships your business depends on — and scout the ones worth building next.",
+  key_activities: "Pin down the work your business must do exceptionally well to deliver on its promise.",
+  key_resources: "Inventory the assets — people, technology, brand, capital — your business can't run without.",
+  value_propositions: "Sharpen why customers choose you, and pressure-test each claim against your competitors.",
+  customer_relationships: "Design how you win customers, keep them, and grow their value over time.",
+  channels: "Work out how your offer reaches customers, and which routes actually earn their cost.",
+  customer_segments: "Define exactly who you serve, what they need, and which segments deserve focus next.",
+  cost_structure: "Break down what running the business costs and where the efficiency opportunities hide.",
+  revenue_streams: "Examine how the business earns — pricing, monetization models, and revenue you're leaving on the table.",
+};
+
+/**
  * Explicit grid placement for the traditional Business Model Canvas layout.
  *
  * The top area is a 5-column × 2-row grid. The three "pillar" sections
