@@ -102,8 +102,9 @@ export default function ActivityPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Activity</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Real-time activity stream — agent runs, canvas edits, gap
-            discoveries, evidence collection, and scheduled loop executions.
+            Watch your AI team work — every agent run, canvas change, gap
+            discovery, and scheduled job, newest first. Check here when you
+            wonder what happened or why.
           </p>
         </div>
         <Button

@@ -100,9 +100,9 @@ export default function Agents() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agents</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Agent registry — 10 default BMC section agents plus custom agents.
-            Each agent owns canvas sections, runs analysis, and produces
-            evidence-backed claims.
+            Your AI strategy team — one specialist per canvas section plus
+            Atlas, the orchestrator. Open an agent to tune its instructions,
+            model, and schedule, or to review what it has produced.
           </p>
         </div>
         <div className="flex items-center gap-2">

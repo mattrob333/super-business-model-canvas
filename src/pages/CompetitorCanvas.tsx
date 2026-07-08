@@ -176,7 +176,7 @@ export default function CompetitorCanvas() {
             <div>
             <h1 className="break-words text-2xl font-semibold tracking-tight">{competitor.name}</h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Competitor Business Model Canvas with evidence-linked items and gap-engine comparison.
+              How this competitor runs their business, rebuilt from live research — every item links to its evidence. Compare it against your canvas to spot threats and gaps.
             </p>
             </div>
           </div>
