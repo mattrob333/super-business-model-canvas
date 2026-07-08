@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   CANVAS_SECTION_KEYS,
   CANVAS_SECTION_LABELS,
+  CANVAS_SECTION_PURPOSES,
   type CanvasSectionKey,
 } from "@/components/canvas/section-types";
 import { AGENT_ROSTER, ATLAS } from "@/lib/agent-roster";
@@ -32,20 +33,22 @@ export function WorkspaceTopBar({ room }: { room: CanvasSectionKey | "atlas" }) 
 
       <div className="h-5 w-px bg-border" aria-hidden />
 
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
         <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ring-1 ${current.avatarClass}`}>
           <CurrentIcon className="h-3.5 w-3.5" />
         </span>
-        <div className="min-w-0 leading-tight">
-          {/* Section first: "Key Partners" is what the user recognizes; the
-              agent callsign is flavor, not wayfinding (owner ask 2026-07-08). */}
-          <p className="truncate text-sm font-semibold">
-            {isAtlas ? "War Room" : CANVAS_SECTION_LABELS[room]}
-          </p>
-          <p className="truncate text-[10px] text-muted-foreground">
-            {isAtlas ? `${ATLAS.callsign} · ${ATLAS.role}` : `${current.callsign} · ${current.role}`}
-          </p>
-        </div>
+        {/* Section first, and the room must SAY what work happens in it —
+            "Key Partners" is BMC jargon a first-time user can't act on
+            (owner directive 2026-07-08). */}
+        <p className="shrink-0 text-base font-bold leading-none">
+          {isAtlas ? "War Room" : CANVAS_SECTION_LABELS[room]}
+        </p>
+        <span className="hidden h-4 w-px shrink-0 bg-border sm:block" aria-hidden />
+        <p className="hidden min-w-0 truncate text-xs text-muted-foreground sm:block">
+          {isAtlas
+            ? "Your chief strategist reads the whole canvas and hands you the one move that matters most right now."
+            : CANVAS_SECTION_PURPOSES[room]}
+        </p>
       </div>
 
       <div className="ml-auto">
