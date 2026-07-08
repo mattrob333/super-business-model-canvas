@@ -12,7 +12,7 @@ describe("feed fetchers", () => {
     await expect(fetchers.get("firecrawl_scrape")?.run(baseInput("firecrawl_scrape")))
       .resolves.toMatchObject({ health: "degraded", error: "FIRECRAWL_API_KEY is not configured" });
     await expect(fetchers.get("grok_live_search")?.run(baseInput("grok_live_search")))
-      .resolves.toMatchObject({ health: "degraded", error: "XAI_API_KEY is not configured" });
+      .resolves.toMatchObject({ health: "degraded", error: "No search provider configured — set EXA_API_KEY or FIRECRAWL_API_KEY" });
     await expect(fetchers.get("fred_series")?.run(baseInput("fred_series")))
       .resolves.toMatchObject({ health: "degraded", error: "FRED_API_KEY is not configured" });
     await expect(fetchers.get("google_trends")?.run(baseInput("google_trends")))
@@ -37,9 +37,9 @@ describe("feed fetchers", () => {
     expect(result?.evidence[0]?.excerpt).toContain("Pro plan for $29");
   });
 
-  it("normalizes Grok live-search fixtures into news evidence", async () => {
-    const fetch = fixtureFetch("grok-live-search.json");
-    const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", fetch });
+  it("normalizes Exa search fixtures into news evidence and calls Exa first when both providers are configured", async () => {
+    const fetch = fixtureFetch("exa-search.json");
+    const fetchers = createFeedFetchers({ exaApiKey: "exa-key", firecrawlApiKey: "firecrawl-key", fetch });
 
     const result = await fetchers.get("grok_live_search")?.run({
       ...baseInput("grok_live_search"),
@@ -49,54 +49,67 @@ describe("feed fetchers", () => {
     expect(result).toMatchObject({
       health: "ok",
       evidence: [
-        { title: "Live search: Acme analytics (1)", sourceType: "news", sourceName: "Grok Live Search", sourceUrl: "https://news.example/acme-analytics" },
-        { title: "Live search: Acme analytics (2)", sourceType: "news", sourceName: "Grok Live Search", sourceUrl: "https://acme.example/blog/enterprise-analytics" },
+        { title: "Acme launches enterprise analytics product", sourceType: "news", sourceName: "Exa", sourceUrl: "https://news.example/acme-analytics" },
+        { title: "Introducing Acme Analytics", sourceType: "news", sourceName: "Exa", sourceUrl: "https://acme.example/blog/enterprise-analytics" },
       ],
     });
     expect(result?.evidence[0]?.excerpt).toContain("enterprise analytics product");
+    expect(fetch).toHaveBeenCalledTimes(1);
     const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
-    const requestInit = fetchMock.mock.calls[0]?.[1];
+    const [url, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.exa.ai/search");
     expect(JSON.parse(String(requestInit?.body))).toMatchObject({
-      model: "grok-4-fast",
-      search_parameters: { mode: "on", return_citations: true },
+      query: "Acme analytics",
+      numResults: 5,
+      contents: { text: { maxCharacters: 1500 } },
     });
   });
 
-  it("sends the configured XAI_MODEL override to Grok", async () => {
-    const fetch = fixtureFetch("grok-live-search.json");
-    const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", xaiModel: "grok-next", fetch });
+  it("falls back to Firecrawl search when Exa is not configured", async () => {
+    const fetch = fixtureFetch("firecrawl-search.json");
+    const fetchers = createFeedFetchers({ firecrawlApiKey: "firecrawl-key", fetch });
 
-    await fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" });
+    const result = await fetchers.get("grok_live_search")?.run({
+      ...baseInput("grok_live_search"),
+      query: "Acme analytics",
+    });
 
+    expect(result).toMatchObject({
+      health: "ok",
+      evidence: [{ title: "Acme launches enterprise analytics product", sourceType: "news", sourceName: "Firecrawl", sourceUrl: "https://news.example/acme-analytics" }],
+    });
     const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ model: "grok-next" });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe("https://api.firecrawl.dev/v2/search");
   });
 
-  it("degrades Grok responses that carry no content and no citations instead of reporting ok", async () => {
-    const fetch = vi.fn(async () => new Response(
-      JSON.stringify({ choices: [{ message: { role: "assistant", content: "" } }] }),
-      { status: 200, headers: { "content-type": "application/json" } },
-    ));
-    const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", fetch });
+  it("falls back to Firecrawl when Exa returns zero usable results", async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(readFixture("firecrawl-search.json"), { status: 200 }));
+    const fetchers = createFeedFetchers({ exaApiKey: "exa-key", firecrawlApiKey: "firecrawl-key", fetch });
 
-    await expect(fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" }))
-      .resolves.toMatchObject({
-        health: "degraded",
-        error: expect.stringContaining("no content and no citations"),
-      });
+    const result = await fetchers.get("grok_live_search")?.run({
+      ...baseInput("grok_live_search"),
+      query: "Acme analytics",
+    });
+
+    expect(result).toMatchObject({ health: "ok", evidence: [{ sourceName: "Firecrawl" }] });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("surfaces the Grok error body when the API rejects the request", async () => {
-    const fetch = vi.fn(async () => new Response(
-      JSON.stringify({ error: "The model grok-4-fast does not exist" }),
-      { status: 404 },
-    ));
-    const fetchers = createFeedFetchers({ xaiApiKey: "xai-key", fetch });
+  it("degrades with every provider's reason when all configured search providers fail", async () => {
+    const fetch = vi.fn(async () => new Response("service unavailable", { status: 503 }));
+    const fetchers = createFeedFetchers({ exaApiKey: "exa-key", firecrawlApiKey: "firecrawl-key", fetch });
 
-    const result = await fetchers.get("grok_live_search")?.run({ ...baseInput("grok_live_search"), query: "Acme analytics" });
+    const result = await fetchers.get("grok_live_search")?.run({
+      ...baseInput("grok_live_search"),
+      query: "Acme analytics",
+    });
+
     expect(result).toMatchObject({ health: "degraded" });
-    expect(result?.error).toContain("HTTP 404");
-    expect(result?.error).toContain("does not exist");
+    expect(result?.error).toContain("Exa search failed with HTTP 503");
+    expect(result?.error).toContain("Firecrawl search failed with HTTP 503");
   });
 
   it("normalizes FRED fixtures into API evidence and metrics", async () => {
