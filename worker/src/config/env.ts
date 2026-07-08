@@ -7,6 +7,7 @@ const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().min(1).optional(),
   XAI_API_KEY: z.string().min(1).optional(),
   XAI_MODEL: z.string().min(1).optional(),
+  EXA_API_KEY: z.string().min(1).optional(),
   FIRECRAWL_API_KEY: z.string().min(1).optional(),
   FRED_API_KEY: z.string().min(1).optional(),
   GOOGLE_TRENDS_API_KEY: z.string().min(1).optional(),

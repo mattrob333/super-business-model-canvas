@@ -42,6 +42,7 @@ const handler = createJobDispatcher({
   openRouterApiKey: config.OPENROUTER_API_KEY,
   xaiApiKey: config.XAI_API_KEY,
   xaiModel: config.XAI_MODEL,
+  exaApiKey: config.EXA_API_KEY,
   firecrawlApiKey: config.FIRECRAWL_API_KEY,
   fredApiKey: config.FRED_API_KEY,
   googleTrendsApiKey: config.GOOGLE_TRENDS_API_KEY,

@@ -19,7 +19,7 @@ export function createFeedFetchers(config: FeedRuntimeConfig = {}): Map<string, 
   const fetcher = withTimeout(config.fetch ?? fetch, config.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS);
   const fetchers: FeedFetcher[] = [
     firecrawlScrapeFetcher(config, fetcher),
-    grokLiveSearchFetcher(config, fetcher),
+    webSearchFetcher(config, fetcher),
     fredSeriesFetcher(config, fetcher),
     googleTrendsFetcher(config, fetcher),
     gdeltCountFetcher(fetcher),
@@ -67,78 +67,143 @@ function firecrawlScrapeFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): 
   };
 }
 
+interface WebSearchHit {
+  url?: string;
+  title?: string;
+  text?: string;
+  publishedDate?: string;
+}
+
+interface WebSearchProviderResult {
+  provider: string;
+  raw: Record<string, unknown>;
+  hits: WebSearchHit[];
+}
+
+type WebSearchProviderOutcome = WebSearchProviderResult | { error: string };
+
 /**
- * Overridable via the XAI_MODEL Fly secret so a retired/renamed model id can
- * be flipped without a code deploy. Live incident 2026-07-08: skills failed
- * with "could not retrieve industry evidence" and the diagnose logs contained
- * ZERO grok lines — this fetcher failed silently. It now logs every outcome.
+ * xAI Live Search was retired 2026-01-12 — confirmed 2026-07-08 via worker
+ * logs (HTTP 410, "Live search is deprecated. Please switch to the Agent
+ * Tools API"). Every search-backed skill had been silently broken since:
+ * the old single-provider fetcher failed with no logging, and a "successful"
+ * empty response still reported health "ok". This is a provider chain
+ * instead — Exa first (semantic search, full page text, built for this),
+ * Firecrawl search as a fallback (its scrape key already exists here) — so
+ * one vendor's deprecation can never again take down every search skill.
+ * feedKey stays "grok_live_search": ~15 skill modules and the run_skill
+ * chat tool reference it by that literal string, and it is now just a cache
+ * key, not an instruction to call Grok specifically. xAI's replacement
+ * Agent Tools API is a candidate future leg, not implemented here.
  */
-const DEFAULT_GROK_MODEL = "grok-4-fast";
+const WEB_SEARCH_FEED_KEY = "grok_live_search";
+const WEB_SEARCH_RESULT_LIMIT = 5;
+const WEB_SEARCH_EXCERPT_MAX_CHARS = 1500;
 
-function grokLiveSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): FeedFetcher {
+async function exaSearch(apiKey: string, query: string, fetcher: FetchLike): Promise<WebSearchProviderOutcome> {
+  const response = await fetcher("https://api.exa.ai/search", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": apiKey },
+    body: JSON.stringify({
+      query,
+      type: "auto",
+      numResults: WEB_SEARCH_RESULT_LIMIT,
+      contents: { text: { maxCharacters: WEB_SEARCH_EXCERPT_MAX_CHARS } },
+    }),
+  });
+  if (!response.ok) {
+    const body = (await response.text().catch(() => "")).slice(0, 300);
+    return { error: `Exa search failed with HTTP ${response.status}${body ? ` — ${body}` : ""}` };
+  }
+  const payload = await response.json() as { results?: Array<Record<string, unknown>> };
+  const results = Array.isArray(payload.results) ? payload.results : [];
   return {
-    feedKey: "grok_live_search",
-    async run(input) {
-      if (!config.xaiApiKey) return degraded("grok_live_search", "XAI_API_KEY is not configured");
-      const query = input.query ?? readString(input.config.query) ?? input.companyName;
-      if (!query) return degraded("grok_live_search", "No query configured for Grok live search");
+    provider: "Exa",
+    raw: payload,
+    hits: results.map((item) => ({
+      url: readString(item.url),
+      title: readString(item.title),
+      text: readString(item.text),
+      publishedDate: readString(item.publishedDate),
+    })),
+  };
+}
 
-      const model = config.xaiModel ?? DEFAULT_GROK_MODEL;
-      const response = await fetcher("https://api.x.ai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${config.xaiApiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: "Search the live web and return concise sourced snippets." },
-            { role: "user", content: query },
-          ],
-          search_parameters: { mode: "on", return_citations: true },
-          stream: false,
-        }),
-      });
-      if (!response.ok) {
-        const body = (await response.text().catch(() => "")).slice(0, 300);
-        console.error(`[grok_live_search] HTTP ${response.status} from api.x.ai (model=${model})${body ? ` body=${body}` : ""}`);
-        return degraded("grok_live_search", `Grok search failed with HTTP ${response.status} (model=${model})${body ? ` — ${body.slice(0, 160)}` : ""}`);
+async function firecrawlSearch(apiKey: string, query: string, fetcher: FetchLike): Promise<WebSearchProviderOutcome> {
+  const response = await fetcher("https://api.firecrawl.dev/v2/search", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      query,
+      limit: WEB_SEARCH_RESULT_LIMIT,
+      scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
+    }),
+  });
+  if (!response.ok) {
+    const body = (await response.text().catch(() => "")).slice(0, 300);
+    return { error: `Firecrawl search failed with HTTP ${response.status}${body ? ` — ${body}` : ""}` };
+  }
+  const payload = await response.json() as { data?: Array<Record<string, unknown>> };
+  const results = Array.isArray(payload.data) ? payload.data : [];
+  return {
+    provider: "Firecrawl",
+    raw: payload,
+    hits: results.map((item) => ({
+      url: readString(item.url),
+      title: readString(item.title),
+      text: readString(item.markdown) ?? readString(item.description),
+    })),
+  };
+}
+
+function webSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): FeedFetcher {
+  return {
+    feedKey: WEB_SEARCH_FEED_KEY,
+    async run(input) {
+      const query = input.query ?? readString(input.config.query) ?? input.companyName;
+      if (!query) return degraded(WEB_SEARCH_FEED_KEY, "No query configured for web search");
+
+      const providers: Array<{ name: string; run: () => Promise<WebSearchProviderOutcome> }> = [];
+      if (config.exaApiKey) providers.push({ name: "Exa", run: () => exaSearch(config.exaApiKey!, query, fetcher) });
+      if (config.firecrawlApiKey) providers.push({ name: "Firecrawl", run: () => firecrawlSearch(config.firecrawlApiKey!, query, fetcher) });
+
+      if (providers.length === 0) {
+        return degraded(WEB_SEARCH_FEED_KEY, "No search provider configured — set EXA_API_KEY or FIRECRAWL_API_KEY");
       }
-      const payload = await response.json() as Record<string, unknown>;
-      const content = readString((((payload.choices as unknown[])?.[0] as Record<string, unknown> | undefined)?.message as Record<string, unknown> | undefined)?.content);
-      const citations = extractCitationUrls(payload);
-      // A 200 with nothing in it used to come back health "ok" with an empty
-      // excerpt, which skills filtered to zero evidence — the failure surfaced
-      // rooms away as "could not retrieve industry evidence". Call it what it
-      // is at the source.
-      if (!content?.trim() && citations.length === 0) {
-        console.warn(`[grok_live_search] empty response (model=${model}) — no content and no citations for query=${JSON.stringify(query)}`);
-        return degraded("grok_live_search", `Grok returned no content and no citations (model=${model}) — check XAI_MODEL and live-search availability`);
+
+      const failures: string[] = [];
+      for (const provider of providers) {
+        const outcome = await provider.run();
+        if ("error" in outcome) {
+          console.warn(`[web_search] ${provider.name} failed: ${outcome.error}`);
+          failures.push(`${provider.name}: ${outcome.error}`);
+          continue;
+        }
+        const evidence = outcome.hits
+          .filter((hit) => hit.url || hit.text)
+          .map((hit, index) => ({
+            title: hit.title ?? `${outcome.provider} result ${index + 1}: ${query}`,
+            sourceType: "news" as const,
+            sourceName: outcome.provider,
+            sourceUrl: hit.url,
+            sourceDate: hit.publishedDate,
+            excerpt: hit.text ? hit.text.slice(0, WEB_SEARCH_EXCERPT_MAX_CHARS) : undefined,
+            metadata: { feedKey: input.feedKey, query, provider: outcome.provider },
+          }));
+        // A "successful" response with no usable url/text is the same silent
+        // failure mode the old Grok fetcher had — treat it as a miss and try
+        // the next provider rather than reporting health "ok" with nothing in it.
+        if (evidence.length === 0) {
+          console.warn(`[web_search] ${provider.name} returned results with no usable url/text for query=${JSON.stringify(query)}`);
+          failures.push(`${provider.name}: results had no usable url or text`);
+          continue;
+        }
+        console.log(`[web_search] ok provider=${outcome.provider} hits=${evidence.length} query=${JSON.stringify(query)}`);
+        return { health: "ok", payload: { provider: outcome.provider, raw: outcome.raw }, evidence, metrics: [] };
       }
-      console.log(`[grok_live_search] ok model=${model} citations=${citations.length} contentChars=${content?.length ?? 0}`);
-      const evidence = citations.length > 0
-        ? citations.map((url, index) => ({
-            title: `Live search: ${query} (${index + 1})`,
-            sourceType: "news" as const,
-            sourceName: "Grok Live Search",
-            sourceUrl: url,
-            excerpt: content,
-            metadata: { feedKey: input.feedKey, query },
-          }))
-        : [{
-            title: `Live search: ${query}`,
-            sourceType: "news" as const,
-            sourceName: "Grok Live Search",
-            excerpt: content,
-            metadata: { feedKey: input.feedKey, query },
-          }];
-      return {
-        health: "ok",
-        payload,
-        evidence,
-        metrics: [],
-      };
+
+      console.error(`[web_search] all providers failed for query=${JSON.stringify(query)}: ${failures.join(" | ")}`);
+      return degraded(WEB_SEARCH_FEED_KEY, `All search providers failed — ${failures.join(" | ")}`);
     },
   };
 }
@@ -310,34 +375,6 @@ export function cleanMarkdownExcerpt(markdown: string, maxLength: number): strin
 
 function readStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length > 0) : [];
-}
-
-function extractCitationUrls(payload: Record<string, unknown>): string[] {
-  const urls = new Set<string>();
-  collectCitationUrls(payload.citations, urls);
-  const choices = payload.choices;
-  if (Array.isArray(choices)) {
-    for (const choice of choices) {
-      if (!choice || typeof choice !== "object") continue;
-      collectCitationUrls((choice as { citations?: unknown }).citations, urls);
-      const message = (choice as { message?: unknown }).message;
-      if (message && typeof message === "object") collectCitationUrls((message as { citations?: unknown }).citations, urls);
-    }
-  }
-  return [...urls];
-}
-
-function collectCitationUrls(value: unknown, urls: Set<string>): void {
-  if (!Array.isArray(value)) return;
-  for (const item of value) {
-    const url = typeof item === "string"
-      ? item
-      : item && typeof item === "object"
-        ? readString((item as { url?: unknown; source_url?: unknown }).url)
-          ?? readString((item as { url?: unknown; source_url?: unknown }).source_url)
-        : undefined;
-    if (url) urls.add(url);
-  }
 }
 
 function latestTrendValue(payload: Record<string, unknown>, keyword: string): number | null {

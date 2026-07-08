@@ -36,6 +36,7 @@ export interface CanvasSectionAnalysisDependencies {
   runner?: AgentRunner;
   xaiApiKey?: string;
   xaiModel?: string;
+  exaApiKey?: string;
   firecrawlApiKey?: string;
   fredApiKey?: string;
   googleTrendsApiKey?: string;
@@ -79,6 +80,7 @@ export class CanvasSectionAnalysisHandler {
       proposalMode: true,
       xaiApiKey: this.deps.xaiApiKey,
       xaiModel: this.deps.xaiModel,
+      exaApiKey: this.deps.exaApiKey,
       firecrawlApiKey: this.deps.firecrawlApiKey,
       fredApiKey: this.deps.fredApiKey,
       googleTrendsApiKey: this.deps.googleTrendsApiKey,

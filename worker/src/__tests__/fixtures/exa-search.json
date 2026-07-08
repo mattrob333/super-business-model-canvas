@@ -1,0 +1,18 @@
+{
+  "results": [
+    {
+      "id": "https://news.example/acme-analytics",
+      "url": "https://news.example/acme-analytics",
+      "title": "Acme launches enterprise analytics product",
+      "text": "Acme announced a new enterprise analytics product in June 2026, aimed at mid-market data teams.",
+      "publishedDate": "2026-06-02"
+    },
+    {
+      "id": "https://acme.example/blog/enterprise-analytics",
+      "url": "https://acme.example/blog/enterprise-analytics",
+      "title": "Introducing Acme Analytics",
+      "text": "Our new analytics suite gives teams real-time dashboards and alerting.",
+      "publishedDate": "2026-06-01"
+    }
+  ]
+}
