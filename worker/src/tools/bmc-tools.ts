@@ -247,14 +247,20 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
 
   const searchWeb = tool(
     "search_web",
-    "Search the live web through the cached web search feed when configured. Gracefully degrades when unset.",
-    { query: z.string().min(1) },
+    "Search the live web through the cached web search feed when configured. Gracefully degrades when unset. Set recency_days when only fresh results are useful (news, launches, hiring) — it filters out older pages.",
+    {
+      query: z.string().min(1),
+      recency_days: z.number().int().positive().max(730).optional(),
+    },
     async (args) => {
       const result = await feedRunner.refresh({
         accountId: ctx.accountId,
         feedKey: "web_search",
-        cacheKey: `tool:search_web:${args.query}`,
+        // recency in the cache key: a fresh-only answer and an all-time
+        // answer to the same query are different results.
+        cacheKey: `tool:search_web:${args.query}${args.recency_days ? `:r${args.recency_days}` : ""}`,
         query: args.query,
+        recencyDays: args.recency_days,
       });
       return toolResult(feedToolResult(result, { query: args.query }));
     },

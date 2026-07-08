@@ -319,8 +319,11 @@ The worker's Supabase client uses the **service-role key, which bypasses RLS ent
   with `health = 'ok'` and `expires_at` in the future. Writes get `ttl_seconds` from the feed
   when healthy, or a short **300 s TTL when degraded/failing** so failures retry soon.
 - **Fetchers** (`fetchers.ts`), keyed by `feed_key`: `firecrawl_scrape` (Firecrawl v2 scrape),
-  `web_search` (provider chain: Exa semantic search -> Firecrawl search -> xAI Agent Tools API,
-  first provider with real evidence wins), `fred_series` (FRED observations → metrics),
+  `web_search` (provider chain: Exa semantic search -> Firecrawl search -> xAI Agent Tools API
+  with web_search + x_search, first provider with real evidence wins; callers may pass
+  `recencyDays`/`searchCategory` — watch-style skills filter to fresh news, mining skills stay
+  unfiltered, and Exa retries once unfiltered if the filtered query returns nothing),
+  `fred_series` (FRED observations → metrics),
   `google_trends` (SerpAPI engine), `gdelt_count` (no key needed), `github_repo_stats`. Every
   fetcher returns `degraded(...)` instead of throwing when its API key is missing or the
   upstream call fails — tools and jobs surface `health`/`error` rather than crashing the run.

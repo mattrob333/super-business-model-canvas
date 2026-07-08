@@ -9,6 +9,16 @@ export interface FeedRunInput {
   companyName?: string;
   companyUrl?: string;
   query?: string;
+  /**
+   * web_search only: restrict results to pages published within this many
+   * days. Watch-style skills (launches, partnerships, hiring) set this so a
+   * two-year-old announcement can't masquerade as a current move; mining
+   * skills (communities, industry structure) leave it unset — recency
+   * filtering drops undated evergreen pages.
+   */
+  recencyDays?: number;
+  /** web_search only: Exa category hint (their enum; only these two have proven useful). */
+  searchCategory?: "news" | "company";
 }
 
 export interface EvidenceCandidate {

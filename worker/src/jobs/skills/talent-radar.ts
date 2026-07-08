@@ -100,6 +100,9 @@ export const runTalentRadar: SkillRun = async (toolkit, job, scope) => {
     cacheKey: `talent_radar:${job.account_id}:${slug(companyName)}:${slug(competitorNames.join("-"))}`,
     companyName,
     query: `${competitorNames.join(", ")} hiring jobs careers roles engineering sales data AI`,
+    // Hiring is a NOW signal — filled or expired postings are noise. No
+    // category: job posts and careers pages are not "news".
+    recencyDays: 180,
   });
   const sources = feed.health === "ok"
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)

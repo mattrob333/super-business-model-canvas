@@ -64,7 +64,7 @@ describe("feed fetchers", () => {
     expect(JSON.parse(String(requestInit?.body))).toMatchObject({
       model: "grok-4.3",
       input: "Acme analytics",
-      tools: [{ type: "web_search" }],
+      tools: [{ type: "web_search" }, { type: "x_search" }],
     });
   });
 
@@ -145,6 +145,65 @@ describe("feed fetchers", () => {
     expect(result?.evidence[0]?.excerpt).toContain("enterprise analytics product");
     const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.firecrawl.dev/v2/search");
+  });
+
+  it("maps recencyDays and searchCategory onto Exa's category and startPublishedDate", async () => {
+    const fetch = fixtureFetch("exa-search.json");
+    const fetchers = createFeedFetchers({ exaApiKey: "exa-key", fetch });
+
+    await fetchers.get("web_search")?.run({
+      ...baseInput("web_search"),
+      query: "Acme launches",
+      recencyDays: 90,
+      searchCategory: "news",
+    });
+
+    const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as Record<string, unknown>;
+    expect(body.category).toBe("news");
+    const cutoff = Date.parse(String(body.startPublishedDate));
+    expect(cutoff).toBeGreaterThan(Date.now() - 91 * 86_400_000);
+    expect(cutoff).toBeLessThan(Date.now() - 89 * 86_400_000);
+  });
+
+  it("retries Exa once without filters when the filtered query returns nothing", async () => {
+    const fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      const filtered = Boolean(body.startPublishedDate || body.category);
+      return new Response(filtered ? JSON.stringify({ results: [] }) : readFixture("exa-search.json"), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const fetchers = createFeedFetchers({ exaApiKey: "exa-key", fetch });
+
+    const result = await fetchers.get("web_search")?.run({
+      ...baseInput("web_search"),
+      query: "Acme launches",
+      recencyDays: 90,
+      searchCategory: "news",
+    });
+
+    expect(result?.health).toBe("ok");
+    expect(result?.evidence[0]?.sourceName).toBe("Exa");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const secondBody = JSON.parse(String((fetch.mock.calls[1] as [unknown, RequestInit?])[1]?.body)) as Record<string, unknown>;
+    expect(secondBody.startPublishedDate).toBeUndefined();
+    expect(secondBody.category).toBeUndefined();
+  });
+
+  it("maps recencyDays onto Firecrawl's tbs buckets", async () => {
+    const fetch = fixtureFetch("firecrawl-search.json");
+    const fetchers = createFeedFetchers({ firecrawlApiKey: "firecrawl-key", fetch });
+
+    await fetchers.get("web_search")?.run({
+      ...baseInput("web_search"),
+      query: "Acme launches",
+      recencyDays: 90,
+    });
+
+    const fetchMock = fetch as unknown as { mock: { calls: Array<[unknown, RequestInit?]> } };
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ tbs: "qdr:y" });
   });
 
   it("tries providers in order Exa -> Firecrawl -> xAI and stops at the first with evidence", async () => {

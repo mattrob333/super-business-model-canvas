@@ -76,6 +76,10 @@ export const runVelocityWatch: SkillRun = async (toolkit, job, scope) => {
     cacheKey: `velocity_watch:${job.account_id}:${slug(companyName)}:${competitorNames.map(slug).sort().join("+")}`,
     companyName,
     query: `${competitorNames.join(", ")} product launch changelog release announcement recent`,
+    // A watch is only as honest as its window: a two-year-old launch served
+    // as "recent shipping" corrupts the whole artifact.
+    recencyDays: 90,
+    searchCategory: "news",
   });
   const sources = feed.health === "ok"
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)

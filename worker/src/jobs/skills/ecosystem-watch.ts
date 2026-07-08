@@ -54,6 +54,10 @@ export const runEcosystemWatch: SkillRun = async (toolkit, job, scope) => {
     cacheKey: `ecosystem_watch:${job.account_id}:${slug(companyName)}`,
     companyName,
     query: `${competitorNames.join(", ")} partnership announcement integration alliance`,
+    // Partnership moves stay strategically relevant a bit longer than
+    // launches, but a years-old alliance is not an "observed move".
+    recencyDays: 180,
+    searchCategory: "news",
   });
   const sources = feed.health === "ok"
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)

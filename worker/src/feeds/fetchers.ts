@@ -125,21 +125,43 @@ function webSearchFetcher(config: FeedRuntimeConfig, fetcher: FetchLike): FeedFe
 }
 
 async function runExaSearch(config: FeedRuntimeConfig, fetcher: FetchLike, input: FeedRunInput, query: string): Promise<SearchLegResult> {
+  const hasFilters = Boolean(input.recencyDays || input.searchCategory);
+  const first = await exaSearchOnce(config, fetcher, input, query, true);
+  if (first.outcome === "ok" || !hasFilters) return first;
+  // Recency/category filters can legitimately return nothing (undated pages
+  // are excluded by startPublishedDate) — stale evidence beats a dead skill,
+  // so retry once unfiltered before giving the leg up.
+  console.warn(`[web_search] exa filtered query empty (${first.reason}) — retrying without filters`);
+  return exaSearchOnce(config, fetcher, input, query, false);
+}
+
+async function exaSearchOnce(
+  config: FeedRuntimeConfig,
+  fetcher: FetchLike,
+  input: FeedRunInput,
+  query: string,
+  applyFilters: boolean,
+): Promise<SearchLegResult> {
+  const body: Record<string, unknown> = {
+    query,
+    numResults: 5,
+    contents: { text: { maxCharacters: 1500 } },
+  };
+  if (applyFilters && input.searchCategory) body.category = input.searchCategory;
+  if (applyFilters && input.recencyDays) {
+    body.startPublishedDate = new Date(Date.now() - input.recencyDays * 86_400_000).toISOString();
+  }
   const response = await fetcher("https://api.exa.ai/search", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "x-api-key": config.exaApiKey!,
     },
-    body: JSON.stringify({
-      query,
-      numResults: 5,
-      contents: { text: { maxCharacters: 1500 } },
-    }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
-    const body = (await response.text().catch(() => "")).slice(0, 300);
-    return { provider: "exa", outcome: "failed", reason: `HTTP ${response.status}${body ? ` — ${body.slice(0, 160)}` : ""}` };
+    const errBody = (await response.text().catch(() => "")).slice(0, 300);
+    return { provider: "exa", outcome: "failed", reason: `HTTP ${response.status}${errBody ? ` — ${errBody.slice(0, 160)}` : ""}` };
   }
   const payload = await response.json() as Record<string, unknown>;
   const results = Array.isArray(payload.results) ? payload.results as Record<string, unknown>[] : [];
@@ -164,17 +186,23 @@ async function runExaSearch(config: FeedRuntimeConfig, fetcher: FetchLike, input
 }
 
 async function runFirecrawlSearch(config: FeedRuntimeConfig, fetcher: FetchLike, input: FeedRunInput, query: string): Promise<SearchLegResult> {
+  const body: Record<string, unknown> = {
+    query,
+    limit: 5,
+    scrapeOptions: { formats: ["markdown"] },
+  };
+  // Firecrawl's recency knob is Google's coarse tbs buckets, so the day
+  // count rounds up to the next bucket. No category equivalent: the news
+  // source type changes the response shape (data.news), not worth the fork.
+  const tbs = tbsForRecencyDays(input.recencyDays);
+  if (tbs) body.tbs = tbs;
   const response = await fetcher("https://api.firecrawl.dev/v2/search", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${config.firecrawlApiKey}`,
     },
-    body: JSON.stringify({
-      query,
-      limit: 5,
-      scrapeOptions: { formats: ["markdown"] },
-    }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     const body = (await response.text().catch(() => "")).slice(0, 300);
@@ -201,6 +229,15 @@ async function runFirecrawlSearch(config: FeedRuntimeConfig, fetcher: FetchLike,
     .filter((item): item is EvidenceCandidate => item !== null);
   if (evidence.length === 0) return { provider: "firecrawl_search", outcome: "failed", reason: "no results with content" };
   return { provider: "firecrawl_search", outcome: "ok", evidence, payload };
+}
+
+function tbsForRecencyDays(days: number | undefined): string | undefined {
+  if (!days || days <= 0) return undefined;
+  if (days <= 1) return "qdr:d";
+  if (days <= 7) return "qdr:w";
+  if (days <= 31) return "qdr:m";
+  if (days <= 366) return "qdr:y";
+  return undefined;
 }
 
 /**
@@ -236,7 +273,10 @@ async function runXaiAgentSearch(config: FeedRuntimeConfig, fetcher: FetchLike, 
       model,
       instructions: "Search the live web and return concise sourced snippets.",
       input: query,
-      tools: [{ type: "web_search" }],
+      // x_search is xAI's unique advantage over the Exa/Firecrawl legs:
+      // X-native signal (partnership announcements, launch chatter) that web
+      // crawls miss. Grok picks which tool(s) to invoke per query.
+      tools: [{ type: "web_search" }, { type: "x_search" }],
       reasoning: { effort: "low" },
       stream: false,
     }),

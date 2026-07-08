@@ -285,6 +285,72 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### OWNER ROUND — company switcher doesn't switch the canvas + search-logic pass (2026-07-08, later)
+
+Owner reports: picking another company in the sidebar dropdown left the old
+company's canvas on screen. Owner also confirmed `EXA_API_KEY` is now on the
+worker app and asked for a full search-logic pass: is Exa the right first
+choice everywhere, and does every search-consuming step use the best tool
+for its task?
+
+- **Switcher fix (one line, `src/components/layout/AccountSwitcher.tsx`):**
+  `switchToCompany` wrote the new session pointers then called
+  `navigate("/canvas")` — a same-route no-op when the user is already ON
+  /canvas (the common case: the switcher is most useful while looking at a
+  canvas). The canvas (Analysis.tsx) only reads `loadedAnalysis`/
+  `activeAnalysis` in a mount-only effect, so nothing re-rendered. Fix:
+  `window.location.assign("/canvas")` — the exact hard-load pattern
+  `startNewCompany` in the same file already uses for the same reason
+  ("no stale component state can keep the old company on screen"). All
+  pointers are sessionStorage-backed, so they survive the reload.
+- **Search-logic pass, conclusions:**
+  1. *Exa-first is right for all evidence retrieval* (the 11 search skills,
+     avatar_refinement, company-research backfill/403-fallback, agents'
+     `search_web` tool) — semantic search returning full page text is the
+     evidence contract. Already the chain order; no change.
+  2. *Exa-first is wrong for the conversational edge functions*
+     (`strategy-coach-chat`, `competitor-chat`, `analyze-company`,
+     `research-competitors`): they embed search inside the LLM call via
+     xAI's Responses API — the current supported product, not the retired
+     one — and swapping to Exa would mean building a separate RAG pipeline
+     for no chat-quality gain. Unchanged, decision recorded here.
+  3. *The chain treated every query identically*, but skills have two
+     search shapes: WATCH skills (launches, partnerships, hiring) need
+     fresh results — a two-year-old "recent launch" corrupts the artifact —
+     while MINING skills (communities, industry structure, review language)
+     are evergreen and a published-date filter would drop undated pages and
+     starve sparse queries.
+- **Implemented — per-task search options** (`recencyDays`,
+  `searchCategory: "news" | "company"`) on `FeedRefreshRequest`/
+  `FeedRunInput`, mapped per provider: Exa gets `category` +
+  `startPublishedDate` (with a one-shot unfiltered retry when the filtered
+  query returns nothing — stale evidence beats a dead skill); Firecrawl gets
+  the coarse `tbs` bucket (`qdr:d/w/m/y`, rounded up); xAI gets neither (no
+  verified per-request contract) but its leg now passes
+  `tools: [{web_search}, {x_search}]` — X-native signal (partnership
+  announcements, launch chatter) is xAI's one advantage over the other legs,
+  contract verified against docs.x.ai (x_search is a first-class Agent
+  Tools type; Grok picks which tools to invoke per query).
+  Applied: velocity_watch 90d+news, ecosystem_watch 180d+news, talent_radar
+  180d, operational_benchmark 180d, churn_signal_audit 365d. Deliberately
+  UNSET on watering_holes / supply_chain_map / wtp_signals / efficiency_scan
+  / build_vs_buy / advocacy_engine_scan / avatar_refinement / research
+  backfill+fallback (evergreen or sparse). The agents' `search_web` MCP tool
+  gained an optional `recency_days` arg, folded into its cache key so
+  fresh-only and all-time answers never cross-serve.
+- Tests: 3 new fetcher cases (Exa category/date mapping with window bounds,
+  filtered-empty -> unfiltered retry asserting the second body has no
+  filters, Firecrawl tbs bucket) + x_search added to the existing xAI
+  request-shape assertion. Worker suite 393 passed / 2 skipped.
+- Gates: worker typecheck/build/eslint exit 0; root `npx tsc` exit 0; root
+  build green; root lint 64 problems (frozen baseline); UTF-8 decode check
+  on touched files exit 0.
+- HONEST SCOPE: the switcher fix is code-path verified (the no-op-navigate
+  root cause is structural); confirming the live click-through needs the
+  deploy + an owner check. The recency windows (90/180/365) are judgment
+  calls — tunable per skill in one line each if live artifacts skew too
+  sparse or too stale.
+
 ### `grok_live_search` -> `web_search` provider chain + xAI Agent Tools API migration (2026-07-08)
 
 The new `[grok_live_search]` logging (previous entry) paid off immediately: Matt's

@@ -61,6 +61,9 @@ export const runChurnSignalAudit: SkillRun = async (toolkit, job, scope) => {
     companyName,
     query: [companyName, ...competitorNames].join(" and ")
       + " customer reviews complaints churn cancelled switching",
+    // Complaints about problems fixed years ago mislead the audit; a year
+    // keeps enough review volume while staying current.
+    recencyDays: 365,
   });
   const sources = feed.health === "ok"
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)

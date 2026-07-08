@@ -27,6 +27,10 @@ export interface FeedRefreshRequest {
   companyName?: string;
   companyUrl?: string;
   query?: string;
+  /** web_search only — see FeedRunInput. Callers varying this per call must fold it into cacheKey. */
+  recencyDays?: number;
+  /** web_search only — see FeedRunInput. */
+  searchCategory?: "news" | "company";
   force?: boolean;
 }
 
@@ -60,6 +64,8 @@ export class FeedRunner {
       companyName: request.companyName,
       companyUrl: request.companyUrl,
       query: request.query,
+      recencyDays: request.recencyDays,
+      searchCategory: request.searchCategory,
     } satisfies FeedRunInput);
 
     await this.writeCache(request.accountId, feed, cacheKey, result);

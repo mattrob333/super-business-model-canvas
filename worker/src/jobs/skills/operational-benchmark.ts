@@ -66,6 +66,9 @@ export const runOperationalBenchmark: SkillRun = async (toolkit, job, scope) => 
     cacheKey: `operational_benchmark:${job.account_id}:${slug(companyName)}`,
     companyName,
     query: `${competitorNames.join(", ")} hiring careers engineering product launches shipped features`,
+    // Benchmarks compare current operating pace; stale hiring/launch pages
+    // would credit competitors with momentum they no longer have.
+    recencyDays: 180,
   });
   const sources = feed.health === "ok"
     ? feed.evidence.filter((entry) => Boolean(entry.excerpt?.trim())).slice(0, 6)
