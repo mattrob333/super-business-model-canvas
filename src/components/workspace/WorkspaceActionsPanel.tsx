@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, FileText, Loader2, Play, Wrench } from "lucide-react";
+import { ExternalLink, FileText, Loader2, Lock, Play, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FocusDrawer } from "@/components/overlay/FocusDrawer";
@@ -40,6 +40,45 @@ interface SkillRunState {
 const ARTIFACT_REFRESH_MS = 30_000;
 const RUN_POLL_INTERVAL_MS = 3_000;
 const RUN_POLL_MAX_ATTEMPTS = 100;
+/** Competitor research may land while the user sits here — re-check until it does. */
+const COMPETITOR_GATE_RECHECK_MS = 30_000;
+
+/**
+ * Skills whose worker implementation throws immediately without researched
+ * competitor data (owner screenshot 2026-07-08: failed runs, wasted tokens).
+ * Derived from the honest-throw preconditions in worker/src/jobs/skill-run.ts
+ * and worker/src/jobs/skills/* — every "requires ... competitor ... research
+ * first" guard, keyed exactly as the catalog/registry keys them:
+ *
+ *   yield.pricing_teardown      "requires at least one competitor entity — run competitor research first"
+ *   compass.segment_expansion   "requires competitor Customer Segments research first"
+ *   relay.channel_gap_scan      "requires competitor Channels research first"
+ *   relay.channel_economics     "requires competitor Channels research first"
+ *   forge.differentiator_audit  "requires competitor Value Propositions research first"
+ *   vault.talent_radar          "requires at least one researched competitor first"
+ *   envoy.ecosystem_watch       "requires at least one researched competitor first"
+ *   anchor.lifecycle_map        "requires competitor Customer Relationships research first"
+ *   anchor.advocacy_engine_scan "requires at least one researched competitor first"
+ *   tempo.operational_benchmark "requires at least one researched competitor first"
+ *   tempo.velocity_watch        "requires at least one researched competitor first"
+ *   yield.monetization_gaps     "requires at least one researched competitor first"
+ *
+ * Keep in sync when a worker skill adds or drops a competitor precondition.
+ */
+const REQUIRES_COMPETITOR_RESEARCH = new Set<string>([
+  "yield.pricing_teardown",
+  "compass.segment_expansion",
+  "relay.channel_gap_scan",
+  "relay.channel_economics",
+  "forge.differentiator_audit",
+  "vault.talent_radar",
+  "envoy.ecosystem_watch",
+  "anchor.lifecycle_map",
+  "anchor.advocacy_engine_scan",
+  "tempo.operational_benchmark",
+  "tempo.velocity_watch",
+  "yield.monetization_gaps",
+]);
 
 /**
  * Spec 10 ActionsPanel, studio edition: the top half runs this agent's
@@ -66,8 +105,51 @@ export function WorkspaceActionsPanel({
   const [tileErrors, setTileErrors] = useState<Record<string, string>>({});
   const pollTimer = useRef<ReturnType<typeof setTimeout>>();
   const startingRef = useRef(false);
+  /**
+   * Does the active company have ANY researched competitor canvas rows
+   * (competitor-linked canvas_section_versions within scope.contextIds —
+   * the exact read the worker's loadCompetitorSectionItems performs)?
+   * null = not checked yet (skills stay runnable until we know).
+   */
+  const [hasCompetitorResearch, setHasCompetitorResearch] = useState<boolean | null>(null);
 
   useEffect(() => () => clearTimeout(pollTimer.current), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let recheckTimer: ReturnType<typeof setTimeout> | undefined;
+    const check = async () => {
+      // Company-scoped, same as loadArtifacts: a company switch must not let
+      // a previous company's competitor research unlock this company's skills.
+      const scope = await loadCompanyScope(accountId).catch(() => null);
+      let query = supabase
+        .from("canvas_section_versions")
+        .select("id")
+        .eq("account_id", accountId)
+        .not("competitor_id", "is", null);
+      if (scope) query = query.in("business_context_version_id", scope.contextIds);
+      const { data, error } = await query.limit(1);
+      if (cancelled) return;
+      if (error) {
+        // Fail open: the worker's own precondition throw stays the honest
+        // backstop; a read error must not lock every competitor skill.
+        setHasCompetitorResearch(true);
+        return;
+      }
+      const found = (data ?? []).length > 0;
+      setHasCompetitorResearch(found);
+      // Research runs take minutes — keep re-checking until the data lands
+      // so the gate lifts without a page reload.
+      if (!found) {
+        recheckTimer = setTimeout(() => void check(), COMPETITOR_GATE_RECHECK_MS);
+      }
+    };
+    void check();
+    return () => {
+      cancelled = true;
+      if (recheckTimer) clearTimeout(recheckTimer);
+    };
+  }, [accountId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,6 +265,9 @@ export function WorkspaceActionsPanel({
     // state, so a fast double-click passes the null check twice before the
     // re-render lands — that enqueued two identical runs in production.
     if (!skill.implemented || runningRun || startingRef.current) return;
+    // Frontend mirror of the worker's precondition throw: enqueueing this run
+    // without researched competitors would only burn tokens and fail.
+    if (REQUIRES_COMPETITOR_RESEARCH.has(skill.skill_key) && hasCompetitorResearch === false) return;
     startingRef.current = true;
     setTileErrors((prev) => ({ ...prev, [skill.skill_key]: "" }));
     try {
@@ -218,7 +303,7 @@ export function WorkspaceActionsPanel({
     } finally {
       startingRef.current = false;
     }
-  }, [accountId, agentProfileId, ensureBusinessContext, pollSkillRun, runningRun, toast, user]);
+  }, [accountId, agentProfileId, ensureBusinessContext, hasCompetitorResearch, pollSkillRun, runningRun, toast, user]);
 
   return (
     <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -242,38 +327,71 @@ export function WorkspaceActionsPanel({
         </p>
       ) : (
         <ul className="mt-3 space-y-2">
-          {skills.map((skill) => (
-            <li key={skill.skill_key} className="rounded-md border border-border/60 p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold leading-snug">{skill.title}</p>
-                  <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-                    {skill.description}
-                  </p>
+          {skills.map((skill) => {
+            // Gate only once we KNOW there is no competitor research (null =
+            // still checking): the worker throws on these without it.
+            const needsCompetitorResearch =
+              skill.implemented &&
+              REQUIRES_COMPETITOR_RESEARCH.has(skill.skill_key) &&
+              hasCompetitorResearch === false;
+            return (
+              <li key={skill.skill_key} className="rounded-md border border-border/60 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold leading-snug">{skill.title}</p>
+                    <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                      {skill.description}
+                    </p>
+                  </div>
+                  {!skill.implemented && (
+                    <Badge variant="secondary" className="shrink-0 text-[10px]">
+                      Coming
+                    </Badge>
+                  )}
                 </div>
-                {!skill.implemented && (
-                  <Badge variant="secondary" className="shrink-0 text-[10px]">
-                    Coming
-                  </Badge>
+                <Button
+                  size="sm"
+                  className="mt-3 h-8 w-full gap-1.5"
+                  variant={skill.implemented && !needsCompetitorResearch ? "default" : "outline"}
+                  disabled={!skill.implemented || runningRun !== null || needsCompetitorResearch}
+                  onClick={() => void runSkill(skill)}
+                >
+                  {runningRun?.skillKey === skill.skill_key ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : needsCompetitorResearch ? (
+                    <Lock className="h-3.5 w-3.5" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                  {runningRun?.skillKey === skill.skill_key
+                    ? "Running"
+                    : needsCompetitorResearch
+                      ? "Needs competitor research first"
+                      : skill.implemented
+                        ? "Run"
+                        : "Coming"}
+                </Button>
+                {needsCompetitorResearch && (
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="link"
+                    className="mt-1 h-auto w-full justify-start gap-1 px-0 text-xs"
+                  >
+                    <Link to="/canvas">
+                      Research competitors on the Industry landscape
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </Button>
                 )}
-              </div>
-              <Button
-                size="sm"
-                className="mt-3 h-8 w-full gap-1.5"
-                variant={skill.implemented ? "default" : "outline"}
-                disabled={!skill.implemented || runningRun !== null}
-                onClick={() => void runSkill(skill)}
-              >
-                {runningRun?.skillKey === skill.skill_key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                {runningRun?.skillKey === skill.skill_key ? "Running" : skill.implemented ? "Run" : "Coming"}
-              </Button>
-              {tileErrors[skill.skill_key] && (
-                <p className="mt-2 text-xs leading-relaxed text-destructive">
-                  {tileErrors[skill.skill_key]}
-                </p>
-              )}
-            </li>
-          ))}
+                {tileErrors[skill.skill_key] && (
+                  <p className="mt-2 text-xs leading-relaxed text-destructive">
+                    {tileErrors[skill.skill_key]}
+                  </p>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 

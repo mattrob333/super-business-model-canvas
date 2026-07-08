@@ -191,6 +191,15 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
       : [];
   }, [itemsBySection, sectionKey, activeAnalysis]);
   const handleLatestRun = useCallback((run: AgentRunSnapshot | null) => setLatestRun(run), []);
+  // One-shot briefs: clear them the moment the thread consumes them. The
+  // sessionStorage guards above only stop the prompt being REBUILT — this
+  // state survives the thread unmounting, and handing a remounted thread the
+  // same prompt re-sent it and fired a duplicate agent run (owner repro
+  // 2026-07-08: switching browser tabs and back).
+  const handleInitialPromptConsumed = useCallback(() => {
+    setGapPrompt(null);
+    setAtlasPrompt(null);
+  }, []);
   const handleVerifyAssumption = useCallback((text: string) => {
     setComposerPrefill(
       `Let's verify this assumption: «${text}». Research it with your tools and propose an evidence-backed replacement through the proposal loop — or tell me what information you need from me.`,
@@ -264,6 +273,7 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
               initialThreadTitle={atlasPrompt ? "Directive from Atlas" : null}
               composerPrefill={composerPrefill}
               onComposerPrefillConsumed={() => setComposerPrefill(null)}
+              onInitialPromptConsumed={handleInitialPromptConsumed}
             />
           </main>
 

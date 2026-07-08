@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { ExternalLink, MessageCircle, Building2, Loader2, Radar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -28,20 +29,81 @@ export const CompetitiveLandscape = ({
   onSimilarCompanyChat,
 }: CompetitiveLandscapeProps) => {
   const { stateFor, startResearch, ready } = useCompetitorResearch(competitors);
+  // Synchronous double-fire guard: researchingAll is React state, so a fast
+  // double-click would pass the disabled check twice before the re-render
+  // lands (same production bug pattern as WorkspaceActionsPanel.startingRef).
+  const researchAllRef = useRef(false);
+  const [researchingAll, setResearchingAll] = useState(false);
+
+  // Snapshot of the cards that would show "Research this competitor" —
+  // already-researched, starting and queued ones are never re-enqueued.
+  const unresearched = competitors.filter((competitor) => {
+    const research = stateFor(competitor);
+    return !research.researched && research.status !== "starting" && research.status !== "queued";
+  });
+  const allResearched =
+    competitors.length > 0 && competitors.every((competitor) => stateFor(competitor).researched);
+
+  const handleResearchAll = async () => {
+    if (researchAllRef.current || !ready || unresearched.length === 0) return;
+    researchAllRef.current = true;
+    setResearchingAll(true);
+    try {
+      // Sequentially enqueue every unresearched competitor — the worker queue
+      // serializes execution; each startResearch flips that card's own
+      // pending state exactly as a single-card click does. startResearch
+      // never throws (it records per-card errors), so one failure does not
+      // stop the rest of the batch.
+      for (const competitor of unresearched) {
+        await startResearch(competitor);
+      }
+    } finally {
+      researchAllRef.current = false;
+      setResearchingAll(false);
+    }
+  };
 
   return (
     <div className="w-full">
-      <div className="mb-4 space-y-1">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-          Market competition
-        </p>
-        <h2 className="text-lg font-semibold tracking-tight text-foreground md:text-xl">
-          Industry landscape
-        </h2>
-        <p className="max-w-2xl text-xs text-muted-foreground">
-          Comparable companies in this space — research one to build its evidence-cited canvas
-          and score the gaps against yours.
-        </p>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+            Market competition
+          </p>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground md:text-xl">
+            Industry landscape
+          </h2>
+          <p className="max-w-2xl text-xs text-muted-foreground">
+            Comparable companies in this space — research one to build its evidence-cited canvas
+            and score the gaps against yours. Skills that need competitive data unlock once
+            research lands.
+          </p>
+        </div>
+        {competitors.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-1.5"
+            disabled={!ready || researchingAll || unresearched.length === 0}
+            onClick={() => void handleResearchAll()}
+          >
+            {researchingAll ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Starting research…
+              </>
+            ) : (
+              <>
+                <Radar className="h-3.5 w-3.5" />
+                {unresearched.length > 0
+                  ? `Research all competitors (${unresearched.length})`
+                  : allResearched
+                    ? "All competitors researched"
+                    : "Research queued"}
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">

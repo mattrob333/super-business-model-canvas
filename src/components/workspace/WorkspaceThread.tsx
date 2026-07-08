@@ -114,6 +114,7 @@ export function WorkspaceThread({
   initialThreadTitle = null,
   composerPrefill = null,
   onComposerPrefillConsumed,
+  onInitialPromptConsumed,
 }: {
   accountId: string;
   agentProfileId: string;
@@ -124,6 +125,13 @@ export function WorkspaceThread({
   initialThreadTitle?: string | null;
   composerPrefill?: string | null;
   onComposerPrefillConsumed?: () => void;
+  /**
+   * Called the moment the initialPrompt is consumed (sent or deliberately
+   * skipped). The parent must clear the prompt it passed — autoSentRef alone
+   * dies with this component, and a remount with the prompt still set would
+   * re-send it and fire a duplicate agent run (owner finding 2026-07-08).
+   */
+  onInitialPromptConsumed?: () => void;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -330,6 +338,7 @@ export function WorkspaceThread({
       // Atlas delegation: always a fresh thread — the handoff was consumed
       // one-shot upstream, so refreshes cannot re-fire this.
       autoSentRef.current = true;
+      onInitialPromptConsumed?.();
       void (async () => {
         try {
           const scope = await loadCompanyScope(accountId).catch(() => null);
@@ -360,9 +369,10 @@ export function WorkspaceThread({
     }
     if (activeThreadId && !messagesReady) return;
     autoSentRef.current = true;
+    onInitialPromptConsumed?.();
     if (messages.length > 0) return;
     void sendMessage(initialPrompt);
-  }, [initialPrompt, initialThreadTitle, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage, accountId, agentProfileId, user, entry.callsign]);
+  }, [initialPrompt, initialThreadTitle, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage, accountId, agentProfileId, user, entry.callsign, onInitialPromptConsumed]);
 
   useEffect(() => {
     if (!composerPrefill) return;

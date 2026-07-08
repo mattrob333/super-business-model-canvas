@@ -285,6 +285,57 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### OWNER ROUND — artifact design system, tab-refocus rerun bug, chat typography, research-competition UX (2026-07-08)
+
+Four parallel workstreams from the owner's live review ("forgettable walls
+of text"; duplicate runs on tab return; unreadable chat; failed
+competitor-dependent runs), plus the coverage investigation.
+
+- **Artifact design system (spec 13 + flagships):**
+  docs/specs/13_ARTIFACT_DESIGN_SYSTEM.md — dataviz-skill-validated chart
+  palette on the white paper (brand_color is chrome, never data), 8 exhibit
+  primitives, and a 27-skill map of hero visual + support exhibits, all
+  derivable from EXISTING payloads (skills too thin for a chart say so —
+  no fabricated axes). New src/components/skills/exhibit-charts.tsx
+  (RadarProfile, QuadrantMatrix, MeterBar, KpiStatRow/ArcGauge,
+  DistributionStrip); flagships upgraded in place: moat audit = durability
+  radar + ranked meters; build-vs-buy = numbered 2x2 with verdict-mix
+  strip; unit economics = coverage strip + KPI tiles with grounding
+  gauges. print-color-adjust exact for PDF. Remaining 24 exhibits get the
+  system in waves per the spec's map.
+- **Tab-refocus rerun bug (root-caused, 3 layers):** token refresh swapped
+  the user object identity → useAccountId re-entered loading →
+  Workspace unmounted the thread → remount opened a fresh chat AND
+  re-sent the still-held gap/atlas brief (duplicate run). Fixed:
+  useAuth keeps object identity on TOKEN_REFRESHED (memoized context,
+  admin check only on user-id change); useAccountId keys on user id;
+  WorkspaceThread reports onInitialPromptConsumed so WorkspaceRoom clears
+  the prompt — even a genuine remount can never re-send.
+- **Chat typography (Grok-style):** AgentMarkdown headers up-sized/bolded
+  with tracking, brand-accent bullet + numbered-list markers, tinted
+  inline-code chips.
+- **Research-competition UX:** "Research all competitors" button
+  (sequential, failure-isolated, double-fire guarded); auto-research of
+  top 3 after a new analysis (localStorage one-shot per saved analysis,
+  dismissible toast); 12 competitor-dependent skills (exact worker throws
+  quoted in WorkspaceActionsPanel) gate with "Needs competitor research
+  first" + landscape link, fail-open, 30s re-check auto-unlock.
+- **Coverage investigation (report to owner, fixes queued as next round):**
+  research starves extraction (6 guessed URLs, 6KB evidence cap, prompt
+  never lists the 9 sections, silent key drops, 2 mashed backfill
+  queries); plan R1-R6 ranked (prompt fix → budget/chunking → per-section
+  grok queries → smarter crawl list → SEC EDGAR fetcher → review mining).
+
+**Gate results for this commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+worker untouched                       -> last green (tsc 0, vitest 382, build 0, eslint 0)
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### GOAL PHASE 6 — final QA + security sweep: GOAL COMPLETE (2026-07-07)
 
 Final phase of docs/GOAL_FINISH_LINE.md. Two auditors (worker tenancy sweep,

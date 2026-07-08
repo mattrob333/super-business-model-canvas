@@ -1,7 +1,10 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -27,6 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLoading, setAdminLoading] = useState(true);
+  // Which user id the admin role was last checked for — token refreshes for
+  // the SAME user must not re-enter the adminLoading state.
+  const adminCheckedForUserId = useRef<string | null>(null);
 
   const checkAdminStatus = async (userId: string) => {
     try {
@@ -45,43 +51,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
+    // Token refreshes (e.g. returning to the browser tab) hand us a brand-new
+    // session/user object for the SAME signed-in user. Swapping the user's
+    // object identity on every refresh cascaded into effect re-runs and page
+    // remounts downstream (owner finding 2026-07-08: the workspace thread
+    // reset to a fresh chat and re-fired its auto-send). Keep the previous
+    // object whenever the underlying value hasn't changed, and only re-check
+    // the admin role for a genuinely different user.
+    const applySession = (nextSession: Session | null, deferAdminCheck: boolean) => {
+      setSession((prev) =>
+        prev && nextSession && prev.access_token === nextSession.access_token
+          ? prev
+          : nextSession,
+      );
+      setUser((prev) =>
+        prev && nextSession?.user && prev.id === nextSession.user.id
+          ? prev
+          : nextSession?.user ?? null,
+      );
 
-      if (nextSession?.user) {
-        setAdminLoading(true);
-        // Defer: supabase-js warns against making Supabase calls directly
-        // inside the onAuthStateChange callback (can deadlock)
-        setTimeout(() => void checkAdminStatus(nextSession.user.id), 0);
+      const nextUserId = nextSession?.user?.id ?? null;
+      if (nextUserId) {
+        if (adminCheckedForUserId.current !== nextUserId) {
+          adminCheckedForUserId.current = nextUserId;
+          setAdminLoading(true);
+          if (deferAdminCheck) {
+            // Defer: supabase-js warns against making Supabase calls directly
+            // inside the onAuthStateChange callback (can deadlock)
+            setTimeout(() => void checkAdminStatus(nextUserId), 0);
+          } else {
+            void checkAdminStatus(nextUserId);
+          }
+        }
       } else {
+        adminCheckedForUserId.current = null;
         setIsAdmin(false);
         setAdminLoading(false);
       }
 
       setLoading(false);
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      applySession(nextSession, true);
     });
 
     void supabase.auth.getSession().then(({ data: { session: existing } }) => {
-      setSession(existing);
-      setUser(existing?.user ?? null);
-
-      if (existing?.user) {
-        setAdminLoading(true);
-        void checkAdminStatus(existing.user.id);
-      } else {
-        setAdminLoading(false);
-      }
-
-      setLoading(false);
+      applySession(existing, false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/canvas`;
 
     const { error } = await supabase.auth.signUp({
@@ -93,38 +117,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return { error };
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     return { error };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     return { error };
-  };
+  }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        loading,
-        isAdmin,
-        adminLoading,
-        signUp,
-        signIn,
-        signOut,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  // Stable context identity: consumers only re-render when a value actually
+  // changed, never because the provider itself re-rendered.
+  const value = useMemo(
+    () => ({
+      user,
+      session,
+      loading,
+      isAdmin,
+      adminLoading,
+      signUp,
+      signIn,
+      signOut,
+    }),
+    [user, session, loading, isAdmin, adminLoading, signUp, signIn, signOut],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {
