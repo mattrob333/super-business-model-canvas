@@ -898,10 +898,10 @@ Website: ${comp.website || 'N/A'}
           <section className="w-full max-w-7xl mx-auto">
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-foreground mb-1">
-                Your Saved Contexts
+                Pick up where you left off
               </h2>
               <p className="text-sm text-muted-foreground">
-                Continue refining or launch new strategy sessions from previous analyses.
+                Reopen a company you've already analyzed — its canvas, research, and reports come back with it.
               </p>
             </div>
             

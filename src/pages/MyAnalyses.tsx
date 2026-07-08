@@ -233,15 +233,18 @@ const MyAnalyses = () => {
       <div className="max-w-6xl mx-auto">
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">My Analyses</h1>
-            <p className="text-muted-foreground mt-2">View and manage your saved analyses</p>
+            <h1 className="text-2xl font-semibold tracking-tight">Saved Companies</h1>
+            <p className="text-muted-foreground mt-2">
+              Every company you've analyzed. Open one to make it your active
+              workspace and pick up where you left off.
+            </p>
           </div>
 
           {analyses.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <p className="text-muted-foreground text-center mb-4">
-                  No saved analyses yet. Analyze a company to get started!
+                  No companies yet. Paste a company website on the Canvas page to analyze your first one.
                 </p>
                 <Button onClick={() => navigate('/canvas')}>
                   Start Analysis

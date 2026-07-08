@@ -260,8 +260,8 @@ const Dashboard = () => {
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {company?.name
-            ? `Strategy overview for ${company.name}`
-            : "Enterprise strategy operating overview"}
+            ? `${company.name}'s strategic health at a glance — open gaps, competitor threats, and agent activity, with what needs your attention first.`
+            : "Your strategic health at a glance — open gaps, competitor threats, and agent activity, with what needs your attention first."}
         </p>
         {company?.industry && (
           <Badge variant="outline" className="mt-2 text-primary border-primary/30">

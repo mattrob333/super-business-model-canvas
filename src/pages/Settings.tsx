@@ -108,7 +108,7 @@ const Settings = () => {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage workspace configuration and preferences
+          Set up how your workspace runs — company brand, AI models and provider keys, agent defaults, and security.
         </p>
       </div>
 
