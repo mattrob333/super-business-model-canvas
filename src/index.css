@@ -154,5 +154,9 @@
   .artifact-paper {
     border: 0 !important;
     box-shadow: none !important;
+    /* Exhibit fills (meters, gauges, quadrant washes, chips) must survive
+       Print / Save-PDF — spec 13 §4. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
