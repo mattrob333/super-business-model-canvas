@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "data": {
+    "web": [
+      {
+        "url": "https://news.example/acme-analytics",
+        "title": "Acme launches enterprise analytics suite",
+        "description": "Acme's new analytics product targets mid-market data teams.",
+        "markdown": "# Acme launches enterprise analytics suite\n\nAcme announced a new enterprise analytics product in June 2026, aimed at mid-market data teams."
+      }
+    ]
+  }
+}

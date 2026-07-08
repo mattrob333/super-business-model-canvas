@@ -16,6 +16,7 @@ export interface ToolContext {
   allowSkillRuns?: boolean;
   xaiApiKey?: string;
   xaiModel?: string;
+  exaApiKey?: string;
   firecrawlApiKey?: string;
   fredApiKey?: string;
   googleTrendsApiKey?: string;
@@ -392,6 +393,7 @@ function feedConfigFromContext(ctx: ToolContext): FeedRuntimeConfig {
   return {
     xaiApiKey: ctx.xaiApiKey,
     xaiModel: ctx.xaiModel,
+    exaApiKey: ctx.exaApiKey,
     firecrawlApiKey: ctx.firecrawlApiKey,
     fredApiKey: ctx.fredApiKey,
     googleTrendsApiKey: ctx.googleTrendsApiKey,

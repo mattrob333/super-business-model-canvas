@@ -40,6 +40,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           GOOGLE_TRENDS_API_KEY: ${{ secrets.GOOGLE_TRENDS_API_KEY }}
@@ -52,6 +53,7 @@ jobs:
           add ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
           add OPENROUTER_API_KEY "$OPENROUTER_API_KEY"
           add XAI_API_KEY "$XAI_API_KEY"
+          add EXA_API_KEY "$EXA_API_KEY"
           add FIRECRAWL_API_KEY "$FIRECRAWL_API_KEY"
           add FRED_API_KEY "$FRED_API_KEY"
           add GOOGLE_TRENDS_API_KEY "$GOOGLE_TRENDS_API_KEY"

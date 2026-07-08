@@ -46,6 +46,7 @@ export interface FeedRuntimeConfig {
   firecrawlApiKey?: string;
   xaiApiKey?: string;
   xaiModel?: string;
+  exaApiKey?: string;
   fredApiKey?: string;
   googleTrendsApiKey?: string;
   githubToken?: string;

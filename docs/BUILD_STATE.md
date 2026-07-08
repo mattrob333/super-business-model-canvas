@@ -285,6 +285,59 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Search-provider fallback chain replaces the single xAI dependency (2026-07-08)
+
+The new `[grok_live_search]` logging (previous entry) paid off immediately: Matt's
+re-run showed `HTTP 410 from api.x.ai body={"error":"Live search is deprecated.
+Please switch to the Agent Tools API"}` on all 3 attempts. xAI retired Live Search
+on 2026-01-12 — every search-backed skill had been silently broken since, and no
+model-name fix could have addressed it.
+
+- **`grok_live_search` is now a provider chain, not a single vendor call**
+  (`worker/src/feeds/fetchers.ts`): Exa (semantic search, full page text) ->
+  Firecrawl search (same key that already powers page scraping, new `/v2/search`
+  leg alongside the existing scrape) -> xAI (kept as a last-resort leg; still
+  degrades honestly on the dead endpoint until migrated to their Agent Tools API,
+  which is harmless since Exa/Firecrawl answer first). The feed key, its
+  `data_feeds` row, and all 11 skill call sites are untouched — only what answers
+  the key changed. Each leg is tried in order; the first with real evidence wins;
+  every attempt logs a `[grok_live_search]` line (`ok via <provider>` or
+  `<provider> failed: <reason>`) so a diagnose run shows exactly what was tried.
+  Legs auto-detect from configured keys, so the chain runs today on whichever of
+  `EXA_API_KEY` / `FIRECRAWL_API_KEY` / `XAI_API_KEY` are set and upgrades itself
+  the moment a higher-priority key lands — no code change needed to adopt Exa.
+- **New `EXA_API_KEY`** plumbed `env.ts` -> `index.ts` -> `FeedRuntimeConfig`
+  (dispatcher/skill-run/company-research/knowledge-jobs/feed-refresh inherit
+  structurally) and through `ToolContext` -> `bmc-tools`/`workspace-chat`/
+  `canvas-section-analysis`, mirroring the existing `xaiApiKey` wiring exactly.
+  Added to the `ops.yml` `sync-secrets` job and `DEPLOY.md`'s secrets table as
+  optional, alongside the other feed keys.
+- Tests: 6 new cases in `worker/src/__tests__/feeds.test.ts` — Exa success,
+  Firecrawl-search success, chain stops at the first provider with evidence
+  (Exa configured -> Firecrawl/xAI never called), falls back to Firecrawl when
+  Exa returns zero usable results, and degrades with every configured provider's
+  reason when all legs fail. New fixtures `exa-search.json`,
+  `firecrawl-search.json`. Updated the "no keys configured" degrade-message
+  assertion for the new chain-level message.
+- Gates: worker `npx vitest run src/__tests__/feeds.test.ts` 19 passed; worker
+  `npm test` 390 passed / 2 skipped; worker `npm run typecheck` exit 0; worker
+  `npm run build` exit 0; worker `npx eslint src` exit 0; root `npx tsc -p
+  tsconfig.app.json --noEmit` exit 0; root `npm run build` exit 0; root `npm run
+  lint` exits 1 with the known frozen baseline of 64 problems (46 errors, 18
+  warnings), unchanged, within the <=65 ceiling; UTF-8 decode check on touched
+  files exit 0.
+- HONEST SCOPE: Matt added `EXA_API_KEY` to Fly directly (not through the
+  `ops.yml` GitHub-secrets sync path) and asked for confirmation. This session
+  had no `flyctl`/`FLY_API_TOKEN` and the GitHub App integration returned 403
+  on `workflow_dispatch` for the `worker-diagnose`/`sync-secrets` Ops jobs, so
+  the key's presence on Fly could not be verified from the repo — Matt should
+  confirm via `flyctl secrets list -a super-bmc-worker` or the Fly dashboard,
+  or run Actions -> Ops -> `worker-diagnose` himself. The xAI-to-Agent-Tools-API
+  migration mentioned as a stretch goal was deliberately NOT done this pass —
+  the last-resort leg already degrades honestly and correctly, and guessing at
+  an unverified request contract for a leg that only fires when both better
+  providers fail was not worth the risk.
+
 ### OWNER ROUND — Grok feed diagnosis, dashboard company leak, company switcher, on-demand State of the Union (2026-07-08)
 
 Owner reports: supply_chain_map failed with "could not retrieve industry

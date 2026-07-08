@@ -1,0 +1,22 @@
+{
+  "results": [
+    {
+      "id": "doc-1",
+      "title": "Acme launches enterprise analytics suite",
+      "url": "https://news.example/acme-analytics",
+      "publishedDate": "2026-06-15",
+      "author": "Jane Reporter",
+      "score": 0.91,
+      "text": "Acme announced a new enterprise analytics product in June 2026, aimed at mid-market data teams."
+    },
+    {
+      "id": "doc-2",
+      "title": "Acme blog: enterprise analytics deep dive",
+      "url": "https://acme.example/blog/enterprise-analytics",
+      "publishedDate": "2026-06-16",
+      "author": null,
+      "score": 0.84,
+      "text": "The new suite includes real-time dashboards and a query builder for non-technical users."
+    }
+  ]
+}
