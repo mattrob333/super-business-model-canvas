@@ -285,6 +285,48 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### ATLAS FIRST-RUN + MOBILE DOCK (2026-07-08)
+
+Owner-approved onboarding design + two mobile reports, built by two agents,
+integrated by hand.
+
+- **Adaptive first contact:** new useDataRichness hook (own canvas rows +
+  researched competitor / evidence probes, company-scoped, fails rich)
+  drives AtlasChat's greeting + opener chips — sparse startups get coaching
+  openers ("Interview me…", documents-in), rich companies get strategy
+  openers (state of the union, exposure, single move). Matching
+  "First contact" doctrine appended to Atlas's worker prompt (derives
+  posture from the coverage board — no new plumbing).
+- **Fresh Atlas chat + History:** the single permanent "War Room" thread model is
+  gone — opening the app/switching companies starts clean; first message
+  names the thread; a History icon (dock header + War Room) lists the
+  company's recent Atlas chats (legacy War Room threads reachable there).
+- **Earned War Room entry:** first briefing auto-requests once per new
+  analysis (localStorage one-shot, silent failure); the briefing card gains
+  "Review this in the War Room →" (hidden on the War Room itself).
+- **Mobile fixes (owner screenshots):** the ~2s auto-takeover was the
+  persisted desktop atlas:dock-open state applying on mobile once accountId
+  resolved — the dock now NEVER auto-opens below lg and mobile sessions
+  don't write the desktop preference. Closed mobile state = floating Atlas
+  pill (safe-area aware, unseen-briefing pulse); open = full-screen with X
+  — that pair is the Canvas↔Atlas toggle. Composer pinned via dvh heights
+  (dock h-dvh; War Room center column fixed h-[calc(100dvh-6.5rem)] so
+  messages scroll inside), overscroll-contain, and horizontal overflow
+  killed (min-w-0 chain, action buttons wrap instead of nowrap-overflowing).
+  Desktop pixel-identical (lg-scoped).
+
+**Gate results for this commit:**
+```
+npx tsc -p tsconfig.app.json --noEmit  -> exit 0
+npx tsc -p tsconfig.node.json --noEmit -> exit 0
+npm run build                          -> green
+npm run lint                           -> 64 problems, within frozen <=65 ceiling
+cd worker && npx tsc --noEmit          -> exit 0
+cd worker && npx vitest run            -> 382 passed, 2 skipped
+cd worker && npx eslint src            -> exit 0
+UTF-8 touched-file decode              -> encoding clean, exit 0
+```
+
 ### OWNER ROUND — artifact design system, tab-refocus rerun bug, chat typography, research-competition UX (2026-07-08)
 
 Four parallel workstreams from the owner's live review ("forgettable walls
