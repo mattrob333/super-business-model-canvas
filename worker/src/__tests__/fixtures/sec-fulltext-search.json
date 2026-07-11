@@ -1,0 +1,17 @@
+{
+  "hits": {
+    "total": { "value": 2 },
+    "hits": [
+      {
+        "_id": "0000050493-26-000012:gww-20251231.htm",
+        "_source": {
+          "ciks": ["0000050493"],
+          "display_names": ["GRAINGER W W INC (GWW) (CIK 0000050493)"],
+          "file_date": "2026-02-15",
+          "form": "10-K",
+          "root_forms": ["10-K"]
+        }
+      }
+    ]
+  }
+}

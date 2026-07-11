@@ -87,6 +87,7 @@ export interface WorkspaceChatDependencies {
   fredApiKey?: string;
   googleTrendsApiKey?: string;
   githubToken?: string;
+  secEdgarUserAgent?: string;
   taskLimits?: AgentTaskLimits;
 }
 
@@ -158,6 +159,7 @@ export class WorkspaceChatHandler {
           fredApiKey: this.deps.fredApiKey,
           googleTrendsApiKey: this.deps.googleTrendsApiKey,
           githubToken: this.deps.githubToken,
+          secEdgarUserAgent: this.deps.secEdgarUserAgent,
         }),
       },
       allowedTools: ["mcp__bmc__*"],

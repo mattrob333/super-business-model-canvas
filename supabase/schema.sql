@@ -2461,7 +2461,8 @@ values
   (null, 'fred_series', 'FRED macro series', 'api', 'T1', 'monthly', 2592000, 'degraded', 'free', '{"series":["FEDFUNDS","CPIAUCSL","UMCSENT"]}'::jsonb),
   (null, 'google_trends', 'Google Trends interest', 'api', 'T2', 'weekly', 604800, 'degraded', 'free', '{}'::jsonb),
   (null, 'gdelt_count', 'GDELT news count', 'api', 'T2', 'weekly', 604800, 'degraded', 'free', '{}'::jsonb),
-  (null, 'github_repo_stats', 'GitHub repository stats', 'api', 'T1', 'weekly', 604800, 'degraded', 'free', '{}'::jsonb)
+  (null, 'github_repo_stats', 'GitHub repository stats', 'api', 'T1', 'weekly', 604800, 'degraded', 'free', '{}'::jsonb),
+  (null, 'sec_edgar_filings', 'SEC EDGAR filings', 'api', 'T1', 'weekly', 604800, 'degraded', 'free', '{}'::jsonb)
 on conflict (account_id, feed_key) do update set
   name = excluded.name,
   kind = excluded.kind,

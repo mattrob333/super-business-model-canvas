@@ -47,6 +47,7 @@ const handler = createJobDispatcher({
   fredApiKey: config.FRED_API_KEY,
   googleTrendsApiKey: config.GOOGLE_TRENDS_API_KEY,
   githubToken: config.GITHUB_TOKEN,
+  secEdgarUserAgent: config.SEC_EDGAR_USER_AGENT,
   taskLimits: taskLimitsFromConfig(config),
 });
 

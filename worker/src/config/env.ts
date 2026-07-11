@@ -12,6 +12,7 @@ const envSchema = z.object({
   FRED_API_KEY: z.string().min(1).optional(),
   GOOGLE_TRENDS_API_KEY: z.string().min(1).optional(),
   GITHUB_TOKEN: z.string().min(1).optional(),
+  SEC_EDGAR_USER_AGENT: z.string().min(1).optional(),
   WORKER_ID: z.string().min(1).optional(),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
   JOB_HEARTBEAT_STALE_SECONDS: z.coerce.number().int().positive().default(120),

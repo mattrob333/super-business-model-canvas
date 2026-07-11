@@ -242,12 +242,12 @@ with checks as (
 
   union all
 
-  select 'seed: 6 global data feeds exist',
+  select 'seed: 7 global data feeds exist',
          case when (
            select count(distinct feed_key) from public.data_feeds
            where account_id is null
-             and feed_key in ('firecrawl_scrape', 'web_search', 'fred_series', 'google_trends', 'gdelt_count', 'github_repo_stats')
-         ) = 6 then 'PASS' else 'FAIL' end
+             and feed_key in ('firecrawl_scrape', 'web_search', 'fred_series', 'google_trends', 'gdelt_count', 'github_repo_stats', 'sec_edgar_filings')
+         ) = 7 then 'PASS' else 'FAIL' end
 
   union all
 

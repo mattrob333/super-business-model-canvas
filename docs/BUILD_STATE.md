@@ -285,6 +285,68 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### New feed: sec_edgar_filings — free SEC filing text, zero configuration (2026-07-11)
+
+Owner brainstorm: thin competitor canvases (Sonepar 1/9 sections, Rexel 2/9)
+come from leaning on scarce, marketing-filtered competitor websites. Public
+companies disclose far richer competitive-position language under
+securities law — 10-K risk factors, segment revenue, strategy narrative, in
+their own filed words. Owner asked to connect SEC EDGAR; the URL given
+(`api.edgarfiling.sec.gov`) turned out to be the wrong API entirely (the
+FILER SUBMISSION API — for transmitting filings TO the SEC, needs real
+filer credentials, zero use to us). Redirected to the free, public,
+read-only data APIs instead.
+
+- **New feed `sec_edgar_filings`** (`worker/src/feeds/fetchers.ts`): the
+  only feed that needs ZERO configuration — SEC requires just a descriptive
+  contact User-Agent (hardcoded default, overridable via
+  `SEC_EDGAR_USER_AGENT`), no API key. Two independently-degrading layers:
+  1. Company match (name -> CIK via SEC's static ticker index, normalized-
+     token Jaccard similarity so "W.W. Grainger" matches EDGAR's legal-style
+     "GRAINGER W W INC" despite word-order/punctuation differences) +
+     recent filing list from the submissions API, filtered to strategic
+     forms (10-K/10-Q/8-K/20-F/6-K/DEF 14A) so routine Form 4 insider
+     paperwork doesn't drown out substance. A "no match" (private or
+     foreign-listed company) degrades honestly, not as an error.
+  2. IF a query is given: full-text search scoped to that CIK for quote-
+     level excerpts, wrapped so a failure or shape mismatch degrades ONLY
+     this layer — layer 1's filing list still ships either way.
+- **New MCP tool `search_sec_filings`** on the bmc-tools server, alongside
+  `search_web` — agents can pull a company's real filing history and search
+  its text mid-conversation, not just through a skill run.
+- `secEdgarUserAgent` plumbed through the same 5 sites `exaApiKey` already
+  established: env.ts -> index.ts -> FeedRuntimeConfig (all FeedRunner
+  construction sites inherit structurally) -> ToolContext ->
+  bmc-tools/workspace-chat/canvas-section-analysis.
+- Migration `20260711180000_sec_edgar_filings_feed_key.sql` (purely
+  additive — new row only, matching the `web_search` migration's safety
+  convention) applied live via Supabase MCP; mirrored into schema.sql and
+  verify-schema.sql (6 -> 7 global feeds).
+- Tests: 6 new cases — zero-config operation, fuzzy company-name matching
+  with routine-form filtering, honest no-match degrade, full-text search
+  additive on success, full-text search non-fatal on failure. New fixtures
+  `sec-company-tickers.json` / `sec-submissions.json` /
+  `sec-fulltext-search.json`.
+- Gates: worker typecheck/tests (398 passed / 2 skipped)/build/eslint all
+  green; root tsc exit 0, build green, lint 64 (frozen baseline); UTF-8
+  decode clean.
+- HONEST SCOPE: this session's sandbox had `data.sec.gov` and
+  `efts.sec.gov` blocked by its own network egress policy (unrelated to
+  SEC or production — the deployed worker has normal internet, same as
+  every other feed). The submissions/ticker-index layer's shape is
+  extremely well-established (every EDGAR wrapper library relies on it) and
+  is exercised against hand-written fixtures matching the documented
+  contract. The full-text-search layer's exact field names (`file_date`,
+  `root_forms`, the `_id` accession:filename format) are the LEAST certain
+  part of this integration — built from best available public documentation
+  but genuinely unverified live, which is exactly why it's isolated to
+  fail non-fatally. First live diagnose run (`[sec_edgar_filings]` log
+  lines) on a real public competitor is the actual confirmation. Not yet
+  wired into any of the 27 existing skills — exposed as a feed + agent tool
+  first; deciding which skills should pull SEC evidence (differentiator
+  audit and moat audit are the obvious first candidates) is a deliberate
+  follow-up, not bundled into this pass.
+
 ### OWNER ROUND — section-first room headers, button press feedback, one-competitor audit diagnosis (2026-07-08, evening)
 
 Owner reports: room headers lead with agent callsigns ("Envoy") nobody

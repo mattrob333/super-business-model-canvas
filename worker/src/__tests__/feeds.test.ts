@@ -255,6 +255,136 @@ describe("feed fetchers", () => {
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
+  it("sec_edgar_filings needs no config at all (works with an empty createFeedFetchers())", async () => {
+    const fetch = vi.fn(async (url: unknown) => {
+      const href = String(url);
+      if (href.includes("company_tickers.json")) {
+        return new Response(readFixture("sec-company-tickers.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (href.includes("submissions")) {
+        return new Response(readFixture("sec-submissions.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      throw new Error(`unexpected call to ${href}`);
+    });
+    const fetchers = createFeedFetchers({ fetch });
+
+    const result = await fetchers.get("sec_edgar_filings")?.run({
+      ...baseInput("sec_edgar_filings"),
+      companyName: "W.W. Grainger",
+    });
+
+    expect(result?.health).toBe("ok");
+    expect(result?.evidence.length).toBeGreaterThan(0);
+    // The default User-Agent is sent even with zero config — SEC requires one.
+    const [, requestInit] = fetch.mock.calls[0] as [unknown, RequestInit?];
+    expect((requestInit?.headers as Record<string, string>)?.["user-agent"]).toContain("@");
+  });
+
+  it("matches a company name to its SEC filer despite word-order/punctuation differences, and skips routine Form 4s", async () => {
+    const fetch = vi.fn(async (url: unknown) => {
+      const href = String(url);
+      if (href.includes("company_tickers.json")) {
+        return new Response(readFixture("sec-company-tickers.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (href.includes("submissions")) {
+        return new Response(readFixture("sec-submissions.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      throw new Error(`unexpected call to ${href}`);
+    });
+    const fetchers = createFeedFetchers({ fetch });
+
+    const result = await fetchers.get("sec_edgar_filings")?.run({
+      ...baseInput("sec_edgar_filings"),
+      companyName: "W.W. Grainger",
+    });
+
+    expect(result).toMatchObject({
+      health: "ok",
+      evidence: [
+        { title: "GRAINGER W W INC: 10-K filed 2026-02-15", sourceType: "filing", sourceName: "SEC EDGAR" },
+        { title: "GRAINGER W W INC: 8-K filed 2026-01-20", sourceType: "filing" },
+        { title: "GRAINGER W W INC: 10-Q filed 2025-11-05", sourceType: "filing" },
+      ],
+    });
+    // The routine Form 4 is excluded — strategic filings only, when any exist.
+    expect(result?.evidence.some((item) => item.title.includes(": 4 filed"))).toBe(false);
+    expect(result?.evidence[0]?.sourceUrl).toBe(
+      "https://www.sec.gov/Archives/edgar/data/50493/000005049326000012/gww-20251231.htm",
+    );
+  });
+
+  it("degrades honestly (not an error) when no SEC filer matches — private/foreign companies", async () => {
+    const fetch = vi.fn(async (url: unknown) => {
+      const href = String(url);
+      if (href.includes("company_tickers.json")) {
+        return new Response(readFixture("sec-company-tickers.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      throw new Error(`unexpected call to ${href}`);
+    });
+    const fetchers = createFeedFetchers({ fetch });
+
+    const result = await fetchers.get("sec_edgar_filings")?.run({
+      ...baseInput("sec_edgar_filings"),
+      companyName: "Sonepar North America",
+    });
+
+    expect(result?.health).toBe("degraded");
+    expect(result?.error).toContain("No SEC-registered filer matched");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds full-text-search evidence on top of the filing list when a query is given, without breaking the base layer on a bad shape", async () => {
+    const fetch = vi.fn(async (url: unknown) => {
+      const href = String(url);
+      if (href.includes("company_tickers.json")) {
+        return new Response(readFixture("sec-company-tickers.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (href.includes("submissions")) {
+        return new Response(readFixture("sec-submissions.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (href.includes("efts.sec.gov")) {
+        return new Response(readFixture("sec-fulltext-search.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      throw new Error(`unexpected call to ${href}`);
+    });
+    const fetchers = createFeedFetchers({ fetch });
+
+    const result = await fetchers.get("sec_edgar_filings")?.run({
+      ...baseInput("sec_edgar_filings"),
+      companyName: "W.W. Grainger",
+      query: "supply chain disruption",
+    });
+
+    expect(result?.health).toBe("ok");
+    expect(result?.evidence.some((item) => item.sourceName === "SEC EDGAR full-text search")).toBe(true);
+  });
+
+  it("full-text search failure is non-fatal — the filing list still ships", async () => {
+    const fetch = vi.fn(async (url: unknown) => {
+      const href = String(url);
+      if (href.includes("company_tickers.json")) {
+        return new Response(readFixture("sec-company-tickers.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (href.includes("submissions")) {
+        return new Response(readFixture("sec-submissions.json"), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (href.includes("efts.sec.gov")) {
+        return new Response("nope", { status: 503 });
+      }
+      throw new Error(`unexpected call to ${href}`);
+    });
+    const fetchers = createFeedFetchers({ fetch });
+
+    const result = await fetchers.get("sec_edgar_filings")?.run({
+      ...baseInput("sec_edgar_filings"),
+      companyName: "W.W. Grainger",
+      query: "supply chain disruption",
+    });
+
+    expect(result?.health).toBe("ok");
+    expect(result?.evidence.every((item) => item.sourceName === "SEC EDGAR")).toBe(true);
+  });
+
   it("normalizes FRED fixtures into API evidence and metrics", async () => {
     const fetch = fixtureFetch("fred-series.json");
     const fetchers = createFeedFetchers({ fredApiKey: "fred-key", fetch });

@@ -50,6 +50,7 @@ GitHub → repo → Settings → Secrets and variables → Actions → **New rep
 | `FRED_API_KEY` *(optional)* | fred.stlouisfed.org (free) |
 | `GOOGLE_TRENDS_API_KEY` *(optional)* | serpapi.com |
 | `GH_FEED_TOKEN` *(optional)* | GitHub PAT for the repo-stats feed (name avoids the reserved `GITHUB_TOKEN`) |
+| `SEC_EDGAR_USER_AGENT` *(optional)* | no signup — SEC just requires a contact-identifying User-Agent; a working default is hardcoded, set this only to change the contact |
 
 ### 3. Supabase dashboard (two clicks + two SQL runs)
 

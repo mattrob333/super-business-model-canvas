@@ -21,6 +21,7 @@ export interface ToolContext {
   fredApiKey?: string;
   googleTrendsApiKey?: string;
   githubToken?: string;
+  secEdgarUserAgent?: string;
   feedRunner?: FeedRunner;
 }
 
@@ -267,6 +268,26 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
     { annotations: { readOnlyHint: true } },
   );
 
+  const searchSecFilings = tool(
+    "search_sec_filings",
+    "Search a company's real SEC filings (10-K, 10-Q, 8-K) for competitive-position language, risk factors, and segment revenue — in their own filed words. Works only for SEC-registered public companies (many competitors are private or foreign-listed and will honestly return no match); needs no configuration. Set query to search filing text for a topic, or omit it for just the recent filing list.",
+    {
+      company_name: z.string().min(1),
+      query: z.string().min(1).optional(),
+    },
+    async (args) => {
+      const result = await feedRunner.refresh({
+        accountId: ctx.accountId,
+        feedKey: "sec_edgar_filings",
+        cacheKey: `tool:search_sec_filings:${args.company_name}${args.query ? `:${args.query}` : ""}`,
+        companyName: args.company_name,
+        query: args.query,
+      });
+      return toolResult(feedToolResult(result, { company_name: args.company_name, query: args.query }));
+    },
+    { annotations: { readOnlyHint: true } },
+  );
+
   const firecrawlScrape = tool(
     "firecrawl_scrape",
     "Scrape a URL through the cached Firecrawl feed when configured. Gracefully degrades when unset.",
@@ -389,6 +410,7 @@ export function createBmcServer(client: SupabaseClient, ctx: ToolContext): McpSe
       postInsight,
       readCompetitorCanvas,
       searchWeb,
+      searchSecFilings,
       firecrawlScrape,
       ...(ctx.allowSkillRuns ? [runSkill] : []),
     ],
@@ -404,6 +426,7 @@ function feedConfigFromContext(ctx: ToolContext): FeedRuntimeConfig {
     fredApiKey: ctx.fredApiKey,
     googleTrendsApiKey: ctx.googleTrendsApiKey,
     githubToken: ctx.githubToken,
+    secEdgarUserAgent: ctx.secEdgarUserAgent,
   };
 }
 
