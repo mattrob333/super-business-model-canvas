@@ -16,6 +16,7 @@ import { CANVAS_SECTION_LABELS, LEGACY_SECTION_KEYS } from "@/components/canvas/
 import { getActiveAnalysisCanvas } from "@/lib/active-analysis";
 import { loadCompanyScope } from "@/lib/company-scope";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
+import { WORKSPACE_HERO, focusStudioTile } from "@/lib/workspace-hero";
 
 /**
  * Spec 02 zone 2 — the collaboration surface, slice 1: persistent threads
@@ -726,6 +727,13 @@ export function WorkspaceThread({
   );
 }
 
+/**
+ * Action Board hero (owner design round 2026-07-08): the empty thread is
+ * the room's front door, so it states the room's promise and its three
+ * real capabilities as cards that deep-link to their Studio tiles. The
+ * hero exists ONLY while the thread is empty — the first message replaces
+ * it with the conversation.
+ */
 function EmptyThread({
   callsign,
   sectionLabel,
@@ -738,16 +746,48 @@ function EmptyThread({
   onPick: (prompt: string) => void;
 }) {
   const prompts = [...(SUGGESTED_PROMPTS[sectionKey] ?? []), MISSING_DATA_PROMPT];
+  const entry = AGENT_ROSTER[sectionKey];
+  const hero = WORKSPACE_HERO[sectionKey];
+  const Icon = entry.icon;
   return (
-    <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center gap-4 text-center">
-      <div>
-        <p className="text-sm font-semibold">Talk to {callsign} about {sectionLabel}</p>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          {callsign} reads the section canvas and the evidence behind it, and proposes changes
-          instead of making silent edits.
-        </p>
+    <div className="mx-auto flex h-full max-w-2xl flex-col justify-center gap-5 py-4">
+      <div className="flex items-center gap-4">
+        {/* Mascot slot: agent icon today, the room's town-building art when it lands. */}
+        <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ring-1 ${entry.avatarClass}`}>
+          <Icon className="h-7 w-7" />
+        </span>
+        <div className="min-w-0">
+          <p className={`text-[11px] font-semibold uppercase tracking-wider ${entry.accentTextClass}`}>
+            {hero.building} · with {callsign}, your {entry.role}
+          </p>
+          <h2 className="text-xl font-bold tracking-tight">{sectionLabel}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">{hero.promise}</p>
+        </div>
       </div>
-      <div className="w-full space-y-1.5">
+
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        {hero.actions.map((action) => (
+          <button
+            key={action.skillKey}
+            type="button"
+            onClick={() => focusStudioTile(action.skillKey)}
+            className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {action.skillTitle}
+            </span>
+            <span className="text-xs leading-relaxed">{action.outcome}</span>
+            <span className={`mt-auto pt-1 text-[11px] font-semibold ${entry.accentTextClass}`}>
+              Run in Studio →
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Or start by asking
+        </p>
         {prompts.map((prompt) => (
           <button
             key={prompt}
