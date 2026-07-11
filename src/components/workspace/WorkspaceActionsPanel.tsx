@@ -345,7 +345,12 @@ export function WorkspaceActionsPanel({
               REQUIRES_COMPETITOR_RESEARCH.has(skill.skill_key) &&
               hasCompetitorResearch === false;
             return (
-              <li key={skill.skill_key} className="rounded-md border border-border/60 p-3">
+              <li
+                key={skill.skill_key}
+                // Anchor for the hero's "Run in Studio" deep link (workspace-hero.ts).
+                id={`skill-tile-${skill.skill_key}`}
+                className="rounded-md border border-border/60 p-3"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold leading-snug">{skill.title}</p>
