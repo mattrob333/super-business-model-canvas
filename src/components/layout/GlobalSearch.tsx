@@ -175,8 +175,8 @@ export function GlobalSearch() {
                   onSelect={() => go(`/workspace/${sectionKey}`)}
                 >
                   <agent.icon className="mr-2 h-4 w-4" />
-                  {agent.callsign}
-                  <span className="ml-2 text-xs text-muted-foreground">{label}</span>
+                  {label}
+                  <span className="ml-2 text-xs text-muted-foreground">{agent.role}</span>
                 </CommandItem>
               );
             })}

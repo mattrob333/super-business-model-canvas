@@ -1,25 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, FileText, Loader2, Lock, Play, Wrench } from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { FocusDrawer } from "@/components/overlay/FocusDrawer";
 import { ArtifactDocument } from "@/components/skills/ArtifactDocument";
-import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { loadCompanyScope } from "@/lib/company-scope";
-import { getAgentRuntime } from "@/lib/agent-runtime";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-
-interface CatalogSkill {
-  skill_key: string;
-  title: string;
-  description: string;
-  implemented: boolean;
-  sort_order: number;
-}
+import { ARTIFACT_CREATED_EVENT } from "@/hooks/useRoomSkills";
 
 interface SkillArtifact {
   id: string;
@@ -31,155 +19,46 @@ interface SkillArtifact {
   created_at: string;
 }
 
-interface SkillRunState {
-  skillKey: string;
-  runId: string;
-}
-
 /** New artifacts land while the user is in the room — keep the shelf live. */
 const ARTIFACT_REFRESH_MS = 30_000;
-const RUN_POLL_INTERVAL_MS = 3_000;
-const RUN_POLL_MAX_ATTEMPTS = 100;
-/** Competitor research may land while the user sits here — re-check until it does. */
-const COMPETITOR_GATE_RECHECK_MS = 30_000;
 
 /**
- * Skills whose worker implementation throws immediately without researched
- * competitor data (owner screenshot 2026-07-08: failed runs, wasted tokens).
- * Derived from the honest-throw preconditions in worker/src/jobs/skill-run.ts
- * and worker/src/jobs/skills/* — every "requires ... competitor ... research
- * first" guard, keyed exactly as the catalog/registry keys them:
- *
- *   yield.pricing_teardown      "requires at least one competitor entity — run competitor research first"
- *   compass.segment_expansion   "requires competitor Customer Segments research first"
- *   relay.channel_gap_scan      "requires competitor Channels research first"
- *   relay.channel_economics     "requires competitor Channels research first"
- *   forge.differentiator_audit  "requires competitor Value Propositions research first"
- *   vault.talent_radar          "requires at least one researched competitor first"
- *   envoy.ecosystem_watch       "requires at least one researched competitor first"
- *   anchor.lifecycle_map        "requires competitor Customer Relationships research first"
- *   anchor.advocacy_engine_scan "requires at least one researched competitor first"
- *   tempo.operational_benchmark "requires at least one researched competitor first"
- *   tempo.velocity_watch        "requires at least one researched competitor first"
- *   yield.monetization_gaps     "requires at least one researched competitor first"
- *
- * Keep in sync when a worker skill adds or drops a competitor precondition.
- */
-const REQUIRES_COMPETITOR_RESEARCH = new Set<string>([
-  "yield.pricing_teardown",
-  "compass.segment_expansion",
-  "relay.channel_gap_scan",
-  "relay.channel_economics",
-  "forge.differentiator_audit",
-  "vault.talent_radar",
-  "envoy.ecosystem_watch",
-  "anchor.lifecycle_map",
-  "anchor.advocacy_engine_scan",
-  "tempo.operational_benchmark",
-  "tempo.velocity_watch",
-  "yield.monetization_gaps",
-]);
-
-/**
- * Spec 10 ActionsPanel, studio edition: the top half runs this agent's
- * signature skills; the bottom half is the output shelf — every artifact the
- * agent has produced, opening in the spec 11 paper document. The work
- * product stays in the room instead of hiding on the Dashboard.
+ * The Shelf: every document this room's agent has produced, newest first,
+ * opening in the spec 11 paper document. Skill RUNNING moved into the room
+ * hero (owner design round 2026-07-08) — this rail is outputs only, so the
+ * work product stays in the room instead of hiding on the Dashboard.
  */
 export function WorkspaceActionsPanel({
   accountId,
-  agentProfileId,
   agentKey,
 }: {
   accountId: string;
-  agentProfileId: string;
   agentKey: string;
 }) {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [skills, setSkills] = useState<CatalogSkill[]>([]);
+  const [skillKeys, setSkillKeys] = useState<string[]>([]);
   const [artifacts, setArtifacts] = useState<SkillArtifact[]>([]);
   const [openArtifact, setOpenArtifact] = useState<SkillArtifact | null>(null);
   const [loading, setLoading] = useState(true);
-  const [runningRun, setRunningRun] = useState<SkillRunState | null>(null);
-  /**
-   * Set synchronously on click, before the enqueue round-trip: the gap
-   * between click and setRunningRun is 1-2 network calls with ZERO visual
-   * change, which read as "the button didn't work" and invited double
-   * clicks (owner finding 2026-07-08 — startingRef already guarded the
-   * double enqueue, but silently).
-   */
-  const [startingKey, setStartingKey] = useState<string | null>(null);
-  const [tileErrors, setTileErrors] = useState<Record<string, string>>({});
-  const pollTimer = useRef<ReturnType<typeof setTimeout>>();
-  const startingRef = useRef(false);
-  /**
-   * Does the active company have ANY researched competitor canvas rows
-   * (competitor-linked canvas_section_versions within scope.contextIds —
-   * the exact read the worker's loadCompetitorSectionItems performs)?
-   * null = not checked yet (skills stay runnable until we know).
-   */
-  const [hasCompetitorResearch, setHasCompetitorResearch] = useState<boolean | null>(null);
-
-  useEffect(() => () => clearTimeout(pollTimer.current), []);
 
   useEffect(() => {
     let cancelled = false;
-    let recheckTimer: ReturnType<typeof setTimeout> | undefined;
-    const check = async () => {
-      // Company-scoped, same as loadArtifacts: a company switch must not let
-      // a previous company's competitor research unlock this company's skills.
-      const scope = await loadCompanyScope(accountId).catch(() => null);
-      let query = supabase
-        .from("canvas_section_versions")
-        .select("id")
-        .eq("account_id", accountId)
-        .not("competitor_id", "is", null);
-      if (scope) query = query.in("business_context_version_id", scope.contextIds);
-      const { data, error } = await query.limit(1);
-      if (cancelled) return;
-      if (error) {
-        // Fail open: the worker's own precondition throw stays the honest
-        // backstop; a read error must not lock every competitor skill.
-        setHasCompetitorResearch(true);
-        return;
-      }
-      const found = (data ?? []).length > 0;
-      setHasCompetitorResearch(found);
-      // Research runs take minutes — keep re-checking until the data lands
-      // so the gate lifts without a page reload.
-      if (!found) {
-        recheckTimer = setTimeout(() => void check(), COMPETITOR_GATE_RECHECK_MS);
-      }
-    };
-    void check();
-    return () => {
-      cancelled = true;
-      if (recheckTimer) clearTimeout(recheckTimer);
-    };
-  }, [accountId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
     (async () => {
       const { data, error } = await supabaseUntyped
-        .from<CatalogSkill>("skill_catalog")
-        .select("skill_key, title, description, implemented, sort_order")
-        .eq("agent_key", agentKey)
-        .order("sort_order", { ascending: true });
+        .from<{ skill_key: string }>("skill_catalog")
+        .select("skill_key")
+        .eq("agent_key", agentKey);
       if (cancelled) return;
-      setSkills(error ? [] : data ?? []);
-      setLoading(false);
+      setSkillKeys(error ? [] : (data ?? []).map((row) => row.skill_key));
     })();
     return () => {
       cancelled = true;
     };
   }, [agentKey]);
 
-  const loadArtifacts = useCallback(async (skillKeys: string[]) => {
+  const loadArtifacts = useCallback(async () => {
     if (skillKeys.length === 0) {
       setArtifacts([]);
+      setLoading(false);
       return;
     }
     // The shelf shows the ACTIVE company's artifacts only — a company switch
@@ -193,257 +72,69 @@ export function WorkspaceActionsPanel({
     if (scope) query = query.in("business_context_version_id", scope.contextIds);
     const { data, error } = await query
       .order("created_at", { ascending: false })
-      .limit(8);
+      .limit(12);
     setArtifacts(error ? [] : data ?? []);
-  }, [accountId]);
+    setLoading(false);
+  }, [accountId, skillKeys]);
 
   useEffect(() => {
-    const skillKeys = skills.map((skill) => skill.skill_key);
-    void loadArtifacts(skillKeys);
-    const timer = setInterval(() => void loadArtifacts(skillKeys), ARTIFACT_REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [skills, loadArtifacts]);
-
-  const ensureBusinessContext = useCallback(async (): Promise<string> => {
-    // The active company's newest context — never a stale prior-company row.
-    const scope = await loadCompanyScope(accountId).catch(() => null);
-    if (scope?.activeContextId) return scope.activeContextId;
-
-    const { data: created, error } = await supabase
-      .from("business_context_versions")
-      .insert({
-        account_id: accountId,
-        version_number: 1,
-        summary: "Initial business context",
-        data: {},
-        created_by: user?.id ?? null,
-      })
-      .select("id")
-      .single();
-    if (error || !created) throw new Error(error?.message ?? "Failed to create business context");
-    return created.id;
-  }, [accountId, user]);
-
-  const pollSkillRun = useCallback((skill: CatalogSkill, runId: string, attempt: number) => {
-    if (attempt >= RUN_POLL_MAX_ATTEMPTS) {
-      setRunningRun(null);
-      setTileErrors((prev) => ({
-        ...prev,
-        [skill.skill_key]: "Run is taking longer than expected. Check Activity or try again shortly.",
-      }));
-      return;
-    }
-
-    getAgentRuntime(accountId)
-      .getRunStatus(runId)
-      .then((status) => {
-        if (!status || status.status === "pending" || status.status === "running") {
-          setRunningRun({ skillKey: skill.skill_key, runId });
-          pollTimer.current = setTimeout(
-            () => pollSkillRun(skill, runId, attempt + 1),
-            RUN_POLL_INTERVAL_MS,
-          );
-          return;
-        }
-
-        setRunningRun(null);
-        if (status.status === "completed") {
-          toast({
-            title: `${skill.title} complete`,
-            description: "The finished document is on the shelf.",
-          });
-          void loadArtifacts(skills.map((entry) => entry.skill_key));
-        } else {
-          setTileErrors((prev) => ({
-            ...prev,
-            [skill.skill_key]: status.error ?? `Run ${status.status}.`,
-          }));
-        }
-      })
-      .catch(() => {
-        pollTimer.current = setTimeout(
-          () => pollSkillRun(skill, runId, attempt + 1),
-          RUN_POLL_INTERVAL_MS,
-        );
-      });
-  }, [accountId, loadArtifacts, skills, toast]);
-
-  const runSkill = useCallback(async (skill: CatalogSkill) => {
-    // startingRef is the synchronous half of the guard: runningRun is React
-    // state, so a fast double-click passes the null check twice before the
-    // re-render lands — that enqueued two identical runs in production.
-    if (!skill.implemented || runningRun || startingRef.current) return;
-    // Frontend mirror of the worker's precondition throw: enqueueing this run
-    // without researched competitors would only burn tokens and fail.
-    if (REQUIRES_COMPETITOR_RESEARCH.has(skill.skill_key) && hasCompetitorResearch === false) return;
-    startingRef.current = true;
-    setStartingKey(skill.skill_key);
-    setTileErrors((prev) => ({ ...prev, [skill.skill_key]: "" }));
-    try {
-      const contextVersionId = await ensureBusinessContext();
-      const { runId } = await getAgentRuntime(accountId).startRun({
-        agentProfileId,
-        accountId,
-        runType: "skill_run",
-        triggerType: "manual",
-        triggeredBy: user?.id ?? null,
-        input: {
-          skill_key: skill.skill_key,
-          business_context_version_id: contextVersionId,
-        },
-      });
-      setRunningRun({ skillKey: skill.skill_key, runId });
-      toast({
-        title: `${skill.title} queued`,
-        description: "Takes a few minutes. The finished document appears on the shelf below.",
-      });
-      pollSkillRun(skill, runId, 0);
-    } catch (error) {
-      setRunningRun(null);
-      setTileErrors((prev) => ({
-        ...prev,
-        [skill.skill_key]: error instanceof Error ? error.message : "Try again.",
-      }));
-      toast({
-        title: "Skill did not start",
-        description: error instanceof Error ? error.message : "Try again.",
-        variant: "destructive",
-      });
-    } finally {
-      startingRef.current = false;
-      setStartingKey(null);
-    }
-  }, [accountId, agentProfileId, ensureBusinessContext, hasCompetitorResearch, pollSkillRun, runningRun, toast, user]);
+    void loadArtifacts();
+    const timer = setInterval(() => void loadArtifacts(), ARTIFACT_REFRESH_MS);
+    // The hero announces a finished run this way — refresh immediately
+    // instead of waiting out the poll interval.
+    const onCreated = () => void loadArtifacts();
+    window.addEventListener(ARTIFACT_CREATED_EVENT, onCreated);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(ARTIFACT_CREATED_EVENT, onCreated);
+    };
+  }, [loadArtifacts]);
 
   return (
     <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center gap-2">
-        <Wrench className="h-4 w-4 text-primary" />
+        <FileText className="h-4 w-4 text-primary" />
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Studio
+          Shelf
         </h2>
       </div>
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        Run a signature workflow — the finished document lands on the shelf below.
+        Documents this room has produced, newest first. Run an action above the chat to add one.
       </p>
 
       {loading ? (
-        <div className="flex justify-center py-4">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-        </div>
-      ) : skills.length === 0 ? (
+        <p className="mt-3 text-xs text-muted-foreground">Loading…</p>
+      ) : artifacts.length === 0 ? (
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          No room-specific skills are assigned yet.
+          Nothing here yet — run one of the actions above the chat and the finished document lands here.
         </p>
       ) : (
-        <ul className="mt-3 space-y-2">
-          {skills.map((skill) => {
-            // Gate only once we KNOW there is no competitor research (null =
-            // still checking): the worker throws on these without it.
-            const needsCompetitorResearch =
-              skill.implemented &&
-              REQUIRES_COMPETITOR_RESEARCH.has(skill.skill_key) &&
-              hasCompetitorResearch === false;
-            return (
-              <li
-                key={skill.skill_key}
-                // Anchor for the hero's "Run in Studio" deep link (workspace-hero.ts).
-                id={`skill-tile-${skill.skill_key}`}
-                className="rounded-md border border-border/60 p-3"
+        <div className="mt-3 space-y-1.5">
+          {artifacts.map((artifact) => (
+            <div
+              key={artifact.id}
+              className="flex items-center gap-1 rounded-md border border-border/60 transition-colors hover:border-primary/35 hover:bg-muted/40"
+            >
+              <button
+                type="button"
+                onClick={() => setOpenArtifact(artifact)}
+                className="flex min-w-0 flex-1 items-center justify-between gap-2 px-2.5 py-2 text-left"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold leading-snug">{skill.title}</p>
-                    <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-                      {skill.description}
-                    </p>
-                  </div>
-                  {!skill.implemented && (
-                    <Badge variant="secondary" className="shrink-0 text-[10px]">
-                      Coming
-                    </Badge>
-                  )}
-                </div>
-                <Button
-                  size="sm"
-                  className="mt-3 h-8 w-full gap-1.5"
-                  variant={skill.implemented && !needsCompetitorResearch ? "default" : "outline"}
-                  disabled={!skill.implemented || runningRun !== null || startingKey !== null || needsCompetitorResearch}
-                  onClick={() => void runSkill(skill)}
-                >
-                  {startingKey === skill.skill_key || runningRun?.skillKey === skill.skill_key ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : needsCompetitorResearch ? (
-                    <Lock className="h-3.5 w-3.5" />
-                  ) : (
-                    <Play className="h-3.5 w-3.5" />
-                  )}
-                  {startingKey === skill.skill_key
-                    ? "Starting…"
-                    : runningRun?.skillKey === skill.skill_key
-                      ? "Running"
-                      : needsCompetitorResearch
-                        ? "Needs competitor research first"
-                        : skill.implemented
-                          ? "Run"
-                          : "Coming"}
-                </Button>
-                {needsCompetitorResearch && (
-                  <Button
-                    asChild
-                    size="sm"
-                    variant="link"
-                    className="mt-1 h-auto w-full justify-start gap-1 px-0 text-xs"
-                  >
-                    <Link to="/canvas">
-                      Research competitors on the Industry landscape
-                      <ExternalLink className="h-3 w-3" />
-                    </Link>
-                  </Button>
-                )}
-                {tileErrors[skill.skill_key] && (
-                  <p className="mt-2 text-xs leading-relaxed text-destructive">
-                    {tileErrors[skill.skill_key]}
-                  </p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {artifacts.length > 0 && (
-        <div className="mt-4 border-t border-border/60 pt-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Shelf
-          </h3>
-          <div className="mt-2 space-y-1.5">
-            {artifacts.map((artifact) => (
-              <div
-                key={artifact.id}
-                className="flex items-center gap-1 rounded-md border border-border/60 transition-colors hover:border-primary/35 hover:bg-muted/40"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenArtifact(artifact)}
-                  className="flex min-w-0 flex-1 items-center justify-between gap-2 px-2.5 py-2 text-left"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span className="truncate text-xs font-medium">{artifact.title}</span>
-                  </span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">
-                    {new Date(artifact.created_at).toLocaleDateString()}
-                  </span>
-                </button>
-                <Button asChild size="icon" variant="ghost" className="mr-1 h-7 w-7 shrink-0" title="Open full page">
-                  <Link to={`/artifacts/${artifact.id}`}>
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </Link>
-                </Button>
-              </div>
-            ))}
-          </div>
+                <span className="flex min-w-0 items-center gap-2">
+                  <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="truncate text-xs font-medium">{artifact.title}</span>
+                </span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">
+                  {new Date(artifact.created_at).toLocaleDateString()}
+                </span>
+              </button>
+              <Button asChild size="icon" variant="ghost" className="mr-1 h-7 w-7 shrink-0" title="Open full page">
+                <Link to={`/artifacts/${artifact.id}`}>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
+          ))}
         </div>
       )}
 

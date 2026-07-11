@@ -19,6 +19,7 @@ import { ContextSourcesPanel } from "@/components/workspace/ContextSourcesPanel"
 import { MobileCollapse } from "@/components/workspace/MobileCollapse";
 import { SectionCanvasPanel } from "@/components/workspace/SectionCanvasPanel";
 import { WorkspaceActionsPanel } from "@/components/workspace/WorkspaceActionsPanel";
+import { WorkspaceHeroCard } from "@/components/workspace/WorkspaceHeroCard";
 import { WorkspaceRunQueue } from "@/components/workspace/WorkspaceRunQueue";
 import { WorkspaceThread } from "@/components/workspace/WorkspaceThread";
 import { WorkspaceTopBar } from "@/components/workspace/WorkspaceTopBar";
@@ -48,6 +49,9 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [latestRun, setLatestRun] = useState<AgentRunSnapshot | null>(null);
   const [composerPrefill, setComposerPrefill] = useState<string | null>(null);
+  // The hero is the full headpiece on an empty thread and collapses to a
+  // slim strip once a conversation exists — the thread reports which.
+  const [threadEmpty, setThreadEmpty] = useState(true);
   const { itemsBySection, loading: canvasLoading } = useCanvasEvidence();
 
   // Arriving from the Gap Register ("Fix with <agent>"): load the gap and
@@ -138,7 +142,7 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
         .limit(1);
       if (cancelled) return;
       if (error || !data?.[0]) {
-        setProfileError(error?.message ?? `No agent profile found for ${entry.callsign}. Run the seed migration.`);
+        setProfileError(error?.message ?? `No agent profile found for the ${entry.displayName}. Run the seed migration.`);
         return;
       }
       setProfile({ id: data[0].id, description: data[0].description });
@@ -229,12 +233,11 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
           {/* Left rail — identity + the section's live canvas. On mobile the
               chat leads and these panels collapse (owner pass 2026-07-06). */}
           <aside className="order-2 space-y-3 lg:order-1 lg:col-span-3 lg:space-y-4 lg:overflow-y-auto lg:pr-1">
-            <MobileCollapse title={`About ${entry.callsign}`}>
+            <MobileCollapse title="About this agent">
               <AgentIdentityCard
                 accountId={accountId}
                 agentProfileId={profile.id}
                 sectionKey={sectionKey}
-                description={profile.description}
                 latestRun={latestRun}
               />
             </MobileCollapse>
@@ -260,31 +263,36 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
             </MobileCollapse>
           </aside>
 
-          {/* Center — the collaboration thread. On mobile it fills the first
-              screenful exactly (viewport minus top bar and page padding) so
-              the room reads as a full-screen chat; the supporting panels sit
-              below the fold (owner directive 2026-07-06). */}
-          <main className="order-1 flex min-h-[calc(100dvh-6.5rem)] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:order-2 lg:col-span-6 lg:min-h-0">
-            <WorkspaceThread
+          {/* Center — hero headpiece on top, the collaboration thread below,
+              each its own card (owner design round 2026-07-08). On mobile the
+              pair fills the first screenful so the room reads as hero + chat;
+              the supporting panels sit below the fold. */}
+          <main className="order-1 flex min-h-[calc(100dvh-6.5rem)] flex-col gap-3 lg:order-2 lg:col-span-6 lg:min-h-0">
+            <WorkspaceHeroCard
               accountId={accountId}
               agentProfileId={profile.id}
               sectionKey={sectionKey}
-              initialPrompt={gapPrompt ?? atlasPrompt}
-              initialThreadTitle={atlasPrompt ? "Directive from Atlas" : null}
-              composerPrefill={composerPrefill}
-              onComposerPrefillConsumed={() => setComposerPrefill(null)}
-              onInitialPromptConsumed={handleInitialPromptConsumed}
+              collapsed={!threadEmpty}
             />
-          </main>
-
-          {/* Right rail — room actions + run queue */}
-          <aside className="order-3 space-y-3 lg:col-span-3 lg:space-y-4 lg:overflow-y-auto lg:pl-1">
-            <MobileCollapse title="Studio and shelf">
-              <WorkspaceActionsPanel
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+              <WorkspaceThread
                 accountId={accountId}
                 agentProfileId={profile.id}
-                agentKey={entry.agentKey}
+                sectionKey={sectionKey}
+                initialPrompt={gapPrompt ?? atlasPrompt}
+                initialThreadTitle={atlasPrompt ? "Directive from Atlas" : null}
+                composerPrefill={composerPrefill}
+                onComposerPrefillConsumed={() => setComposerPrefill(null)}
+                onInitialPromptConsumed={handleInitialPromptConsumed}
+                onEmptyStateChange={setThreadEmpty}
               />
+            </div>
+          </main>
+
+          {/* Right rail — the shelf: this room's finished documents. */}
+          <aside className="order-3 space-y-3 lg:col-span-3 lg:space-y-4 lg:overflow-y-auto lg:pl-1">
+            <MobileCollapse title="Shelf">
+              <WorkspaceActionsPanel accountId={accountId} agentKey={entry.agentKey} />
             </MobileCollapse>
           </aside>
         </div>

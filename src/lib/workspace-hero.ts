@@ -30,7 +30,7 @@ export interface WorkspaceHeroCopy {
 export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
   value_propositions: {
     building: "The Forge",
-    promise: "Forge pressure-tests why customers pick you — claim by claim, against every rival.",
+    promise: "Pressure-test why customers pick you — claim by claim, against every rival.",
     actions: [
       { skillKey: "forge.differentiator_audit", skillTitle: "Differentiator audit", outcome: "Learn which claims are truly unique and which are table stakes" },
       { skillKey: "forge.proof_gap_scan", skillTitle: "Proof gap scan", outcome: "Find claims with no proof — and a plan to get some" },
@@ -39,7 +39,7 @@ export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
   },
   key_partners: {
     building: "The Embassy",
-    promise: "Envoy finds the partners that make you stronger — and watches the deals your rivals sign.",
+    promise: "Find the partners that make you stronger — and watch the deals your rivals sign.",
     actions: [
       { skillKey: "envoy.supply_chain_map", skillTitle: "Supply-chain map", outcome: "Map your industry and see which partnerships matter most" },
       { skillKey: "envoy.partner_outreach", skillTitle: "Partner outreach", outcome: "Turn approved targets into ready-to-send outreach drafts" },
@@ -48,7 +48,7 @@ export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
   },
   channels: {
     building: "The Signal Tower",
-    promise: "Relay finds where your buyers hang out — and ranks your best new routes to them.",
+    promise: "Find where your buyers hang out — and rank your best new routes to them.",
     actions: [
       { skillKey: "relay.channel_gap_scan", skillTitle: "Channel gap scan", outcome: "See channels competitors use that you don't, ranked by payoff" },
       { skillKey: "relay.watering_holes", skillTitle: "Watering holes", outcome: "Find the communities your buyers already trust" },
@@ -57,7 +57,7 @@ export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
   },
   customer_segments: {
     building: "The Observatory",
-    promise: "Compass studies your buyers in their own words, so you know exactly who you're selling to.",
+    promise: "Study your buyers in their own words, so you know exactly who you're selling to.",
     actions: [
       { skillKey: "compass.avatar_refinement", skillTitle: "Avatar refinement", outcome: "Build customer profiles from real quotes, not guesses" },
       { skillKey: "compass.segment_expansion", skillTitle: "Segment expansion", outcome: "Find nearby markets your rivals serve that you could win" },
@@ -66,7 +66,7 @@ export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
   },
   customer_relationships: {
     building: "The Lighthouse Inn",
-    promise: "Anchor reads real reviews to learn why customers stay, leave, and rave.",
+    promise: "Read real reviews to learn why customers stay, leave, and rave.",
     actions: [
       { skillKey: "anchor.churn_signal_audit", skillTitle: "Churn signal audit", outcome: "Find why customers quit you — and your rivals — in their own words" },
       { skillKey: "anchor.lifecycle_map", skillTitle: "Lifecycle map", outcome: "Map your customer journey against competitors' and mark the gaps" },
@@ -75,7 +75,7 @@ export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
   },
   key_activities: {
     building: "The Workshop",
-    promise: "Tempo compares how fast you ship and hire against your rivals — so you know where to speed up.",
+    promise: "Compare how fast you ship and hire against your rivals — so you know where to speed up.",
     actions: [
       { skillKey: "tempo.operational_benchmark", skillTitle: "Operational benchmark", outcome: "See who's out-shipping you, and where" },
       { skillKey: "tempo.build_vs_buy", skillTitle: "Build vs buy", outcome: "Find work you do in-house that's now cheaper to buy" },
@@ -84,7 +84,7 @@ export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
   },
   key_resources: {
     building: "The Vault",
-    promise: "Vault checks how defensible your assets really are — and where one failure could hurt you.",
+    promise: "Check how defensible your assets really are — and where one failure could hurt you.",
     actions: [
       { skillKey: "vault.moat_audit", skillTitle: "Moat audit", outcome: "Score each asset: real moat, or easy to copy?" },
       { skillKey: "vault.single_point_scan", skillTitle: "Single-point-of-failure scan", outcome: "Spot key-person, single-supplier, and platform risks" },
@@ -93,7 +93,7 @@ export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
   },
   cost_structure: {
     building: "The Counting House",
-    promise: "Ledger frames your costs and unit economics honestly — no invented numbers, ever.",
+    promise: "Frame your costs and unit economics honestly — no invented numbers, ever.",
     actions: [
       { skillKey: "ledger.cost_benchmark", skillTitle: "Cost benchmark", outcome: "Compare your cost structure to companies shaped like yours" },
       { skillKey: "ledger.unit_economics_frame", skillTitle: "Unit economics frame", outcome: "Build a CAC/LTV picture from what's actually known" },
@@ -102,7 +102,7 @@ export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
   },
   revenue_streams: {
     building: "The Mill",
-    promise: "Yield studies how everyone in your market makes money — and where you're leaving some on the table.",
+    promise: "Study how everyone in your market makes money — and where you're leaving some on the table.",
     actions: [
       { skillKey: "yield.pricing_teardown", skillTitle: "Pricing teardown", outcome: "Tear down competitor pricing into one comparable table" },
       { skillKey: "yield.monetization_gaps", skillTitle: "Monetization gaps", outcome: "Spot revenue streams rivals run that you don't" },
@@ -110,17 +110,3 @@ export const WORKSPACE_HERO: Record<CanvasSectionKey, WorkspaceHeroCopy> = {
     ],
   },
 };
-
-/**
- * Scroll the matching Studio tile into view and pulse it — the hero card's
- * "Run in Studio" affordance. No-op if the tile isn't in the DOM (mobile
- * collapsed layout); the Studio panel remains the one place skills run, so
- * preconditions (competitor research gating, single-run guard) stay there.
- */
-export function focusStudioTile(skillKey: string): void {
-  const tile = document.getElementById(`skill-tile-${skillKey}`);
-  if (!tile) return;
-  tile.scrollIntoView({ behavior: "smooth", block: "center" });
-  tile.classList.add("studio-tile-pulse");
-  window.setTimeout(() => tile.classList.remove("studio-tile-pulse"), 1800);
-}

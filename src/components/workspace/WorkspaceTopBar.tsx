@@ -5,7 +5,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   CANVAS_SECTION_KEYS,
   CANVAS_SECTION_LABELS,
-  CANVAS_SECTION_PURPOSES,
   type CanvasSectionKey,
 } from "@/components/canvas/section-types";
 import { AGENT_ROSTER, ATLAS } from "@/lib/agent-roster";
@@ -33,23 +32,24 @@ export function WorkspaceTopBar({ room }: { room: CanvasSectionKey | "atlas" }) 
 
       <div className="h-5 w-px bg-border" aria-hidden />
 
-      <div className="flex min-w-0 flex-1 items-center gap-2.5">
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ring-1 ${current.avatarClass}`}>
-          <CurrentIcon className="h-3.5 w-3.5" />
-        </span>
-        {/* Section first, and the room must SAY what work happens in it —
-            "Key Partners" is BMC jargon a first-time user can't act on
-            (owner directive 2026-07-08). */}
-        <p className="shrink-0 text-base font-bold leading-none">
-          {isAtlas ? "War Room" : CANVAS_SECTION_LABELS[room]}
-        </p>
-        <span className="hidden h-4 w-px shrink-0 bg-border sm:block" aria-hidden />
-        <p className="hidden min-w-0 truncate text-xs text-muted-foreground sm:block">
-          {isAtlas
-            ? "Your chief strategist reads the whole canvas and hands you the one move that matters most right now."
-            : CANVAS_SECTION_PURPOSES[room]}
-        </p>
-      </div>
+      {/* Section rooms: the hero card below carries the room's title and
+          purpose, so this bar is pure navigation — a second title here was
+          one of three competing headers (owner finding 2026-07-08). The War
+          Room has no hero card yet and keeps its door plate. */}
+      {isAtlas ? (
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ring-1 ${current.avatarClass}`}>
+            <CurrentIcon className="h-3.5 w-3.5" />
+          </span>
+          <p className="shrink-0 text-base font-bold leading-none">War Room</p>
+          <span className="hidden h-4 w-px shrink-0 bg-border sm:block" aria-hidden />
+          <p className="hidden min-w-0 truncate text-xs text-muted-foreground sm:block">
+            Your chief strategist reads the whole canvas and hands you the one move that matters most right now.
+          </p>
+        </div>
+      ) : (
+        <div className="min-w-0 flex-1" />
+      )}
 
       <div className="ml-auto">
         <Popover>
@@ -83,7 +83,7 @@ export function WorkspaceTopBar({ room }: { room: CanvasSectionKey | "atlas" }) 
                     <span className="min-w-0">
                       <span className="block truncate text-xs font-medium">{CANVAS_SECTION_LABELS[key]}</span>
                       <span className="block truncate text-[10px] text-muted-foreground">
-                        {entry.callsign} · {entry.role}
+                        {entry.role}
                       </span>
                     </span>
                   </button>
@@ -102,7 +102,7 @@ export function WorkspaceTopBar({ room }: { room: CanvasSectionKey | "atlas" }) 
                   <ATLAS.icon className="h-3 w-3" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-xs font-medium">{ATLAS.callsign} — War Room</span>
+                  <span className="block truncate text-xs font-medium">War Room</span>
                   <span className="block truncate text-[10px] text-muted-foreground">{ATLAS.role}</span>
                 </span>
               </button>

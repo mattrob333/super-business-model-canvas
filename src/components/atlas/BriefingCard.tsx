@@ -307,8 +307,8 @@ function DirectiveCard({
   const rosterEntry = room ? AGENT_ROSTER[room] : null;
   const buttonLabel = rosterEntry
     ? directive.skill_key && skillTitle
-      ? `Run ${skillTitle} with ${rosterEntry.callsign}`
-      : `Open ${rosterEntry.callsign}’s room`
+      ? `Run ${skillTitle} in ${CANVAS_SECTION_LABELS[rosterEntry.sectionKey]}`
+      : `Open the ${CANVAS_SECTION_LABELS[rosterEntry.sectionKey]} room`
     : null;
 
   return (

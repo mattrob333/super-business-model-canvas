@@ -2,7 +2,6 @@ import { useState } from "react";
 import { AlertTriangle, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
-import { CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
 import { AgentSettingsSheet } from "@/components/workspace/AgentSettingsSheet";
 
@@ -19,13 +18,11 @@ export function AgentIdentityCard({
   accountId,
   agentProfileId,
   sectionKey,
-  description,
   latestRun,
 }: {
   accountId: string;
   agentProfileId: string;
   sectionKey: CanvasSectionKey;
-  description: string | null;
   latestRun: AgentRunSnapshot | null;
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -43,7 +40,10 @@ export function AgentIdentityCard({
             <Icon className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <h1 className="text-base font-semibold leading-tight">{entry.callsign}</h1>
+            {/* Function-first (owner call 2026-07-08): "Envoy" told a new
+                user nothing; the hero card carries the room identity, this
+                card is the status + settings surface. */}
+            <h2 className="text-sm font-semibold leading-tight">{entry.displayName}</h2>
             <p className="text-xs text-muted-foreground">{entry.role}</p>
             <p className="mt-1.5 inline-flex items-center gap-1.5 text-[11px]">
               {running ? (
@@ -72,22 +72,18 @@ export function AgentIdentityCard({
           size="icon"
           className="h-8 w-8 shrink-0"
           onClick={() => setSettingsOpen(true)}
-          aria-label={`${entry.callsign} settings`}
-          title={`${entry.callsign} settings`}
+          aria-label={`${entry.displayName} settings`}
+          title={`${entry.displayName} settings`}
         >
           <Settings className="h-4 w-4" />
         </Button>
       </div>
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        {description ??
-          `Owns ${CANVAS_SECTION_LABELS[sectionKey]} on the canvas — evidence-cited items, proposals over silent edits.`}
-      </p>
       <AgentSettingsSheet
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         accountId={accountId}
         agentProfileId={agentProfileId}
-        callsign={entry.callsign}
+        callsign={entry.displayName}
       />
     </section>
   );
