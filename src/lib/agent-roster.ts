@@ -40,7 +40,7 @@ export interface RosterEntry {
   avatarClass: string;
   /** small accent text (status dots, active states) */
   accentTextClass: string;
-  /** Room hero card wash — each room gets its own tint (full literals for the JIT). */
+  /** Room hero card wash — opaque card base + accent gradient (translucent tints let the page grid bleed through; owner finding 2026-07-11). Full literals for the JIT. */
   heroCardClass: string;
 }
 
@@ -54,7 +54,7 @@ export const AGENT_ROSTER: Record<CanvasSectionKey, RosterEntry> = {
     icon: Compass,
     avatarClass: "bg-teal-500/10 text-teal-600 ring-teal-500/30",
     accentTextClass: "text-teal-600",
-    heroCardClass: "bg-teal-500/[0.06] border-teal-500/25 dark:bg-teal-500/10",
+    heroCardClass: "bg-card bg-gradient-to-br from-teal-500/10 to-teal-500/[0.03] border-teal-500/30",
   },
   value_propositions: {
     sectionKey: "value_propositions",
@@ -65,7 +65,7 @@ export const AGENT_ROSTER: Record<CanvasSectionKey, RosterEntry> = {
     icon: Hammer,
     avatarClass: "bg-orange-500/10 text-orange-600 ring-orange-500/30",
     accentTextClass: "text-orange-600",
-    heroCardClass: "bg-orange-500/[0.06] border-orange-500/25 dark:bg-orange-500/10",
+    heroCardClass: "bg-card bg-gradient-to-br from-orange-500/10 to-orange-500/[0.03] border-orange-500/30",
   },
   channels: {
     sectionKey: "channels",
@@ -76,7 +76,7 @@ export const AGENT_ROSTER: Record<CanvasSectionKey, RosterEntry> = {
     icon: RadioTower,
     avatarClass: "bg-sky-500/10 text-sky-600 ring-sky-500/30",
     accentTextClass: "text-sky-600",
-    heroCardClass: "bg-sky-500/[0.06] border-sky-500/25 dark:bg-sky-500/10",
+    heroCardClass: "bg-card bg-gradient-to-br from-sky-500/10 to-sky-500/[0.03] border-sky-500/30",
   },
   customer_relationships: {
     sectionKey: "customer_relationships",
@@ -87,7 +87,7 @@ export const AGENT_ROSTER: Record<CanvasSectionKey, RosterEntry> = {
     icon: Anchor,
     avatarClass: "bg-emerald-500/10 text-emerald-600 ring-emerald-500/30",
     accentTextClass: "text-emerald-600",
-    heroCardClass: "bg-emerald-500/[0.06] border-emerald-500/25 dark:bg-emerald-500/10",
+    heroCardClass: "bg-card bg-gradient-to-br from-emerald-500/10 to-emerald-500/[0.03] border-emerald-500/30",
   },
   revenue_streams: {
     sectionKey: "revenue_streams",
@@ -98,7 +98,7 @@ export const AGENT_ROSTER: Record<CanvasSectionKey, RosterEntry> = {
     icon: TrendingUp,
     avatarClass: "bg-amber-500/10 text-amber-600 ring-amber-500/30",
     accentTextClass: "text-amber-600",
-    heroCardClass: "bg-amber-500/[0.06] border-amber-500/25 dark:bg-amber-500/10",
+    heroCardClass: "bg-card bg-gradient-to-br from-amber-500/10 to-amber-500/[0.03] border-amber-500/30",
   },
   key_resources: {
     sectionKey: "key_resources",
@@ -109,7 +109,7 @@ export const AGENT_ROSTER: Record<CanvasSectionKey, RosterEntry> = {
     icon: Landmark,
     avatarClass: "bg-slate-500/10 text-slate-600 ring-slate-500/30",
     accentTextClass: "text-slate-600",
-    heroCardClass: "bg-slate-500/[0.06] border-slate-500/25 dark:bg-slate-500/10",
+    heroCardClass: "bg-card bg-gradient-to-br from-slate-500/10 to-slate-500/[0.03] border-slate-500/30",
   },
   key_activities: {
     sectionKey: "key_activities",
@@ -120,7 +120,7 @@ export const AGENT_ROSTER: Record<CanvasSectionKey, RosterEntry> = {
     icon: Timer,
     avatarClass: "bg-violet-500/10 text-violet-600 ring-violet-500/30",
     accentTextClass: "text-violet-600",
-    heroCardClass: "bg-violet-500/[0.06] border-violet-500/25 dark:bg-violet-500/10",
+    heroCardClass: "bg-card bg-gradient-to-br from-violet-500/10 to-violet-500/[0.03] border-violet-500/30",
   },
   key_partners: {
     sectionKey: "key_partners",
@@ -131,7 +131,7 @@ export const AGENT_ROSTER: Record<CanvasSectionKey, RosterEntry> = {
     icon: Handshake,
     avatarClass: "bg-rose-500/10 text-rose-600 ring-rose-500/30",
     accentTextClass: "text-rose-600",
-    heroCardClass: "bg-rose-500/[0.06] border-rose-500/25 dark:bg-rose-500/10",
+    heroCardClass: "bg-card bg-gradient-to-br from-rose-500/10 to-rose-500/[0.03] border-rose-500/30",
   },
   cost_structure: {
     sectionKey: "cost_structure",
@@ -142,7 +142,7 @@ export const AGENT_ROSTER: Record<CanvasSectionKey, RosterEntry> = {
     icon: BookOpen,
     avatarClass: "bg-zinc-500/10 text-zinc-600 ring-zinc-500/30",
     accentTextClass: "text-zinc-600",
-    heroCardClass: "bg-zinc-500/[0.06] border-zinc-500/25 dark:bg-zinc-500/10",
+    heroCardClass: "bg-card bg-gradient-to-br from-zinc-500/10 to-zinc-500/[0.03] border-zinc-500/30",
   },
 };
 
