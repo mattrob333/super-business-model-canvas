@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { loadCompanyScope } from "@/lib/company-scope";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
-import { CANVAS_SECTION_KEYS } from "@/components/canvas/section-types";
+import { CANVAS_SECTION_KEYS, CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
 
 /**
  * The War Room's document shelf — Atlas sees everything the team produces.
@@ -85,7 +85,7 @@ export function WarRoomShelf({ accountId }: { accountId: string }) {
                       <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground/80">
                         {entry ? (
                           <Badge variant="outline" className={`px-1 py-0 text-[9px] ${entry.avatarClass}`}>
-                            {entry.callsign}
+                            {CANVAS_SECTION_LABELS[entry.sectionKey]}
                           </Badge>
                         ) : null}
                         {new Date(artifact.created_at).toLocaleDateString()}

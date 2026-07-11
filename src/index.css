@@ -160,24 +160,3 @@
     print-color-adjust: exact;
   }
 }
-
-/* Hero "Run in Studio" deep link lands here: a brief ring pulse on the
-   target skill tile (workspace-hero.ts adds/removes the class). */
-.studio-tile-pulse {
-  animation: studio-tile-pulse 1.8s ease-out;
-}
-@keyframes studio-tile-pulse {
-  0%, 60% {
-    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.45);
-    border-color: hsl(var(--primary));
-  }
-  100% {
-    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .studio-tile-pulse {
-    animation: none;
-    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.45);
-  }
-}

@@ -16,7 +16,6 @@ import { CANVAS_SECTION_LABELS, LEGACY_SECTION_KEYS } from "@/components/canvas/
 import { getActiveAnalysisCanvas } from "@/lib/active-analysis";
 import { loadCompanyScope } from "@/lib/company-scope";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
-import { WORKSPACE_HERO, focusStudioTile } from "@/lib/workspace-hero";
 
 /**
  * Spec 02 zone 2 — the collaboration surface, slice 1: persistent threads
@@ -116,6 +115,7 @@ export function WorkspaceThread({
   composerPrefill = null,
   onComposerPrefillConsumed,
   onInitialPromptConsumed,
+  onEmptyStateChange,
 }: {
   accountId: string;
   agentProfileId: string;
@@ -133,6 +133,8 @@ export function WorkspaceThread({
    * re-send it and fire a duplicate agent run (owner finding 2026-07-08).
    */
   onInitialPromptConsumed?: () => void;
+  /** Reports whether the active thread is empty — drives the hero's collapse. */
+  onEmptyStateChange?: (empty: boolean) => void;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -156,6 +158,15 @@ export function WorkspaceThread({
   const autoSentRef = useRef(false);
 
   useEffect(() => () => clearTimeout(pollTimer.current), []);
+
+  // Report the empty state upward — the room hero shows its full headpiece
+  // on an empty thread and collapses once a conversation exists. Count an
+  // in-flight reply as "not empty" so the hero collapses the moment the
+  // user sends, not after the agent answers.
+  const threadIsEmpty = messages.length === 0 && !awaitingReply && !sending;
+  useEffect(() => {
+    onEmptyStateChange?.(threadIsEmpty);
+  }, [threadIsEmpty, onEmptyStateChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -257,7 +268,7 @@ export function WorkspaceThread({
     if (attempt >= RUN_POLL_MAX_ATTEMPTS) {
       setAwaitingReply(false);
       setChatError(
-        `${entry.callsign} is taking longer than expected. The run continues in the background — check the Activity page or reload shortly.`,
+        `Your ${entry.displayName} is taking longer than expected. The run continues in the background — check the Activity page or reload shortly.`,
       );
       return;
     }
@@ -274,7 +285,7 @@ export function WorkspaceThread({
         } else {
           setChatError(
             status.error
-              ? `${entry.callsign} hit an error: ${status.error} — send your message again to retry, or check the Activity page for details.`
+              ? `Your ${entry.displayName} hit an error: ${status.error} — send your message again to retry, or check the Activity page for details.`
               : `The run ended (${status.status}) without a reply. Send your message again to retry, or check the Activity page.`,
           );
         }
@@ -282,7 +293,7 @@ export function WorkspaceThread({
       .catch(() => {
         pollTimer.current = setTimeout(() => pollRun(runId, threadId, attempt + 1), RUN_POLL_INTERVAL_MS);
       });
-  }, [accountId, entry.callsign, loadMessages]);
+  }, [accountId, entry.displayName, loadMessages]);
 
   const sendMessage = useCallback(async (text: string, threadIdOverride?: string) => {
     const trimmed = text.trim();
@@ -362,7 +373,7 @@ export function WorkspaceThread({
           setChatError(
             `Couldn't deliver the directive from Atlas${
               sendError instanceof Error ? `: ${sendError.message}` : ""
-            }. Head back to the War Room and try the handoff again, or just ask ${entry.callsign} directly below.`,
+            }. Head back to the War Room and try the handoff again, or just ask your ${entry.displayName} directly below.`,
           );
         }
       })();
@@ -373,7 +384,7 @@ export function WorkspaceThread({
     onInitialPromptConsumed?.();
     if (messages.length > 0) return;
     void sendMessage(initialPrompt);
-  }, [initialPrompt, initialThreadTitle, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage, accountId, agentProfileId, user, entry.callsign, onInitialPromptConsumed]);
+  }, [initialPrompt, initialThreadTitle, threadsLoaded, activeThreadId, messagesReady, sending, awaitingReply, messages.length, sendMessage, accountId, agentProfileId, user, entry.displayName, onInitialPromptConsumed]);
 
   useEffect(() => {
     if (!composerPrefill) return;
@@ -615,7 +626,7 @@ export function WorkspaceThread({
                 ))}
                 {threads.length === 0 && (
                   <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                    No chats with {entry.callsign} for this company yet.
+                    No chats with your {entry.displayName} for this company yet.
                   </p>
                 )}
               </div>
@@ -641,7 +652,7 @@ export function WorkspaceThread({
           </Popover>
         </div>
         <span className="text-[10px] text-muted-foreground">
-          with {entry.callsign} / {CANVAS_SECTION_LABELS[sectionKey]}
+          with your {entry.displayName}
         </span>
       </div>
 
@@ -652,12 +663,7 @@ export function WorkspaceThread({
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : messages.length === 0 && !awaitingReply ? (
-          <EmptyThread
-            callsign={entry.callsign}
-            sectionLabel={CANVAS_SECTION_LABELS[sectionKey]}
-            sectionKey={sectionKey}
-            onPick={(prompt) => setDraft(prompt)}
-          />
+          <EmptyThread sectionKey={sectionKey} onPick={(prompt) => setDraft(prompt)} />
         ) : (
           <div className="space-y-3">
             {messages.map((message) => (
@@ -674,7 +680,7 @@ export function WorkspaceThread({
             {awaitingReply && (
               <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {entry.callsign} is working on a reply — this can take a minute…
+                Your {entry.displayName} is working on a reply — this can take a minute…
               </div>
             )}
           </div>
@@ -709,7 +715,7 @@ export function WorkspaceThread({
               void sendMessage(draft);
             }
           }}
-          placeholder={`Message ${entry.callsign}… (Enter to send, Shift+Enter for a new line)`}
+          placeholder={`Message your ${entry.displayName}… (Enter to send, Shift+Enter for a new line)`}
           rows={2}
           className="min-h-[44px] resize-none text-sm"
         />
@@ -728,66 +734,24 @@ export function WorkspaceThread({
 }
 
 /**
- * Action Board hero (owner design round 2026-07-08): the empty thread is
- * the room's front door, so it states the room's promise and its three
- * real capabilities as cards that deep-link to their Studio tiles. The
- * hero exists ONLY while the thread is empty — the first message replaces
- * it with the conversation.
+ * Empty-thread suggestions. The room's headpiece (title, promise, run
+ * actions) lives in WorkspaceHeroCard ABOVE this card now — in here the
+ * empty state's only job is getting the first message written.
  */
 function EmptyThread({
-  callsign,
-  sectionLabel,
   sectionKey,
   onPick,
 }: {
-  callsign: string;
-  sectionLabel: string;
   sectionKey: CanvasSectionKey;
   onPick: (prompt: string) => void;
 }) {
   const prompts = [...(SUGGESTED_PROMPTS[sectionKey] ?? []), MISSING_DATA_PROMPT];
-  const entry = AGENT_ROSTER[sectionKey];
-  const hero = WORKSPACE_HERO[sectionKey];
-  const Icon = entry.icon;
   return (
-    <div className="mx-auto flex h-full max-w-2xl flex-col justify-center gap-5 py-4">
-      <div className="flex items-center gap-4">
-        {/* Mascot slot: agent icon today, the room's town-building art when it lands. */}
-        <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ring-1 ${entry.avatarClass}`}>
-          <Icon className="h-7 w-7" />
-        </span>
-        <div className="min-w-0">
-          <p className={`text-[11px] font-semibold uppercase tracking-wider ${entry.accentTextClass}`}>
-            {hero.building} · with {callsign}, your {entry.role}
-          </p>
-          <h2 className="text-xl font-bold tracking-tight">{sectionLabel}</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">{hero.promise}</p>
-        </div>
-      </div>
-
-      <div className="grid gap-2.5 sm:grid-cols-3">
-        {hero.actions.map((action) => (
-          <button
-            key={action.skillKey}
-            type="button"
-            onClick={() => focusStudioTile(action.skillKey)}
-            className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
-          >
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {action.skillTitle}
-            </span>
-            <span className="text-xs leading-relaxed">{action.outcome}</span>
-            <span className={`mt-auto pt-1 text-[11px] font-semibold ${entry.accentTextClass}`}>
-              Run in Studio →
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Or start by asking
-        </p>
+    <div className="mx-auto flex h-full max-w-md flex-col justify-center gap-2 py-4">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Start by asking
+      </p>
+      <div className="w-full space-y-1.5">
         {prompts.map((prompt) => (
           <button
             key={prompt}

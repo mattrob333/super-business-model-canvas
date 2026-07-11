@@ -51,7 +51,7 @@ export function SectionCanvasPanel({
       ) : items.length === 0 ? (
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           No canvas items yet. Run the section analysis from the canvas to give{" "}
-          {entry.callsign} something to work with.
+          your {entry.displayName} something to work with.
         </p>
       ) : (
         <ul className="mt-3 space-y-2">
