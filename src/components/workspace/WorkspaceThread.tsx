@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, Lightbulb, Loader2, MessageSquarePlus, Pencil, Send, WifiOff, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, FileText, Lightbulb, Loader2, MessageSquarePlus, Pencil, Send, WifiOff, XCircle } from "lucide-react";
+import type { SkillRunOutcome } from "@/hooks/useRoomSkills";
 import { AgentMarkdown } from "@/components/chat/AgentMarkdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,6 +117,7 @@ export function WorkspaceThread({
   onComposerPrefillConsumed,
   onInitialPromptConsumed,
   onEmptyStateChange,
+  skillRunStatus,
 }: {
   accountId: string;
   agentProfileId: string;
@@ -135,6 +137,15 @@ export function WorkspaceThread({
   onInitialPromptConsumed?: () => void;
   /** Reports whether the active thread is empty — drives the hero's collapse. */
   onEmptyStateChange?: (empty: boolean) => void;
+  /**
+   * Live state of the hero's skill run, narrated here as status cards —
+   * hitting Run must visibly activate the chat (owner call 2026-07-11).
+   */
+  skillRunStatus?: {
+    running: boolean;
+    skillTitle: string | null;
+    lastOutcome: SkillRunOutcome | null;
+  };
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -663,7 +674,14 @@ export function WorkspaceThread({
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : messages.length === 0 && !awaitingReply ? (
-          <EmptyThread sectionKey={sectionKey} onPick={(prompt) => setDraft(prompt)} />
+          <div className="flex h-full flex-col justify-center">
+            {skillRunStatus && (
+              <div className="mx-auto mb-3 w-full max-w-md">
+                <SkillRunStatusCard status={skillRunStatus} />
+              </div>
+            )}
+            <EmptyThread sectionKey={sectionKey} onPick={(prompt) => setDraft(prompt)} />
+          </div>
         ) : (
           <div className="space-y-3">
             {messages.map((message) => (
@@ -683,6 +701,7 @@ export function WorkspaceThread({
                 Your {entry.displayName} is working on a reply — this can take a minute…
               </div>
             )}
+            {skillRunStatus && <SkillRunStatusCard status={skillRunStatus} />}
           </div>
         )}
       </div>
@@ -844,4 +863,51 @@ function MessageCard({
       </div>
     </div>
   );
+}
+
+/**
+ * The hero's skill run, narrated in the chat: running / done / failed.
+ * Ephemeral by design — the durable record is the run queue and the Shelf;
+ * writing fake agent messages into the thread would leak into the model's
+ * conversation context on the next reply.
+ */
+function SkillRunStatusCard({
+  status,
+}: {
+  status: { running: boolean; skillTitle: string | null; lastOutcome: SkillRunOutcome | null };
+}) {
+  if (status.running && status.skillTitle) {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 text-xs">
+        <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+        <span>
+          Running <span className="font-semibold">{status.skillTitle}</span> — this takes a few
+          minutes. The finished document will land on the Shelf, and you can keep chatting meanwhile.
+        </span>
+      </div>
+    );
+  }
+  if (status.lastOutcome?.status === "completed") {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 text-xs">
+        <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+        <span>
+          <span className="font-semibold">{status.lastOutcome.skillTitle}</span> is done — the
+          document is on the Shelf, in the panel to the right.
+        </span>
+      </div>
+    );
+  }
+  if (status.lastOutcome?.status === "failed") {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs text-destructive">
+        <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>
+          <span className="font-semibold">{status.lastOutcome.skillTitle}</span> failed:{" "}
+          {status.lastOutcome.error ?? "unknown error"}
+        </span>
+      </div>
+    );
+  }
+  return null;
 }

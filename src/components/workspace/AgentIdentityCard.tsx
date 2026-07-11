@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, Settings } from "lucide-react";
+import { AlertTriangle, Bot, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
@@ -27,7 +27,6 @@ export function AgentIdentityCard({
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const entry = AGENT_ROSTER[sectionKey];
-  const Icon = entry.icon;
 
   const running = latestRun?.status === "pending" || latestRun?.status === "running";
   const attention = latestRun?.status === "failed" || latestRun?.status === "timeout";
@@ -36,8 +35,11 @@ export function AgentIdentityCard({
     <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
+          {/* Robot head, not the section icon — the hero already carries the
+              section identity; this card is about the AGENT (owner call
+              2026-07-11). */}
           <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ring-2 ${entry.avatarClass}`}>
-            <Icon className="h-5 w-5" />
+            <Bot className="h-5 w-5" />
           </span>
           <div className="min-w-0">
             {/* Function-first (owner call 2026-07-08): "Envoy" told a new
