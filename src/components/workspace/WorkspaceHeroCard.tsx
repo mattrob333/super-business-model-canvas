@@ -71,7 +71,7 @@ export function WorkspaceHeroCard({
                 key={action.skillKey}
                 size="sm"
                 variant="outline"
-                className="h-7 gap-1.5 bg-background/60 px-2.5 text-xs"
+                className="h-7 gap-1.5 bg-card px-2.5 text-xs"
                 disabled={runDisabled(skill)}
                 onClick={() => skill && void runSkill(skill)}
                 title={action.outcome}
@@ -111,7 +111,7 @@ export function WorkspaceHeroCard({
           return (
             <div
               key={action.skillKey}
-              className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-background/80 p-3"
+              className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-card p-3"
             >
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {action.skillTitle}
