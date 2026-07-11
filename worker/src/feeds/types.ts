@@ -60,6 +60,12 @@ export interface FeedRuntimeConfig {
   fredApiKey?: string;
   googleTrendsApiKey?: string;
   githubToken?: string;
+  /**
+   * SEC EDGAR requires no API key — only a descriptive contact User-Agent
+   * per their fair-access policy. Optional override; the fetcher has a
+   * sensible hardcoded default, so this feed works with zero configuration.
+   */
+  secEdgarUserAgent?: string;
   fetch?: typeof fetch;
   /** Abort outbound feed requests after this many ms (default 120s). */
   fetchTimeoutMs?: number;

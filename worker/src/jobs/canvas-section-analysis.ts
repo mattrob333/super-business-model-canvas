@@ -41,6 +41,7 @@ export interface CanvasSectionAnalysisDependencies {
   fredApiKey?: string;
   googleTrendsApiKey?: string;
   githubToken?: string;
+  secEdgarUserAgent?: string;
   taskLimits?: AgentTaskLimits;
 }
 
@@ -85,6 +86,7 @@ export class CanvasSectionAnalysisHandler {
       fredApiKey: this.deps.fredApiKey,
       googleTrendsApiKey: this.deps.googleTrendsApiKey,
       githubToken: this.deps.githubToken,
+      secEdgarUserAgent: this.deps.secEdgarUserAgent,
     });
 
     const limits = this.deps.taskLimits?.sectionAnalysis;
