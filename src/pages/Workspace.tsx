@@ -6,6 +6,7 @@ import { useAccountId } from "@/hooks/useAccountId";
 import { useActiveAnalysis } from "@/hooks/useActiveAnalysis";
 import { useAuth } from "@/hooks/useAuth";
 import { useCanvasEvidence } from "@/hooks/useCanvasEvidence";
+import { useRoomSkills } from "@/hooks/useRoomSkills";
 import { getActiveAnalysisCanvas, setActiveAnalysis } from "@/lib/active-analysis";
 import type { CanvasItemEvidence } from "@/components/canvas/CanvasSectionCard";
 import {
@@ -52,6 +53,10 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
   // The hero is the full headpiece on an empty thread and collapses to a
   // slim strip once a conversation exists — the thread reports which.
   const [threadEmpty, setThreadEmpty] = useState(true);
+  // One skill-run state shared by the hero (Run buttons), the chat (live
+  // "running…" narration), and the shelf (refresh event) — owner call
+  // 2026-07-11: hitting Run must visibly activate the chat.
+  const skillRuns = useRoomSkills(accountId ?? "", profile?.id ?? null, entry.agentKey);
   const { itemsBySection, loading: canvasLoading } = useCanvasEvidence();
 
   // Arriving from the Gap Register ("Fix with <agent>"): load the gap and
@@ -268,12 +273,7 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
               pair fills the first screenful so the room reads as hero + chat;
               the supporting panels sit below the fold. */}
           <main className="order-1 flex min-h-[calc(100dvh-6.5rem)] flex-col gap-3 lg:order-2 lg:col-span-6 lg:min-h-0">
-            <WorkspaceHeroCard
-              accountId={accountId}
-              agentProfileId={profile.id}
-              sectionKey={sectionKey}
-              collapsed={!threadEmpty}
-            />
+            <WorkspaceHeroCard sectionKey={sectionKey} collapsed={!threadEmpty} skillRuns={skillRuns} />
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
               <WorkspaceThread
                 accountId={accountId}
@@ -285,6 +285,14 @@ function WorkspaceRoom({ sectionKey }: { sectionKey: CanvasSectionKey }) {
                 onComposerPrefillConsumed={() => setComposerPrefill(null)}
                 onInitialPromptConsumed={handleInitialPromptConsumed}
                 onEmptyStateChange={setThreadEmpty}
+                skillRunStatus={{
+                  running: skillRuns.startingKey !== null || skillRuns.runningRun !== null,
+                  skillTitle:
+                    skillRuns.skills.find(
+                      (skill) => skill.skill_key === (skillRuns.startingKey ?? skillRuns.runningRun?.skillKey),
+                    )?.title ?? null,
+                  lastOutcome: skillRuns.lastOutcome,
+                }}
               />
             </div>
           </main>

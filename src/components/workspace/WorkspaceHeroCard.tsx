@@ -5,35 +5,32 @@ import type { CanvasSectionKey } from "@/components/canvas/section-types";
 import { CANVAS_SECTION_LABELS } from "@/components/canvas/section-types";
 import { AGENT_ROSTER } from "@/lib/agent-roster";
 import { WORKSPACE_HERO } from "@/lib/workspace-hero";
-import { useRoomSkills, type CatalogSkill } from "@/hooks/useRoomSkills";
+import type { CatalogSkill, RoomSkillsState } from "@/hooks/useRoomSkills";
 
 /**
- * The room's headpiece (owner design round 2026-07-08): its own card above
- * the chat, tinted with the room's accent so every room is unmistakably
- * itself. Carries the ONLY room title on the page (the top bar went
- * nav-only) and the room's three skills as the actual Run actions — the
- * right rail is just the shelf now.
+ * The room's headpiece (owner design rounds 2026-07-08 → 07-11): its own
+ * card above the chat with a bold accent wash so every room pops as
+ * itself. Carries the ONLY room title on the page and the room's three
+ * skills as the Run actions — subtle text-buttons, not orange slabs
+ * (owner call 2026-07-11). Skill-run state arrives from the parent so the
+ * chat can narrate the same run (single useRoomSkills instance).
  *
- * Adaptive: full headpiece while the thread is empty; once a conversation
- * exists it collapses to a slim strip so the working chat gets the space
- * back — the Run buttons stay reachable in both states.
+ * Adaptive: full headpiece while the thread is empty; collapses to a slim
+ * strip once a conversation exists — run actions stay reachable in both.
  */
 export function WorkspaceHeroCard({
-  accountId,
-  agentProfileId,
   sectionKey,
   collapsed,
+  skillRuns,
 }: {
-  accountId: string;
-  agentProfileId: string;
   sectionKey: CanvasSectionKey;
   collapsed: boolean;
+  skillRuns: RoomSkillsState;
 }) {
   const entry = AGENT_ROSTER[sectionKey];
   const hero = WORKSPACE_HERO[sectionKey];
   const Icon = entry.icon;
-  const { skills, runningRun, startingKey, skillErrors, runSkill, needsCompetitorResearch } =
-    useRoomSkills(accountId, agentProfileId, entry.agentKey);
+  const { skills, runningRun, startingKey, skillErrors, runSkill, needsCompetitorResearch } = skillRuns;
   const skillByKey = new Map(skills.map((skill) => [skill.skill_key, skill]));
 
   const runLabel = (skill: CatalogSkill | undefined) => {
@@ -41,7 +38,7 @@ export function WorkspaceHeroCard({
     if (startingKey === skill.skill_key) return "Starting…";
     if (runningRun?.skillKey === skill.skill_key) return "Running";
     if (needsCompetitorResearch(skill)) return "Needs research";
-    return skill.implemented ? "Run" : "Coming";
+    return skill.implemented ? "Run" : "Coming soon";
   };
   const runIcon = (skill: CatalogSkill | undefined) => {
     if (skill && (startingKey === skill.skill_key || runningRun?.skillKey === skill.skill_key)) {
@@ -70,8 +67,8 @@ export function WorkspaceHeroCard({
               <Button
                 key={action.skillKey}
                 size="sm"
-                variant="outline"
-                className="h-7 gap-1.5 bg-card px-2.5 text-xs"
+                variant="ghost"
+                className={`h-7 gap-1.5 px-2.5 text-xs font-semibold ${entry.accentTextClass} hover:bg-card`}
                 disabled={runDisabled(skill)}
                 onClick={() => skill && void runSkill(skill)}
                 title={action.outcome}
@@ -90,7 +87,7 @@ export function WorkspaceHeroCard({
     <section className={`rounded-lg border p-5 shadow-sm ${entry.heroCardClass}`}>
       <div className="flex items-start gap-4">
         {/* Mascot slot: agent icon today, the room's character art when it lands. */}
-        <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ring-1 ${entry.avatarClass}`}>
+        <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-card ring-1 ${entry.avatarClass}`}>
           <Icon className="h-7 w-7" />
         </span>
         <div className="min-w-0">
@@ -100,7 +97,7 @@ export function WorkspaceHeroCard({
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             {CANVAS_SECTION_LABELS[sectionKey]}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{hero.promise}</p>
+          <p className="mt-1 max-w-2xl text-sm text-foreground/80">{hero.promise}</p>
         </div>
       </div>
 
@@ -111,17 +108,17 @@ export function WorkspaceHeroCard({
           return (
             <div
               key={action.skillKey}
-              className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-card p-3"
+              className="flex flex-col gap-1 rounded-lg border border-border/70 bg-card p-3 shadow-sm"
             >
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {action.skillTitle}
               </span>
               <span className="text-xs leading-relaxed">{action.outcome}</span>
-              <div className="mt-auto pt-1.5">
+              <div className="mt-auto pt-1">
                 <Button
                   size="sm"
-                  className="h-7 w-full gap-1.5 text-xs"
-                  variant={skill?.implemented && !gated ? "default" : "outline"}
+                  variant="ghost"
+                  className={`-ml-2 h-7 gap-1.5 px-2 text-xs font-semibold ${entry.accentTextClass} hover:bg-muted/60`}
                   disabled={runDisabled(skill)}
                   onClick={() => skill && void runSkill(skill)}
                 >

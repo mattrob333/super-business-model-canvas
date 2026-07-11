@@ -24,6 +24,14 @@ export interface CatalogSkill {
   sort_order: number;
 }
 
+/** Terminal record of the most recent run — the chat shows it as a status card. */
+export interface SkillRunOutcome {
+  skillKey: string;
+  skillTitle: string;
+  status: "completed" | "failed";
+  error?: string;
+}
+
 const RUN_POLL_INTERVAL_MS = 3_000;
 const RUN_POLL_MAX_ATTEMPTS = 100;
 /** Competitor research may land while the user sits here — re-check until it does. */
@@ -52,7 +60,7 @@ const REQUIRES_COMPETITOR_RESEARCH = new Set<string>([
   "yield.monetization_gaps",
 ]);
 
-export function useRoomSkills(accountId: string, agentProfileId: string, agentKey: string) {
+export function useRoomSkills(accountId: string, agentProfileId: string | null, agentKey: string) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [skills, setSkills] = useState<CatalogSkill[]>([]);
@@ -66,6 +74,7 @@ export function useRoomSkills(accountId: string, agentProfileId: string, agentKe
    * double enqueue, but silently).
    */
   const [startingKey, setStartingKey] = useState<string | null>(null);
+  const [lastOutcome, setLastOutcome] = useState<SkillRunOutcome | null>(null);
   const [skillErrors, setSkillErrors] = useState<Record<string, string>>({});
   const pollTimer = useRef<ReturnType<typeof setTimeout>>();
   const startingRef = useRef(false);
@@ -177,15 +186,18 @@ export function useRoomSkills(accountId: string, agentProfileId: string, agentKe
 
         setRunningRun(null);
         if (status.status === "completed") {
+          setLastOutcome({ skillKey: skill.skill_key, skillTitle: skill.title, status: "completed" });
           toast({
             title: `${skill.title} complete`,
             description: "The finished document is on the shelf.",
           });
           window.dispatchEvent(new CustomEvent(ARTIFACT_CREATED_EVENT));
         } else {
+          const message = status.error ?? `Run ${status.status}.`;
+          setLastOutcome({ skillKey: skill.skill_key, skillTitle: skill.title, status: "failed", error: message });
           setSkillErrors((prev) => ({
             ...prev,
-            [skill.skill_key]: status.error ?? `Run ${status.status}.`,
+            [skill.skill_key]: message,
           }));
         }
       })
@@ -205,8 +217,10 @@ export function useRoomSkills(accountId: string, agentProfileId: string, agentKe
     // Frontend mirror of the worker's precondition throw: enqueueing this run
     // without researched competitors would only burn tokens and fail.
     if (REQUIRES_COMPETITOR_RESEARCH.has(skill.skill_key) && hasCompetitorResearch === false) return;
+    if (!agentProfileId) return;
     startingRef.current = true;
     setStartingKey(skill.skill_key);
+    setLastOutcome(null);
     setSkillErrors((prev) => ({ ...prev, [skill.skill_key]: "" }));
     try {
       const contextVersionId = await ensureBusinessContext();
@@ -252,5 +266,7 @@ export function useRoomSkills(accountId: string, agentProfileId: string, agentKe
     [hasCompetitorResearch],
   );
 
-  return { skills, loading, runningRun, startingKey, skillErrors, runSkill, needsCompetitorResearch };
+  return { skills, loading, runningRun, startingKey, lastOutcome, skillErrors, runSkill, needsCompetitorResearch };
 }
+
+export type RoomSkillsState = ReturnType<typeof useRoomSkills>;
