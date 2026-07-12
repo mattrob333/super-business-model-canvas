@@ -85,11 +85,29 @@ describe("CanvasSectionAnalysisHandler", () => {
       "account-1",
       [{
         path: "canvas.value_propositions",
-        value: ["Sharper customer promise"],
+        value: [{ text: "Sharper customer promise", confidence: 0.82 }],
         confidence: "high",
       }],
       { source: "scraped", sourceArtifact: "run-1" },
     );
+  });
+
+  it("does not fail the analysis when the brain mirror write throws", async () => {
+    writeVariablesMock.mockRejectedValueOnce(new Error("write_brain_variables missing"));
+    const client = new FakeSupabaseClient();
+    const handler = new CanvasSectionAnalysisHandler({
+      client: client.asSupabase(),
+      runner: new RecordingRunner(),
+      taskLimits: {
+        sectionAnalysis: { maxTurns: 12, taskBudgetTokens: 12345, maxBudgetUsd: 0.42 },
+        workspaceChat: { maxTurns: 8, taskBudgetTokens: 6789 },
+      },
+    });
+
+    await expect(handler.handle(makeJob())).resolves.toBeUndefined();
+    const lastUpdate = client.updates.at(-1);
+    expect(lastUpdate?.table).toBe("agent_runs");
+    expect(lastUpdate?.values.status).toBe("completed");
   });
 
   it("marks the linked agent run failed when the handler throws", async () => {

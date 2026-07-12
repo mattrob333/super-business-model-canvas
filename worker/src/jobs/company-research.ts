@@ -550,26 +550,32 @@ ${evidencePrompt(evidence)}`,
       });
       if (error) throw new Error(`Failed to write researched canvas section: ${error.message}`);
       if (subject.competitorId === null) {
-        await writeVariables(
-          this.deps.client,
-          job.account_id,
-          [{
-            path: `canvas.${sectionKey}`,
-            value: sectionClaims.map((claim) => ({
-              text: claim.text,
-              confidence: earnedConfidence(claim),
-              evidence_ids: [claim.evidenceId],
-              verification_status: claim.status,
-              flags: [
-                ...(claim.status === "unsupported" ? ["unsupported"] : []),
-                ...(claim.sourceKind === "web_search_backfill" ? ["web_search_backfill"] : []),
-              ],
-              source_kind: claim.sourceKind ?? "crawl",
-            })),
-            confidence: confidenceBand(average(sectionClaims.map(earnedConfidence)) ?? 0),
-          }],
-          { source: "scraped", sourceArtifact: job.agent_run_id ?? undefined },
-        );
+        // Brain mirror is a secondary sink (AT-1 R3): a failure here must
+        // never fail the research run — the canvas write above already landed.
+        try {
+          await writeVariables(
+            this.deps.client,
+            job.account_id,
+            [{
+              path: `canvas.${sectionKey}`,
+              value: sectionClaims.map((claim) => ({
+                text: claim.text,
+                confidence: earnedConfidence(claim),
+                evidence_ids: [claim.evidenceId],
+                verification_status: claim.status,
+                flags: [
+                  ...(claim.status === "unsupported" ? ["unsupported"] : []),
+                  ...(claim.sourceKind === "web_search_backfill" ? ["web_search_backfill"] : []),
+                ],
+                source_kind: claim.sourceKind ?? "crawl",
+              })),
+              confidence: confidenceBand(average(sectionClaims.map(earnedConfidence)) ?? 0),
+            }],
+            { source: "scraped", sourceArtifact: job.agent_run_id ?? undefined },
+          );
+        } catch (mirrorError) {
+          console.error(`[brain] canvas.${sectionKey} mirror failed: ${mirrorError instanceof Error ? mirrorError.message : String(mirrorError)}`);
+        }
       }
     }
   }

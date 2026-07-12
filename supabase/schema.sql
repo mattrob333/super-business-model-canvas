@@ -3135,7 +3135,7 @@ create table if not exists public.brain_variables (
 
 create table if not exists public.brain_variable_history (
   id uuid primary key default gen_random_uuid(),
-  variable_id uuid not null references public.brain_variables(id) on delete restrict,
+  variable_id uuid not null references public.brain_variables(id) on delete cascade,
   account_id uuid not null references public.accounts(id) on delete cascade,
   path text not null,
   value jsonb not null,
@@ -3205,7 +3205,7 @@ end;
 $$;
 drop trigger if exists brain_variable_history_append_only on public.brain_variable_history;
 create trigger brain_variable_history_append_only
-  before update or delete on public.brain_variable_history
+  before update on public.brain_variable_history
   for each row execute function public.reject_brain_variable_history_mutation();
 
 -- One service-role RPC is the transaction boundary for trust evaluation,

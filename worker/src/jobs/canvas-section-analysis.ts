@@ -110,16 +110,23 @@ export class CanvasSectionAnalysisHandler {
     const parsed = parseLegacySectionAnalysis(agentResult.resultText);
     const estimatedCost = agentResult.costUsd ?? estimateCost(agentResult.tokensIn, agentResult.tokensOut, modelRoute);
 
-    await writeVariables(
-      this.deps.client,
-      job.account_id,
-      [{
-        path: `canvas.${sectionKey}`,
-        value: parsed.items,
-        confidence: confidenceBand(parsed.confidence),
-      }],
-      { source: "scraped", sourceArtifact: job.agent_run_id ?? undefined },
-    );
+    // Brain mirror is a secondary sink (AT-1 R3): a failure here must never
+    // fail the analysis itself. Value shape matches the company-research
+    // mirror ({text, confidence} items) so canvas.<section> is uniform.
+    try {
+      await writeVariables(
+        this.deps.client,
+        job.account_id,
+        [{
+          path: `canvas.${sectionKey}`,
+          value: parsed.items.map((text) => ({ text, confidence: parsed.confidence })),
+          confidence: confidenceBand(parsed.confidence),
+        }],
+        { source: "scraped", sourceArtifact: job.agent_run_id ?? undefined },
+      );
+    } catch (error) {
+      console.error(`[brain] canvas.${sectionKey} mirror failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
     if (job.agent_run_id) {
       const { error } = await this.deps.client
