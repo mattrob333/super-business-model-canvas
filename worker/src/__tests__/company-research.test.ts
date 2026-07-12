@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { writeVariablesMock } = vi.hoisted(() => ({ writeVariablesMock: vi.fn() }));
+vi.mock("../db/brain.js", () => ({ writeVariables: writeVariablesMock }));
 import type { AgentRunner } from "../agent/runner.js";
 import { SECTION_KEYS } from "../domain/sections.js";
 import { CompanyResearchHandler } from "../jobs/company-research.js";
@@ -6,6 +9,8 @@ import { createJobDispatcher } from "../jobs/dispatch.js";
 import type { AgentJob } from "../queue/types.js";
 
 describe("CompanyResearchHandler", () => {
+  beforeEach(() => writeVariablesMock.mockClear());
+
   it("writes cited canvas items and logs contradicted claims as gaps", async () => {
     const client = new CompanyResearchFakeClient();
     const runner = new ScriptedRunner([
@@ -34,6 +39,14 @@ describe("CompanyResearchHandler", () => {
     });
     const items = canvasInsert?.value.items as Array<{ evidence_ids: string[] }> | undefined;
     expect(items?.[0]?.evidence_ids).toEqual(["evidence-1"]);
+    expect(writeVariablesMock).toHaveBeenCalledWith(
+      client.asSupabase(),
+      "account-1",
+      expect.arrayContaining([
+        expect.objectContaining({ path: "canvas.value_propositions", confidence: "high" }),
+      ]),
+      { source: "scraped", sourceArtifact: "run-1" },
+    );
     const citedRatio = (items ?? []).filter((item) => item.evidence_ids.length > 0).length / Math.max(1, items?.length ?? 0);
     expect(citedRatio).toBeGreaterThanOrEqual(0.8);
     expect(client.inserts.find((insert) => insert.table === "gaps")?.value).toMatchObject({
@@ -164,6 +177,7 @@ describe("CompanyResearchHandler", () => {
       section_key: "value_propositions",
     });
     expect(canvasInsert?.value.notes).toContain("competitor_research");
+    expect(writeVariablesMock).not.toHaveBeenCalled();
     expect(runner.requests[0]?.prompt).toContain("RivalCo");
     expect(client.updates.at(-1)).toMatchObject({
       table: "agent_runs",

@@ -3,6 +3,7 @@ import type { AgentTaskLimits } from "../agent/limits.js";
 import { createAgentHooks } from "../agent/guardrails.js";
 import { ClaudeAgentRunner, type AgentRunner } from "../agent/runner.js";
 import { loadCompanyScope } from "../db/company-scope.js";
+import { writeVariables } from "../db/brain.js";
 import { asRecord, asStringArray } from "../db/json.js";
 import { buildSystemPrompt, buildUserPrompt, parseLegacySectionAnalysis } from "../domain/legacy-output.js";
 import { isSectionKey, SECTION_AGENT_KEYS, SECTION_LABELS, type SectionKey } from "../domain/sections.js";
@@ -108,6 +109,24 @@ export class CanvasSectionAnalysisHandler {
 
     const parsed = parseLegacySectionAnalysis(agentResult.resultText);
     const estimatedCost = agentResult.costUsd ?? estimateCost(agentResult.tokensIn, agentResult.tokensOut, modelRoute);
+
+    // Brain mirror is a secondary sink (AT-1 R3): a failure here must never
+    // fail the analysis itself. Value shape matches the company-research
+    // mirror ({text, confidence} items) so canvas.<section> is uniform.
+    try {
+      await writeVariables(
+        this.deps.client,
+        job.account_id,
+        [{
+          path: `canvas.${sectionKey}`,
+          value: parsed.items.map((text) => ({ text, confidence: parsed.confidence })),
+          confidence: confidenceBand(parsed.confidence),
+        }],
+        { source: "scraped", sourceArtifact: job.agent_run_id ?? undefined },
+      );
+    } catch (error) {
+      console.error(`[brain] canvas.${sectionKey} mirror failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
     if (job.agent_run_id) {
       const { error } = await this.deps.client
@@ -242,6 +261,12 @@ function estimateCost(tokensIn: number | null, tokensOut: number | null, route: 
   const inputCost = ((tokensIn ?? 0) / 1000) * (route.cost_per_1k_in ?? 0);
   const outputCost = ((tokensOut ?? 0) / 1000) * (route.cost_per_1k_out ?? 0);
   return Math.round((inputCost + outputCost) * 10000) / 10000;
+}
+
+function confidenceBand(confidence: number): "high" | "medium" | "low" {
+  if (confidence >= 0.8) return "high";
+  if (confidence >= 0.5) return "medium";
+  return "low";
 }
 
 export function chooseModelRoute(

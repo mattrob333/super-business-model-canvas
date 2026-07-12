@@ -285,6 +285,42 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas AT-1: business brain schema, BrainStore, scrape mirrors (2026-07-12)
+
+First phase of `docs/atlas/ATLAS_BUILD_PLAN.md`, built by a sub-agent session
+(PR #130) and merged with two reviewer fixes.
+
+- **Schema** (`supabase/migrations/20260711200000_atlas_brain_schema.sql`):
+  `brain_variables` (unique account+path, provenance metadata: confidence /
+  source / source_artifact / staleness_policy), append-only
+  `brain_variable_history`, `coverage_manifest` seeded with the 9 `canvas.*`
+  BMC slots + 8 `positioning.*` slots (global-template `account_id is null`
+  pattern). RLS: members read; no authenticated write policies — the
+  service-role RPC `write_brain_variables` is the single write path and
+  enforces trust ordering in the database: machine writes (`scraped` /
+  `mcp_pull:*` / `workflow:*`) against `user_stated`/`user_override` values
+  divert to `contradiction.<path>` records instead of overwriting, with
+  advisory locks in sorted path order against concurrent-job races.
+- **Worker** `BrainStore` (`worker/src/db/brain.ts`): `readVariables`
+  (prefix/paths), `writeVariables` (one RPC round trip). R3 scrape mirrors:
+  `company-research.ts` and `canvas-section-analysis.ts` mirror OWN-company
+  section writes into `canvas.<section>` brain variables
+  (`source: 'scraped'`); competitor research explicitly excluded.
+- **Reviewer fixes on merge (both found in review, PR #130):**
+  (1) account deletion was blocked — `brain_variable_history.variable_id`
+  was `on delete restrict` and the append-only trigger also rejected
+  DELETE, so the `accounts` cascade could never clear brain rows; now
+  cascade + trigger on UPDATE only. (2) mirror writes were fatal — a brain
+  outage (or unapplied migration) would have crashed every research run;
+  now try/catch with `[brain]` log lines, since the mirror is a secondary
+  sink. Also normalized the canvas-section-analysis mirror value to
+  `{text, confidence}` items so `canvas.<section>` has one shape regardless
+  of which job wrote it.
+- **Gates:** worker typecheck/build/eslint clean, 404 tests passed (new:
+  mirror failure does not fail the analysis); root tsc exit 0, build green,
+  lint 64 (frozen ceiling). Migration applied live + RPC trust-ordering
+  smoke against project `mehhuxzamnpxnkbrslls` — see merge notes on PR #130.
+
 ### Atlas refactor assimilated: spec package + phased build plan (2026-07-12)
 
 Owner uploaded a six-file design package (`atlas_updates.zip`) — a directional
