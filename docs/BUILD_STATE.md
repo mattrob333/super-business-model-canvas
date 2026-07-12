@@ -285,6 +285,45 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas AT-2: workflow registry + headless runner (2026-07-12)
+
+Second phase of `docs/atlas/ATLAS_BUILD_PLAN.md`, implemented on branch
+`atlas-at2-workflow-runner`. This is the UI-free heart of the Atlas build:
+workflow cards are YAML data, one interpreter runs every card, and each step
+emits markdown plus schema-validated VARIABLES JSON into the AT-1 brain store.
+
+- **Registry + authored cards:** added `worker/src/workflows/registry.ts` with
+  zod validation for the card shape and AJV validation for data-driven
+  `variables_schema` blocks. Workflow cards live in `worker/workflows/*.yaml`.
+  Authored cards included: `positioning-sprint.yaml` (transcribed from the
+  canonical Positioning Sprint card/output contract) and
+  `hormozi-brain-os.yaml` (prompts 00–06 preserved, wrapped in the standard
+  registry contract, with schemas derived from the TakeoffSpeed golden run).
+- **Schema:** added `workflow_runs` and `workflow_artifacts` via
+  `supabase/migrations/20260712100000_atlas_workflow_runs.sql`, mirrored into
+  `supabase/schema.sql` and generated Supabase TS types. No `workflow_catalog`
+  table — cards ship with the worker, per the plan. RLS: members read; worker /
+  service-role writes.
+- **Runner:** added `worker/src/jobs/workflow-run.ts` and wired `workflow_run`
+  into the existing dispatcher. The runner loads company/brain context, builds a
+  compact canvas snapshot from uniform AT-1 `canvas.<section>` `{text,
+  confidence}` rows, selects existing model routes, executes card-driven steps,
+  parses dual output, retries once on invalid VARIABLES JSON, writes variables
+  through `BrainStore` with `workflow:<id>@v<ver>#s<n>` provenance, persists
+  durable run state and final frontmattered artifacts, and records visible
+  failure state. Added `worker/src/workflows/postprocess.ts` as an identity
+  de-slop hook seam.
+- **Tests:** added registry/card validation, compact snapshot tests, and
+  headless workflow-run tests covering scripted Positioning Sprint execution,
+  invalid JSON retry/failure, user-stated contradiction behavior, and Hormozi
+  consuming seeded `positioning.*` variables.
+- **Gates:** worker typecheck/build/eslint clean, worker full suite green
+  (416 passed / 2 skipped in the build-agent run), root production build green,
+  `git diff --check` clean. Root lint remains at the known frozen baseline
+  (64 problems: 46 errors, 18 warnings) with no new errors in AT-2 files.
+- **Not applied live:** migration and deploy intentionally deferred for review.
+  AT-3 (A2UI/chat surface) remains next.
+
 ### Atlas AT-1: business brain schema, BrainStore, scrape mirrors (2026-07-12)
 
 First phase of `docs/atlas/ATLAS_BUILD_PLAN.md`, built by a sub-agent session

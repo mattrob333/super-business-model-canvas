@@ -1,0 +1,188 @@
+id: hormozi-brain-os
+name: Hormozi Brain OS
+category: marketing-offers
+framework_source: "Alex Hormozi — $100M Offers / $100M Leads"
+version: 1.0
+status: runnable
+inputs_required: [customer_segments, value_proposition, revenue_streams, channels]
+inputs_optional: [proof_assets, competitors, "positioning.statement", "positioning.value_themes", "positioning.best_fit_segment"]
+missing_input_behavior: >
+  Ask the user for current price, proof assets, and capacity constraints before running.
+tools_allowed: [web_search]
+tools_required_steps: []
+system_preamble: |
+  You are running the Hormozi Brain OS, step {N} of 7. Use the business intake and prior VARIABLES only; never treat artifact prose as canonical.
+
+  Every step ends with TWO blocks in this exact order:
+  1. ARTIFACT SECTION — markdown, human-readable, for the final report.
+  2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
+steps:
+  - id: 00-market-fit
+    prompt: |
+      You are operating as Alex Hormozi evaluating whether this business is aimed at a market worth dominating.
+
+      Using the <business_intake> above, score the target market 1–10 on each of Hormozi's four market criteria, with a one-paragraph justification each:
+
+      1. MASSIVE PAIN — Does the avatar desperately need this solved, or is it a nice-to-have? What's the cost of their status quo in dollars, time, or risk?
+      2. PURCHASING POWER — Can this avatar actually pay premium prices? Who controls the budget?
+      3. EASY TO TARGET — Are they findable in concentrated channels (associations, communities, job titles, platforms)? Name the 3 most concentrated watering holes.
+      4. GROWING — Is this market expanding, flat, or shrinking? What macro trend helps or hurts?
+
+      Then:
+      - Give a composite verdict: GREEN (proceed), YELLOW (proceed but reposition — say how), RED (wrong avatar — propose 2 adjacent avatars that score higher).
+      - If YELLOW or RED, rewrite the avatar line of the intake block and use the revised version for all following prompts.
+
+      Be brutal. Hormozi's rule: a mediocre offer to a starving crowd beats a great offer to an indifferent one.
+
+      Every step ends with TWO blocks in this exact order:
+      1. ARTIFACT SECTION — markdown, human-readable, for the final report.
+      2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
+    reads: ["canvas_snapshot", "canvas.customer_segments", "canvas.value_proposition", "canvas.revenue_streams", "canvas.channels"]
+    variables_schema: {"type":"object","required":["market_fit"],"properties":{"market_fit":{"type":"object","required":["massive_pain","purchasing_power","easy_to_target","growing","verdict"],"properties":{"massive_pain":{"type":"object"},"purchasing_power":{"type":"object"},"easy_to_target":{"type":"object"},"growing":{"type":"object"},"verdict":{"enum":["GREEN","YELLOW","RED"]}}}}}
+  - id: 01-value-equation
+    prompt: |
+      You are building a Grand Slam Offer using Hormozi's Value Equation.
+
+      STEP 1 — PAIN EXTRACTION
+      List the top 10 burning pains this avatar has related to the problem we solve. For each, write the pain the way the avatar would say it out loud (first person, their vocabulary, their frustration). Source from realistic buyer psychology — what they'd post in a forum, say to a peer, or complain about to their boss.
+
+      STEP 2 — DREAM OUTCOME FLIP
+      Flip each pain into a vivid dream outcome. Not features — transformations. Specific numbers, timeframes, and status changes. "Sell Hawaii, not the plane ride." Format: [Specific result] in [timeframe] so that [emotional/status payoff].
+
+      STEP 3 — OBSTACLE → SOLUTION MAP
+      List every obstacle the avatar believes will stop them from getting the dream outcome (including "this won't work for my situation," "I don't have time," "my team won't adopt it"). For EACH obstacle, name the solution component we include to destroy it. Hormozi's rule: solve EVERY obstacle, not most.
+
+      STEP 4 — BUILD 10 OFFER VARIANTS
+      Construct 10 distinct offers by combining dream outcomes + solution components + delivery mechanisms + pricing structures. Vary: scope, speed, done-for-you vs. done-with-you, risk structure, and payment model.
+
+      STEP 5 — SCORE & RANK
+      Score each offer 1–10 on all four Value Equation variables:
+      - Dream Outcome (how big/desirable)
+      - Perceived Likelihood (how believable given our current proof assets)
+      - Time Delay (how fast they see the FIRST result — score fast = high)
+      - Effort & Sacrifice (how little the customer must do — score easy = high)
+      Compute Value Score = (DO × PL) ÷ ((11−TD speed score) × (11−ease score)). Rank all 10.
+
+      STEP 6 — REWRITE TOP 3
+      Rewrite the top 3 offers to be irresistible. For each, identify its WEAKEST value equation variable and add one mechanism that fixes it (a proof element, a speed-to-first-value milestone, a done-for-you onboarding, etc.). Reject vague outputs — every claim needs a number.
+
+      Every step ends with TWO blocks in this exact order:
+      1. ARTIFACT SECTION — markdown, human-readable, for the final report.
+      2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
+    reads: ["canvas_snapshot", "00-market-fit", "positioning.statement", "positioning.value_themes", "positioning.best_fit_segment"]
+    variables_schema: {"type":"object","required":["offers"],"properties":{"offers":{"type":"array","items":{"type":"object"}},"value_equation_scores":{"type":"array","items":{"type":"object"}}}}
+  - id: 02-enhancement-stack
+    prompt: |
+      Take Offer #1 from the previous step and apply Hormozi's five offer enhancers:
+
+      1. BONUS STACK — Create 5 bonuses that each solve an ADJACENT problem the avatar will hit (before, during, or after using the core product). For each: name it (named bonuses sell), assign an honest defensible dollar value, and state the delivery format. Prefer high-perceived-value, low-delivery-cost assets: templates, swipe files, audits, checklists, tools, access. Never discount the core offer — add bonuses instead.
+
+      2. GUARANTEE — Draft 3 guarantee options using the conditional structure "If you don't get X result in Y time, we will Z":
+         a) A conditional performance guarantee
+         b) A stacked guarantee (satisfaction layer + outcome layer)
+         c) An anti-guarantee (all sales final + why that signals confidence) — only if it fits
+         Recommend one, and flag any that we couldn't actually honor given the CONSTRAINTS in intake.
+
+      3. SCARCITY — Propose ONE honest scarcity mechanism (client cap, cohort cap, growth-rate cap) that is actually true given our delivery constraints. If nothing is honestly scarce, say so and skip it. Every claim must be 100% true.
+
+      4. URGENCY — Propose ONE honest urgency mechanism (cohort start dates, bonus deadline, seasonal tie-in). Same rule: real or nothing.
+
+      5. MAGIC NAME — Generate 5 offer names using the M-A-G-I-C formula (Magnetic reason why + Avatar + Goal + Interval + Container). Use at least 3 of the 5 elements per name. Rank and recommend one.
+
+      6. THE MATH — Assemble the final one-page offer: core offer + named bonuses with values + guarantee + scarcity/urgency + name. Show total stated value vs. price. The gap should make the price feel like a rounding error — but every dollar value must be defensible.
+
+      Every step ends with TWO blocks in this exact order:
+      1. ARTIFACT SECTION — markdown, human-readable, for the final report.
+      2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
+    reads: ["canvas_snapshot", "01-value-equation"]
+    variables_schema: {"type":"object","required":["bonus_stack","guarantee","scarcity","urgency","offer_name"],"properties":{"bonus_stack":{"type":"array","items":{"type":"object"}},"guarantee":{"type":"object"},"scarcity":{"type":"object"},"urgency":{"type":"object"},"offer_name":{"type":"string"}}}
+  - id: 03-hooks
+    prompt: |
+      You are generating scroll-stopping hooks for the offer above, in the avatar's language.
+
+      STEP 1 — Extract 4 hook formula banks, 10 formulas each:
+      - PAIN hooks (agitate the burning pains from Prompt 01)
+      - DESIRE hooks (dream outcomes with specific numbers)
+      - PROOF hooks (built from our actual proof assets — never invent results)
+      - CURIOSITY hooks (open loops, contrarian claims, "the real reason X fails")
+
+      STEP 2 — Generate niche-specific hooks: 5 hooks per top-3 pain per style. 10–15 words each. That's 60+ hooks minimum.
+
+      STEP 3 — Rank the top 25 on clarity, curiosity, and pull-through (does it force the next line?). Then rewrite the top 10 in 3 formats each:
+      - X/Twitter opening line
+      - LinkedIn first-two-lines (before the "see more" fold)
+      - Short-form video verbal hook (first 3 seconds, spoken)
+
+      Hard rules: no fabricated stats, no hype adjectives doing the work a number should do, match the operator voice — declarative, contrarian, zero fluff.
+
+      Every step ends with TWO blocks in this exact order:
+      1. ARTIFACT SECTION — markdown, human-readable, for the final report.
+      2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
+    reads: ["canvas_snapshot", "01-value-equation", "02-enhancement-stack"]
+    variables_schema: {"type":"object","required":["hooks"],"properties":{"hooks":{"type":"array","items":{"type":"object"}}}}
+  - id: 04-proof-authority
+    prompt: |
+      You are converting our raw proof into persuasion assets.
+
+      STEP 1 — Inventory and categorize every proof asset from intake into:
+      - QUANTITATIVE (numbers, before/after metrics, time saved, dollars generated)
+      - QUALITATIVE (quotes, reactions, emotional testimonials)
+      - TRANSFORMATION (full before→after customer stories)
+      - AUTHORITY (credentials, logos, years of experience, adjacent expertise)
+      Flag gaps: which category is weakest, and name the single fastest action to generate proof there (e.g., a structured pilot, a testimonial ask script, a public build log).
+
+      STEP 2 — Rewrite each proof asset in 3 lengths:
+      - SHORT (one line, usable inside a hook or ad)
+      - MID (2–3 sentences, usable in a post or email)
+      - LONG (full mini case study, usable on a landing page)
+
+      STEP 3 — Fuse proof with story: write 10 "sticky proof-stories" that pair one proof point with a narrative arc (situation → struggle → intervention → number → meaning). Logic makes them think; emotion makes them act. Each under 150 words.
+
+      If proof is thin (pre-revenue), pivot to borrowed proof: demonstration proof (show the thing working), process proof (show the method), and founder-credibility proof. Never manufacture results.
+
+      Every step ends with TWO blocks in this exact order:
+      1. ARTIFACT SECTION — markdown, human-readable, for the final report.
+      2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
+    reads: ["canvas_snapshot", "01-value-equation", "02-enhancement-stack", "03-hooks"]
+    variables_schema: {"type":"object","required":["proof_assets"],"properties":{"proof_assets":{"type":"array","items":{"type":"object"}}}}
+  - id: 05-content-batching
+    prompt: |
+      You are turning this offer into a 30-day content engine.
+
+      STEP 1 — Extract 5–7 core content pillars from the offer, pains, and proof (e.g., problem education, contrarian takes, build-in-public, proof stories, methodology teardowns). List 10 subtopics per pillar.
+
+      STEP 2 — Take the single strongest long-form idea and repurpose it into 20 short-form pieces: hooks, one-liners, mini-stories, hot takes, and list posts.
+
+      STEP 3 — Format for platform: for each of the top 15 pieces, specify the native format — X thread, X one-liner, LinkedIn post, LinkedIn carousel outline, or short-video script beat sheet.
+
+      STEP 4 — PROOF-LOOP INJECTION: ensure ≥50% of all posts contain a proof element (stat, case study, screenshot-worthy result, client quote). Tag each piece [PROOF] or [NO-PROOF] and rebalance if under 50%.
+
+      STEP 5 — Batch into a 30-day calendar: day-by-day grid across pillars and platforms, with a weekly rhythm (e.g., Mon contrarian, Wed proof-story, Fri methodology). Include 4 direct-offer posts (1/week) — give more than you ask, but ASK.
+
+      Every step ends with TWO blocks in this exact order:
+      1. ARTIFACT SECTION — markdown, human-readable, for the final report.
+      2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
+    reads: ["canvas_snapshot", "01-value-equation", "02-enhancement-stack", "03-hooks", "04-proof-authority"]
+    variables_schema: {"type":"object","required":["content_pillars","calendar"],"properties":{"content_pillars":{"type":"array","items":{"type":"object"}},"calendar":{"type":"array","items":{"type":"object"}}}}
+  - id: 06-funnel-audit
+    prompt: |
+      You are auditing the path from stranger → lead → customer.
+
+      STEP 1 — AWARENESS AUDIT: stress-test our hooks, messaging, and proof placement. Where does attention leak? Check: is the dream outcome in the first line? Is proof visible before the ask? Is the avatar named explicitly? Flag every leak and give 10 concrete fixes ranked by impact.
+
+      STEP 2 — LEAD MAGNET AUDIT: score each existing (or proposed) lead magnet on the Value Equation — does it deliver a complete solution to a NARROW problem, fast, with near-zero effort? Hormozi's rule: the lead magnet should solve one problem fully and reveal the next problem (which the core offer solves). Kill friction: every form field, click, and step is a leak. Rewrite the weakest magnet into one that gives away something painfully good.
+
+      STEP 3 — OFFER CONGRUENCE CHECK: does the funnel promise match the offer's dream outcome exactly? Any bait-and-switch between hook → magnet → offer kills perceived likelihood. Flag mismatches.
+
+      STEP 4 — Output a prioritized punch list: top 10 changes, each with effort estimate (S/M/L) and expected leverage (which value equation variable it moves).
+
+      Every step ends with TWO blocks in this exact order:
+      1. ARTIFACT SECTION — markdown, human-readable, for the final report.
+      2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
+    reads: ["canvas_snapshot", "01-value-equation", "02-enhancement-stack", "03-hooks", "04-proof-authority", "05-content-batching"]
+    variables_schema: {"type":"object","required":["punch_list"],"properties":{"punch_list":{"type":"array","items":{"type":"object"}}}}
+produces_variables: ["market_fit", "offers[]", "bonus_stack[]", guarantee, scarcity, urgency, offer_name, "hooks[]", "proof_assets[]", "content_pillars[]", calendar, "punch_list[]"]
+consumed_by: [landing-page-prompts, content-os, pricing-lab]
+output_artifact: full-marketing-os.md
+output_page_hint: offer-stack + proof-grid + content-calendar + punch-list
+est_context_per_step: 8k tokens

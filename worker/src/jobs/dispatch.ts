@@ -8,6 +8,7 @@ import { KnowledgeJobHandler } from "./knowledge-jobs.js";
 import { SkillRunHandler } from "./skill-run.js";
 import { StalenessSweepHandler } from "./staleness-sweep.js";
 import { WorkspaceChatHandler } from "./workspace-chat.js";
+import { WorkflowRunHandler } from "./workflow-run.js";
 import type { AgentTaskLimits } from "../agent/limits.js";
 import type { AgentRunner } from "../agent/runner.js";
 import type { FeedRunner } from "../feeds/feed-runner.js";
@@ -34,6 +35,7 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
   const knowledgeJobs = new KnowledgeJobHandler(options);
   const skillRun = new SkillRunHandler(options);
   const stalenessSweep = new StalenessSweepHandler(options);
+  const workflowRun = new WorkflowRunHandler(options);
 
   return async (job: AgentJob): Promise<void> => {
     try {
@@ -99,6 +101,11 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
 
       if (job.kind === "staleness_sweep") {
         await stalenessSweep.handle(job);
+        return;
+      }
+
+      if (job.kind === "workflow_run") {
+        await workflowRun.handle(job);
         return;
       }
 
