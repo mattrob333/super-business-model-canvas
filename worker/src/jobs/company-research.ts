@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentRunner } from "../agent/runner.js";
 import { ClaudeAgentRunner, OpenRouterChatRunner } from "../agent/runner.js";
 import { asRecord } from "../db/json.js";
+import { writeVariables } from "../db/brain.js";
 import { SECTION_KEYS, SECTION_LABELS, isSectionKey, type SectionKey } from "../domain/sections.js";
 import { FeedRunner } from "../feeds/feed-runner.js";
 import type { EvidenceCandidate, FeedRuntimeConfig } from "../feeds/types.js";
@@ -548,6 +549,28 @@ ${evidencePrompt(evidence)}`,
         last_verified_at: new Date().toISOString(),
       });
       if (error) throw new Error(`Failed to write researched canvas section: ${error.message}`);
+      if (subject.competitorId === null) {
+        await writeVariables(
+          this.deps.client,
+          job.account_id,
+          [{
+            path: `canvas.${sectionKey}`,
+            value: sectionClaims.map((claim) => ({
+              text: claim.text,
+              confidence: earnedConfidence(claim),
+              evidence_ids: [claim.evidenceId],
+              verification_status: claim.status,
+              flags: [
+                ...(claim.status === "unsupported" ? ["unsupported"] : []),
+                ...(claim.sourceKind === "web_search_backfill" ? ["web_search_backfill"] : []),
+              ],
+              source_kind: claim.sourceKind ?? "crawl",
+            })),
+            confidence: confidenceBand(average(sectionClaims.map(earnedConfidence)) ?? 0),
+          }],
+          { source: "scraped", sourceArtifact: job.agent_run_id ?? undefined },
+        );
+      }
     }
   }
 
@@ -703,6 +726,12 @@ function earnedConfidence(claim: VerifiedClaim): number {
   if (claim.status === "unsupported") return Math.min(claim.confidence, 0.5);
   if (claim.status === "contradicted") return 0;
   return claim.confidence;
+}
+
+function confidenceBand(confidence: number): "high" | "medium" | "low" {
+  if (confidence >= 0.8) return "high";
+  if (confidence >= 0.5) return "medium";
+  return "low";
 }
 
 function evidencePrompt(evidence: EvidenceCandidate[]): string {

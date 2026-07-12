@@ -575,6 +575,163 @@ export type Database = {
           },
         ]
       }
+      brain_variable_history: {
+        Row: {
+          id: string
+          variable_id: string
+          account_id: string
+          path: string
+          value: Json
+          confidence: string
+          source: string
+          source_artifact: string | null
+          staleness_policy: string | null
+          change_reason: string
+          updated_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          variable_id: string
+          account_id: string
+          path: string
+          value: Json
+          confidence: string
+          source: string
+          source_artifact?: string | null
+          staleness_policy?: string | null
+          change_reason: string
+          updated_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          variable_id?: string
+          account_id?: string
+          path?: string
+          value?: Json
+          confidence?: string
+          source?: string
+          source_artifact?: string | null
+          staleness_policy?: string | null
+          change_reason?: string
+          updated_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_variable_history_variable_id_fkey"
+            columns: ["variable_id"]
+            isOneToOne: false
+            referencedRelation: "brain_variables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brain_variable_history_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brain_variables: {
+        Row: {
+          id: string
+          account_id: string
+          path: string
+          value: Json
+          confidence: string
+          source: string
+          source_artifact: string | null
+          staleness_policy: string | null
+          updated_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          path: string
+          value: Json
+          confidence: string
+          source: string
+          source_artifact?: string | null
+          staleness_policy?: string | null
+          updated_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          path?: string
+          value?: Json
+          confidence?: string
+          source?: string
+          source_artifact?: string | null
+          staleness_policy?: string | null
+          updated_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brain_variables_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coverage_manifest: {
+        Row: {
+          id: string
+          account_id: string | null
+          path: string
+          section_key: string | null
+          title: string
+          value_weight: number
+          fill_actions: Json
+          freshness: string | null
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id?: string | null
+          path: string
+          section_key?: string | null
+          title: string
+          value_weight: number
+          fill_actions: Json
+          freshness?: string | null
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string | null
+          path?: string
+          section_key?: string | null
+          title?: string
+          value_weight?: number
+          fill_actions?: Json
+          freshness?: string | null
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coverage_manifest_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_context_versions: {
         Row: {
           id: string
@@ -2664,6 +2821,15 @@ export type Database = {
           _account_id: string
         }
         Returns: boolean
+      }
+      write_brain_variables: {
+        Args: {
+          p_account_id: string
+          p_writes: Json
+          p_source: string
+          p_source_artifact?: string | null
+        }
+        Returns: Json
       }
     }
     Enums: {

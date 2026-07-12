@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { writeVariablesMock } = vi.hoisted(() => ({ writeVariablesMock: vi.fn() }));
+vi.mock("../db/brain.js", () => ({ writeVariables: writeVariablesMock }));
 import { CanvasSectionAnalysisHandler, chooseModelRoute } from "../jobs/canvas-section-analysis.js";
 import { createJobDispatcher } from "../jobs/dispatch.js";
 import type { AgentRunner } from "../agent/runner.js";
@@ -26,6 +29,8 @@ function makeJob(): AgentJob {
 }
 
 describe("CanvasSectionAnalysisHandler", () => {
+  beforeEach(() => writeVariablesMock.mockClear());
+
   it("runs a section analysis job and writes the legacy output shape account-scoped", async () => {
     const client = new FakeSupabaseClient();
     const runner = new RecordingRunner();
@@ -75,6 +80,16 @@ describe("CanvasSectionAnalysisHandler", () => {
         tokens_out: 50,
       },
     });
+    expect(writeVariablesMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "account-1",
+      [{
+        path: "canvas.value_propositions",
+        value: ["Sharper customer promise"],
+        confidence: "high",
+      }],
+      { source: "scraped", sourceArtifact: "run-1" },
+    );
   });
 
   it("marks the linked agent run failed when the handler throws", async () => {
