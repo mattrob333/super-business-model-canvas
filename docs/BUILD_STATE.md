@@ -285,6 +285,38 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas refactor assimilated: spec package + phased build plan (2026-07-12)
+
+Owner uploaded a six-file design package (`atlas_updates.zip`) — a directional
+refactor of the core loop: Atlas becomes a **gap-driven orchestrator** over a
+typed **business brain** (namespaced variables with confidence/source/provenance
+metadata); business-framework workflows become **YAML registry cards** run by one
+headless runner with a dual output contract (ARTIFACT SECTION markdown +
+schema-validated VARIABLES JSON); chat renders a **10-component whitelisted A2UI
+catalog**; synthesis jobs find contradictions/synergies and cascade-invalidate
+stale artifacts. Docs-only round — no code changed.
+
+- **`docs/atlas/`** now holds the six files verbatim as received (handoff, orchestrator
+  + A2UI spec, workflow library, positioning-sprint card with the canonical OUTPUT
+  CONTRACT, hormozi-brain-os prompts, TakeoffSpeed golden-run fixture).
+- **`docs/atlas/ATLAS_BUILD_PLAN.md`** (new, the assimilation layer): maps the spec's
+  7 milestones + 4 retrofits onto the ACTUAL stack — the specs assume Next.js 15 /
+  Vercel SSE; reality is Vite SPA + Fly worker + Supabase job queue. Six sub-agent
+  phases AT-1…AT-6 (brain schema → headless runner → A2UI chat surface → write-back →
+  coverage engine → synthesis), each with explicit file targets, migrations, tests,
+  and the handoff §6 acceptance items assigned per phase.
+- **Reuse map verified against the repo**: new `workflow_run` pipeline is a sibling of
+  (not a replacement for) `skill_run`; all new gap work is named "coverage" to avoid
+  colliding with the existing competitor `gaps` engine; the A2UI transport adapts to
+  `workspace_messages` kind `a2ui` + existing polling (handoff decision 7 pre-approves
+  the hand-rolled dispatcher); R3 mirrors own-company scrape writes into `canvas.*`
+  brain variables without touching the existing canvas write path.
+- Six `DECISION-NEEDED` items registered for Matt (SSE streaming, cascades-vs-cards,
+  launch UX home, competitor-scoped brains, draft stubs, skill/workflow convergence)
+  — none block AT-1/AT-2, which are UI-free and ready for sub-agents.
+- **Gates:** docs-only; root tsc exit 0, build green, lint at frozen ceiling,
+  worker untouched.
+
 ### New feed: sec_edgar_filings — free SEC filing text, zero configuration (2026-07-11)
 
 Owner brainstorm: thin competitor canvases (Sonepar 1/9 sections, Rexel 2/9)
