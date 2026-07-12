@@ -323,6 +323,22 @@ emits markdown plus schema-validated VARIABLES JSON into the AT-1 brain store.
   (64 problems: 46 errors, 18 warnings) with no new errors in AT-2 files.
 - **Not applied live:** migration and deploy intentionally deferred for review.
   AT-3 (A2UI/chat surface) remains next.
+- **Reviewer fixes on merge (PR #131):** (1) **worker crash-loop on deploy
+  averted** — the registry loads via top-level await from
+  `worker/workflows/*.yaml`, but `worker/Dockerfile` never copied that
+  directory into the image, so module evaluation would have thrown at boot in
+  production and taken down every job kind; the runtime stage now does
+  `COPY workflows ./workflows`. (2) a step's declared `contradictions[]` block
+  (output-contract clause 4) was silently discarded by `variablesToWrites`;
+  it now persists as `contradiction.<workflow>.<step>` brain records for the
+  AT-6 sweep, with a test. Post-fix gates: worker 417 passed / 2 skipped,
+  typecheck/build/eslint clean; root tsc exit 0, build green, lint 64 (frozen).
+  Also noted for AT-3+: the dummy `agentProfileId` in the runner's tool server
+  is safe only while `allowedTools` stays restricted to the two read-only
+  search tools; `canvas.competitors` never exists as a brain path so
+  positioning step 1 always enters full-research mode even when the companies
+  table already lists competitors — a cheap future improvement is injecting
+  known competitors into the snapshot.
 
 ### Atlas AT-1: business brain schema, BrainStore, scrape mirrors (2026-07-12)
 

@@ -238,6 +238,37 @@ describe("workflow_run headless interpreter", () => {
     await expect(handler.handle(workflowJob("positioning-sprint"))).rejects.toThrow("failed visibly at step s1-alternatives");
     expect(client.tables.workflow_runs.at(-1)).toMatchObject({ status: "failed" });
   });
+
+  it("persists a step's declared contradictions[] block as a contradiction.* record", async () => {
+    const client = new WorkflowFakeClient();
+    const base = new SchemaScriptedRunner();
+    const runner: AgentRunner = {
+      async run(request) {
+        const result = await base.run(request);
+        if (base.requests.length !== 1) return result;
+        const fenceStart = result.resultText.lastIndexOf("```json\n");
+        const variables = JSON.parse(
+          result.resultText.slice(fenceStart + "```json\n".length).replace(/```\s*$/, ""),
+        ) as Record<string, unknown>;
+        variables.contradictions = [{ claim: "canvas says $99", found: "$49", source_url: "https://example.com" }];
+        return {
+          ...result,
+          resultText: `${result.resultText.slice(0, fenceStart)}\`\`\`json\n${JSON.stringify(variables)}\n\`\`\``,
+        };
+      },
+    };
+    const handler = new WorkflowRunHandler({ client: client.asSupabase(), runner });
+
+    await handler.handle(workflowJob("positioning-sprint"));
+
+    const contradictionWrite = client.rpcWrites.find((write) =>
+      write.path === "contradiction.positioning-sprint.s1-alternatives");
+    expect(contradictionWrite).toBeDefined();
+    expect(contradictionWrite?.value).toEqual([
+      { claim: "canvas says $99", found: "$49", source_url: "https://example.com" },
+    ]);
+    expect(client.rpcWrites.some((write) => write.path === "positioning.contradictions")).toBe(false);
+  });
 });
 
 describe("parseDualOutput", () => {

@@ -146,6 +146,17 @@ export class WorkflowRunHandler {
       if (writes.length === 0) {
         throw new Error(`Step ${step.id} produced no declared workflow variables`);
       }
+      // Output contract: a step that finds research contradicting the brain
+      // emits a contradictions[] block. Persist it as a contradiction.* record
+      // so Atlas (AT-6 sweep) can surface it — never drop it silently.
+      const declaredContradictions = execution.parsed.variables.contradictions;
+      if (Array.isArray(declaredContradictions) && declaredContradictions.length > 0) {
+        writes.push({
+          path: `contradiction.${card.id}.${step.id}`,
+          value: declaredContradictions,
+          confidence: confidenceFromVariables(execution.parsed.variables),
+        });
+      }
       const sourceArtifact = `artifact/${card.id}/${runId}/${card.output_artifact}`;
       const writeResult = await writeVariables(this.deps.client, job.account_id, writes, {
         source: `workflow:${card.id}@v${String(card.version)}#s${index + 1}`,

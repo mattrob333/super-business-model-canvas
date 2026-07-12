@@ -14,6 +14,10 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
+# Workflow registry cards are runtime data read from ../../workflows relative
+# to dist/workflows/registry.js — without this COPY the registry's boot load
+# throws and the whole worker crash-loops.
+COPY workflows ./workflows
 # The Claude CLI refuses bypassPermissions as root ("--dangerously-skip-
 # permissions cannot be used with root/sudo privileges") — every agent run
 # died with exit code 1 while the container ran as root (live incident
