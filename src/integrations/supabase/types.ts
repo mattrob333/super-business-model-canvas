@@ -729,6 +729,114 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          }
+        ]
+      }
+      workflow_artifacts: {
+        Row: {
+          id: string
+          account_id: string
+          workflow_id: string
+          run_id: string
+          title: string
+          body_md: string
+          frontmatter: Json
+          stale: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          workflow_id: string
+          run_id: string
+          title: string
+          body_md: string
+          frontmatter?: Json
+          stale?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          workflow_id?: string
+          run_id?: string
+          title?: string
+          body_md?: string
+          frontmatter?: Json
+          stale?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_artifacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_artifacts_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_runs: {
+        Row: {
+          id: string
+          account_id: string
+          workflow_id: string
+          status: string
+          current_step: string | null
+          step_state: Json
+          artifact_id: string | null
+          error: string | null
+          created_at: string
+          started_at: string | null
+          finished_at: string | null
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          workflow_id: string
+          status: string
+          current_step?: string | null
+          step_state?: Json
+          artifact_id?: string | null
+          error?: string | null
+          created_at?: string
+          started_at?: string | null
+          finished_at?: string | null
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          workflow_id?: string
+          status?: string
+          current_step?: string | null
+          step_state?: Json
+          artifact_id?: string | null
+          error?: string | null
+          created_at?: string
+          started_at?: string | null
+          finished_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_runs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_artifacts"
+            referencedColumns: ["id"]
           },
         ]
       }
