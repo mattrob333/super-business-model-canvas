@@ -2939,6 +2939,15 @@ export type Database = {
         }
         Returns: Json
       }
+      write_brain_variable: {
+        Args: {
+          p_account_id: string
+          p_path: string
+          p_value: Json
+          p_source?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "user"
@@ -2968,7 +2977,7 @@ export type Database = {
       owner_question_status: "open" | "answered" | "dismissed"
       founder_document_status: "uploaded" | "parsing" | "needs_review" | "distributed" | "failed"
       company_logo_source: "firecrawl_metadata" | "og_image" | "favicon" | "manual" | "fallback"
-      workspace_message_kind: "text" | "tool_call" | "artifact" | "proposal" | "delegation"
+      workspace_message_kind: "text" | "tool_call" | "artifact" | "proposal" | "delegation" | "a2ui"
       context_source_type: "file" | "url" | "evidence_query" | "note"
       insight_severity: "info" | "notable" | "warning" | "critical"
       agenda_item_status: "proposed" | "accepted" | "dismissed" | "done"

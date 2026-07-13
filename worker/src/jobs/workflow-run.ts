@@ -11,6 +11,16 @@ import type { FeedRuntimeConfig } from "../feeds/types.js";
 import type { AgentJob } from "../queue/types.js";
 import { createBmcServer } from "../tools/bmc-tools.js";
 import { chooseModelRoute } from "./canvas-section-analysis.js";
+import {
+  createSurface,
+  emitA2ui,
+  pointerSegment,
+  surfaceIdForRun,
+  updateComponents,
+  updateDataModel,
+  type A2uiComponent,
+  type A2uiMessage,
+} from "../workflows/a2ui.js";
 import { postprocessWorkflowArtifact } from "../workflows/postprocess.js";
 import {
   loadWorkflowRegistry,
@@ -72,6 +82,7 @@ export class WorkflowRunHandler {
     const payload = asRecord(job.payload);
     const workflowId = readString(payload.workflow_id ?? payload.workflowId);
     if (!workflowId) throw new Error("workflow_run requires workflow_id");
+    const threadId = readString(payload.thread_id ?? payload.threadId) ?? null;
 
     const registry = this.deps.registry ?? await registryAtBoot;
     const card = registry.get(workflowId);
@@ -80,15 +91,19 @@ export class WorkflowRunHandler {
 
     const runId = await this.ensureWorkflowRun(job, card, readString(payload.workflow_run_id ?? payload.workflowRunId));
     try {
-      await this.execute(job, runId, card);
+      await this.execute(job, runId, card, threadId);
     } catch (error) {
       const message = humanError(error);
       await this.failWorkflowRun(job.account_id, runId, message);
+      await this.emit(job, threadId, runId, [
+        updateDataModel(surfaceIdForRun(runId), "/run/status", "failed"),
+        updateDataModel(surfaceIdForRun(runId), "/run/error", message),
+      ]);
       throw error;
     }
   }
 
-  private async execute(job: AgentJob, runId: string, card: LoadedWorkflowCard): Promise<void> {
+  private async execute(job: AgentJob, runId: string, card: LoadedWorkflowCard, threadId: string | null): Promise<void> {
     const scope = await loadCompanyScope(this.deps.client, job.account_id);
     if (!scope.activeContextId) {
       throw new Error("This workflow needs an analyzed company first. Add a website or founder document, then retry.");
@@ -121,6 +136,34 @@ export class WorkflowRunHandler {
     const artifactSections: string[] = [];
     const stepState: Record<string, unknown> = {};
     let totals = { tokensIn: 0, tokensOut: 0, costUsd: 0 };
+
+    // AT-3: one A2UI surface per run. The WorkflowRunCard binds to /run and
+    // GapPrompts offer to fill the missing required inputs (answers write
+    // user_stated via the AT-4 RPC and benefit the NEXT run — this run
+    // proceeds per the card's missing_input_behavior).
+    const surfaceId = surfaceIdForRun(runId);
+    await this.emit(job, threadId, runId, [
+      createSurface(surfaceId),
+      updateComponents(surfaceId, [
+        { id: "run", component: { WorkflowRunCard: { path: "/run" } } },
+        ...missing.map((input): A2uiComponent => ({
+          id: `gap-${input}`,
+          component: {
+            GapPrompt: {
+              slot: inputBrainPath(input) ?? input,
+              question: `I don't have "${input.replace(/_/g, " ")}" yet. Add it and the next run gets sharper.`,
+              mode: "text",
+            },
+          },
+        })),
+      ]),
+      updateDataModel(surfaceId, "/run", {
+        workflowId: card.id,
+        name: card.name,
+        status: "running",
+        steps: card.steps.map((step) => ({ id: step.id, status: "pending" })),
+      }),
+    ]);
 
     for (let index = 0; index < card.steps.length; index += 1) {
       const step = card.steps[index];
@@ -175,6 +218,29 @@ export class WorkflowRunHandler {
         current_step: step.id,
         step_state: stepState,
       });
+
+      // Step boundary emission: the run card ticks, and each written variable
+      // materializes as a VariableCard bound under /variables.
+      const stepMessages: A2uiMessage[] = [
+        updateDataModel(surfaceId, `/run/steps/${index}/status`, "completed"),
+        ...writes.map((write) =>
+          updateDataModel(surfaceId, `/variables/${pointerSegment(write.path)}`, {
+            path: write.path,
+            value: write.value,
+            confidence: write.confidence,
+          }),
+        ),
+      ];
+      const variableCards = writes
+        .filter((write) => !write.path.startsWith("contradiction."))
+        .map((write): A2uiComponent => ({
+          id: `var-${write.path}`,
+          component: {
+            VariableCard: { path: `/variables/${pointerSegment(write.path)}`, editable: true },
+          },
+        }));
+      if (variableCards.length > 0) stepMessages.push(updateComponents(surfaceId, variableCards));
+      await this.emit(job, threadId, runId, stepMessages);
     }
 
     const confidence = workflowConfidence(priorVariables);
@@ -199,7 +265,23 @@ export class WorkflowRunHandler {
       finished_at: new Date().toISOString(),
       step_state: stepState,
     });
+    await this.emit(job, threadId, runId, [
+      updateDataModel(surfaceId, "/run/status", "completed"),
+      updateDataModel(surfaceId, "/run/artifactTitle", card.name),
+      updateDataModel(surfaceId, "/run/confidence", confidence),
+    ]);
     await this.completeAgentRun(job, card, artifactId, totals);
+  }
+
+  /** Non-fatal by contract — chat emission never fails the run (a2ui.ts logs). */
+  private async emit(job: AgentJob, threadId: string | null, runId: string, messages: A2uiMessage[]): Promise<void> {
+    if (!threadId) return;
+    await emitA2ui(this.deps.client, {
+      threadId,
+      agentRunId: job.agent_run_id,
+      surfaceId: surfaceIdForRun(runId),
+      messages,
+    });
   }
 
   private async runValidatedStep(

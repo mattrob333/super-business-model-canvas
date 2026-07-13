@@ -285,6 +285,58 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas AT-3/AT-4: A2UI chat surface, live workflow runs, brain write-back (2026-07-13)
+
+Phases 3 and 4 of `docs/atlas/ATLAS_BUILD_PLAN.md`, built as one round because
+the components need the write-back to be honest UI (a GapPrompt that can't
+save its answer is a lie). Workflows now run FROM the War Room chat and
+render live.
+
+- **Transport (decision 7 fallback, as planned):** the runner emits A2UI
+  messages (`createSurface` / `updateComponents` / `updateDataModel`) as
+  durable `workspace_messages` rows — new enum value `kind: 'a2ui'` — at run
+  start, every step boundary, completion, and failure
+  (`worker/src/workflows/a2ui.ts`, non-fatal by contract + tests). One
+  surface per run; `src/lib/a2ui.ts` folds a thread's rows into per-surface
+  state (ordered components + JSON-Pointer data model), so each poll-driven
+  re-fold IS the "render once, stay live" adaptation.
+- **Catalog complete at 10** (`src/components/a2ui/`): VariableCard,
+  GapPrompt, ChoiceChips, ScoreTable, ComparisonStrip, ValueThemeCard,
+  ConfidenceBadge, CoverageMap, WorkflowRunCard, ContradictionAlert. The
+  dispatcher map IS the whitelist — off-catalog components render a
+  rejection marker and log `[a2ui]`, never throw, never evaluate model
+  markup. README.md documents the cap-is-law rule. Confidence is displayed
+  on every variable render (spec §1).
+- **Write-back (AT-4):** new RPC `write_brain_variable` — the ONE
+  authenticated brain write path (membership-checked, `user_stated` /
+  `user_override` only, `contradiction.*` paths refused, high confidence,
+  history appended). VariableCard edits save as `user_override`;
+  GapPrompt/ChoiceChips answers save as `user_stated`. Trust ordering stays
+  server-side, so a later workflow re-run contradicts rather than
+  overwrites (AT-1 RPC already enforces it).
+- **Launch UX:** War Room chat gains a Workflows popover in the header and
+  launch cards in the empty state (`RUNNABLE_WORKFLOWS` in
+  `src/lib/brain.ts` mirrors the two runnable cards). Launching narrates in
+  chat as a user message; the run card is the reply; polling reloads the
+  thread every 5s (~30 min budget) so step cards materialize progressively.
+  Chat stays usable while a workflow runs.
+- **Edge function:** `workflow_run` added to the agent-run `workerJobKinds`
+  allowlist (was silently falling back to canvas_section_analysis);
+  edge-deploy.yml auto-deploys it on merge.
+- **Migration `20260713210000_atlas_a2ui_writeback.sql`** applied live +
+  verified (enum value present; RPC exists and its membership guard fires).
+  Supabase types hand-mirrored (10-line delta; full regen would have been a
+  4,200-line reformat).
+- **Gates:** worker 419 passed / 2 skipped (new: emission at every boundary,
+  same-surface folding, no-thread silence, insert-failure survival), worker
+  typecheck/build/eslint clean; root tsc exit 0, build green, lint 64
+  (frozen ceiling; the two new fast-refresh warnings were refactored away,
+  not suppressed).
+- **Honest limits:** progressive render is per-step (not token streaming —
+  DECISION-NEEDED #1 stands); WorkspaceThread (section rooms) does not render
+  a2ui rows yet — they can only exist in Atlas threads today; CoverageMap
+  renders but real coverage data arrives with AT-5.
+
 ### Atlas AT-2: workflow registry + headless runner (2026-07-12)
 
 Second phase of `docs/atlas/ATLAS_BUILD_PLAN.md`, implemented on branch

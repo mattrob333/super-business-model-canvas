@@ -71,6 +71,7 @@ function workflowJob(workflowId: string): AgentJob {
 class WorkflowFakeClient {
   readonly tables: Record<string, Record<string, unknown>[]>;
   readonly rpcWrites: Array<Record<string, unknown>> = [];
+  failMessageInserts = false;
   private ids = 0;
 
   constructor() {
@@ -182,6 +183,10 @@ class WorkflowFakeQuery {
   }
 
   private applyInsert(): Record<string, unknown> {
+    if (this.table === "workspace_messages" && this.client.failMessageInserts) {
+      this.inserted = null;
+      throw new Error("workspace_messages insert refused (scripted)");
+    }
     const row = { id: this.client.nextId(this.table), ...this.inserted };
     this.client.tables[this.table] ??= [];
     this.client.tables[this.table].push(row);
@@ -237,6 +242,41 @@ describe("workflow_run headless interpreter", () => {
 
     await expect(handler.handle(workflowJob("positioning-sprint"))).rejects.toThrow("failed visibly at step s1-alternatives");
     expect(client.tables.workflow_runs.at(-1)).toMatchObject({ status: "failed" });
+  });
+
+  it("emits a2ui rows at run start, every step boundary, and completion when a thread is given", async () => {
+    const client = new WorkflowFakeClient();
+    const handler = new WorkflowRunHandler({ client: client.asSupabase(), runner: new SchemaScriptedRunner() });
+    const job = workflowJob("positioning-sprint");
+    (job.payload as Record<string, unknown>).thread_id = "thread-1";
+
+    await handler.handle(job);
+
+    const rows = client.tables.workspace_messages ?? [];
+    // 1 initial (createSurface + run card) + 6 step boundaries + 1 completion.
+    expect(rows).toHaveLength(8);
+    expect(rows.every((row) => row.kind === "a2ui" && row.thread_id === "thread-1")).toBe(true);
+    const first = rows[0].content as { surface_id: string; messages: Array<Record<string, unknown>> };
+    expect(first.messages[0]).toHaveProperty("createSurface");
+    expect(JSON.stringify(first.messages)).toContain("WorkflowRunCard");
+    const last = rows.at(-1)?.content as { messages: Array<Record<string, unknown>> };
+    expect(JSON.stringify(last.messages)).toContain('"completed"');
+    // Same surface across every row — the frontend folds them into one view.
+    expect(new Set(rows.map((row) => (row.content as { surface_id: string }).surface_id)).size).toBe(1);
+  });
+
+  it("emits nothing without a thread and survives message-insert failures", async () => {
+    const silent = new WorkflowFakeClient();
+    await new WorkflowRunHandler({ client: silent.asSupabase(), runner: new SchemaScriptedRunner() })
+      .handle(workflowJob("positioning-sprint"));
+    expect(silent.tables.workspace_messages ?? []).toHaveLength(0);
+
+    const refusing = new WorkflowFakeClient();
+    refusing.failMessageInserts = true;
+    const job = workflowJob("positioning-sprint");
+    (job.payload as Record<string, unknown>).thread_id = "thread-1";
+    await new WorkflowRunHandler({ client: refusing.asSupabase(), runner: new SchemaScriptedRunner() }).handle(job);
+    expect(refusing.tables.workflow_runs.at(-1)).toMatchObject({ status: "completed" });
   });
 
   it("persists a step's declared contradictions[] block as a contradiction.* record", async () => {
