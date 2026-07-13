@@ -7,6 +7,7 @@ import { asRecord } from "../db/json.js";
 import { SECTION_LABELS, sectionKeyForAgentKey, type SectionKey } from "../domain/sections.js";
 import type { AgentJob } from "../queue/types.js";
 import { createBmcServer } from "../tools/bmc-tools.js";
+import { loadCoverageReport, type CoverageReport } from "../domain/coverage.js";
 import {
   formatCoverageSummary,
   formatGapSummary,
@@ -75,6 +76,8 @@ interface AtlasBoard {
   coverage: CoverageEntry[];
   gaps: GapSummary;
   skills: ImplementedSkill[];
+  /** AT-5: brain-slot coverage; null when the engine fails (non-fatal). */
+  brainCoverage: CoverageReport | null;
 }
 
 export interface WorkspaceChatDependencies {
@@ -310,12 +313,16 @@ export class WorkspaceChatHandler {
   private async loadAtlasBoard(accountId: string, scope: CompanyScope): Promise<AtlasBoard> {
     // Same deterministic queries the atlas_briefing job runs — one source of
     // truth for what Atlas is allowed to know about the account (rule B1).
-    const [coverage, gaps, skills] = await Promise.all([
+    const [coverage, gaps, skills, brainCoverage] = await Promise.all([
       loadSectionCoverage(this.deps.client, accountId, scope),
       loadGapSummary(this.deps.client, accountId, scope),
       loadImplementedSkills(this.deps.client),
+      loadCoverageReport(this.deps.client, accountId).catch((error: unknown) => {
+        console.error(`[coverage] atlas chat coverage failed: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
+      }),
     ]);
-    return { coverage, gaps, skills };
+    return { coverage, gaps, skills, brainCoverage };
   }
 
   private async markRunRunning(job: AgentJob, profile: AgentProfile, modelRoute: ModelRoute, input: Record<string, unknown>): Promise<void> {
@@ -411,9 +418,26 @@ ${DATA_GAP_PROTOCOL}${formatCompanyBrief(brief)}
 
 ${formatCoverageSummary(board.coverage)}
 
-${formatGapSummary(board.gaps)}
+${formatBrainCoverage(board.brainCoverage)}${formatGapSummary(board.gaps)}
 
 ${formatSkillList(board.skills)}${sourceBlock}`;
+}
+
+/**
+ * AT-5: the coverage engine's read of the business brain. Atlas may propose
+ * filling ONE gap when the conversation makes it natural — never derail a
+ * user mid-task (spec §2); queued gaps live in the briefing.
+ */
+function formatBrainCoverage(report: CoverageReport | null): string {
+  if (!report || report.total === 0) return "";
+  const top = report.gaps.slice(0, 3);
+  const gapLines = top
+    .map((gap) => `- ${gap.title} (${gap.path}, ${gap.reason}${gap.askPrompt ? ` — ask: "${gap.askPrompt}"` : ""})`)
+    .join("\n");
+  return `Business brain coverage (computed — never restate different numbers): ${report.filled} of ${report.total} slots filled.
+${top.length > 0 ? `Highest-value gaps, cheapest fill first — when it fits the conversation (never mid-task), ask for AT MOST ONE of these, using its ask prompt:\n${gapLines}` : "No open gaps — the brain is current."}
+
+`;
 }
 
 function formatCompanyBrief(brief: CompanyBrief | null): string {

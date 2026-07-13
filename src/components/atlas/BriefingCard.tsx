@@ -180,6 +180,8 @@ export function BriefingCard({
 
       <CoverageBoard coverage={payload.coverage} />
 
+      <BrainCoveragePanel coverage={payload.brain_coverage} />
+
       <DirectiveCard
         directive={payload.directive}
         skillTitle={skillTitle}
@@ -289,6 +291,50 @@ function CoverageBoard({ coverage }: { coverage: AtlasBriefingPayload["coverage"
           Empty
         </span>
       </div>
+    </div>
+  );
+}
+
+/**
+ * AT-5: the coverage engine's read of the business brain — how filled the
+ * variable store is and the highest-value gaps (weight × urgency ÷ fill
+ * cost). Older briefings without the field render nothing.
+ */
+function BrainCoveragePanel({ coverage }: { coverage: AtlasBriefingPayload["brain_coverage"] }) {
+  if (!coverage) return null;
+  const pct = Math.round((coverage.filled / coverage.total) * 100);
+  return (
+    <div className="mt-4">
+      <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Business brain
+      </h3>
+      <div className="mt-1.5 flex items-center gap-2">
+        <div
+          className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Business brain coverage"
+        >
+          <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+          {coverage.filled} of {coverage.total} · {pct}%
+        </span>
+      </div>
+      {coverage.top_gaps.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5">
+          {coverage.top_gaps.map((gap) => (
+            <li key={gap.path} className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+              <span className="min-w-0 truncate" title={gap.path}>{gap.title}</span>
+              <span className="shrink-0 text-[9px] uppercase tracking-wide">
+                {gap.reason === "stale" ? "needs refresh" : "missing"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

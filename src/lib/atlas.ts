@@ -35,11 +35,19 @@ export interface AtlasDirective {
   why: string;
 }
 
+export interface AtlasBrainCoverage {
+  filled: number;
+  total: number;
+  top_gaps: Array<{ path: string; title: string; score: number; reason: "empty" | "stale" }>;
+}
+
 export interface AtlasBriefingPayload {
   kind: "atlas_briefing_v1";
   headline: string;
   position: AtlasPositionClaim[];
   coverage: AtlasCoverageEntry[];
+  /** AT-5 coverage engine — computed worker-side; absent on older briefings. */
+  brain_coverage: AtlasBrainCoverage | null;
   changes: string[];
   directive: AtlasDirective;
   watchouts: string[];
@@ -130,10 +138,34 @@ export function parseAtlasBriefing(json: unknown): AtlasBriefingPayload | null {
     headline: json.headline,
     position,
     coverage,
+    brain_coverage: parseBrainCoverage(json.brain_coverage),
     changes: stringArray(json.changes),
     directive,
     watchouts: stringArray(json.watchouts).slice(0, 2),
     generated_at: typeof json.generated_at === "string" ? json.generated_at : "",
     model: typeof json.model === "string" ? json.model : "",
   };
+}
+
+function parseBrainCoverage(value: unknown): AtlasBrainCoverage | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.filled !== "number" || typeof value.total !== "number" || value.total <= 0) return null;
+  const topGaps = Array.isArray(value.top_gaps)
+    ? value.top_gaps
+        .filter(isRecord)
+        .flatMap((gap) =>
+          typeof gap.path === "string" && typeof gap.title === "string"
+            ? [
+                {
+                  path: gap.path,
+                  title: gap.title,
+                  score: typeof gap.score === "number" && Number.isFinite(gap.score) ? gap.score : 0,
+                  reason: gap.reason === "stale" ? ("stale" as const) : ("empty" as const),
+                },
+              ]
+            : [],
+        )
+        .slice(0, 3)
+    : [];
+  return { filled: value.filled, total: value.total, top_gaps: topGaps };
 }
