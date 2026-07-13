@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, History, Lightbulb, Loader2, MessageSquarePlus, RefreshCw, Send } from "lucide-react";
+import { ArrowRight, History, Lightbulb, Loader2, MessageSquarePlus, Play, RefreshCw, Send, Workflow } from "lucide-react";
 import { parseAtlasActions } from "@/lib/atlas-actions";
 import { AgentMarkdown } from "@/components/chat/AgentMarkdown";
+import { A2uiSurface } from "@/components/a2ui/A2uiSurface";
+import { useA2uiSurfaces } from "@/components/a2ui/useA2uiSurfaces";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDataRichness } from "@/hooks/useDataRichness";
 import { loadCompanyScope } from "@/lib/company-scope";
 import { ATLAS } from "@/lib/atlas";
+import { RUNNABLE_WORKFLOWS } from "@/lib/brain";
 
 /**
  * The War Room chat (spec 12 §6), shared by the dock and the full-screen War
@@ -41,6 +44,10 @@ interface MessageRow {
 
 const RUN_POLL_INTERVAL_MS = 3_000;
 const RUN_POLL_MAX_ATTEMPTS = 100; // ~5 minutes
+// Workflows run 6-7 model calls back to back; poll slower, for much longer,
+// and reload the thread each tick so per-step a2ui cards appear as they land.
+const WORKFLOW_POLL_INTERVAL_MS = 5_000;
+const WORKFLOW_POLL_MAX_ATTEMPTS = 360; // ~30 minutes
 const HISTORY_LIMIT = 15;
 
 /** New threads take their name from the opening message, like any chat app. */
@@ -92,14 +99,19 @@ export function AtlasChat({
   const [sending, setSending] = useState(false);
   const [awaitingReply, setAwaitingReply] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [workflowRunId, setWorkflowRunId] = useState<string | null>(null);
+  const [workflowsOpen, setWorkflowsOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const disposedRef = useRef(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout>>();
+  const workflowTimer = useRef<ReturnType<typeof setTimeout>>();
+  const surfaces = useA2uiSurfaces(messages);
 
   useEffect(
     () => () => {
       disposedRef.current = true;
       clearTimeout(pollTimer.current);
+      clearTimeout(workflowTimer.current);
     },
     [],
   );
@@ -298,6 +310,75 @@ export function AtlasChat({
     }
   }, [accountId, agentProfileId, awaitingReply, pollRun, sending, threadId, user]);
 
+  // Progressive workflow polling: the runner drops a2ui rows at every step
+  // boundary, so each tick reloads the thread and the run card + variable
+  // cards materialize as they land. Chat stays usable while a workflow runs.
+  const pollWorkflow = useCallback((runId: string, thread: string, attempt: number) => {
+    if (attempt >= WORKFLOW_POLL_MAX_ATTEMPTS) {
+      setWorkflowRunId(null);
+      setChatError(
+        "The workflow is taking longer than expected. It continues in the background — reload in a few minutes to see the result.",
+      );
+      return;
+    }
+    getAgentRuntime(accountId)
+      .getRunStatus(runId)
+      .then((status) => {
+        if (disposedRef.current) return;
+        void loadMessages(thread);
+        if (!status || status.status === "pending" || status.status === "running") {
+          workflowTimer.current = setTimeout(() => pollWorkflow(runId, thread, attempt + 1), WORKFLOW_POLL_INTERVAL_MS);
+          return;
+        }
+        setWorkflowRunId(null);
+        if (status.status !== "completed" && status.error) {
+          setChatError(`The workflow stopped: ${status.error}`);
+        }
+      })
+      .catch(() => {
+        if (disposedRef.current) return;
+        workflowTimer.current = setTimeout(() => pollWorkflow(runId, thread, attempt + 1), WORKFLOW_POLL_INTERVAL_MS);
+      });
+  }, [accountId, loadMessages]);
+
+  const launchWorkflow = useCallback(async (workflow: { id: string; title: string }) => {
+    if (sending || workflowRunId) return;
+    setWorkflowsOpen(false);
+    setChatError(null);
+    setSending(true);
+    try {
+      const thread = await ensureThread(`Run ${workflow.title}`);
+      // The launch narrates in chat like any other action — the run card that
+      // follows is the agent's reply.
+      const { error: messageError } = await supabaseUntyped.from("workspace_messages").insert({
+        thread_id: thread,
+        role: "user",
+        kind: "text",
+        content: { text: `Run the ${workflow.title} workflow.` },
+      });
+      if (messageError) throw new Error(messageError.message);
+      await loadMessages(thread);
+      const { runId } = await getAgentRuntime(accountId).startRun({
+        agentProfileId,
+        accountId,
+        runType: "workflow_run",
+        triggerType: "manual",
+        triggeredBy: user?.id ?? null,
+        input: { workflow_id: workflow.id, thread_id: thread },
+      });
+      setWorkflowRunId(runId);
+      pollWorkflow(runId, thread, 0);
+    } catch (error) {
+      setChatError(
+        error instanceof Error
+          ? `Couldn't start the workflow: ${error.message}. Try again in a moment.`
+          : "Couldn't reach the agent runtime. Check your connection and try again in a moment.",
+      );
+    } finally {
+      setSending(false);
+    }
+  }, [accountId, agentProfileId, ensureThread, loadMessages, pollWorkflow, sending, user, workflowRunId]);
+
   const lastMessage = messages[messages.length - 1];
   const unanswered = Boolean(lastMessage && lastMessage.role === "user" && !awaitingReply && !sending);
 
@@ -311,6 +392,44 @@ export function AtlasChat({
         </h3>
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-muted-foreground">with {ATLAS.name}</span>
+          <Popover open={workflowsOpen} onOpenChange={setWorkflowsOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground"
+                aria-label="Run a workflow"
+                title="Run a workflow"
+              >
+                <Workflow className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-2">
+              <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Workflows
+              </p>
+              {RUNNABLE_WORKFLOWS.map((workflow) => (
+                <button
+                  key={workflow.id}
+                  type="button"
+                  disabled={Boolean(workflowRunId) || sending}
+                  onClick={() => void launchWorkflow(workflow)}
+                  className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Play className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="min-w-0">
+                    <span className="block font-medium">{workflow.title}</span>
+                    <span className="block text-[11px] text-muted-foreground">{workflow.outcome}</span>
+                  </span>
+                </button>
+              ))}
+              {workflowRunId && (
+                <p className="mt-1 border-t border-border px-2 pt-2 text-[11px] text-muted-foreground">
+                  A workflow is already running — its progress card is in the chat.
+                </p>
+              )}
+            </PopoverContent>
+          </Popover>
           <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -411,12 +530,41 @@ export function AtlasChat({
                 </button>
               ))}
             </div>
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Or run a full workflow
+              </p>
+              <div className="space-y-1.5">
+                {RUNNABLE_WORKFLOWS.map((workflow) => (
+                  <button
+                    key={workflow.id}
+                    type="button"
+                    disabled={Boolean(workflowRunId) || sending}
+                    onClick={() => void launchWorkflow(workflow)}
+                    className="flex w-full items-start gap-2 rounded-md border border-border px-3 py-2 text-left text-xs transition-colors hover:border-primary/35 hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Play className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="min-w-0">
+                      <span className="block font-medium">{workflow.title}</span>
+                      <span className="block text-muted-foreground">{workflow.outcome}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
-            {messages.map((message) => (
-              <AtlasMessage key={message.id} message={message} />
-            ))}
+            {messages.map((message) => {
+              // a2ui rows fold into one live surface, rendered at the row
+              // where the surface first appeared; later rows only feed state.
+              if (message.kind === "a2ui") {
+                const surface = [...surfaces.values()].find((candidate) => candidate.anchorRowId === message.id);
+                if (!surface) return null;
+                return <A2uiSurface key={message.id} surface={surface} accountId={accountId} />;
+              }
+              return <AtlasMessage key={message.id} message={message} />;
+            })}
             {awaitingReply && (
               <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
