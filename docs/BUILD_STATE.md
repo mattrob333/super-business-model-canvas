@@ -285,6 +285,40 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas AT-5: coverage gap engine v1 — Atlas leads (2026-07-13)
+
+Phase 5 of `docs/atlas/ATLAS_BUILD_PLAN.md`. The brain now knows what it
+doesn't know, and Atlas proposes the next best fill.
+
+- **Scoring** (`worker/src/domain/coverage.ts`): pure
+  `gap_score = value_weight × urgency ÷ fill_cost` over `coverage_manifest`
+  slots × the account's brain. Empty slot = urgency 1; filled-but-overdue
+  (per the slot's `freshness`) = 0.4; fill cost from the cheapest declared
+  fill action (ask 1 · scrape 3 · mcp_pull 3 · workflow 8 — named
+  constants). Account rows override the global template at the same path.
+  Deterministic, DB-is-referee, unit-tested (3 new tests).
+- **Briefing** (`atlas-briefing.ts`): payload gains computed
+  `brain_coverage` ({filled, total, top_gaps[3]}) — never model-authored;
+  the prompt gets the same numbers with "never restate different numbers".
+  Non-fatal: a coverage failure logs `[coverage]` and the briefing ships
+  without the block.
+- **Atlas chat** (`workspace-chat.ts`): the Atlas board gains the coverage
+  report; the system prompt lists the top-3 gaps with their ask prompts and
+  the binding rule — propose AT MOST ONE, only when it fits the
+  conversation, never mid-task (spec §2).
+- **War Room UI**: `BriefingCard` renders a "Business brain" panel (fill
+  bar + top gaps as missing/needs-refresh) from the new payload field;
+  older briefings without it render nothing. Frontend parser coerces
+  defensively like every other briefing field.
+- **Naming law held**: nothing touches the competitor `gaps` table or
+  `gap_engine` job; everything new says "coverage".
+- **Gates:** worker 422 passed / 2 skipped, typecheck/build/eslint clean;
+  root tsc exit 0, build green, lint 64 (frozen ceiling).
+- **Honest limits:** answers to gap asks flow through chat or GapPrompt
+  cards (AT-4 RPC); there is no dedicated coverage sidebar — the briefing
+  IS the queued-gaps surface for now. Re-scoring happens on the next
+  briefing/chat run, not live.
+
 ### Atlas AT-3/AT-4: A2UI chat surface, live workflow runs, brain write-back (2026-07-13)
 
 Phases 3 and 4 of `docs/atlas/ATLAS_BUILD_PLAN.md`, built as one round because

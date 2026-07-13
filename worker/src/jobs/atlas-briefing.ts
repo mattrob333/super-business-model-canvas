@@ -3,6 +3,7 @@ import { createAgentHooks } from "../agent/guardrails.js";
 import { ClaudeAgentRunner, type AgentRunner } from "../agent/runner.js";
 import { loadCompanyScope, type CompanyScope } from "../db/company-scope.js";
 import { asRecord } from "../db/json.js";
+import { loadCoverageReport } from "../domain/coverage.js";
 import { isSectionKey, SECTION_KEYS, SECTION_LABELS, sectionKeyForAgentKey, type SectionKey } from "../domain/sections.js";
 import type { AgentJob } from "../queue/types.js";
 import { chooseModelRoute } from "./canvas-section-analysis.js";
@@ -70,11 +71,19 @@ interface Directive {
   why: string;
 }
 
+export interface BrainCoverageSummary {
+  filled: number;
+  total: number;
+  top_gaps: Array<{ path: string; title: string; score: number; reason: "empty" | "stale" }>;
+}
+
 export interface AtlasBriefingPayload {
   kind: "atlas_briefing_v1";
   headline: string;
   position: PositionClaim[];
   coverage: CoverageEntry[];
+  /** AT-5 coverage engine: brain-slot coverage — computed, never model-authored. */
+  brain_coverage: BrainCoverageSummary | null;
   changes: string[];
   directive: Directive;
   watchouts: string[];
@@ -119,6 +128,7 @@ export class AtlasBriefingHandler {
     const skills = await loadImplementedSkills(this.deps.client);
     const previous = await this.loadPreviousBriefing(accountId, scope);
     const changes = computeChanges(coverage, gaps, artifacts, previous);
+    const brainCoverage = await this.loadBrainCoverage(accountId);
     const modelRoute = await this.loadModelRoute(accountId);
 
     // open_gaps in the run input is what lets the NEXT briefing compute the
@@ -133,7 +143,7 @@ export class AtlasBriefingHandler {
     });
 
     const result = await this.runner.run({
-      prompt: buildBriefingPrompt(coverage, brief, competitors, gaps, artifacts, skills, changes),
+      prompt: buildBriefingPrompt(coverage, brief, competitors, gaps, artifacts, skills, changes, brainCoverage),
       systemPrompt: buildBriefingSystemPrompt(),
       model: modelRoute.model_name,
       maxTurns: 8,
@@ -158,6 +168,7 @@ export class AtlasBriefingHandler {
       ...core,
       kind: "atlas_briefing_v1",
       coverage,
+      brain_coverage: brainCoverage,
       changes,
       generated_at: new Date().toISOString(),
       model: modelRoute.model_name,
@@ -224,6 +235,26 @@ export class AtlasBriefingHandler {
       .limit(6);
     if (error) throw new Error(`Failed to load skill artifacts for briefing: ${error.message}`);
     return (data ?? []) as ArtifactSummary[];
+  }
+
+  /** AT-5: brain-slot coverage — computed from the manifest; non-fatal. */
+  private async loadBrainCoverage(accountId: string): Promise<BrainCoverageSummary | null> {
+    try {
+      const report = await loadCoverageReport(this.deps.client, accountId);
+      return {
+        filled: report.filled,
+        total: report.total,
+        top_gaps: report.gaps.slice(0, 3).map((gap) => ({
+          path: gap.path,
+          title: gap.title,
+          score: gap.score,
+          reason: gap.reason,
+        })),
+      };
+    } catch (error) {
+      console.error(`[coverage] briefing brain coverage failed: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
   }
 
   private async loadPreviousBriefing(accountId: string, scope: CompanyScope): Promise<PreviousBriefing | null> {
@@ -424,6 +455,7 @@ function buildBriefingPrompt(
   artifacts: ArtifactSummary[],
   skills: ImplementedSkill[],
   changes: string[],
+  brainCoverage: BrainCoverageSummary | null = null,
 ): string {
   const blocks: string[] = [];
   if (brief && (brief.company_name || brief.industry || brief.summary)) {
@@ -436,6 +468,15 @@ function buildBriefingPrompt(
     blocks.push("Company: unknown — no business context captured yet.");
   }
   blocks.push(formatCoverageSummary(coverage));
+  if (brainCoverage && brainCoverage.total > 0) {
+    const gapLines = brainCoverage.top_gaps
+      .map((gap) => `- ${gap.title} (${gap.path}, ${gap.reason}, score ${gap.score})`)
+      .join("\n");
+    blocks.push(
+      `Business brain coverage (computed — never restate different numbers): ${brainCoverage.filled} of ${brainCoverage.total} slots filled.` +
+        (gapLines ? `\nHighest-value gaps to fill next:\n${gapLines}` : ""),
+    );
+  }
   blocks.push(competitors.length > 0
     ? `Tracked competitors:\n${competitors.map((competitor) => `- ${competitor.name}${competitor.website_url ? ` (${competitor.website_url})` : ""}`).join("\n")}`
     : "Tracked competitors: none yet.");
