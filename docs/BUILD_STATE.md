@@ -285,6 +285,51 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas AT-7: surface hardening + acceptance audit (2026-07-13)
+
+Closing round of the Atlas build. Two honesty fixes and the handoff §6
+definition-of-done audit.
+
+- **Workflow artifacts became findable.** The run card promised "find it in
+  Documents" — but nothing in the app read `workflow_artifacts`. Now: the
+  War Room shelf merges workflow reports with skill artifacts (Workflow
+  badge + amber `stale` marker), `/artifacts/:id` renders them through the
+  same document page (dual lookup; frontmatter rides in the payload slot;
+  stale reports get a "re-run for a current version" banner), and the
+  WorkflowRunCard's completion note is a real link to the report (the
+  runner now emits `artifactId`). Share links stay skill-only —
+  `artifact_shares` FKs to `skill_artifacts` (honest limitation, noted).
+- **Handoff §6 acceptance audit** (docs/atlas/HANDOFF-atlas-refactor.md):
+  1. *Both authored workflows load from registry and run headless E2E
+     against a seeded canvas* — VERIFIED (worker suite: scripted 6-step
+     positioning + 7-step hormozi runs, AT-2).
+  2. *Every step's VARIABLES schema-validates; one automatic retry; visible
+     failures* — VERIFIED (AT-2 tests: retry prompt carries the validation
+     error; second failure → `workflow_runs.status = failed` + error).
+  3. *Variables land with full provenance; artifacts with complete
+     frontmatter* — VERIFIED (AT-1/AT-2 tests + live smoke on the RPC).
+  4. *Positioning variables consumed by Hormozi `inputs_optional`* —
+     VERIFIED (AT-2 test: Hormozi run reads seeded `positioning.*`).
+  5. *Chat renders WorkflowRunCard + VariableCard + GapPrompt from streamed
+     JSONL during a live run* — code + tests verified (AT-3 emission tests,
+     dispatcher render); PENDING one live production run (next step after
+     this merge — first real workflow execution).
+  6. *VariableCard edit writes `user_override` and survives a re-run* —
+     VERIFIED (AT-4 RPC live-smoked; AT-1/AT-2 trust-ordering tests prove
+     re-runs contradict rather than overwrite).
+  7. *Scraped-vs-researched contradiction produces a ContradictionAlert
+     record* — VERIFIED live (AT-1 smoke: user $99 vs scraped $49 →
+     `contradiction.*` record; step-declared `contradictions[]` also
+     persist since the AT-2 review fix; renderer shipped in AT-4).
+  8. *Nothing outside the 10-component catalog renders; attempts rejected
+     and logged* — VERIFIED (dispatcher map IS the whitelist; off-catalog →
+     rejection marker + `[a2ui]` log; catalog README documents the cap).
+- **Scope fence held throughout**: no model-generated markup, no graph RAG,
+  no per-workflow pages, no A2A mesh, no invented workflow content (the
+  other 21 library entries remain unauthored specs).
+- **Gates:** worker 427 passed / 2 skipped, typecheck/build/eslint clean;
+  root tsc exit 0, build green, lint 64 (frozen ceiling).
+
 ### Atlas AT-6: synthesis sweep — the brain thinks (2026-07-13)
 
 Final spec milestone of `docs/atlas/ATLAS_BUILD_PLAN.md`. After a write

@@ -35,6 +35,10 @@ export default function ArtifactPage() {
   const [loading, setLoading] = useState(true);
   const [savingShare, setSavingShare] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  // Workflow artifacts (Atlas runs) render on this same page but can't be
+  // shared (artifact_shares FKs to skill_artifacts) and carry a stale flag.
+  const [isWorkflowArtifact, setIsWorkflowArtifact] = useState(false);
+  const [staleArtifact, setStaleArtifact] = useState(false);
 
   const shareUrl = useMemo(() => {
     if (!share || typeof window === "undefined") return null;
@@ -53,12 +57,41 @@ export default function ArtifactPage() {
       .maybeSingle();
 
     if (error || !data) {
+      // Not a skill artifact — try the workflow shelf (Atlas runs). Same
+      // page, same document renderer; frontmatter rides in the payload slot.
+      const { data: workflowData } = await supabaseUntyped
+        .from<{ id: string; account_id: string; workflow_id: string; title: string; body_md: string; frontmatter: Record<string, unknown>; stale: boolean; created_at: string }>("workflow_artifacts")
+        .select("id, account_id, workflow_id, title, body_md, frontmatter, stale, created_at")
+        .eq("id", id)
+        .eq("account_id", accountId)
+        .maybeSingle();
+      if (workflowData) {
+        setArtifact({
+          id: workflowData.id,
+          account_id: workflowData.account_id,
+          skill_key: `workflow.${workflowData.workflow_id}`,
+          title: workflowData.title,
+          body_md: workflowData.body_md,
+          payload: workflowData.frontmatter as ArtifactRow["payload"],
+          evidence_ids: [],
+          created_at: workflowData.created_at,
+        });
+        setIsWorkflowArtifact(true);
+        setStaleArtifact(workflowData.stale);
+        setShare(null);
+        setSources([]);
+        setBrand(await loadArtifactBrand(accountId));
+        setLoading(false);
+        return;
+      }
       setArtifact(null);
       setShare(null);
       setNotFound(true);
       setLoading(false);
       return;
     }
+    setIsWorkflowArtifact(false);
+    setStaleArtifact(false);
 
     const [{ data: shareData }, brandData, { data: sourceData }] = await Promise.all([
       supabaseUntyped
@@ -184,7 +217,7 @@ export default function ArtifactPage() {
           </Link>
         </Button>
         <div className="flex flex-wrap items-center gap-2">
-          {shareUrl ? (
+          {isWorkflowArtifact ? null : shareUrl ? (
             <>
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void copyShareUrl()}>
                 <ExternalLink className="h-4 w-4" />
@@ -208,6 +241,11 @@ export default function ArtifactPage() {
         </div>
       </div>
       <main className="mx-auto max-w-[900px]">
+        {staleArtifact && (
+          <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400" role="status">
+            An input this report used has changed since it was written — re-run the workflow for a current version.
+          </div>
+        )}
         <ArtifactDocument artifact={artifact} brand={brand} sources={sources} />
       </main>
     </div>
