@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { AlertTriangle, Check, CircleDashed, FileText, Loader2, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -370,7 +371,13 @@ const WorkflowRunCard: CatalogRenderer = (props, ctx) => {
       {status === "completed" && (
         <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           <FileText className="h-3 w-3 shrink-0" />
-          Full report saved — find it in Documents.
+          {str(bound?.artifactId) ? (
+            <Link to={`/artifacts/${String(bound?.artifactId)}`} className="text-primary underline-offset-2 hover:underline">
+              Open the full report
+            </Link>
+          ) : (
+            "Full report saved to the shelf."
+          )}
         </p>
       )}
       {status === "failed" && error && (

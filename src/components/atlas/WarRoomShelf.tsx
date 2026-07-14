@@ -19,6 +19,9 @@ interface ShelfArtifact {
   skill_key: string;
   title: string;
   created_at: string;
+  /** Workflow artifacts only: an upstream input changed since this was written. */
+  stale?: boolean;
+  kind: "skill" | "workflow";
 }
 
 const REFRESH_MS = 30_000;
@@ -37,12 +40,34 @@ export function WarRoomShelf({ accountId }: { accountId: string }) {
   const load = useCallback(async () => {
     const scope = await loadCompanyScope(accountId).catch(() => null);
     let query = supabaseUntyped
-      .from<ShelfArtifact>("skill_artifacts")
+      .from<{ id: string; skill_key: string; title: string; created_at: string }>("skill_artifacts")
       .select("id, skill_key, title, created_at")
       .eq("account_id", accountId);
     if (scope) query = query.in("business_context_version_id", scope.contextIds);
-    const { data, error } = await query.order("created_at", { ascending: false }).limit(10);
-    setArtifacts(error ? [] : data ?? []);
+    const [{ data: skillRows, error: skillError }, { data: workflowRows, error: workflowError }] = await Promise.all([
+      query.order("created_at", { ascending: false }).limit(10),
+      // Workflow reports (Atlas runs) share the shelf. Account-scoped like
+      // the brain they read from; the run card's "saved to the shelf" copy
+      // depends on this list.
+      supabaseUntyped
+        .from<{ id: string; workflow_id: string; title: string; stale: boolean; created_at: string }>("workflow_artifacts")
+        .select("id, workflow_id, title, stale, created_at")
+        .eq("account_id", accountId)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]);
+    const merged: ShelfArtifact[] = [
+      ...(skillError ? [] : (skillRows ?? []).map((row) => ({ ...row, kind: "skill" as const }))),
+      ...(workflowError ? [] : (workflowRows ?? []).map((row) => ({
+        id: row.id,
+        skill_key: `workflow.${row.workflow_id}`,
+        title: row.title,
+        created_at: row.created_at,
+        stale: row.stale,
+        kind: "workflow" as const,
+      }))),
+    ].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 10);
+    setArtifacts(merged);
     setLoading(false);
   }, [accountId]);
 
@@ -83,11 +108,20 @@ export function WarRoomShelf({ accountId }: { accountId: string }) {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium">{artifact.title}</p>
                       <p className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground/80">
-                        {entry ? (
+                        {artifact.kind === "workflow" ? (
+                          <Badge variant="outline" className="px-1 py-0 text-[9px]">
+                            Workflow
+                          </Badge>
+                        ) : entry ? (
                           <Badge variant="outline" className={`px-1 py-0 text-[9px] ${entry.avatarClass}`}>
                             {CANVAS_SECTION_LABELS[entry.sectionKey]}
                           </Badge>
                         ) : null}
+                        {artifact.stale && (
+                          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1 py-0 text-[9px] font-medium text-amber-600 dark:text-amber-400">
+                            stale
+                          </span>
+                        )}
                         {new Date(artifact.created_at).toLocaleDateString()}
                       </p>
                     </div>

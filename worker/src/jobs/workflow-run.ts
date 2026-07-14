@@ -268,6 +268,7 @@ export class WorkflowRunHandler {
     await this.emit(job, threadId, runId, [
       updateDataModel(surfaceId, "/run/status", "completed"),
       updateDataModel(surfaceId, "/run/artifactTitle", card.name),
+      updateDataModel(surfaceId, "/run/artifactId", artifactId),
       updateDataModel(surfaceId, "/run/confidence", confidence),
     ]);
     await this.completeAgentRun(job, card, artifactId, totals);
