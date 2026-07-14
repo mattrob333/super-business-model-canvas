@@ -71,6 +71,13 @@ steps:
       2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
     reads: ["canvas_snapshot", "00-market-fit", "positioning.statement", "positioning.value_themes", "positioning.best_fit_segment"]
     variables_schema: {"type":"object","required":["offers"],"properties":{"offers":{"type":"array","items":{"type":"object"}},"value_equation_scores":{"type":"array","items":{"type":"object"}}}}
+    presentation:
+      - component: ScoreTable
+        bind: offers
+        props: {title: "Offers, scored by the Value Equation", columns: [name, dream_outcome, perceived_likelihood, time_delay_speed, effort_ease, value_score], sort: value_score}
+      - component: ScoreTable
+        bind: value_equation_scores
+        props: {title: "Value Equation scores", sort: value_score}
   - id: 02-enhancement-stack
     prompt: |
       Take Offer #1 from the previous step and apply Hormozi's five offer enhancers:
@@ -96,6 +103,10 @@ steps:
       2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
     reads: ["canvas_snapshot", "01-value-equation"]
     variables_schema: {"type":"object","required":["bonus_stack","guarantee","scarcity","urgency","offer_name"],"properties":{"bonus_stack":{"type":"array","items":{"type":"object"}},"guarantee":{"type":"object"},"scarcity":{"type":"object"},"urgency":{"type":"object"},"offer_name":{"type":"string"}}}
+    presentation:
+      - component: ScoreTable
+        bind: bonus_stack
+        props: {title: "Bonus stack"}
   - id: 03-hooks
     prompt: |
       You are generating scroll-stopping hooks for the offer above, in the avatar's language.
@@ -120,6 +131,10 @@ steps:
       2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
     reads: ["canvas_snapshot", "01-value-equation", "02-enhancement-stack"]
     variables_schema: {"type":"object","required":["hooks"],"properties":{"hooks":{"type":"array","items":{"type":"object"}}}}
+    presentation:
+      - component: ScoreTable
+        bind: hooks
+        props: {title: "Top hooks"}
   - id: 04-proof-authority
     prompt: |
       You are converting our raw proof into persuasion assets.
@@ -145,6 +160,10 @@ steps:
       2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
     reads: ["canvas_snapshot", "01-value-equation", "02-enhancement-stack", "03-hooks"]
     variables_schema: {"type":"object","required":["proof_assets"],"properties":{"proof_assets":{"type":"array","items":{"type":"object"}}}}
+    presentation:
+      - component: ScoreTable
+        bind: proof_assets
+        props: {title: "Proof library"}
   - id: 05-content-batching
     prompt: |
       You are turning this offer into a 30-day content engine.
@@ -164,6 +183,10 @@ steps:
       2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
     reads: ["canvas_snapshot", "01-value-equation", "02-enhancement-stack", "03-hooks", "04-proof-authority"]
     variables_schema: {"type":"object","required":["content_pillars","calendar"],"properties":{"content_pillars":{"type":"array","items":{"type":"object"}},"calendar":{"type":"array","items":{"type":"object"}}}}
+    presentation:
+      - component: ScoreTable
+        bind: content_pillars
+        props: {title: "Content pillars"}
   - id: 06-funnel-audit
     prompt: |
       You are auditing the path from stranger → lead → customer.
@@ -181,6 +204,10 @@ steps:
       2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
     reads: ["canvas_snapshot", "01-value-equation", "02-enhancement-stack", "03-hooks", "04-proof-authority", "05-content-batching"]
     variables_schema: {"type":"object","required":["punch_list"],"properties":{"punch_list":{"type":"array","items":{"type":"object"}}}}
+    presentation:
+      - component: ScoreTable
+        bind: punch_list
+        props: {title: "Prioritized punch list"}
 produces_variables: ["market_fit", "offers[]", "bonus_stack[]", guarantee, scarcity, urgency, offer_name, "hooks[]", "proof_assets[]", "content_pillars[]", calendar, "punch_list[]"]
 consumed_by: [landing-page-prompts, content-os, pricing-lab]
 output_artifact: full-marketing-os.md

@@ -361,7 +361,23 @@ export function AtlasChat({
       const handoff = sessionStorage.getItem(OPEN_THREAD_KEY);
       if (handoff) {
         sessionStorage.removeItem(OPEN_THREAD_KEY);
-        setThreadId(handoff);
+        // The handoff carries the just-launched workflow too, so the pending
+        // phase (job queued, durable row not yet created) shows the running
+        // notice instead of a false "Atlas never replied".
+        try {
+          const parsed = JSON.parse(handoff) as { threadId?: string; workflowId?: string; title?: string };
+          if (parsed.threadId) setThreadId(parsed.threadId);
+          if (parsed.workflowId) {
+            setActiveWorkflow({
+              threadId: parsed.threadId ?? null,
+              workflowId: parsed.workflowId,
+              title: parsed.title ?? workflowTitle(parsed.workflowId),
+              optimistic: true,
+            });
+          }
+        } catch {
+          setThreadId(handoff); // legacy plain thread id
+        }
       }
     } catch {
       // Blocked storage: discovery below still finds the active run.
@@ -480,10 +496,13 @@ export function AtlasChat({
       });
       setActiveWorkflow({ threadId: thread, workflowId: workflow.id, title: workflow.title, optimistic: true });
       if (fullPageOnWorkflow) {
-        // The dock is too small for a live run — hand the thread to the full
-        // War Room, which discovers and watches it on mount.
+        // The dock is too small for a live run — hand the thread AND the
+        // optimistic run state to the full War Room.
         try {
-          sessionStorage.setItem(OPEN_THREAD_KEY, thread);
+          sessionStorage.setItem(
+            OPEN_THREAD_KEY,
+            JSON.stringify({ threadId: thread, workflowId: workflow.id, title: workflow.title }),
+          );
         } catch {
           // Blocked storage: the War Room's mount discovery still finds it.
         }

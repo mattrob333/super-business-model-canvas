@@ -220,7 +220,9 @@ export class WorkflowRunHandler {
       });
 
       // Step boundary emission: the run card ticks, and each written variable
-      // materializes as a VariableCard bound under /variables.
+      // materializes under /variables — through the card's per-step
+      // presentation hints when declared (workflows are data; so is their
+      // rendering), with VariableCard as the universal fallback.
       const stepMessages: A2uiMessage[] = [
         updateDataModel(surfaceId, `/run/steps/${index}/status`, "completed"),
         ...writes.map((write) =>
@@ -231,15 +233,26 @@ export class WorkflowRunHandler {
           }),
         ),
       ];
-      const variableCards = writes
+      const hintByPath = new Map(
+        (step.presentation ?? []).map((hint) => [declaredPathForKey(card, hint.bind), hint]),
+      );
+      const stepComponents = writes
         .filter((write) => !write.path.startsWith("contradiction."))
-        .map((write): A2uiComponent => ({
-          id: `var-${write.path}`,
-          component: {
-            VariableCard: { path: `/variables/${pointerSegment(write.path)}`, editable: true },
-          },
-        }));
-      if (variableCards.length > 0) stepMessages.push(updateComponents(surfaceId, variableCards));
+        .map((write): A2uiComponent => {
+          const pointer = `/variables/${pointerSegment(write.path)}`;
+          const hint = hintByPath.get(write.path);
+          if (hint) {
+            return {
+              id: `var-${write.path}`,
+              component: { [hint.component]: { ...(hint.props ?? {}), path: pointer } },
+            };
+          }
+          return {
+            id: `var-${write.path}`,
+            component: { VariableCard: { path: pointer, editable: true } },
+          };
+        });
+      if (stepComponents.length > 0) stepMessages.push(updateComponents(surfaceId, stepComponents));
       await this.emit(job, threadId, runId, stepMessages);
     }
 

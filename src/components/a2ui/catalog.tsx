@@ -445,33 +445,53 @@ const ScoreTable: CatalogRenderer = (props, ctx) => {
     (row): row is Record<string, unknown> => row !== null && typeof row === "object" && !Array.isArray(row),
   );
   if (source.length === 0) return <RejectedComponent name="ScoreTable" reason="no rows to score" soft />;
-  const columns = Object.keys(source[0]).slice(0, 6);
+
+  // Presentation hints from the workflow card: an ordered column subset, a
+  // numeric sort column (descending — highest score first), and a title.
+  const declaredColumns = Array.isArray(props.columns)
+    ? props.columns.filter((column): column is string => typeof column === "string" && column in source[0])
+    : [];
+  const columns = declaredColumns.length > 0 ? declaredColumns : Object.keys(source[0]).slice(0, 6);
+  const sortKey = str(props.sort);
+  const rows = [...source];
+  if (sortKey && typeof source[0][sortKey] === "number") {
+    rows.sort((a, b) => (Number(b[sortKey]) || 0) - (Number(a[sortKey]) || 0));
+  }
+
   return (
-    <div className="overflow-x-auto rounded-md border border-border">
-      <table className="w-full min-w-[420px] text-left text-xs">
-        <thead className="bg-muted/50 text-[10px] uppercase tracking-wide text-muted-foreground">
-          <tr>
-            {columns.map((column) => (
-              <th key={column} className="px-2.5 py-1.5 font-medium">{column.replace(/_/g, " ")}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {source.slice(0, 12).map((row, index) => (
-            <tr key={index} className="border-t border-border">
+    <div>
+      {str(props.title) && (
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{String(props.title)}</p>
+      )}
+      <div className="overflow-x-auto rounded-md border border-border">
+        <table className="w-full min-w-[420px] text-left text-xs">
+          <thead className="bg-muted/50 text-[10px] uppercase tracking-wide text-muted-foreground">
+            <tr>
               {columns.map((column) => (
-                <td key={column} className="max-w-[220px] truncate px-2.5 py-1.5" title={String(row[column] ?? "")}>
-                  {typeof row[column] === "number" ? (
-                    <span className="font-semibold tabular-nums">{String(row[column])}</span>
-                  ) : (
-                    String(row[column] ?? "—")
-                  )}
-                </td>
+                <th key={column} className="px-2.5 py-1.5 font-medium">{column.replace(/_/g, " ")}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.slice(0, 12).map((row, index) => (
+              <tr key={index} className="border-t border-border">
+                {columns.map((column) => (
+                  <td key={column} className="max-w-[260px] px-2.5 py-1.5 align-top" title={String(row[column] ?? "")}>
+                    {typeof row[column] === "number" ? (
+                      <span className="font-semibold tabular-nums">{String(row[column])}</span>
+                    ) : (
+                      <span className="line-clamp-2 break-words">{typeof row[column] === "string" ? row[column] : row[column] == null ? "—" : JSON.stringify(row[column])}</span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 12 && (
+        <p className="mt-1 text-[10px] text-muted-foreground">Showing 12 of {rows.length} rows — the full set is in the report.</p>
+      )}
     </div>
   );
 };

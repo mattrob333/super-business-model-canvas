@@ -298,6 +298,13 @@ describe("workflow_run headless interpreter", () => {
     const first = rows[0].content as { surface_id: string; messages: Array<Record<string, unknown>> };
     expect(first.messages[0]).toHaveProperty("createSurface");
     expect(JSON.stringify(first.messages)).toContain("WorkflowRunCard");
+    // Presentation hints from the card drive the emitted components: step 1
+    // declares ComparisonStrip for competitive_alternatives; unhinted writes
+    // still fall back to VariableCard.
+    const allRendered = JSON.stringify(rows.map((row) => row.content));
+    expect(allRendered).toContain("ComparisonStrip");
+    expect(allRendered).toContain("ValueThemeCard");
+    expect(allRendered).toContain("VariableCard");
     const last = rows.at(-1)?.content as { messages: Array<Record<string, unknown>> };
     expect(JSON.stringify(last.messages)).toContain('"completed"');
     // Same surface across every row — the frontend folds them into one view.

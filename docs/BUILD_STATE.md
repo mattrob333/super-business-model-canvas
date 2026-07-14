@@ -285,6 +285,42 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Per-workflow presentation lives in the cards + handoff carries run state (2026-07-14)
+
+Owner direction after watching the live Hormozi run: "design the streaming
+UI components custom for each workflow... spend time on each workflow and
+every step of the output." The architecture's answer, now implemented:
+**presentation is card data, not React code** — workflows are data, so is
+their rendering.
+
+- **Card schema gains per-step `presentation`** (`component` / `bind` /
+  `props`): the zod enum IS the 10-component catalog, so an off-catalog
+  name fails card LOAD (test: RawHtmlPanel rejected). The runner resolves
+  each hint's `bind` (a VARIABLES key) to its brain path and emits the
+  declared component; unhinted writes still fall back to VariableCard.
+- **Both cards authored, every array-valued step**: positioning —
+  ComparisonStrip for alternatives, ScoreTable for unique attributes and
+  the messaging hierarchy, ValueThemeCard for themes; hormozi — ScoreTables
+  for offers (sorted by value_score), value-equation scores, bonus stack,
+  hooks, proof library, content pillars, punch list.
+- **ScoreTable earns the job**: `columns` (ordered subset, silently
+  dropping columns absent from the data), `sort` (numeric, descending),
+  `title`, line-clamped text cells, "showing 12 of N" honesty note.
+- **Handoff fix** (the "Atlas never replied" flash on dock launch): the
+  dock→War Room handoff now carries `{threadId, workflowId, title}` so the
+  mounting surface seeds optimistic run state — the running notice shows
+  through the queued phase instead of a false unanswered card.
+- **Next phase, proposed (not built): interactive steps** — a card
+  declares `await_input`, the runner pauses the run (`awaiting_input`
+  status), emits a GapPrompt/ChoiceChips bound to a slot, and resumes when
+  the user's `user_stated` answer lands (the AT-5 re-parameterize mechanic
+  already reads fresh brain values per step). This is the "workflows that
+  interview the user" pattern from the library doc (§4 Guided Interview
+  Mode / EOS #21).
+- **Gates:** worker 430 passed / 2 skipped (new: hint-driven emission,
+  off-catalog presentation rejected at load), typecheck/build/eslint
+  clean; root tsc exit 0, build green, lint 64 (frozen ceiling).
+
 ### VariableCard renders structure, not raw JSON (2026-07-14)
 
 Owner finding from the live Positioning Sprint: object-valued variables
