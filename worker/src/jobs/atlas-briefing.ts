@@ -194,6 +194,37 @@ export class AtlasBriefingHandler {
         .eq("account_id", accountId);
       if (error) throw new Error(`Failed to complete atlas briefing run: ${error.message}`);
     }
+
+    await this.writeBriefingDocument(accountId, scope, payload, job.agent_run_id);
+  }
+
+  /**
+   * Every briefing files itself on the shelf (owner direction 2026-07-14):
+   * the strip in the rail is for glancing, the document is for reading and
+   * history. Non-fatal — the briefing payload is already durable on the run.
+   */
+  private async writeBriefingDocument(
+    accountId: string,
+    scope: CompanyScope,
+    payload: AtlasBriefingPayload,
+    agentRunId: string | null,
+  ): Promise<void> {
+    try {
+      const date = new Date(payload.generated_at);
+      const { error } = await this.deps.client.from("skill_artifacts").insert({
+        account_id: accountId,
+        skill_key: "atlas.state_of_the_union",
+        title: `State of the Union — ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+        body_md: briefingMarkdown(payload),
+        payload,
+        evidence_ids: [],
+        business_context_version_id: scope.activeContextId,
+        agent_run_id: agentRunId,
+      });
+      if (error) throw new Error(error.message);
+    } catch (error) {
+      console.error(`[briefing] shelf document write failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private async loadCompanyBrief(accountId: string, scope: CompanyScope): Promise<CompanyBrief | null> {
@@ -388,6 +419,53 @@ export async function loadGapSummary(client: SupabaseClient, accountId: string, 
     .filter((title): title is string => Boolean(title))
     .slice(0, 3);
   return { total: rows.length, bySeverity, topTitles };
+}
+
+/** Deterministic markdown for the shelf document — same facts as the card. */
+export function briefingMarkdown(payload: AtlasBriefingPayload): string {
+  const lines: string[] = [`# ${payload.headline}`, ""];
+  if (payload.position.length > 0) {
+    lines.push("## Where you stand", "");
+    for (const claim of payload.position) {
+      lines.push(`- **${claim.claim}**${claim.basis ? ` — ${claim.basis}` : ""}`);
+    }
+    lines.push("");
+  }
+  if (payload.changes.length > 0) {
+    lines.push("## Since last briefing", "");
+    for (const change of payload.changes) lines.push(`- ${change}`);
+    lines.push("");
+  }
+  const verified = payload.coverage.filter((entry) => entry.state === "verified").length;
+  const covered = payload.coverage.filter((entry) => entry.state !== "empty").length;
+  lines.push(
+    "## Canvas coverage",
+    "",
+    `${covered} of ${payload.coverage.length} sections have content; ${verified} verified.`,
+    "",
+  );
+  if (payload.brain_coverage && payload.brain_coverage.total > 0) {
+    lines.push("## Business brain", "", `${payload.brain_coverage.filled} of ${payload.brain_coverage.total} slots filled.`);
+    if (payload.brain_coverage.top_gaps.length > 0) {
+      lines.push("", "Highest-value gaps:");
+      for (const gap of payload.brain_coverage.top_gaps) {
+        lines.push(`- ${gap.title} (${gap.reason === "stale" ? "needs refresh" : "missing"})`);
+      }
+    }
+    lines.push("");
+  }
+  if (payload.directive.action) {
+    lines.push("## The one move", "", payload.directive.action);
+    if (payload.directive.why) lines.push("", `**Why:** ${payload.directive.why}`);
+    lines.push("");
+  }
+  if (payload.watchouts.length > 0) {
+    lines.push("## Watchouts", "");
+    for (const watchout of payload.watchouts) lines.push(`- ${watchout}`);
+    lines.push("");
+  }
+  lines.push("---", "", `Generated ${payload.generated_at}`);
+  return lines.join("\n");
 }
 
 export async function loadImplementedSkills(client: SupabaseClient): Promise<ImplementedSkill[]> {

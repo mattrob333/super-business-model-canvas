@@ -56,8 +56,17 @@ export function WarRoomShelf({ accountId }: { accountId: string }) {
         .order("created_at", { ascending: false })
         .limit(10),
     ]);
+    // Briefings auto-generate — only the NEWEST one earns shelf space, or a
+    // week of briefings would bury the documents the team actually made.
+    let briefingKept = false;
+    const dedupedSkillRows = (skillRows ?? []).filter((row) => {
+      if (row.skill_key !== "atlas.state_of_the_union") return true;
+      if (briefingKept) return false;
+      briefingKept = true;
+      return true;
+    });
     const merged: ShelfArtifact[] = [
-      ...(skillError ? [] : (skillRows ?? []).map((row) => ({ ...row, kind: "skill" as const }))),
+      ...(skillError ? [] : dedupedSkillRows.map((row) => ({ ...row, kind: "skill" as const }))),
       ...(workflowError ? [] : (workflowRows ?? []).map((row) => ({
         id: row.id,
         skill_key: `workflow.${row.workflow_id}`,
@@ -111,6 +120,10 @@ export function WarRoomShelf({ accountId }: { accountId: string }) {
                         {artifact.kind === "workflow" ? (
                           <Badge variant="outline" className="px-1 py-0 text-[9px]">
                             Workflow
+                          </Badge>
+                        ) : artifact.skill_key === "atlas.state_of_the_union" ? (
+                          <Badge variant="outline" className="px-1 py-0 text-[9px] text-primary">
+                            Atlas
                           </Badge>
                         ) : entry ? (
                           <Badge variant="outline" className={`px-1 py-0 text-[9px] ${entry.avatarClass}`}>
