@@ -244,6 +244,41 @@ describe("workflow_run headless interpreter", () => {
     expect(client.tables.workflow_runs.at(-1)).toMatchObject({ status: "failed" });
   });
 
+  it("reuses the durable run and surface when a queue retry re-enters with the same agent_run_id", async () => {
+    const client = new WorkflowFakeClient();
+    const job = workflowJob("positioning-sprint");
+    (job.payload as Record<string, unknown>).thread_id = "thread-1";
+
+    // Attempt 1 dies at step 1 (always-malformed runner) → run row failed.
+    await expect(
+      new WorkflowRunHandler({ client: client.asSupabase(), runner: new SchemaScriptedRunner(false, true) }).handle(job),
+    ).rejects.toThrow("failed visibly");
+    expect(client.tables.workflow_runs).toHaveLength(1);
+    expect(client.tables.workflow_runs[0]).toMatchObject({ status: "failed" });
+
+    // Attempt 2 (same agent_run_id) succeeds: SAME run row, SAME a2ui surface.
+    await new WorkflowRunHandler({ client: client.asSupabase(), runner: new SchemaScriptedRunner() }).handle(job);
+    expect(client.tables.workflow_runs).toHaveLength(1);
+    expect(client.tables.workflow_runs[0]).toMatchObject({ status: "completed", error: null });
+    const surfaces = new Set(
+      (client.tables.workspace_messages ?? []).map((row) => (row.content as { surface_id: string }).surface_id),
+    );
+    expect(surfaces.size).toBe(1);
+  });
+
+  it("gives tool-enabled research steps a real budget and reasoning steps a tighter one", async () => {
+    const client = new WorkflowFakeClient();
+    const runner = new SchemaScriptedRunner();
+    await new WorkflowRunHandler({ client: client.asSupabase(), runner }).handle(workflowJob("positioning-sprint"));
+    // positioning card: tools_required_steps [1, 5] — the live incident was
+    // step 1 dying at the old $0.25 single-call budget.
+    const budgets = runner.requests.map((request) => request.maxBudgetUsd);
+    expect(budgets[0]).toBeGreaterThanOrEqual(2.5);
+    expect(budgets[4]).toBeGreaterThanOrEqual(2.5);
+    expect(budgets[1]).toBeGreaterThanOrEqual(1.0);
+    expect(budgets[1]).toBeLessThan(2.5);
+  });
+
   it("emits a2ui rows at run start, every step boundary, and completion when a thread is given", async () => {
     const client = new WorkflowFakeClient();
     const handler = new WorkflowRunHandler({ client: client.asSupabase(), runner: new SchemaScriptedRunner() });
