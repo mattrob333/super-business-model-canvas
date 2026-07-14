@@ -285,6 +285,44 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Live-run visibility: workflows survive remounts, dock hands off to the War Room (2026-07-14)
+
+Owner finding: launching a workflow from the Atlas dock showed nothing —
+"Atlas never replied" misfired, the run queue showed a duplicate, and he
+couldn't tell if anything was running. Root causes: (1) run-watching lived
+in component state, so a dock remount or a second surface was blind to an
+in-flight run — no progress, no double-launch guard (his duplicate Hormozi
+launch; cancelled before it burned tokens); (2) every dock open starts a
+FRESH thread, so the a2ui progress rows landed in a thread nothing was
+displaying; (3) a queued job emits nothing until the worker claims it, so
+the launcher's only feedback was silence.
+
+- **Durable discovery:** `workflow_runs` gains `thread_id` (migration
+  `20260714180000`, applied live; runner stamps it on insert and
+  retry-reuse). The single source of truth for "is a workflow running" is
+  now the table, not component state.
+- **Every AtlasChat surface discovers on mount:** if an active (queued or
+  running) run exists, it resumes watching — and an active run's thread
+  BEATS the fresh-chat default, because live work is exactly what the user
+  came to see. Watching = reload the run's thread every 5s until the
+  durable row goes terminal (failures reported honestly; two delayed
+  reloads catch the synthesis sweep).
+- **Immediate feedback:** launching sets an optimistic active state (with a
+  ~3-min grace window for the queued-but-unclaimed phase). A persistent
+  "The {workflow} is running — step cards land here" notice shows in its
+  thread; other threads/empty states get "running in another chat — Watch
+  it". Launch buttons disable account-wide; the "never replied" card is
+  suppressed while a workflow is active.
+- **Dock hands off to the War Room** (owner's stated expectation): a dock
+  launch stashes the thread (sessionStorage) and navigates to /war-room,
+  which opens that thread and watches the run live. The dock is too small
+  for a live run.
+- Console errors in the report (`contentscript.js`, "Access to storage")
+  are browser-extension noise, not app code.
+- **Gates:** worker 429 passed / 2 skipped (thread stamp asserted in the
+  emission E2E), typecheck/build/eslint clean; root tsc exit 0, build
+  green, lint 64 (frozen ceiling).
+
 ### Briefing demoted to a strip: glance in the rail, read in a drawer, file on the shelf (2026-07-14)
 
 Owner UX finding: the full State of the Union panel permanently parked in
