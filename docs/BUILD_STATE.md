@@ -285,6 +285,18 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### VariableCard renders structure, not raw JSON (2026-07-14)
+
+Owner finding from the live Positioning Sprint: object-valued variables
+(best_fit_segment) rendered as a horizontally-scrolling JSON code block —
+the exact "bland raw output" the catalog exists to prevent. `renderValue`
+in the a2ui catalog now renders structure readably at any depth: objects
+become labeled rows (snake_case keys prettified), arrays of objects become
+stacked bordered blocks, string/number arrays stay bullet lists, empties
+show an honest "—". The JSON `<pre>` fallback survives only past depth 3.
+Benefits VariableCard and ContradictionAlert (shared renderer). Gates:
+root tsc exit 0, build green, lint 64 (frozen); worker untouched.
+
 ### Live-run visibility: workflows survive remounts, dock hands off to the War Room (2026-07-14)
 
 Owner finding: launching a workflow from the Atlas dock showed nothing —
