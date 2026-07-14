@@ -63,17 +63,65 @@ const ConfidenceBadge: CatalogRenderer = (props, ctx) => {
 /* 2 · VariableCard — universal display/edit                            */
 /* ------------------------------------------------------------------ */
 
-function renderValue(value: unknown): JSX.Element {
+/**
+ * Structured values render as READABLE fields, never raw JSON (owner finding
+ * 2026-07-14: a best_fit_segment object rendered as a scrolling JSON block).
+ * Objects become labeled rows, arrays of objects become stacked blocks;
+ * the JSON fallback survives only for pathological nesting depth.
+ */
+const MAX_RENDER_DEPTH = 3;
+
+function renderValue(value: unknown, depth = 0): JSX.Element {
+  if (value === null || value === undefined || value === "") {
+    return <p className="text-muted-foreground">—</p>;
+  }
   if (typeof value === "string") return <p className="whitespace-pre-wrap break-words">{value}</p>;
-  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+  if (typeof value === "number" || typeof value === "boolean") {
+    return <p className="tabular-nums">{String(value)}</p>;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <p className="text-muted-foreground">—</p>;
+    if (value.every((item) => typeof item === "string" || typeof item === "number")) {
+      return (
+        <ul className="list-disc space-y-0.5 pl-4">
+          {value.map((item, index) => (
+            <li key={index} className="break-words">{String(item)}</li>
+          ))}
+        </ul>
+      );
+    }
+    if (depth >= MAX_RENDER_DEPTH) return renderValueFallback(value);
     return (
-      <ul className="list-disc space-y-0.5 pl-4">
+      <div className="space-y-1.5">
         {value.map((item, index) => (
-          <li key={index} className="break-words">{item}</li>
+          <div key={index} className="rounded border border-border/60 bg-muted/20 px-2.5 py-1.5">
+            {renderValue(item, depth + 1)}
+          </div>
         ))}
-      </ul>
+      </div>
     );
   }
+  if (typeof value === "object") {
+    if (depth >= MAX_RENDER_DEPTH) return renderValueFallback(value);
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return <p className="text-muted-foreground">—</p>;
+    return (
+      <dl className="space-y-1.5">
+        {entries.map(([key, entry]) => (
+          <div key={key}>
+            <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {key.replace(/_/g, " ")}
+            </dt>
+            <dd className="mt-0.5">{renderValue(entry, depth + 1)}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
+  return renderValueFallback(value);
+}
+
+function renderValueFallback(value: unknown): JSX.Element {
   return (
     <pre className="overflow-x-auto rounded bg-muted/50 p-2 text-[11px] leading-relaxed">
       {JSON.stringify(value, null, 2)}
