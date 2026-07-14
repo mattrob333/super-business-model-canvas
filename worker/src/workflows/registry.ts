@@ -12,11 +12,36 @@ const jsonSchemaObject = z
     message: "variables_schema must be a JSON Schema object with type: object",
   });
 
+/**
+ * Per-step presentation hints: the card (data, not code) declares which
+ * catalog component renders each VARIABLES key. The enum IS the catalog
+ * whitelist — an off-catalog name fails card load, so nothing outside the
+ * 10 components can ever be requested (spec §3 rule).
+ */
+const presentationSchema = z.strictObject({
+  component: z.enum([
+    "VariableCard",
+    "GapPrompt",
+    "ChoiceChips",
+    "ScoreTable",
+    "ComparisonStrip",
+    "ValueThemeCard",
+    "ConfidenceBadge",
+    "CoverageMap",
+    "WorkflowRunCard",
+    "ContradictionAlert",
+  ]),
+  /** The step's VARIABLES key this component renders. */
+  bind: z.string().min(1),
+  props: z.record(z.string(), z.unknown()).optional(),
+});
+
 const workflowStepSchema = z.strictObject({
   id: z.string().min(1),
   prompt: z.string().min(1),
   reads: z.array(z.string()),
   variables_schema: jsonSchemaObject,
+  presentation: z.array(presentationSchema).optional(),
 });
 
 export const workflowCardSchema = z.strictObject({

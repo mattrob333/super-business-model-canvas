@@ -67,6 +67,9 @@ steps:
         "price": "", "source_urls": [""] } ] }
     reads: ["canvas_snapshot", "canvas.customer_segments", "canvas.value_proposition", "canvas.key_features", "canvas.competitors"]
     variables_schema: {"type":"object","required":["competitive_alternatives"],"properties":{"competitive_alternatives":{"type":"array"}}}
+    presentation:
+      - component: ComparisonStrip
+        bind: competitive_alternatives
   - id: s2-attributes
     prompt: |
       TASK: List what we have that the alternatives from step 1 lack. Attributes are
@@ -93,6 +96,10 @@ steps:
         "researched|assumption", "alternatives_lacking": [""] } ] }
     reads: ["canvas_snapshot", "s1-alternatives"]
     variables_schema: {"type":"object","required":["unique_attributes"],"properties":{"unique_attributes":{"type":"array"}}}
+    presentation:
+      - component: ScoreTable
+        bind: unique_attributes
+        props: {title: "What only we have", columns: [attribute, evidence, evidence_type]}
   - id: s3-value
     prompt: |
       TASK: Translate attributes into value. Attribute → benefit → VALUE (the
@@ -120,6 +127,9 @@ steps:
         "confidence": "high|medium|low", "confidence_gaps": [""] }
     reads: ["canvas_snapshot", "s2-attributes", "canvas.proof_assets", "canvas.won_deal_notes"]
     variables_schema: {"type":"object","required":["value_themes","confidence","confidence_gaps"],"properties":{"value_themes":{"type":"array"},"confidence":{"enum":["high","medium","low"]},"confidence_gaps":{"type":"array"}}}
+    presentation:
+      - component: ValueThemeCard
+        bind: value_themes
   - id: s4-segment
     prompt: |
       TASK: Identify who cares MOST about these value themes — the customers who
@@ -206,6 +216,10 @@ steps:
         "confidence": "high|medium|low", "next_tests": [""] }
     reads: ["canvas_snapshot", "s1-alternatives", "s2-attributes", "s3-value", "s4-segment", "s5-category"]
     variables_schema: {"type":"object","required":["statement","one_liner","elevator","messaging_hierarchy","confidence","next_tests"],"properties":{"statement":{"type":"string"},"one_liner":{"type":"string"},"elevator":{"type":"string"},"messaging_hierarchy":{"type":"array"},"confidence":{"enum":["high","medium","low"]},"next_tests":{"type":"array"}}}
+    presentation:
+      - component: ScoreTable
+        bind: messaging_hierarchy
+        props: {title: "Messaging hierarchy", columns: [theme, lead_proof]}
 produces_variables: ["positioning.competitive_alternatives[]", "positioning.unique_attributes[]", "positioning.value_themes[]", "positioning.best_fit_segment", "positioning.category_frame", "positioning.statement", "positioning.one_liner", "positioning.confidence"]
 consumed_by: [hormozi-brain-os, brandscript, pricing-lab, category-design, crossing-chasm]
 output_artifact: positioning-sprint.md

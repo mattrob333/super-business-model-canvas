@@ -30,6 +30,45 @@ describe("Atlas workflow registry", () => {
     expect(validator?.({ value_themes: [], confidence: "invalid", confidence_gaps: [] })).toBe(false);
   });
 
+  it("rejects presentation hints naming off-catalog components at load time", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "atlas-workflow-registry-"));
+    const card = (await loadWorkflowRegistry()).get("positioning-sprint") as LoadedWorkflowCard;
+    // Both authored cards carry hints, and every hint names a catalog component.
+    const hinted = card.steps.flatMap((step) => step.presentation ?? []);
+    expect(hinted.length).toBeGreaterThan(0);
+
+    const rogue = path.join(directory, "rogue.yaml");
+    const base = `id: rogue
+name: Rogue
+category: test
+framework_source: test
+version: 1.0
+status: draft
+inputs_required: []
+inputs_optional: []
+missing_input_behavior: continue
+tools_allowed: []
+tools_required_steps: []
+system_preamble: test
+steps:
+  - id: s1
+    prompt: test
+    reads: []
+    variables_schema: {"type":"object"}
+    presentation:
+      - component: RawHtmlPanel
+        bind: anything
+produces_variables: []
+consumed_by: []
+output_artifact: rogue.md
+output_page_hint: none
+est_context_per_step: 1k
+`;
+    await writeFile(rogue, base, "utf8");
+    await expect(loadWorkflowRegistry(directory)).rejects.toThrow(/Invalid workflow card/);
+    await rm(directory, { recursive: true, force: true });
+  });
+
   it("fails loudly when a card is malformed", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "atlas-workflow-registry-"));
     const malformed = path.join(directory, "malformed.yaml");
