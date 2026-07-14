@@ -285,6 +285,35 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Briefing demoted to a strip: glance in the rail, read in a drawer, file on the shelf (2026-07-14)
+
+Owner UX finding: the full State of the Union panel permanently parked in
+the War Room rail read as clutter — "I don't always need to read that."
+Design ruling (progressive disclosure): the briefing was doing two jobs in
+one container — ambient status signal AND full report. Split them:
+
+- **Glance:** the rail now shows a one-line `BriefingStrip` (Atlas icon,
+  headline snippet, age, "updating" spinner during auto-refresh, unread
+  pulse, refresh button) — the same slim-bar pattern the dock's
+  `CollapsibleBriefing` already used; the War Room was the odd one out.
+- **Read:** tapping the strip opens the full briefing card in the house
+  `FocusDrawer` (size "reading"). "Seen" now fires when the drawer is
+  actually opened, not on page entry, so the unread pulse means something.
+- **File:** every briefing also lands on the shelf as a document
+  (`skill_artifacts`, key `atlas.state_of_the_union`, deterministic
+  markdown of the same facts — position, changes, coverage, brain, the one
+  move, watchouts). Catalog row seeded with `implemented=false` so it stays
+  out of every runnable-skill list (migration `20260714150000`, applied
+  live). The shelf keeps only the NEWEST briefing doc — auto-refresh must
+  not bury the documents the team actually made — with an "Atlas" badge.
+  Older briefings stay queryable; artifact page renders and shares them
+  like any skill document.
+- Net effect: the rail's job is documents; Atlas's leading lives in chat
+  (AT-5 gap proposals) and the briefing's directive; the full report is one
+  tap away and never blocks the screen.
+- **Gates:** worker 429 passed / 2 skipped, typecheck/build/eslint clean;
+  root tsc exit 0, build green, lint 64 (frozen ceiling).
+
 ### Briefing staleness fixed: the War Room catches you up on open (2026-07-14)
 
 Owner finding: the War Room greeted him with a 6-day-old State of the Union

@@ -3075,6 +3075,24 @@ on conflict (skill_key) do update set
   output_kind = excluded.output_kind,
   sort_order = excluded.sort_order;
 
+-- Briefings file themselves on the shelf (migration 20260714150000). The
+-- catalog row exists ONLY to satisfy skill_artifacts' FK — implemented=false
+-- keeps it out of every runnable-skill list.
+insert into public.skill_catalog
+  (skill_key, agent_key, title, description, trigger_kinds, output_kind, implemented, orchestrator_can_trigger, sort_order)
+values (
+  'atlas.state_of_the_union',
+  'orchestrator',
+  'State of the Union',
+  'Atlas''s cross-canvas briefing: where you stand, what changed since last time, brain coverage, and the one move that matters most.',
+  '{auto}',
+  'briefing',
+  false,
+  false,
+  0
+)
+on conflict (skill_key) do nothing;
+
 insert into public.model_routes
   (account_id, route_key, label, provider, model_name, params, is_default, task_class, cost_per_1k_in, cost_per_1k_out, updated_by)
 values

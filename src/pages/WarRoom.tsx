@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { AtlasChat } from "@/components/atlas/AtlasChat";
 import { AtlasIdentityCard } from "@/components/atlas/AtlasIdentityCard";
-import { BriefingCard } from "@/components/atlas/BriefingCard";
+import { BriefingStrip } from "@/components/atlas/BriefingStrip";
 import { useAtlasBriefing } from "@/components/atlas/useAtlasBriefing";
 import { WarRoomShelf } from "@/components/atlas/WarRoomShelf";
 import type { AgentRunSnapshot } from "@/components/workspace/AgentIdentityCard";
@@ -32,19 +32,20 @@ export default function WarRoom() {
     refreshError,
     refreshStalled,
     skillTitle,
+    hasUnseen,
     markSeen,
     requestBriefing,
   } = useAtlasBriefing();
   const [latestRun, setLatestRun] = useState<AgentRunSnapshot | null>(null);
   const handleLatestRun = useCallback((run: AgentRunSnapshot | null) => setLatestRun(run), []);
 
-  // Entering the War Room reads the briefing — clear the dock's pulse.
-  useEffect(() => {
-    if (briefing) markSeen();
-  }, [briefing, markSeen]);
-
-  const briefingCard = (
-    <BriefingCard
+  // The briefing is a compact strip now (owner finding 2026-07-14: the full
+  // panel parked in the rail was clutter); "seen" happens when the drawer is
+  // actually opened, so the unread pulse means something.
+  const briefingStrip = (
+    <BriefingStrip
+      hasUnseen={hasUnseen}
+      onRead={markSeen}
       loading={briefingLoading}
       error={briefingError}
       refreshing={refreshing}
@@ -105,14 +106,15 @@ export default function WarRoom() {
             <AtlasChat
               accountId={accountId}
               agentProfileId={profileId}
-              briefingSlot={<div className="lg:hidden">{briefingCard}</div>}
+              briefingSlot={<div className="lg:hidden">{briefingStrip}</div>}
             />
           </main>
 
-          {/* Right rail — Atlas's Studio: the State of the Union and the
-              cross-room document shelf. */}
+          {/* Right rail — Atlas's Studio. The shelf is the rail's job now;
+              the briefing is a one-line strip that opens a reading drawer,
+              and each briefing also lands on the shelf as a document. */}
           <aside className="order-3 space-y-3 lg:col-span-3 lg:space-y-4 lg:overflow-y-auto lg:pl-1">
-            <div className="hidden lg:block">{briefingCard}</div>
+            <div className="hidden lg:block">{briefingStrip}</div>
             <MobileCollapse title="Document shelf">
               <WarRoomShelf accountId={accountId} />
             </MobileCollapse>
