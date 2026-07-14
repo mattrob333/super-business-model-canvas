@@ -793,6 +793,7 @@ export type Database = {
           step_state: Json
           artifact_id: string | null
           error: string | null
+          agent_run_id: string | null
           created_at: string
           started_at: string | null
           finished_at: string | null
@@ -806,6 +807,7 @@ export type Database = {
           step_state?: Json
           artifact_id?: string | null
           error?: string | null
+          agent_run_id?: string | null
           created_at?: string
           started_at?: string | null
           finished_at?: string | null
@@ -819,6 +821,7 @@ export type Database = {
           step_state?: Json
           artifact_id?: string | null
           error?: string | null
+          agent_run_id?: string | null
           created_at?: string
           started_at?: string | null
           finished_at?: string | null

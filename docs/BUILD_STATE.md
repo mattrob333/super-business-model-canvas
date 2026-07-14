@@ -285,6 +285,33 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas AT-8: first live run found two real bugs — fixed forward (2026-07-14)
+
+The first production Positioning Sprint (Wesco, launched from a real War
+Room thread) FAILED at step 1 with `error_max_budget_usd` — and the failure
+plumbing worked exactly as designed: failed status + error on the run,
+failure cards in chat, nothing silent. Two fixes:
+
+- **Step budgets were single-call sized.** AT-2's
+  `max(0.25, in*8 + out*4)` gave the 12-turn web-research step $0.25 —
+  tool-result tokens blew through it instantly, and mocked tests could
+  never catch it. Research steps (declared in `tools_required_steps`) now
+  budget like the briefing with tool headroom (≥ $2.50 cap); pure-reasoning
+  steps get ≥ $1.00. Caps, not spends.
+- **Queue retries minted a new run + chat surface per attempt** — the
+  incident left three failed run cards in one thread. `workflow_runs`
+  gained `agent_run_id` (migration `20260714010000`, applied live); a retry
+  now resets and reuses the SAME durable run and surface.
+- Also: brain backfilled for the active company (the R3 mirror only fires
+  on new research, so pre-AT-1 canvases had zero brain variables — seeded
+  all 9 `canvas.*` slots from the latest own-company
+  `canvas_section_versions`, same shape and `scraped` provenance the
+  mirror writes). Failed-attempt debris cleaned from the test thread.
+- **Gates:** worker 429 passed / 2 skipped (new: retry reuses run+surface;
+  research vs reasoning budgets), typecheck/build/eslint clean; root tsc
+  exit 0, build green, lint 64 (frozen). Live E2E re-run follows this
+  deploy.
+
 ### Atlas AT-7: surface hardening + acceptance audit (2026-07-13)
 
 Closing round of the Atlas build. Two honesty fixes and the handoff §6

@@ -3496,10 +3496,14 @@ create table if not exists public.workflow_runs (
   step_state jsonb not null default '{}'::jsonb,
   artifact_id uuid,
   error text,
+  -- Queue-job linkage: retries reuse the run (and its chat surface).
+  agent_run_id uuid references public.agent_runs(id) on delete set null,
   created_at timestamptz not null default now(),
   started_at timestamptz,
   finished_at timestamptz
 );
+create index if not exists workflow_runs_agent_run_idx
+  on public.workflow_runs(agent_run_id) where agent_run_id is not null;
 
 create table if not exists public.workflow_artifacts (
   id uuid primary key default gen_random_uuid(),

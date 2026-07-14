@@ -352,7 +352,7 @@ export class WorkflowRunHandler {
         model: route.model_name,
         modelParams: route.params ?? undefined,
         maxTurns: 12,
-        maxBudgetUsd: budgetForRoute(route),
+        maxBudgetUsd: budgetForRoute(route, requiresTools(card, step)),
         prompt: currentPrompt,
         systemPrompt: replaceToken(
           replaceToken(
@@ -423,9 +423,39 @@ export class WorkflowRunHandler {
       return requestedId;
     }
 
+    // A queue retry re-enters with the same agent_run_id: reuse the durable
+    // run (and thus its chat surface) instead of minting a new failed card
+    // per attempt — live incident 2026-07-13 left three cards in one thread.
+    if (job.agent_run_id) {
+      const { data: existing, error: existingError } = await this.deps.client
+        .from("workflow_runs")
+        .select("id")
+        .eq("account_id", job.account_id)
+        .eq("workflow_id", card.id)
+        .eq("agent_run_id", job.agent_run_id)
+        .maybeSingle();
+      if (existingError) throw new Error(`Failed to load workflow run for retry: ${existingError.message}`);
+      if (existing) {
+        await this.updateWorkflowRun(job.account_id, existing.id as string, {
+          status: "queued",
+          current_step: null,
+          error: null,
+          finished_at: null,
+          step_state: {},
+        });
+        return existing.id as string;
+      }
+    }
+
     const { data, error } = await this.deps.client
       .from("workflow_runs")
-      .insert({ account_id: job.account_id, workflow_id: card.id, status: "queued", step_state: {} })
+      .insert({
+        account_id: job.account_id,
+        workflow_id: card.id,
+        status: "queued",
+        step_state: {},
+        agent_run_id: job.agent_run_id,
+      })
       .select("id")
       .single();
     if (error || !data) throw new Error(`Failed to create workflow run: ${error?.message ?? "no row returned"}`);
@@ -694,10 +724,20 @@ function addUsage(
   };
 }
 
-function budgetForRoute(route: ModelRoute): number {
+/**
+ * Live incident (first production run, 2026-07-13): the original
+ * max(0.25, in*8 + out*4) formula assumed one ~8k-token call and killed the
+ * web-research step at $0.25 (error_max_budget_usd) — a 12-turn research
+ * loop accumulates far more input than a single call. Research steps now
+ * budget like the briefing (~60k in / 8k out) with tool-payload headroom;
+ * pure-reasoning steps stay tighter. These are CAPS, not spends.
+ */
+function budgetForRoute(route: ModelRoute, stepUsesTools: boolean): number {
   const input = route.cost_per_1k_in ?? 0.002;
   const output = route.cost_per_1k_out ?? 0.01;
-  return Math.max(0.25, input * 8 + output * 4);
+  return stepUsesTools
+    ? Math.max(2.5, input * 150 + output * 12)
+    : Math.max(1.0, input * 40 + output * 8);
 }
 
 function readString(value: unknown): string | undefined {
