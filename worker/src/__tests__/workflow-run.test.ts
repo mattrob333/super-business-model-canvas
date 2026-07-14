@@ -287,6 +287,10 @@ describe("workflow_run headless interpreter", () => {
 
     await handler.handle(job);
 
+    // The launch thread rides on the durable run so any surface can discover
+    // and resume watching an in-flight workflow (live-run visibility fix).
+    expect(client.tables.workflow_runs[0]).toMatchObject({ thread_id: "thread-1" });
+
     const rows = client.tables.workspace_messages ?? [];
     // 1 initial (createSurface + run card) + 6 step boundaries + 1 completion.
     expect(rows).toHaveLength(8);

@@ -44,11 +44,31 @@ interface MessageRow {
 
 const RUN_POLL_INTERVAL_MS = 3_000;
 const RUN_POLL_MAX_ATTEMPTS = 100; // ~5 minutes
-// Workflows run 6-7 model calls back to back; poll slower, for much longer,
-// and reload the thread each tick so per-step a2ui cards appear as they land.
-const WORKFLOW_POLL_INTERVAL_MS = 5_000;
-const WORKFLOW_POLL_MAX_ATTEMPTS = 360; // ~30 minutes
+// Workflow watching polls the DURABLE workflow_runs table, not component
+// state (owner finding 2026-07-14: a dock remount went blind to an in-flight
+// run — no progress, no double-launch guard, duplicate runs). Any surface
+// discovers the active run on mount and resumes watching.
+const WORKFLOW_WATCH_INTERVAL_MS = 5_000;
+const WORKFLOW_WATCH_MAX_TICKS = 360; // ~30 minutes
+// A just-launched job sits queued until the worker claims it and creates the
+// durable run row — keep optimistic state alive this long before giving up.
+const WORKFLOW_PENDING_GRACE_TICKS = 36; // ~3 minutes
 const HISTORY_LIMIT = 15;
+
+/** Thread handoff key: the dock stashes the launch thread, the War Room opens it. */
+const OPEN_THREAD_KEY = "atlas:open-thread";
+
+interface ActiveWorkflow {
+  threadId: string | null;
+  workflowId: string | null;
+  title: string;
+  /** True until the durable workflow_runs row has been seen. */
+  optimistic: boolean;
+}
+
+function workflowTitle(workflowId: string | null): string {
+  return RUNNABLE_WORKFLOWS.find((workflow) => workflow.id === workflowId)?.title ?? "workflow";
+}
 
 /** New threads take their name from the opening message, like any chat app. */
 function threadTitleFrom(text: string): string {
@@ -82,13 +102,17 @@ export function AtlasChat({
   accountId,
   agentProfileId,
   briefingSlot,
+  fullPageOnWorkflow = false,
 }: {
   accountId: string;
   agentProfileId: string;
   /** Rendered at the top of the scroll column — the briefing scrolls behind the pinned composer. */
   briefingSlot?: React.ReactNode;
+  /** Dock mode: launching a workflow hands the thread to the full War Room. */
+  fullPageOnWorkflow?: boolean;
 }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const richness = useDataRichness(accountId);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ThreadRow[]>([]);
@@ -99,12 +123,16 @@ export function AtlasChat({
   const [sending, setSending] = useState(false);
   const [awaitingReply, setAwaitingReply] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [workflowRunId, setWorkflowRunId] = useState<string | null>(null);
+  const [activeWorkflow, setActiveWorkflow] = useState<ActiveWorkflow | null>(null);
   const [workflowsOpen, setWorkflowsOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const disposedRef = useRef(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout>>();
   const workflowTimer = useRef<ReturnType<typeof setTimeout>>();
+  const threadIdRef = useRef<string | null>(null);
+  threadIdRef.current = threadId;
+  const activeWorkflowRef = useRef<ActiveWorkflow | null>(null);
+  activeWorkflowRef.current = activeWorkflow;
   const surfaces = useA2uiSurfaces(messages);
 
   useEffect(
@@ -115,6 +143,18 @@ export function AtlasChat({
     },
     [],
   );
+
+  /** The single source of truth for "is a workflow running": the durable table. */
+  const findActiveRun = useCallback(async () => {
+    const { data } = await supabaseUntyped
+      .from<{ id: string; workflow_id: string; thread_id: string | null; status: string }>("workflow_runs")
+      .select("id, workflow_id, thread_id, status")
+      .eq("account_id", accountId)
+      .in("status", ["queued", "running"])
+      .order("created_at", { ascending: false })
+      .limit(1);
+    return data?.[0] ?? null;
+  }, [accountId]);
 
   // Load recent Atlas threads FOR THE ACTIVE COMPANY (each company era keeps
   // its own — a previous company's strategy chat must never bleed in) to fill
@@ -310,48 +350,111 @@ export function AtlasChat({
     }
   }, [accountId, agentProfileId, awaitingReply, pollRun, sending, threadId, user]);
 
-  // Progressive workflow polling: the runner drops a2ui rows at every step
-  // boundary, so each tick reloads the thread and the run card + variable
-  // cards materialize as they land. Chat stays usable while a workflow runs.
-  const pollWorkflow = useCallback((runId: string, thread: string, attempt: number) => {
-    if (attempt >= WORKFLOW_POLL_MAX_ATTEMPTS) {
-      setWorkflowRunId(null);
-      setChatError(
-        "The workflow is taking longer than expected. It continues in the background — reload in a few minutes to see the result.",
-      );
-      return;
+  // Mount discovery: an in-flight run must survive remounts, navigation, and
+  // second surfaces. Read the thread handoff (dock → War Room), then check
+  // the durable table; an ACTIVE run's thread beats the fresh-chat default —
+  // live work is exactly what the user came to see.
+  useEffect(() => {
+    if (!accountId) return;
+    let cancelled = false;
+    try {
+      const handoff = sessionStorage.getItem(OPEN_THREAD_KEY);
+      if (handoff) {
+        sessionStorage.removeItem(OPEN_THREAD_KEY);
+        setThreadId(handoff);
+      }
+    } catch {
+      // Blocked storage: discovery below still finds the active run.
     }
-    getAgentRuntime(accountId)
-      .getRunStatus(runId)
-      .then((status) => {
-        if (disposedRef.current) return;
-        void loadMessages(thread);
-        if (!status || status.status === "pending" || status.status === "running") {
-          workflowTimer.current = setTimeout(() => pollWorkflow(runId, thread, attempt + 1), WORKFLOW_POLL_INTERVAL_MS);
-          return;
-        }
-        setWorkflowRunId(null);
-        if (status.status !== "completed" && status.error) {
-          setChatError(`The workflow stopped: ${status.error}`);
-        }
-        // The synthesis sweep chains AFTER completion and drops its findings
-        // into the same thread — two delayed reloads catch them.
-        workflowTimer.current = setTimeout(() => {
-          if (disposedRef.current) return;
-          void loadMessages(thread);
-          workflowTimer.current = setTimeout(() => {
-            if (!disposedRef.current) void loadMessages(thread);
-          }, 20_000);
-        }, 12_000);
-      })
-      .catch(() => {
-        if (disposedRef.current) return;
-        workflowTimer.current = setTimeout(() => pollWorkflow(runId, thread, attempt + 1), WORKFLOW_POLL_INTERVAL_MS);
+    (async () => {
+      const row = await findActiveRun().catch(() => null);
+      if (cancelled || disposedRef.current || !row) return;
+      setActiveWorkflow({
+        threadId: row.thread_id,
+        workflowId: row.workflow_id,
+        title: workflowTitle(row.workflow_id),
+        optimistic: false,
       });
-  }, [accountId, loadMessages]);
+      if (row.thread_id && !threadIdRef.current) setThreadId(row.thread_id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId, findActiveRun]);
+
+  // The watcher: while a workflow is active, reload its thread every tick so
+  // the run card and step cards materialize as they land; when the durable
+  // row goes terminal, report failures honestly and catch the synthesis
+  // sweep's findings with two delayed reloads.
+  const watching = activeWorkflow !== null;
+  useEffect(() => {
+    if (!watching || !accountId) return;
+    let cancelled = false;
+    let ticks = 0;
+
+    const finish = async () => {
+      const watched = activeWorkflowRef.current;
+      setActiveWorkflow(null);
+      const { data } = await supabaseUntyped
+        .from<{ status: string; error: string | null; workflow_id: string }>("workflow_runs")
+        .select("status, error, workflow_id")
+        .eq("account_id", accountId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (cancelled || disposedRef.current) return;
+      const last = data?.[0];
+      if (last?.status === "failed" && last.error) {
+        setChatError(`The ${workflowTitle(last.workflow_id)} workflow stopped: ${last.error}`);
+      }
+      const reloadThread = watched?.threadId ?? threadIdRef.current;
+      if (reloadThread) {
+        void loadMessages(reloadThread);
+        workflowTimer.current = setTimeout(() => {
+          if (!cancelled && !disposedRef.current) void loadMessages(reloadThread);
+        }, 15_000);
+      }
+    };
+
+    const tick = async () => {
+      if (cancelled || disposedRef.current) return;
+      ticks += 1;
+      const current = activeWorkflowRef.current;
+      if (current?.threadId && current.threadId === threadIdRef.current) {
+        void loadMessages(current.threadId);
+      }
+      const row = await findActiveRun().catch(() => undefined);
+      if (cancelled || disposedRef.current) return;
+      if (row) {
+        if (current?.optimistic || current?.workflowId !== row.workflow_id) {
+          setActiveWorkflow({
+            threadId: row.thread_id,
+            workflowId: row.workflow_id,
+            title: workflowTitle(row.workflow_id),
+            optimistic: false,
+          });
+        }
+      } else if (row === null && !(current?.optimistic && ticks < WORKFLOW_PENDING_GRACE_TICKS)) {
+        // No active row (and past the just-launched grace window) → done.
+        void finish();
+        return;
+      }
+      if (ticks >= WORKFLOW_WATCH_MAX_TICKS) {
+        setActiveWorkflow(null);
+        setChatError("The workflow is taking longer than expected. It continues in the background — reload in a few minutes.");
+        return;
+      }
+      workflowTimer.current = setTimeout(() => void tick(), WORKFLOW_WATCH_INTERVAL_MS);
+    };
+
+    workflowTimer.current = setTimeout(() => void tick(), WORKFLOW_WATCH_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(workflowTimer.current);
+    };
+  }, [watching, accountId, findActiveRun, loadMessages]);
 
   const launchWorkflow = useCallback(async (workflow: { id: string; title: string }) => {
-    if (sending || workflowRunId) return;
+    if (sending || activeWorkflowRef.current) return;
     setWorkflowsOpen(false);
     setChatError(null);
     setSending(true);
@@ -367,7 +470,7 @@ export function AtlasChat({
       });
       if (messageError) throw new Error(messageError.message);
       await loadMessages(thread);
-      const { runId } = await getAgentRuntime(accountId).startRun({
+      await getAgentRuntime(accountId).startRun({
         agentProfileId,
         accountId,
         runType: "workflow_run",
@@ -375,8 +478,17 @@ export function AtlasChat({
         triggeredBy: user?.id ?? null,
         input: { workflow_id: workflow.id, thread_id: thread },
       });
-      setWorkflowRunId(runId);
-      pollWorkflow(runId, thread, 0);
+      setActiveWorkflow({ threadId: thread, workflowId: workflow.id, title: workflow.title, optimistic: true });
+      if (fullPageOnWorkflow) {
+        // The dock is too small for a live run — hand the thread to the full
+        // War Room, which discovers and watches it on mount.
+        try {
+          sessionStorage.setItem(OPEN_THREAD_KEY, thread);
+        } catch {
+          // Blocked storage: the War Room's mount discovery still finds it.
+        }
+        navigate("/war-room");
+      }
     } catch (error) {
       setChatError(
         error instanceof Error
@@ -386,10 +498,12 @@ export function AtlasChat({
     } finally {
       setSending(false);
     }
-  }, [accountId, agentProfileId, ensureThread, loadMessages, pollWorkflow, sending, user, workflowRunId]);
+  }, [accountId, agentProfileId, ensureThread, fullPageOnWorkflow, loadMessages, navigate, sending, user]);
 
   const lastMessage = messages[messages.length - 1];
-  const unanswered = Boolean(lastMessage && lastMessage.role === "user" && !awaitingReply && !sending);
+  // A pending workflow is not an unanswered message — the run card (or the
+  // running-workflow notice) is the reply.
+  const unanswered = Boolean(lastMessage && lastMessage.role === "user" && !awaitingReply && !sending && !activeWorkflow);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -421,7 +535,7 @@ export function AtlasChat({
                 <button
                   key={workflow.id}
                   type="button"
-                  disabled={Boolean(workflowRunId) || sending}
+                  disabled={Boolean(activeWorkflow) || sending}
                   onClick={() => void launchWorkflow(workflow)}
                   className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -432,9 +546,9 @@ export function AtlasChat({
                   </span>
                 </button>
               ))}
-              {workflowRunId && (
+              {activeWorkflow && (
                 <p className="mt-1 border-t border-border px-2 pt-2 text-[11px] text-muted-foreground">
-                  A workflow is already running — its progress card is in the chat.
+                  The {activeWorkflow.title} workflow is already running — one at a time.
                 </p>
               )}
             </PopoverContent>
@@ -543,12 +657,25 @@ export function AtlasChat({
               <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Or run a full workflow
               </p>
+              {activeWorkflow && (
+                <button
+                  type="button"
+                  onClick={() => activeWorkflow.threadId && setThreadId(activeWorkflow.threadId)}
+                  className="mb-1.5 flex w-full items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-left text-xs transition-colors hover:bg-primary/10"
+                >
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+                  <span className="min-w-0">
+                    The {activeWorkflow.title} workflow is running
+                    {activeWorkflow.threadId ? " — open its chat to watch." : "."}
+                  </span>
+                </button>
+              )}
               <div className="space-y-1.5">
                 {RUNNABLE_WORKFLOWS.map((workflow) => (
                   <button
                     key={workflow.id}
                     type="button"
-                    disabled={Boolean(workflowRunId) || sending}
+                    disabled={Boolean(activeWorkflow) || sending}
                     onClick={() => void launchWorkflow(workflow)}
                     className="flex w-full items-start gap-2 rounded-md border border-border px-3 py-2 text-left text-xs transition-colors hover:border-primary/35 hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -579,6 +706,33 @@ export function AtlasChat({
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Atlas is thinking. This can take a minute…
               </div>
+            )}
+            {activeWorkflow && (
+              activeWorkflow.threadId === threadId ? (
+                <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs" role="status">
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+                  <span className="min-w-0">
+                    The {activeWorkflow.title} workflow is running — step cards land here as they finish.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+                    The {activeWorkflow.title} workflow is running in another chat.
+                  </span>
+                  {activeWorkflow.threadId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 shrink-0 text-xs"
+                      onClick={() => setThreadId(activeWorkflow.threadId)}
+                    >
+                      Watch it
+                    </Button>
+                  )}
+                </div>
+              )
             )}
             {unanswered && (
               <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">

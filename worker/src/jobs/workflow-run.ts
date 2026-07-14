@@ -89,7 +89,7 @@ export class WorkflowRunHandler {
     if (!card) throw new Error(`Unknown workflow: ${workflowId}`);
     if (card.status !== "runnable") throw new Error(`Workflow ${workflowId} is not runnable (status: ${card.status})`);
 
-    const runId = await this.ensureWorkflowRun(job, card, readString(payload.workflow_run_id ?? payload.workflowRunId));
+    const runId = await this.ensureWorkflowRun(job, card, threadId, readString(payload.workflow_run_id ?? payload.workflowRunId));
     try {
       await this.execute(job, runId, card, threadId);
     } catch (error) {
@@ -410,7 +410,7 @@ export class WorkflowRunHandler {
     return route;
   }
 
-  private async ensureWorkflowRun(job: AgentJob, card: LoadedWorkflowCard, requestedId?: string): Promise<string> {
+  private async ensureWorkflowRun(job: AgentJob, card: LoadedWorkflowCard, threadId: string | null, requestedId?: string): Promise<string> {
     if (requestedId) {
       const { data, error } = await this.deps.client
         .from("workflow_runs")
@@ -442,6 +442,7 @@ export class WorkflowRunHandler {
           error: null,
           finished_at: null,
           step_state: {},
+          thread_id: threadId,
         });
         return existing.id as string;
       }
@@ -455,6 +456,7 @@ export class WorkflowRunHandler {
         status: "queued",
         step_state: {},
         agent_run_id: job.agent_run_id,
+        thread_id: threadId,
       })
       .select("id")
       .single();

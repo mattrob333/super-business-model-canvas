@@ -279,7 +279,7 @@ export function AtlasDock({ onOpenChange }: { onOpenChange?: (open: boolean) => 
             </p>
           </div>
         ) : everOpened && profileId ? (
-          <AtlasChat accountId={accountId} agentProfileId={profileId} briefingSlot={briefingSlot} />
+          <AtlasChat accountId={accountId} agentProfileId={profileId} briefingSlot={briefingSlot} fullPageOnWorkflow />
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">{briefingSlot}</div>
         )}
