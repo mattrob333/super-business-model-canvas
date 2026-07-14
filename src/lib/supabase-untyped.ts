@@ -28,6 +28,8 @@ export interface UntypedQuery<T> extends PromiseLike<QueryResponse<T>> {
   update(value: unknown): UntypedQuery<T>;
   delete(): UntypedQuery<T>;
   eq(column: string, value: unknown): UntypedQuery<T>;
+  neq(column: string, value: unknown): UntypedQuery<T>;
+  gt(column: string, value: unknown): UntypedQuery<T>;
   contains(column: string, value: Record<string, unknown>): UntypedQuery<T>;
   is(column: string, value: unknown): UntypedQuery<T>;
   in(column: string, value: unknown[]): UntypedQuery<T>;
