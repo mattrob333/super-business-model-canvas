@@ -31,8 +31,20 @@ export interface LoadedBriefing {
 }
 
 const seenBriefingKey = (accountId: string) => `atlas:seen-briefing:${accountId}`;
+const autoBriefKey = (accountId: string) => `atlas:auto-brief:${accountId}`;
 const RUN_POLL_INTERVAL_MS = 3_000;
 const RUN_POLL_MAX_ATTEMPTS = 100; // ~5 minutes
+/**
+ * Staleness policy (owner finding 2026-07-14: a 6-day-old briefing sat in the
+ * War Room through two workflow runs and a research pass). A briefing is
+ * stale when it is older than a day OR when any completed agent run — a
+ * workflow, skill, research pass, sweep — postdates it. Stale briefings
+ * auto-refresh on open; the old one stays visible, honestly aged, while the
+ * new one is written.
+ */
+const BRIEFING_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
+/** Failed/slow engines must not burn a briefing run on every page open. */
+const AUTO_BRIEF_THROTTLE_MS = 30 * 60 * 1_000;
 
 /** localStorage read that survives private mode / blocked storage — null on failure. */
 export function safeGet(key: string): string | null {
@@ -71,6 +83,10 @@ export function useAtlasBriefing() {
   const [skillTitle, setSkillTitle] = useState<string | null>(null);
   const disposedRef = useRef(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout>>();
+  // Auto-refreshes never mark the result "seen" (the dock pulse must still
+  // fire); manual requests do. One auto attempt per surface mount + account.
+  const manualRequestRef = useRef(false);
+  const autoAttemptedRef = useRef<string | null>(null);
 
   useEffect(() => {
     disposedRef.current = false;
@@ -223,8 +239,9 @@ export function useAtlasBriefing() {
         if (status.status === "completed") {
           void loadBriefing().then((loadedId) => {
             if (disposedRef.current) return;
-            // A requested briefing is a read briefing — no pulse for it.
-            if (loadedId && accountId) {
+            // A MANUALLY requested briefing is a read briefing — no pulse.
+            // An auto-refreshed one keeps the pulse so the dock announces it.
+            if (loadedId && accountId && manualRequestRef.current) {
               safeSet(seenBriefingKey(accountId), loadedId);
               setSeenId(loadedId);
             }
@@ -239,8 +256,9 @@ export function useAtlasBriefing() {
       });
   }, [accountId, loadBriefing]);
 
-  const requestBriefing = useCallback(async () => {
+  const startBriefingRun = useCallback(async (manual: boolean) => {
     if (!accountId || !profileId || refreshing) return;
+    manualRequestRef.current = manual;
     setRefreshError(null);
     setRefreshStalled(false);
     setRefreshing(true);
@@ -249,16 +267,64 @@ export function useAtlasBriefing() {
         agentProfileId: profileId,
         accountId,
         runType: "atlas_briefing",
-        triggerType: "manual",
-        triggeredBy: user?.id ?? null,
+        triggerType: manual ? "manual" : "scheduled",
+        triggeredBy: manual ? user?.id ?? null : null,
         input: {},
       });
       pollBriefingRun(runId, 0);
     } catch (error) {
       setRefreshing(false);
-      setRefreshError(error instanceof Error ? error.message : "Runtime unreachable");
+      // Auto-refresh failures stay quiet in the card (the old briefing is
+      // still readable); manual failures surface, as before.
+      if (manual) setRefreshError(error instanceof Error ? error.message : "Runtime unreachable");
     }
   }, [accountId, profileId, refreshing, user, pollBriefingRun]);
+
+  const requestBriefing = useCallback(async () => startBriefingRun(true), [startBriefingRun]);
+
+  // Staleness-aware auto-refresh: opening a briefing surface catches the user
+  // up on the CURRENT state of the company instead of showing whatever was
+  // last generated. Stale = older than a day, or superseded by any completed
+  // run (workflow, skill, research, sweep) since it was written. Throttled so
+  // a broken engine can't burn a run per page open.
+  useEffect(() => {
+    if (!accountId || !profileId || briefingLoading || refreshing) return;
+    if (briefingError || profileError) return;
+    const attemptKey = `${accountId}:${briefing?.runId ?? "none"}`;
+    if (autoAttemptedRef.current === attemptKey) return;
+    let cancelled = false;
+
+    (async () => {
+      let stale = false;
+      if (!briefing) {
+        // No briefing for this company yet — generate the first one.
+        stale = true;
+      } else if (Date.now() - Date.parse(briefing.createdAt) > BRIEFING_MAX_AGE_MS) {
+        stale = true;
+      } else {
+        const { data } = await supabaseUntyped
+          .from<{ id: string }>("agent_runs")
+          .select("id")
+          .eq("account_id", accountId)
+          .eq("status", "completed")
+          .neq("run_type", "atlas_briefing")
+          .gt("completed_at", briefing.createdAt)
+          .limit(1);
+        stale = (data ?? []).length > 0;
+      }
+      if (cancelled || !stale) return;
+
+      const lastAttempt = Number(safeGet(autoBriefKey(accountId)) ?? 0);
+      if (Date.now() - lastAttempt < AUTO_BRIEF_THROTTLE_MS) return;
+      autoAttemptedRef.current = attemptKey;
+      safeSet(autoBriefKey(accountId), String(Date.now()));
+      void startBriefingRun(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId, profileId, briefing, briefingLoading, briefingError, profileError, refreshing, startBriefingRun]);
 
   return {
     accountId,

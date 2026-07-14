@@ -141,8 +141,14 @@ export function BriefingCard({
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           State of the Union
         </h2>
-        <span className="shrink-0 text-[10px] text-muted-foreground">
+        <span className="flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
           {formatDistanceToNow(new Date(generatedAt), { addSuffix: true })}
+          {refreshing && (
+            <span className="flex items-center gap-1 text-primary" role="status">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              updating now
+            </span>
+          )}
         </span>
       </div>
 

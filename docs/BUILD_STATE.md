@@ -285,6 +285,33 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Briefing staleness fixed: the War Room catches you up on open (2026-07-14)
+
+Owner finding: the War Room greeted him with a 6-day-old State of the Union
+that predated the entire Atlas build — two workflow runs, sweeps, and a
+research pass had happened since, and the card never moved. Root cause: the
+briefing had NO freshness heuristic at all — `useAtlasBriefing` loaded the
+latest completed briefing and showed it forever; refresh was a manual
+button only.
+
+- **Staleness-aware auto-refresh** in the shared hook (dock + War Room get
+  it): on open, a briefing is stale when it is older than 24h OR when any
+  completed agent run (workflow, skill, research, sweep — anything but a
+  briefing) FINISHED after it was written. Stale → a fresh briefing run
+  starts automatically; the old card stays visible, honestly aged, with an
+  "updating now" spinner beside the timestamp until the new one lands.
+  No briefing at all (fresh company) → the first one generates itself.
+- **Guardrails:** one auto attempt per surface mount + briefing; a 30-minute
+  localStorage throttle so a broken engine can't burn a run per page open;
+  auto-refresh failures stay quiet (the old briefing is still readable)
+  while manual failures surface as before; auto-refreshed briefings do NOT
+  mark themselves seen, so the dock pulse still announces them.
+- Activity comparison uses `completed_at` (a run created before but
+  finished after the briefing still supersedes it). `neq`/`gt` added to the
+  UntypedQuery facade.
+- **Gates:** root tsc exit 0, build green, lint 64 (frozen ceiling); worker
+  untouched.
+
 ### Atlas E2E VERDICT: first live production run SUCCEEDED (2026-07-14)
 
 Positioning Sprint attempt 2 (post-AT-8 budget fix), Wesco International,
