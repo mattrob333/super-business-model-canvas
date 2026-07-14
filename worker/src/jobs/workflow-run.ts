@@ -271,6 +271,56 @@ export class WorkflowRunHandler {
       updateDataModel(surfaceId, "/run/confidence", confidence),
     ]);
     await this.completeAgentRun(job, card, artifactId, totals);
+    await this.enqueueSynthesisSweep(job, runId, threadId);
+  }
+
+  /**
+   * AT-6: a completed run is a write burst — chain the synthesis sweep.
+   * Log-and-continue: the workflow result stands even if the chain fails.
+   */
+  private async enqueueSynthesisSweep(job: AgentJob, runId: string, threadId: string | null): Promise<void> {
+    try {
+      let agentProfileId: string | null = null;
+      if (job.agent_run_id) {
+        const { data } = await this.deps.client
+          .from("agent_runs")
+          .select("agent_profile_id")
+          .eq("id", job.agent_run_id)
+          .eq("account_id", job.account_id)
+          .maybeSingle();
+        agentProfileId = (data?.agent_profile_id as string | undefined) ?? null;
+      }
+      const nowIso = new Date().toISOString();
+      let chainedRunId: string | null = null;
+      if (agentProfileId) {
+        const { data, error } = await this.deps.client
+          .from("agent_runs")
+          .insert({
+            account_id: job.account_id,
+            agent_profile_id: agentProfileId,
+            run_type: "synthesis_sweep",
+            trigger_type: "cascade",
+            status: "pending",
+            input: { workflow_run_id: runId, chained_from_run_id: job.agent_run_id },
+            started_at: nowIso,
+          })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        chainedRunId = data.id as string;
+      }
+      const { error: jobError } = await this.deps.client.from("agent_jobs").insert({
+        account_id: job.account_id,
+        kind: "synthesis_sweep",
+        payload: { workflow_run_id: runId, thread_id: threadId },
+        status: "queued",
+        agent_run_id: chainedRunId,
+        run_after: nowIso,
+      });
+      if (jobError) throw new Error(jobError.message);
+    } catch (error) {
+      console.error(`[synthesis] chain enqueue failed for run ${runId}: ${humanError(error)}`);
+    }
   }
 
   /** Non-fatal by contract — chat emission never fails the run (a2ui.ts logs). */

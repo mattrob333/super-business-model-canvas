@@ -3238,6 +3238,7 @@ declare
   v_contradictions jsonb := '[]'::jsonb;
   v_history jsonb := '[]'::jsonb;
   v_is_machine boolean;
+  v_written_paths text[] := '{}';
 begin
   if jsonb_typeof(p_writes) <> 'array' then
     raise exception 'p_writes must be a JSON array';
@@ -3337,6 +3338,9 @@ begin
         when p_source in ('user_stated', 'user_override') then 'user_override'
         else 'update'
       end;
+      -- Only ACCEPTED writes cascade: a contradiction-diverted write changed
+      -- nothing that artifacts consume.
+      v_written_paths := v_written_paths || v_saved.path;
     end if;
 
     insert into public.brain_variable_history (
@@ -3353,6 +3357,15 @@ begin
     );
     v_existing := null;
   end loop;
+
+  -- AT-6 cascade invalidation: consuming artifacts go stale on upstream change.
+  if array_length(v_written_paths, 1) > 0 then
+    update public.workflow_artifacts
+    set stale = true
+    where account_id = p_account_id
+      and stale = false
+      and frontmatter->'consumed' ?| v_written_paths;
+  end if;
 
   return jsonb_build_object(
     'variables', v_variables,
@@ -3432,6 +3445,14 @@ begin
     case when v_existing_id is null then 'initial' else 'user_override' end,
     v_saved.updated_at, v_saved.created_at
   );
+
+  -- AT-6 cascade invalidation: a user override stales every artifact that
+  -- consumed the old value.
+  update public.workflow_artifacts
+  set stale = true
+  where account_id = p_account_id
+    and stale = false
+    and frontmatter->'consumed' ? v_path;
 
   return to_jsonb(v_saved);
 end;

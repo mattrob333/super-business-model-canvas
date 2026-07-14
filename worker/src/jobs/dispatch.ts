@@ -7,6 +7,7 @@ import { GapEngineHandler } from "./gap-engine.js";
 import { KnowledgeJobHandler } from "./knowledge-jobs.js";
 import { SkillRunHandler } from "./skill-run.js";
 import { StalenessSweepHandler } from "./staleness-sweep.js";
+import { SynthesisSweepHandler } from "./synthesis-sweep.js";
 import { WorkspaceChatHandler } from "./workspace-chat.js";
 import { WorkflowRunHandler } from "./workflow-run.js";
 import type { AgentTaskLimits } from "../agent/limits.js";
@@ -35,6 +36,7 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
   const knowledgeJobs = new KnowledgeJobHandler(options);
   const skillRun = new SkillRunHandler(options);
   const stalenessSweep = new StalenessSweepHandler(options);
+  const synthesisSweep = new SynthesisSweepHandler(options);
   const workflowRun = new WorkflowRunHandler(options);
 
   return async (job: AgentJob): Promise<void> => {
@@ -106,6 +108,11 @@ export function createJobDispatcher(options: JobDispatcherOptions): JobHandler {
 
       if (job.kind === "workflow_run") {
         await workflowRun.handle(job);
+        return;
+      }
+
+      if (job.kind === "synthesis_sweep") {
+        await synthesisSweep.handle(job);
         return;
       }
 
