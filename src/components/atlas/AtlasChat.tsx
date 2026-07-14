@@ -334,6 +334,15 @@ export function AtlasChat({
         if (status.status !== "completed" && status.error) {
           setChatError(`The workflow stopped: ${status.error}`);
         }
+        // The synthesis sweep chains AFTER completion and drops its findings
+        // into the same thread — two delayed reloads catch them.
+        workflowTimer.current = setTimeout(() => {
+          if (disposedRef.current) return;
+          void loadMessages(thread);
+          workflowTimer.current = setTimeout(() => {
+            if (!disposedRef.current) void loadMessages(thread);
+          }, 20_000);
+        }, 12_000);
       })
       .catch(() => {
         if (disposedRef.current) return;

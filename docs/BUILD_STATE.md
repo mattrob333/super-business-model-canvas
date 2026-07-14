@@ -285,6 +285,45 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas AT-6: synthesis sweep — the brain thinks (2026-07-13)
+
+Final spec milestone of `docs/atlas/ATLAS_BUILD_PLAN.md`. After a write
+burst, the brain looks at itself.
+
+- **`synthesis_sweep` job** (`worker/src/jobs/synthesis-sweep.ts`), chained
+  automatically after every completed workflow run (log-and-continue — the
+  workflow result stands if the chain fails). One compact LLM pass over the
+  source variable graph (own `contradiction.*`/`synergy.*` outputs excluded,
+  values truncated, ~9k char dump cap) finds cross-path contradictions and
+  cross-namespace synergies. Verdict is strict JSON; findings citing
+  hallucinated or duplicate paths are dropped (the model must cite variables
+  that exist); at most 3 per kind; "nothing found" is an accepted, correct
+  answer. Brains under 4 source variables skip the model entirely.
+- **Records, never mutations** (spec §1 rule 3): findings land as
+  `contradiction.sweep.<pathA+pathB>` and `synergy.<pathA+pathB>` brain
+  variables keyed on the sorted pair — re-sweeps overwrite in place instead
+  of piling up. Source `workflow:synthesis-sweep@v1.0#s1`.
+- **Findings render in the run's thread** via the existing catalog — no
+  catalog growth: ContradictionAlert for contradictions, read-only
+  VariableCard for synergies, on a `synth-<jobId>` surface. AtlasChat does
+  two delayed reloads after a workflow completes to catch them.
+- **Cascade invalidation at write time** (migration
+  `20260713230000_atlas_synthesis_cascade.sql`, applied live): both brain
+  write RPCs now flag consuming `workflow_artifacts` STALE when an upstream
+  path changes (`frontmatter->'consumed' ?| written_paths`); only ACCEPTED
+  writes cascade — a contradiction-diverted write changed nothing. A run's
+  own artifact is safe (inserted after its variable writes). **Verified
+  live**: seeded artifact consuming `smoke.cascade_input` flipped to
+  `stale = true` on the next write to that path; smoke rows cleaned.
+- **Gates:** worker 427 passed / 2 skipped (5 new: record keying + emission,
+  thin-brain skip, own-output exclusion + visible parse failure,
+  hallucinated-path rejection, empty-verdict acceptance), typecheck/build/
+  eslint clean; root tsc exit 0, build green, lint 64 (frozen ceiling).
+- **Honest limits:** sweep triggers only after workflow runs (not after
+  scrape mirrors — a company research burst doesn't re-sweep yet);
+  contradiction resolution UX is "edit the variable card", not a dedicated
+  accept/reject flow.
+
 ### Atlas AT-5: coverage gap engine v1 — Atlas leads (2026-07-13)
 
 Phase 5 of `docs/atlas/ATLAS_BUILD_PLAN.md`. The brain now knows what it
