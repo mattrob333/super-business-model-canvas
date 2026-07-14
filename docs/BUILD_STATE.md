@@ -285,6 +285,31 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Atlas E2E VERDICT: first live production run SUCCEEDED (2026-07-14)
+
+Positioning Sprint attempt 2 (post-AT-8 budget fix), Wesco International,
+launched from a real War Room thread (`3e4d9997`): **completed on attempt 1,
+end to end.** This closes the last handoff §6 acceptance item (chat renders
+during a live run) — the Atlas build plan is now fully accepted. Evidence:
+
+- **Run:** `workflow_runs` completed, no error; all 6 steps executed
+  including both web-research steps under the new budgets.
+- **Chat:** 9 `a2ui` rows on one surface in the thread — run start, six step
+  boundaries, completion, plus the synthesis sweep's findings row.
+- **Brain:** 12 `positioning.*` variables with full step-level provenance
+  (`workflow:positioning-sprint@v1#s1…s6`), honest confidence (`low` on the
+  synthesis steps — no won-deal notes were provided, exactly as the card
+  prescribes; `medium` on the researched steps).
+- **Artifact:** 46.5k-char frontmattered report on the shelf
+  (`produces` 8 paths, `consumed` canvas inputs, stale=false).
+- **Synthesis sweep chained and completed:** swept 21 variables, found 0
+  contradictions and 2 synergies — both genuinely useful (e.g. "cite the
+  existing integrated-supply contracts as proof for the 'stop juggling
+  dozens of vendors' theme, currently flagged unproven").
+- Sample output quality — the one-liner: "One contract, one invoice,
+  on-site inventory — replacing the 92 vendors you're stuck juggling after
+  M&A."
+
 ### Atlas AT-8: first live run found two real bugs — fixed forward (2026-07-14)
 
 The first production Positioning Sprint (Wesco, launched from a real War
@@ -339,8 +364,9 @@ definition-of-done audit.
      VERIFIED (AT-2 test: Hormozi run reads seeded `positioning.*`).
   5. *Chat renders WorkflowRunCard + VariableCard + GapPrompt from streamed
      JSONL during a live run* — code + tests verified (AT-3 emission tests,
-     dispatcher render); PENDING one live production run (next step after
-     this merge — first real workflow execution).
+     dispatcher render); CLOSED 2026-07-14 — verified by the first live
+     production run (see the E2E VERDICT entry above: 9 a2ui rows rendered
+     on one surface during the Wesco Positioning Sprint).
   6. *VariableCard edit writes `user_override` and survives a re-run* —
      VERIFIED (AT-4 RPC live-smoked; AT-1/AT-2 trust-ordering tests prove
      re-runs contradict rather than overwrite).
