@@ -580,6 +580,7 @@ export type Database = {
           id: string
           variable_id: string
           account_id: string
+          company_key: string
           path: string
           value: Json
           confidence: string
@@ -594,6 +595,7 @@ export type Database = {
           id?: string
           variable_id: string
           account_id: string
+          company_key?: string
           path: string
           value: Json
           confidence: string
@@ -608,6 +610,7 @@ export type Database = {
           id?: string
           variable_id?: string
           account_id?: string
+          company_key?: string
           path?: string
           value?: Json
           confidence?: string
@@ -639,6 +642,7 @@ export type Database = {
         Row: {
           id: string
           account_id: string
+          company_key: string
           path: string
           value: Json
           confidence: string
@@ -651,6 +655,7 @@ export type Database = {
         Insert: {
           id?: string
           account_id: string
+          company_key?: string
           path: string
           value: Json
           confidence: string
@@ -663,6 +668,7 @@ export type Database = {
         Update: {
           id?: string
           account_id?: string
+          company_key?: string
           path?: string
           value?: Json
           confidence?: string
@@ -738,6 +744,7 @@ export type Database = {
           account_id: string
           workflow_id: string
           run_id: string
+          company_key: string
           title: string
           body_md: string
           frontmatter: Json
@@ -749,6 +756,7 @@ export type Database = {
           account_id: string
           workflow_id: string
           run_id: string
+          company_key?: string
           title: string
           body_md: string
           frontmatter?: Json
@@ -760,6 +768,7 @@ export type Database = {
           account_id?: string
           workflow_id?: string
           run_id?: string
+          company_key?: string
           title?: string
           body_md?: string
           frontmatter?: Json
@@ -795,6 +804,7 @@ export type Database = {
           error: string | null
           agent_run_id: string | null
           thread_id: string | null
+          company_key: string
           created_at: string
           started_at: string | null
           finished_at: string | null
@@ -810,6 +820,7 @@ export type Database = {
           error?: string | null
           agent_run_id?: string | null
           thread_id?: string | null
+          company_key?: string
           created_at?: string
           started_at?: string | null
           finished_at?: string | null
@@ -825,6 +836,7 @@ export type Database = {
           error?: string | null
           agent_run_id?: string | null
           thread_id?: string | null
+          company_key?: string
           created_at?: string
           started_at?: string | null
           finished_at?: string | null
@@ -2941,7 +2953,8 @@ export type Database = {
           p_account_id: string
           p_writes: Json
           p_source: string
-          p_source_artifact?: string | null
+          p_source_artifact: string | null
+          p_company_key: string
         }
         Returns: Json
       }
@@ -2950,6 +2963,7 @@ export type Database = {
           p_account_id: string
           p_path: string
           p_value: Json
+          p_company_key: string
           p_source?: string
         }
         Returns: Json

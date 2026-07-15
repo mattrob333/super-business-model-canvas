@@ -1,10 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
+import { loadCompanyScope } from "@/lib/company-scope";
 
 /**
  * The one authenticated write path into the business brain (plan AT-4).
  * Editing a VariableCard writes `user_override`; answering a GapPrompt writes
  * `user_stated`. Trust ordering lives server-side in the RPC — user values
  * always win and machine re-runs may contradict but never overwrite them.
+ *
+ * Writes land in the ACTIVE company's brain (company-scope law, owner bug
+ * 2026-07-15): the user is answering about the company they're looking at,
+ * and a `user_stated` answer must never follow them to the next company.
  */
 
 export type UserBrainSource = "user_stated" | "user_override";
@@ -12,6 +17,7 @@ export type UserBrainSource = "user_stated" | "user_override";
 export interface BrainVariableRow {
   id: string;
   account_id: string;
+  company_key: string;
   path: string;
   value: unknown;
   confidence: "high" | "medium" | "low";
@@ -25,10 +31,12 @@ export async function writeBrainVariable(
   value: unknown,
   source: UserBrainSource,
 ): Promise<BrainVariableRow> {
+  const scope = await loadCompanyScope(accountId).catch(() => null);
   const { data, error } = await supabase.rpc("write_brain_variable", {
     p_account_id: accountId,
     p_path: path,
     p_value: value as never,
+    p_company_key: scope?.companyKey ?? "",
     p_source: source,
   });
   if (error) throw new Error(error.message);

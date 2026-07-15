@@ -285,6 +285,61 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### The brain is company-scoped + run cards set expectations (2026-07-15)
+
+Live incident, caught during owner testing: a Positioning Sprint launched
+"for AcquiPortal" **positioned Wesco** — the brain was account-scoped, so
+the sprint's canvas snapshot read Wesco's `canvas.*` rows, and a Tier 4
+analysis-apply 47 seconds before launch had even made Tier4 the active
+era. Three-way contamination (AcquiPortal intent, Wesco content, Tier4
+era) from one missing scope. Was DECISION-NEEDED #4; now shipped.
+
+- **Schema** (`20260715220000_brain_company_scope.sql`, applied live
+  before merge): `company_key` (the company-scope.ts era identity —
+  website domain else normalized name, `''` for accounts with no named
+  company) on `brain_variables`, `brain_variable_history`,
+  `workflow_runs`, `workflow_artifacts`. Brain identity is now
+  `(account_id, company_key, path)`. Era-at-timestamp backfill: each
+  existing row was assigned the company whose era was active when it was
+  last written (verified live: Wesco's canvas under `wesco.com`, the
+  Hormozi outputs under `tier4intelligence.com`). SQL mirrors of the
+  normalizers (`company_key_of`, `company_key_at`) exist ONLY for
+  backfill + legacy-signature calls; steady-state keys come from JS.
+- **RPCs**: new 5-arg `write_brain_variables`/`write_brain_variable`
+  carry `p_company_key` explicitly (no default — PostgREST overload
+  resolution stays unambiguous); the old 4-arg signatures remain as
+  delegates resolving the ACTIVE company key, so deploy-window workers
+  and stale tabs keep writing to the right bucket. Advisory locks,
+  upsert conflict targets, and AT-6 cascade invalidation all include the
+  company key.
+- **Worker**: `readVariables`/`writeVariables` REQUIRE a company key
+  (compile-time enforcement — no call site can forget). Workflow runs
+  are stamped at creation and use the stored key for their whole life,
+  so a company switch mid-run or while paused cannot bleed; the
+  synthesis sweep inherits the run's key via job payload (active-scope
+  fallback for pre-scoping queued jobs); research/scrape brain mirrors
+  key off the ANALYZED context, not the active company; coverage,
+  briefing, and Atlas-chat reads scope by active key.
+- **Frontend**: `writeBrainVariable` resolves the active company key
+  (user answers describe the company on screen); `findActiveRun` and the
+  shelf's `workflow_artifacts` list filter by company, so another
+  company's run/report never blocks or clutters this one.
+- **Run-card expectations** (same owner session: a quiet 8-minute
+  research step read as a hung run): card steps now carry authored
+  `label` + `eta_hint`; the WorkflowRunCard shows the label per step and
+  the hint under the ACTIVE step ("Researching competitors on the live
+  web — usually 5–10 minutes"). Authored for both runnable cards.
+- **Data cleanup (post-deploy)**: the mis-run's `positioning.*` rows and
+  artifact (Wesco content) get re-keyed to `wesco.com`; per-era values
+  restorable from history via `distinct on (account, company, path)` —
+  deliberately NOT in the migration so the deploy-window worker never
+  reads two rows for one path.
+- **Gates:** worker 433 passed / 2 skipped (new: same path in two
+  companies stays isolated, no cross-company contradiction; run/artifact
+  company stamping; sweep fallback resolution; mirror keyed to analyzed
+  context), typecheck/build/eslint clean; root tsc exit 0, build green,
+  lint 64 (frozen ceiling).
+
 ### Interactive workflow steps: pause, ask, resume (2026-07-15)
 
 The last piece of "Atlas guides the user through workflows" (owner

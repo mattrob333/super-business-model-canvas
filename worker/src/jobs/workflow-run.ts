@@ -4,7 +4,7 @@ import type { AgentRunner, AgentRunResult } from "../agent/runner.js";
 import { ClaudeAgentRunner, OpenRouterChatRunner } from "../agent/runner.js";
 import { createAgentHooks } from "../agent/guardrails.js";
 import { readVariables, writeVariables, type BrainConfidence, type BrainVariable } from "../db/brain.js";
-import { loadCompanyScope } from "../db/company-scope.js";
+import { loadCompanyScope, type CompanyScope } from "../db/company-scope.js";
 import { asRecord } from "../db/json.js";
 import { buildCanvasSnapshot } from "../domain/canvas-snapshot.js";
 import type { FeedRuntimeConfig } from "../feeds/types.js";
@@ -92,9 +92,17 @@ export class WorkflowRunHandler {
     if (!card) throw new Error(`Unknown workflow: ${workflowId}`);
     if (card.status !== "runnable") throw new Error(`Workflow ${workflowId} is not runnable (status: ${card.status})`);
 
-    const runId = await this.ensureWorkflowRun(job, card, threadId, readString(payload.workflow_run_id ?? payload.workflowRunId));
+    // The run is stamped with the company it was launched for, and every brain
+    // read/write in its lifetime uses that stored key — a company switch while
+    // a run is in flight (or paused for input) can no longer bleed one
+    // company's research into another's brain (owner bug 2026-07-15: an
+    // "AcquiPortal" sprint positioned Wesco off the account-wide canvas).
+    const scope = await loadCompanyScope(this.deps.client, job.account_id);
+    const { runId, companyKey } = await this.ensureWorkflowRun(
+      job, card, threadId, scope, readString(payload.workflow_run_id ?? payload.workflowRunId),
+    );
     try {
-      await this.execute(job, runId, card, threadId, skipAwaits);
+      await this.execute(job, runId, companyKey, card, threadId, scope, skipAwaits);
     } catch (error) {
       const message = humanError(error);
       await this.failWorkflowRun(job.account_id, runId, message);
@@ -106,8 +114,15 @@ export class WorkflowRunHandler {
     }
   }
 
-  private async execute(job: AgentJob, runId: string, card: LoadedWorkflowCard, threadId: string | null, skipAwaits = false): Promise<void> {
-    const scope = await loadCompanyScope(this.deps.client, job.account_id);
+  private async execute(
+    job: AgentJob,
+    runId: string,
+    companyKey: string,
+    card: LoadedWorkflowCard,
+    threadId: string | null,
+    scope: CompanyScope,
+    skipAwaits = false,
+  ): Promise<void> {
     if (!scope.activeContextId) {
       throw new Error("This workflow needs an analyzed company first. Add a website or founder document, then retry.");
     }
@@ -125,7 +140,7 @@ export class WorkflowRunHandler {
     const priorState = asRecord(existingRun?.step_state);
     await this.markRunning(job, runId, card, route);
 
-    const canvasRows = await readVariables(this.deps.client, job.account_id, { prefix: "canvas." });
+    const canvasRows = await readVariables(this.deps.client, job.account_id, companyKey, { prefix: "canvas." });
     const snapshot = buildCanvasSnapshot(canvasRows);
     if (snapshot.truncated) {
       console.warn(`[workflow:${card.id}] compact canvas snapshot truncated to ${snapshot.chars} characters; dropped: ${snapshot.omittedSections.join(", ")}`);
@@ -134,7 +149,7 @@ export class WorkflowRunHandler {
     const declaredInputPaths = unique(
       [...card.inputs_required, ...card.inputs_optional].map(inputBrainPath).filter(isString),
     );
-    const initialInputs = await readVariables(this.deps.client, job.account_id, { paths: declaredInputPaths });
+    const initialInputs = await readVariables(this.deps.client, job.account_id, companyKey, { paths: declaredInputPaths });
     const byPath = new Map(initialInputs.map((variable) => [variable.path, variable]));
     const missing = card.inputs_required.filter((path) => {
       const brainPath = inputBrainPath(path);
@@ -178,7 +193,15 @@ export class WorkflowRunHandler {
         workflowId: card.id,
         name: card.name,
         status: "running",
-        steps: card.steps.map((step) => ({ id: step.id, status: "pending" })),
+        // label/eta_hint are authored per step in the card — the run card uses
+        // them to set expectations ("researching the live web — 5–10 min")
+        // instead of leaving the user staring at an unexplained spinner.
+        steps: card.steps.map((step) => ({
+          id: step.id,
+          status: "pending",
+          label: step.label ?? null,
+          eta_hint: step.eta_hint ?? null,
+        })),
       }),
     ]);
 
@@ -195,7 +218,7 @@ export class WorkflowRunHandler {
           ? completedEntry.variables.filter((path): path is string => typeof path === "string")
           : [];
         if (paths.length > 0) {
-          const restored = await readVariables(this.deps.client, job.account_id, { paths });
+          const restored = await readVariables(this.deps.client, job.account_id, companyKey, { paths });
           for (const variable of restored) priorVariables[variable.path] = variable.value;
         }
         if (typeof completedEntry.artifact_section === "string") {
@@ -214,7 +237,7 @@ export class WorkflowRunHandler {
       const asks = step.await_input ?? [];
       const askPaths = asks.map((ask) => ask.slot);
       if (askPaths.length > 0) {
-        const answered = await readVariables(this.deps.client, job.account_id, { paths: askPaths });
+        const answered = await readVariables(this.deps.client, job.account_id, companyKey, { paths: askPaths });
         for (const variable of answered) {
           byPath.set(variable.path, variable);
           consumed.add(variable.path);
@@ -231,7 +254,7 @@ export class WorkflowRunHandler {
 
       const declaredReads = brainReads(step.reads);
       if (declaredReads.length > 0) {
-        const refreshed = await readVariables(this.deps.client, job.account_id, { paths: declaredReads });
+        const refreshed = await readVariables(this.deps.client, job.account_id, companyKey, { paths: declaredReads });
         for (const variable of refreshed) {
           byPath.set(variable.path, variable);
           consumed.add(variable.path);
@@ -264,7 +287,7 @@ export class WorkflowRunHandler {
         });
       }
       const sourceArtifact = `artifact/${card.id}/${runId}/${card.output_artifact}`;
-      const writeResult = await writeVariables(this.deps.client, job.account_id, writes, {
+      const writeResult = await writeVariables(this.deps.client, job.account_id, companyKey, writes, {
         source: `workflow:${card.id}@v${String(card.version)}#s${index + 1}`,
         sourceArtifact,
       });
@@ -334,7 +357,7 @@ export class WorkflowRunHandler {
     };
     const artifactBody = postprocessWorkflowArtifact(artifactSections.join("\n\n---\n\n").trim());
     const bodyMd = `---\n${stringifyYaml(frontmatter).trimEnd()}\n---\n\n${artifactBody}\n`;
-    const artifactId = await this.insertArtifact(job.account_id, runId, card, bodyMd, frontmatter);
+    const artifactId = await this.insertArtifact(job.account_id, runId, companyKey, card, bodyMd, frontmatter);
 
     await this.updateWorkflowRun(job.account_id, runId, {
       status: "completed",
@@ -351,14 +374,14 @@ export class WorkflowRunHandler {
       updateDataModel(surfaceId, "/run/confidence", confidence),
     ]);
     await this.completeAgentRun(job, card, artifactId, totals);
-    await this.enqueueSynthesisSweep(job, runId, threadId);
+    await this.enqueueSynthesisSweep(job, runId, threadId, companyKey);
   }
 
   /**
    * AT-6: a completed run is a write burst — chain the synthesis sweep.
    * Log-and-continue: the workflow result stands even if the chain fails.
    */
-  private async enqueueSynthesisSweep(job: AgentJob, runId: string, threadId: string | null): Promise<void> {
+  private async enqueueSynthesisSweep(job: AgentJob, runId: string, threadId: string | null, companyKey: string): Promise<void> {
     try {
       let agentProfileId: string | null = null;
       if (job.agent_run_id) {
@@ -392,7 +415,7 @@ export class WorkflowRunHandler {
       const { error: jobError } = await this.deps.client.from("agent_jobs").insert({
         account_id: job.account_id,
         kind: "synthesis_sweep",
-        payload: { workflow_run_id: runId, thread_id: threadId },
+        payload: { workflow_run_id: runId, thread_id: threadId, company_key: companyKey },
         status: "queued",
         agent_run_id: chainedRunId,
         run_after: nowIso,
@@ -541,11 +564,17 @@ export class WorkflowRunHandler {
     return route;
   }
 
-  private async ensureWorkflowRun(job: AgentJob, card: LoadedWorkflowCard, threadId: string | null, requestedId?: string): Promise<string> {
+  private async ensureWorkflowRun(
+    job: AgentJob,
+    card: LoadedWorkflowCard,
+    threadId: string | null,
+    scope: CompanyScope,
+    requestedId?: string,
+  ): Promise<{ runId: string; companyKey: string }> {
     if (requestedId) {
       const { data, error } = await this.deps.client
         .from("workflow_runs")
-        .select("id, workflow_id, status")
+        .select("id, workflow_id, status, company_key")
         .eq("id", requestedId)
         .eq("account_id", job.account_id)
         .maybeSingle();
@@ -554,7 +583,9 @@ export class WorkflowRunHandler {
       // Double-resume guard: a duplicate resume against a finished run would
       // re-execute remaining steps and write a duplicate artifact.
       if (data.status === "completed") throw new Error("This workflow run already completed — nothing to resume.");
-      return requestedId;
+      // A resumed run keeps the company it was LAUNCHED for, even if the user
+      // switched companies while it sat paused.
+      return { runId: requestedId, companyKey: (data.company_key as string | null) ?? "" };
     }
 
     // A queue retry re-enters with the same agent_run_id: reuse the durable
@@ -563,7 +594,7 @@ export class WorkflowRunHandler {
     if (job.agent_run_id) {
       const { data: existing, error: existingError } = await this.deps.client
         .from("workflow_runs")
-        .select("id")
+        .select("id, company_key")
         .eq("account_id", job.account_id)
         .eq("workflow_id", card.id)
         .eq("agent_run_id", job.agent_run_id)
@@ -578,10 +609,11 @@ export class WorkflowRunHandler {
           step_state: {},
           thread_id: threadId,
         });
-        return existing.id as string;
+        return { runId: existing.id as string, companyKey: (existing.company_key as string | null) ?? "" };
       }
     }
 
+    const companyKey = scope.companyKey ?? "";
     const { data, error } = await this.deps.client
       .from("workflow_runs")
       .insert({
@@ -591,11 +623,12 @@ export class WorkflowRunHandler {
         step_state: {},
         agent_run_id: job.agent_run_id,
         thread_id: threadId,
+        company_key: companyKey,
       })
       .select("id")
       .single();
     if (error || !data) throw new Error(`Failed to create workflow run: ${error?.message ?? "no row returned"}`);
-    return data.id as string;
+    return { runId: data.id as string, companyKey };
   }
 
   private async markRunning(job: AgentJob, runId: string, card: LoadedWorkflowCard, route: ModelRoute): Promise<void> {
@@ -623,6 +656,7 @@ export class WorkflowRunHandler {
   private async insertArtifact(
     accountId: string,
     runId: string,
+    companyKey: string,
     card: LoadedWorkflowCard,
     bodyMd: string,
     frontmatter: WorkflowFrontmatter,
@@ -633,6 +667,7 @@ export class WorkflowRunHandler {
         account_id: accountId,
         workflow_id: card.id,
         run_id: runId,
+        company_key: companyKey,
         title: card.name,
         body_md: bodyMd,
         frontmatter,

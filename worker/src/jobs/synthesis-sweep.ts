@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAgentHooks } from "../agent/guardrails.js";
 import { ClaudeAgentRunner, type AgentRunner } from "../agent/runner.js";
 import { readVariables, writeVariables, type BrainVariable } from "../db/brain.js";
+import { loadCompanyScope } from "../db/company-scope.js";
 import { asRecord } from "../db/json.js";
 import type { AgentJob } from "../queue/types.js";
 import {
@@ -71,10 +72,18 @@ export class SynthesisSweepHandler {
   async handle(job: AgentJob): Promise<void> {
     const payload = asRecord(job.payload);
     const threadId = readString(payload.thread_id ?? payload.threadId);
+    // The sweep audits ONE company's brain — the one whose run triggered it
+    // ('' is a real bucket: accounts with no named company). Jobs queued
+    // before company scoping shipped carry no key and fall back to the
+    // active company.
+    const rawKey = payload.company_key ?? payload.companyKey;
+    const companyKey = typeof rawKey === "string"
+      ? rawKey
+      : (await loadCompanyScope(this.deps.client, job.account_id)).companyKey ?? "";
 
     // Sweep the source graph only — never our own outputs, or every sweep
     // would re-synthesize the previous sweep's records.
-    const all = await readVariables(this.deps.client, job.account_id, {});
+    const all = await readVariables(this.deps.client, job.account_id, companyKey, {});
     const sources = all.filter(
       (variable) => !variable.path.startsWith("contradiction.") && !variable.path.startsWith("synergy."),
     );
@@ -116,7 +125,7 @@ export class SynthesisSweepHandler {
       })),
     ];
     if (writes.length > 0) {
-      await writeVariables(this.deps.client, job.account_id, writes, { source: SWEEP_SOURCE });
+      await writeVariables(this.deps.client, job.account_id, companyKey, writes, { source: SWEEP_SOURCE });
     }
 
     if (threadId && writes.length > 0) {

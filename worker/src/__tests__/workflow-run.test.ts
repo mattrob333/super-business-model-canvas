@@ -121,11 +121,14 @@ class WorkflowFakeClient {
 
   async rpc(name: string, params: Record<string, unknown>): Promise<{ data: unknown; error: null }> {
     if (name !== "write_brain_variables") throw new Error(`Unexpected RPC ${name}`);
+    const companyKey = (params.p_company_key as string | null) ?? "";
     const writes = params.p_writes as Array<Record<string, unknown>>;
     for (const write of writes) {
-      this.rpcWrites.push(write);
-      const row = variable(String(write.path), write.value);
-      const index = this.tables.brain_variables.findIndex((entry) => entry.path === write.path);
+      this.rpcWrites.push({ ...write, company_key: companyKey });
+      const row = variable(String(write.path), write.value, companyKey);
+      const index = this.tables.brain_variables.findIndex(
+        (entry) => entry.path === write.path && entry.company_key === companyKey,
+      );
       if (index >= 0) this.tables.brain_variables[index] = row;
       else this.tables.brain_variables.push(row);
     }
@@ -206,10 +209,12 @@ class WorkflowFakeQuery {
   }
 }
 
-function variable(path: string, value: unknown): Record<string, unknown> {
+/** The fake context (Acme Strategy / acme.example) puts every seeded brain row in that company's era. */
+function variable(path: string, value: unknown, companyKey = "acme.example"): Record<string, unknown> {
   return {
     id: `var-${path}`,
     account_id: "account-1",
+    company_key: companyKey,
     path,
     value,
     confidence: "medium",
@@ -233,8 +238,12 @@ describe("workflow_run headless interpreter", () => {
     await handler.handle(workflowJob(workflowId));
 
     expect(runner.requests).toHaveLength(stepCount + (retryFirst ? 1 : 0));
-    expect(client.tables.workflow_runs.at(-1)).toMatchObject({ status: "completed", current_step: null });
+    // The run and its artifact are stamped with the company they ran for —
+    // brain reads/writes and the shelf all scope by this key.
+    expect(client.tables.workflow_runs.at(-1)).toMatchObject({ status: "completed", current_step: null, company_key: "acme.example" });
     expect(client.tables.workflow_artifacts).toHaveLength(1);
+    expect(client.tables.workflow_artifacts[0]).toMatchObject({ company_key: "acme.example" });
+    expect(client.rpcWrites.every((write) => write.company_key === "acme.example")).toBe(true);
     expect(client.tables.workflow_artifacts[0].body_md).toContain(`workflow: ${workflowId}`);
     expect(client.tables.workflow_artifacts[0].body_md).toContain("# ARTIFACT-CALL-");
     expect(client.rpcWrites.length).toBeGreaterThanOrEqual(stepCount);

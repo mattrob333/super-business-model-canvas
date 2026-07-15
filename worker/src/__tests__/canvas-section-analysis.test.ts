@@ -80,9 +80,12 @@ describe("CanvasSectionAnalysisHandler", () => {
         tokens_out: 50,
       },
     });
+    // The mirror is keyed to the analyzed context's company ("Acme", no
+    // website → normalized-name key), not merely the account.
     expect(writeVariablesMock).toHaveBeenCalledWith(
       expect.anything(),
       "account-1",
+      "acme",
       [{
         path: "canvas.value_propositions",
         value: [{ text: "Sharper customer promise", confidence: 0.82 }],

@@ -146,13 +146,14 @@ export function buildCanvasSnapshot(
   };
 }
 
-/** Load the account's canvas namespace, leaving active-company scoping to the brain store. */
+/** Load one company's canvas namespace (pass CompanyScope.companyKey). */
 export async function loadCanvasSnapshot(
   client: SupabaseClient,
   accountId: string,
+  companyKey: string | null,
   options: CanvasSnapshotOptions = {},
 ): Promise<CanvasSnapshot> {
-  const variables = await readVariables(client, accountId, { prefix: "canvas." });
+  const variables = await readVariables(client, accountId, companyKey, { prefix: "canvas." });
   return buildCanvasSnapshot(variables, options);
 }
 

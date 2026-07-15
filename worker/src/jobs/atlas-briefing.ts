@@ -128,7 +128,7 @@ export class AtlasBriefingHandler {
     const skills = await loadImplementedSkills(this.deps.client);
     const previous = await this.loadPreviousBriefing(accountId, scope);
     const changes = computeChanges(coverage, gaps, artifacts, previous);
-    const brainCoverage = await this.loadBrainCoverage(accountId);
+    const brainCoverage = await this.loadBrainCoverage(accountId, scope);
     const modelRoute = await this.loadModelRoute(accountId);
 
     // open_gaps in the run input is what lets the NEXT briefing compute the
@@ -269,9 +269,9 @@ export class AtlasBriefingHandler {
   }
 
   /** AT-5: brain-slot coverage — computed from the manifest; non-fatal. */
-  private async loadBrainCoverage(accountId: string): Promise<BrainCoverageSummary | null> {
+  private async loadBrainCoverage(accountId: string, scope: CompanyScope): Promise<BrainCoverageSummary | null> {
     try {
-      const report = await loadCoverageReport(this.deps.client, accountId);
+      const report = await loadCoverageReport(this.deps.client, accountId, scope.companyKey);
       return {
         filled: report.filled,
         total: report.total,

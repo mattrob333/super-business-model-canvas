@@ -44,17 +44,17 @@ export function WarRoomShelf({ accountId }: { accountId: string }) {
       .select("id, skill_key, title, created_at")
       .eq("account_id", accountId);
     if (scope) query = query.in("business_context_version_id", scope.contextIds);
+    // Workflow reports (Atlas runs) share the shelf, scoped to the active
+    // company like every other read — Wesco's positioning report must not sit
+    // on AcquiPortal's shelf (owner bug 2026-07-15).
+    let workflowQuery = supabaseUntyped
+      .from<{ id: string; workflow_id: string; title: string; stale: boolean; created_at: string }>("workflow_artifacts")
+      .select("id, workflow_id, title, stale, created_at")
+      .eq("account_id", accountId);
+    if (scope) workflowQuery = workflowQuery.eq("company_key", scope.companyKey ?? "");
     const [{ data: skillRows, error: skillError }, { data: workflowRows, error: workflowError }] = await Promise.all([
       query.order("created_at", { ascending: false }).limit(10),
-      // Workflow reports (Atlas runs) share the shelf. Account-scoped like
-      // the brain they read from; the run card's "saved to the shelf" copy
-      // depends on this list.
-      supabaseUntyped
-        .from<{ id: string; workflow_id: string; title: string; stale: boolean; created_at: string }>("workflow_artifacts")
-        .select("id, workflow_id, title, stale, created_at")
-        .eq("account_id", accountId)
-        .order("created_at", { ascending: false })
-        .limit(10),
+      workflowQuery.order("created_at", { ascending: false }).limit(10),
     ]);
     // Briefings auto-generate — only the NEWEST one earns shelf space, or a
     // week of briefings would bury the documents the team actually made.

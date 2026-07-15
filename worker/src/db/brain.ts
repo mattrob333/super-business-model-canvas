@@ -12,6 +12,8 @@ export type BrainConfidence = "high" | "medium" | "low";
 export interface BrainVariable {
   id: string;
   account_id: string;
+  /** Company era the value belongs to ('' when the account has no named company). */
+  company_key: string;
   path: string;
   value: unknown;
   confidence: BrainConfidence;
@@ -61,13 +63,23 @@ function assertNoError(error: { message: string } | null, operation: string): vo
   if (error) throw new Error(`BrainStore ${operation} failed: ${error.message}`);
 }
 
-/** Read account-scoped brain variables. No query can return another account's rows. */
+/**
+ * Read company-scoped brain variables. The company key is REQUIRED (owner bug
+ * 2026-07-15: account-wide reads fed Wesco's canvas into an AcquiPortal
+ * positioning run) — pass CompanyScope.companyKey; null means the account has
+ * no named company and maps to the '' bucket.
+ */
 export async function readVariables(
   client: SupabaseClient,
   accountId: string,
+  companyKey: string | null,
   options: BrainReadOptions = {},
 ): Promise<BrainVariable[]> {
-  let query = client.from("brain_variables").select("*").eq("account_id", accountId);
+  let query = client
+    .from("brain_variables")
+    .select("*")
+    .eq("account_id", accountId)
+    .eq("company_key", companyKey ?? "");
   if (options.prefix !== undefined) query = query.like("path", `${options.prefix}%`);
   if (options.paths !== undefined) query = query.in("path", options.paths);
 
@@ -83,6 +95,7 @@ export async function readVariables(
 export async function writeVariables(
   client: SupabaseClient,
   accountId: string,
+  companyKey: string | null,
   writes: BrainVariableWrite[],
   options: BrainWriteOptions,
 ): Promise<BrainWriteResult> {
@@ -98,6 +111,7 @@ export async function writeVariables(
     })),
     p_source: options.source,
     p_source_artifact: options.sourceArtifact ?? null,
+    p_company_key: companyKey ?? "",
   });
   assertNoError(error, "write");
 
