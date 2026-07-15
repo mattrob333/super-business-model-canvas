@@ -148,12 +148,18 @@ export function AtlasChat({
     [],
   );
 
-  /** The single source of truth for "is a workflow running": the durable table. */
+  /**
+   * The single source of truth for "is a workflow running": the durable
+   * table, scoped to the ACTIVE company — another company's in-flight run
+   * must neither block this company's launcher nor hijack its chat.
+   */
   const findActiveRun = useCallback(async () => {
+    const scope = await loadCompanyScope(accountId).catch(() => null);
     const { data } = await supabaseUntyped
       .from<{ id: string; workflow_id: string; thread_id: string | null; status: string }>("workflow_runs")
       .select("id, workflow_id, thread_id, status")
       .eq("account_id", accountId)
+      .eq("company_key", scope?.companyKey ?? "")
       .in("status", ["queued", "running", "awaiting_input"])
       .order("created_at", { ascending: false })
       .limit(1);
@@ -419,12 +425,15 @@ export function AtlasChat({
     const finish = async () => {
       const watched = activeWorkflowRef.current;
       setActiveWorkflow(null);
-      const { data } = await supabaseUntyped
+      // Report on the run we were actually watching; only fall back to the
+      // account's newest run for legacy watchers with no row id (and never
+      // let another company's failure surface here).
+      let query = supabaseUntyped
         .from<{ status: string; error: string | null; workflow_id: string }>("workflow_runs")
         .select("status, error, workflow_id")
-        .eq("account_id", accountId)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .eq("account_id", accountId);
+      if (watched?.runRowId) query = query.eq("id", watched.runRowId);
+      const { data } = await query.order("created_at", { ascending: false }).limit(1);
       if (cancelled || disposedRef.current) return;
       const last = data?.[0];
       if (last?.status === "failed" && last.error) {

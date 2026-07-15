@@ -35,6 +35,8 @@ system_preamble: |
   - If research contradicts the canvas, say so explicitly — do not silently comply.
 steps:
   - id: s1-alternatives
+    label: Map who you actually compete with
+    eta_hint: "Researching competitors on the live web — usually 5–10 minutes"
     prompt: |
       TASK: Establish what customers would ACTUALLY do if this product didn't exist.
       Dunford's rule: your real competition is rarely who you think — it includes
@@ -71,6 +73,8 @@ steps:
       - component: ComparisonStrip
         bind: competitive_alternatives
   - id: s2-attributes
+    label: Isolate what only you have
+    eta_hint: "Reasoning over the step-1 research — usually 2–4 minutes"
     prompt: |
       TASK: List what we have that the alternatives from step 1 lack. Attributes are
       FACTS about the product/company — features, capabilities, delivery model,
@@ -101,6 +105,8 @@ steps:
         bind: unique_attributes
         props: {title: "What only we have", columns: [attribute, evidence, evidence_type]}
   - id: s3-value
+    label: Turn attributes into value themes
+    eta_hint: "May pause to ask about your won deals — then 2–4 minutes"
     prompt: |
       TASK: Translate attributes into value. Attribute → benefit → VALUE (the
       customer-goal language). Cluster into 2-4 themes max — more than 4 means
@@ -135,6 +141,8 @@ steps:
       - component: ValueThemeCard
         bind: value_themes
   - id: s4-segment
+    label: Score who cares most
+    eta_hint: "Scoring candidate segments — usually 2–4 minutes"
     prompt: |
       TASK: Identify who cares MOST about these value themes — the customers who
       feel the value so strongly they buy fast, pay more, and refer.
@@ -159,6 +167,8 @@ steps:
     reads: ["canvas_snapshot", "s3-value"]
     variables_schema: {"type":"object","required":["best_fit_segment"],"properties":{"best_fit_segment":{"type":"object"}}}
   - id: s5-category
+    label: Choose the market frame
+    eta_hint: "Researching category language on the live web — usually 5–10 minutes"
     prompt: |
       TASK: Choose the market frame — the category context that makes our value
       obvious to the best-fit segment. Dunford's three plays:
@@ -191,6 +201,8 @@ steps:
     reads: ["canvas_snapshot", "s4-segment"]
     variables_schema: {"type":"object","required":["category_frame"],"properties":{"category_frame":{"type":"object"}}}
   - id: s6-assembly
+    label: Assemble the positioning canon
+    eta_hint: "Writing the statements and messaging hierarchy — usually 2–4 minutes"
     prompt: |
       TASK: Assemble the positioning into canonical, reusable statements. Now — and
       only now — language gets polished.

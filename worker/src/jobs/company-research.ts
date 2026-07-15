@@ -3,6 +3,7 @@ import type { AgentRunner } from "../agent/runner.js";
 import { ClaudeAgentRunner, OpenRouterChatRunner } from "../agent/runner.js";
 import { asRecord } from "../db/json.js";
 import { writeVariables } from "../db/brain.js";
+import { companyKeyOf, loadCompanyScope } from "../db/company-scope.js";
 import { SECTION_KEYS, SECTION_LABELS, isSectionKey, type SectionKey } from "../domain/sections.js";
 import { FeedRunner } from "../feeds/feed-runner.js";
 import type { EvidenceCandidate, FeedRuntimeConfig } from "../feeds/types.js";
@@ -511,6 +512,10 @@ ${evidencePrompt(evidence)}`,
   }
 
   private async writeVerifiedClaims(job: AgentJob, subject: ResearchSubject, claims: VerifiedClaim[]): Promise<void> {
+    // Brain mirrors land in the researched company's own brain — keyed off
+    // the context under research, not whatever company is active right now.
+    const mirrorKey = companyKeyOf(subject.context.company_name, subject.context.website ?? null)
+      ?? (await loadCompanyScope(this.deps.client, job.account_id)).companyKey;
     const grouped = new Map<SectionKey, VerifiedClaim[]>();
     for (const claim of claims) {
       if (claim.status === "contradicted") {
@@ -556,6 +561,7 @@ ${evidencePrompt(evidence)}`,
           await writeVariables(
             this.deps.client,
             job.account_id,
+            mirrorKey,
             [{
               path: `canvas.${sectionKey}`,
               value: sectionClaims.map((claim) => ({

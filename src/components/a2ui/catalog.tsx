@@ -364,6 +364,9 @@ const ChoiceChips: CatalogRenderer = (props, ctx) => {
 interface RunStep {
   id?: unknown;
   status?: unknown;
+  /** Authored in the workflow card: human step name + expectation-setter. */
+  label?: unknown;
+  eta_hint?: unknown;
 }
 
 const WorkflowRunCard: CatalogRenderer = (props, ctx) => {
@@ -404,18 +407,26 @@ const WorkflowRunCard: CatalogRenderer = (props, ctx) => {
             const stepId = str(step.id) ?? `step ${index + 1}`;
             const state = str(step.status) ?? "pending";
             const active = status === "running" && state === "pending" && index === done;
+            const label = str(step.label) ?? (stepId.replace(/^s?\d+[-.]?\s*/, "").replace(/-/g, " ") || stepId);
+            // The expectation-setter (authored in the card) shows only under
+            // the ACTIVE step: "researching the live web — usually 5–10 min"
+            // is the difference between "working" and "looks hung".
+            const eta = active ? str(step.eta_hint) : null;
             return (
-              <li key={stepId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                {state === "completed" ? (
-                  <Check className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                ) : active ? (
-                  <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />
-                ) : (
-                  <CircleDashed className="h-3 w-3 shrink-0" />
-                )}
-                <span className={`truncate ${state === "completed" ? "text-foreground" : ""}`}>
-                  {stepId.replace(/^s?\d+[-.]?\s*/, "").replace(/-/g, " ") || stepId}
+              <li key={stepId} className="text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  {state === "completed" ? (
+                    <Check className="h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  ) : active ? (
+                    <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />
+                  ) : (
+                    <CircleDashed className="h-3 w-3 shrink-0" />
+                  )}
+                  <span className={`truncate ${state === "completed" ? "text-foreground" : ""}`}>{label}</span>
                 </span>
+                {eta && (
+                  <p className="ml-[18px] mt-0.5 text-[11px] italic text-muted-foreground/80">{eta}</p>
+                )}
               </li>
             );
           })}

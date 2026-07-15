@@ -39,9 +39,12 @@ describe("CompanyResearchHandler", () => {
     });
     const items = canvasInsert?.value.items as Array<{ evidence_ids: string[] }> | undefined;
     expect(items?.[0]?.evidence_ids).toEqual(["evidence-1"]);
+    // The mirror is keyed to the researched context's company (acme.example),
+    // not whatever company happens to be active.
     expect(writeVariablesMock).toHaveBeenCalledWith(
       client.asSupabase(),
       "account-1",
+      "acme.example",
       expect.arrayContaining([
         expect.objectContaining({ path: "canvas.value_propositions", confidence: "high" }),
       ]),

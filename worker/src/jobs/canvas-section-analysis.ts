@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentTaskLimits } from "../agent/limits.js";
 import { createAgentHooks } from "../agent/guardrails.js";
 import { ClaudeAgentRunner, type AgentRunner } from "../agent/runner.js";
-import { loadCompanyScope } from "../db/company-scope.js";
+import { companyKeyOf, loadCompanyScope } from "../db/company-scope.js";
 import { writeVariables } from "../db/brain.js";
 import { asRecord, asStringArray } from "../db/json.js";
 import { buildSystemPrompt, buildUserPrompt, parseLegacySectionAnalysis } from "../domain/legacy-output.js";
@@ -30,6 +30,7 @@ interface ModelRoute {
 interface BusinessContext {
   company_name?: string;
   industry?: string;
+  website?: string | null;
 }
 
 export interface CanvasSectionAnalysisDependencies {
@@ -113,10 +114,15 @@ export class CanvasSectionAnalysisHandler {
     // Brain mirror is a secondary sink (AT-1 R3): a failure here must never
     // fail the analysis itself. Value shape matches the company-research
     // mirror ({text, confidence} items) so canvas.<section> is uniform.
+    // The mirror lands in the brain of the company the analyzed CONTEXT
+    // belongs to (falling back to the active company for anonymous contexts).
     try {
+      const mirrorKey = companyKeyOf(businessContext.company_name ?? null, businessContext.website ?? null)
+        ?? (await loadCompanyScope(this.deps.client, job.account_id)).companyKey;
       await writeVariables(
         this.deps.client,
         job.account_id,
+        mirrorKey,
         [{
           path: `canvas.${sectionKey}`,
           value: parsed.items.map((text) => ({ text, confidence: parsed.confidence })),
@@ -181,7 +187,7 @@ export class CanvasSectionAnalysisHandler {
     const contextId = typeof payload.businessContextVersionId === "string" ? payload.businessContextVersionId : null;
     let query = this.deps.client
       .from("business_context_versions")
-      .select("company_name, industry")
+      .select("company_name, industry, website")
       .eq("account_id", accountId);
 
     query = contextId ? query.eq("id", contextId) : query.order("created_at", { ascending: false });

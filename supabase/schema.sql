@@ -3135,10 +3135,79 @@ on conflict (route_key) where account_id is null do update set
 -- =============================================================================
 -- ATLAS AT-1: BUSINESS BRAIN + COVERAGE MANIFEST
 -- =============================================================================
+-- Brain rows are COMPANY-scoped inside the account (2026-07-15 migration):
+-- company_key is the era identity from company-scope.ts (website domain, else
+-- normalized name; '' when the account has no named company). The SQL
+-- normalizer mirrors below serve backfills and legacy-signature RPC calls —
+-- steady-state keys are computed in JS and passed explicitly.
+
+create or replace function public.normalize_company_domain(p_website text)
+returns text
+language sql
+immutable
+as $$
+  select case when candidate like '%.%' then candidate end
+  from (
+    select regexp_replace(
+             regexp_replace(
+               regexp_replace(
+                 regexp_replace(lower(btrim(coalesce(p_website, ''))), '^[a-z][a-z0-9+.-]*://', ''),
+                 '[/?#].*$', ''),
+               '^www\.', ''),
+             ':[0-9]+$', '') as candidate
+  ) normalized;
+$$;
+
+create or replace function public.normalize_company_name(p_name text)
+returns text
+language sql
+immutable
+as $$
+  select nullif(btrim(regexp_replace(
+    regexp_replace(
+      regexp_replace(lower(coalesce(p_name, '')), '[^[:alnum:]]+', ' ', 'g'),
+      '\y(inc|llc|ltd|corp|corporation|co|company|gmbh|sa|plc)\y', ' ', 'g'),
+    '\s+', ' ', 'g')), '');
+$$;
+
+create or replace function public.company_key_of(p_name text, p_website text)
+returns text
+language sql
+immutable
+as $$
+  select coalesce(public.normalize_company_domain(p_website), public.normalize_company_name(p_name));
+$$;
+
+-- The company era active at a moment in time: the newest NAMED context at or
+-- before p_at opens the era (anonymous ensure-rows inherit it); rows older
+-- than every named context belong to the first era; '' for accounts with no
+-- named context at all.
+create or replace function public.company_key_at(p_account_id uuid, p_at timestamptz)
+returns text
+language sql
+stable
+as $$
+  select coalesce(
+    (select public.company_key_of(company_name, website)
+       from public.business_context_versions
+      where account_id = p_account_id
+        and created_at <= p_at
+        and public.company_key_of(company_name, website) is not null
+      order by created_at desc
+      limit 1),
+    (select public.company_key_of(company_name, website)
+       from public.business_context_versions
+      where account_id = p_account_id
+        and public.company_key_of(company_name, website) is not null
+      order by created_at asc
+      limit 1),
+    '');
+$$;
 
 create table if not exists public.brain_variables (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null references public.accounts(id) on delete cascade,
+  company_key text not null default '',
   path text not null,
   value jsonb not null,
   confidence text not null check (confidence in ('high', 'medium', 'low')),
@@ -3149,14 +3218,16 @@ create table if not exists public.brain_variables (
   source_artifact text,
   staleness_policy text,
   updated_at timestamptz not null default now(),
-  created_at timestamptz not null default now(),
-  unique (account_id, path)
+  created_at timestamptz not null default now()
 );
+alter table public.brain_variables add column if not exists company_key text not null default '';
+alter table public.brain_variables drop constraint if exists brain_variables_account_id_path_key;
 
 create table if not exists public.brain_variable_history (
   id uuid primary key default gen_random_uuid(),
   variable_id uuid not null references public.brain_variables(id) on delete cascade,
   account_id uuid not null references public.accounts(id) on delete cascade,
+  company_key text not null default '',
   path text not null,
   value jsonb not null,
   confidence text not null check (confidence in ('high', 'medium', 'low')),
@@ -3187,12 +3258,16 @@ create table if not exists public.coverage_manifest (
   updated_at timestamptz not null default now()
 );
 
-create unique index if not exists brain_variables_account_path_unique
-  on public.brain_variables(account_id, path);
-create index if not exists brain_variables_account_path_idx
-  on public.brain_variables(account_id, path);
+alter table public.brain_variable_history add column if not exists company_key text not null default '';
+
+drop index if exists public.brain_variables_account_path_unique;
+drop index if exists public.brain_variables_account_path_idx;
+create unique index if not exists brain_variables_account_company_path_unique
+  on public.brain_variables(account_id, company_key, path);
 create index if not exists brain_variable_history_account_path_created_idx
   on public.brain_variable_history(account_id, path, created_at desc);
+create index if not exists brain_variable_history_account_company_path_idx
+  on public.brain_variable_history(account_id, company_key, path, created_at desc);
 create index if not exists brain_variable_history_variable_created_idx
   on public.brain_variable_history(variable_id, created_at desc);
 create unique index if not exists coverage_manifest_global_path_unique
@@ -3230,12 +3305,16 @@ create trigger brain_variable_history_append_only
 
 -- One service-role RPC is the transaction boundary for trust evaluation,
 -- variable upserts, and append-only history. Lock paths in deterministic order
--- so concurrent worker jobs cannot race a user-authored value.
+-- so concurrent worker jobs cannot race a user-authored value. The 5-arg
+-- signature carries the company key explicitly (no default — PostgREST
+-- named-argument resolution must never see an ambiguous call); the legacy
+-- 4-arg signature delegates with the ACTIVE company key for the deploy window.
 create or replace function public.write_brain_variables(
   p_account_id uuid,
   p_writes jsonb,
   p_source text,
-  p_source_artifact text default null
+  p_source_artifact text,
+  p_company_key text
 )
 returns jsonb
 language plpgsql
@@ -3243,6 +3322,7 @@ security definer
 set search_path = public
 as $$
 declare
+  v_company_key text := coalesce(btrim(p_company_key), '');
   v_write jsonb;
   v_path text;
   v_value jsonb;
@@ -3274,7 +3354,7 @@ begin
 
   -- Advisory locks cover paths that do not exist yet; row locks below cover
   -- existing records. Sorting prevents deadlocks for overlapping batches.
-  perform pg_advisory_xact_lock(hashtextextended(p_account_id::text || ':' || value, 0))
+  perform pg_advisory_xact_lock(hashtextextended(p_account_id::text || ':' || v_company_key || ':' || value, 0))
   from (
     select distinct item->>'path' as value
     from jsonb_array_elements(p_writes) item
@@ -3296,7 +3376,7 @@ begin
 
     select * into v_existing
     from public.brain_variables
-    where account_id = p_account_id and path = v_path
+    where account_id = p_account_id and company_key = v_company_key and path = v_path
     for update;
 
     if found
@@ -3304,10 +3384,11 @@ begin
       and v_is_machine then
       v_contradiction_path := 'contradiction.' || v_path;
       insert into public.brain_variables (
-        account_id, path, value, confidence, source, source_artifact,
+        account_id, company_key, path, value, confidence, source, source_artifact,
         staleness_policy, updated_at
       ) values (
         p_account_id,
+        v_company_key,
         v_contradiction_path,
         jsonb_build_object(
           'existing', v_existing.value,
@@ -3320,7 +3401,7 @@ begin
         null,
         now()
       )
-      on conflict (account_id, path) do update set
+      on conflict (account_id, company_key, path) do update set
         value = excluded.value,
         confidence = excluded.confidence,
         source = excluded.source,
@@ -3337,13 +3418,13 @@ begin
       ));
     else
       insert into public.brain_variables (
-        account_id, path, value, confidence, source, source_artifact,
+        account_id, company_key, path, value, confidence, source, source_artifact,
         staleness_policy, updated_at
       ) values (
-        p_account_id, v_path, v_value, v_confidence, p_source,
+        p_account_id, v_company_key, v_path, v_value, v_confidence, p_source,
         p_source_artifact, v_staleness_policy, now()
       )
-      on conflict (account_id, path) do update set
+      on conflict (account_id, company_key, path) do update set
         value = excluded.value,
         confidence = excluded.confidence,
         source = excluded.source,
@@ -3362,10 +3443,10 @@ begin
     end if;
 
     insert into public.brain_variable_history (
-      variable_id, account_id, path, value, confidence, source,
+      variable_id, account_id, company_key, path, value, confidence, source,
       source_artifact, staleness_policy, change_reason, updated_at, created_at
     ) values (
-      v_saved.id, v_saved.account_id, v_saved.path, v_saved.value,
+      v_saved.id, v_saved.account_id, v_saved.company_key, v_saved.path, v_saved.value,
       v_saved.confidence, v_saved.source, v_saved.source_artifact,
       v_saved.staleness_policy, v_reason, v_saved.updated_at, v_saved.created_at
     );
@@ -3376,11 +3457,13 @@ begin
     v_existing := null;
   end loop;
 
-  -- AT-6 cascade invalidation: consuming artifacts go stale on upstream change.
+  -- AT-6 cascade invalidation: consuming artifacts go stale on upstream change
+  -- — within the same company only.
   if array_length(v_written_paths, 1) > 0 then
     update public.workflow_artifacts
     set stale = true
     where account_id = p_account_id
+      and company_key = v_company_key
       and stale = false
       and frontmatter->'consumed' ?| v_written_paths;
   end if;
@@ -3393,17 +3476,41 @@ begin
 end;
 $$;
 
+revoke all on function public.write_brain_variables(uuid, jsonb, text, text, text) from public, anon, authenticated;
+grant execute on function public.write_brain_variables(uuid, jsonb, text, text, text) to service_role;
+
+-- Legacy 4-arg signature: delegate with the account's ACTIVE company key.
+create or replace function public.write_brain_variables(
+  p_account_id uuid,
+  p_writes jsonb,
+  p_source text,
+  p_source_artifact text default null
+)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select public.write_brain_variables(
+    p_account_id, p_writes, p_source, p_source_artifact,
+    public.company_key_at(p_account_id, now())
+  );
+$$;
+
 revoke all on function public.write_brain_variables(uuid, jsonb, text, text) from public, anon, authenticated;
 grant execute on function public.write_brain_variables(uuid, jsonb, text, text) to service_role;
 
 -- The ONE authenticated write path into the brain (AT-4 write-back): users
 -- editing a VariableCard (user_override) or answering a GapPrompt
 -- (user_stated). User values are ground truth — they always win and carry
--- high confidence. Machine writes keep using write_brain_variables.
+-- high confidence. Machine writes keep using write_brain_variables. The
+-- 5-arg signature carries the company key; the legacy 4-arg signature
+-- delegates with the ACTIVE company key (already-open tabs keep working).
 create or replace function public.write_brain_variable(
   p_account_id uuid,
   p_path text,
   p_value jsonb,
+  p_company_key text,
   p_source text default 'user_override'
 )
 returns jsonb
@@ -3412,6 +3519,7 @@ security definer
 set search_path = public
 as $$
 declare
+  v_company_key text := coalesce(btrim(p_company_key), '');
   v_path text;
   v_saved public.brain_variables;
   v_existing_id uuid;
@@ -3433,20 +3541,20 @@ begin
     raise exception 'value is required';
   end if;
 
-  perform pg_advisory_xact_lock(hashtextextended(p_account_id::text || ':' || v_path, 0));
+  perform pg_advisory_xact_lock(hashtextextended(p_account_id::text || ':' || v_company_key || ':' || v_path, 0));
 
   select id into v_existing_id
   from public.brain_variables
-  where account_id = p_account_id and path = v_path
+  where account_id = p_account_id and company_key = v_company_key and path = v_path
   for update;
 
   insert into public.brain_variables (
-    account_id, path, value, confidence, source, source_artifact,
+    account_id, company_key, path, value, confidence, source, source_artifact,
     staleness_policy, updated_at
   ) values (
-    p_account_id, v_path, p_value, 'high', p_source, null, null, now()
+    p_account_id, v_company_key, v_path, p_value, 'high', p_source, null, null, now()
   )
-  on conflict (account_id, path) do update set
+  on conflict (account_id, company_key, path) do update set
     value = excluded.value,
     confidence = excluded.confidence,
     source = excluded.source,
@@ -3454,10 +3562,10 @@ begin
   returning * into v_saved;
 
   insert into public.brain_variable_history (
-    variable_id, account_id, path, value, confidence, source,
+    variable_id, account_id, company_key, path, value, confidence, source,
     source_artifact, staleness_policy, change_reason, updated_at, created_at
   ) values (
-    v_saved.id, v_saved.account_id, v_saved.path, v_saved.value,
+    v_saved.id, v_saved.account_id, v_saved.company_key, v_saved.path, v_saved.value,
     v_saved.confidence, v_saved.source, v_saved.source_artifact,
     v_saved.staleness_policy,
     case when v_existing_id is null then 'initial' else 'user_override' end,
@@ -3465,15 +3573,38 @@ begin
   );
 
   -- AT-6 cascade invalidation: a user override stales every artifact that
-  -- consumed the old value.
+  -- consumed the old value — within the same company only.
   update public.workflow_artifacts
   set stale = true
   where account_id = p_account_id
+    and company_key = v_company_key
     and stale = false
     and frontmatter->'consumed' ? v_path;
 
   return to_jsonb(v_saved);
 end;
+$$;
+
+revoke all on function public.write_brain_variable(uuid, text, jsonb, text, text) from public, anon;
+grant execute on function public.write_brain_variable(uuid, text, jsonb, text, text) to authenticated, service_role;
+
+-- Legacy 4-arg signature: delegate with the ACTIVE company key.
+create or replace function public.write_brain_variable(
+  p_account_id uuid,
+  p_path text,
+  p_value jsonb,
+  p_source text default 'user_override'
+)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select public.write_brain_variable(
+    p_account_id, p_path, p_value,
+    public.company_key_at(p_account_id, now()),
+    p_source
+  );
 $$;
 
 revoke all on function public.write_brain_variable(uuid, text, jsonb, text) from public, anon;
@@ -3518,14 +3649,19 @@ create table if not exists public.workflow_runs (
   agent_run_id uuid references public.agent_runs(id) on delete set null,
   -- Launch thread: lets any surface discover an active run and resume watching.
   thread_id uuid references public.workspace_threads(id) on delete set null,
+  -- Company era the run was LAUNCHED for — brain reads/writes for the run's
+  -- whole life use this key, so a mid-run company switch cannot bleed.
+  company_key text not null default '',
   created_at timestamptz not null default now(),
   started_at timestamptz,
   finished_at timestamptz
 );
+alter table public.workflow_runs add column if not exists company_key text not null default '';
 create index if not exists workflow_runs_agent_run_idx
   on public.workflow_runs(agent_run_id) where agent_run_id is not null;
+drop index if exists public.workflow_runs_active_idx;
 create index if not exists workflow_runs_active_idx
-  on public.workflow_runs(account_id, created_at desc)
+  on public.workflow_runs(account_id, company_key, created_at desc)
   where status in ('queued', 'running', 'awaiting_input');
 
 create table if not exists public.workflow_artifacts (
@@ -3533,12 +3669,16 @@ create table if not exists public.workflow_artifacts (
   account_id uuid not null references public.accounts(id) on delete cascade,
   workflow_id text not null,
   run_id uuid not null references public.workflow_runs(id) on delete cascade,
+  company_key text not null default '',
   title text not null,
   body_md text not null,
   frontmatter jsonb not null default '{}'::jsonb,
   stale boolean not null default false,
   created_at timestamptz not null default now()
 );
+alter table public.workflow_artifacts add column if not exists company_key text not null default '';
+create index if not exists workflow_artifacts_account_company_created_idx
+  on public.workflow_artifacts(account_id, company_key, created_at desc);
 
 do $$
 begin

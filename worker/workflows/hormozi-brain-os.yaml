@@ -18,6 +18,8 @@ system_preamble: |
   2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
 steps:
   - id: 00-market-fit
+    label: Score the market (pain, budget, reach, growth)
+    eta_hint: "Asks you three intake questions first — then 2–4 minutes"
     prompt: |
       You are operating as Alex Hormozi evaluating whether this business is aimed at a market worth dominating.
 
@@ -50,6 +52,8 @@ steps:
         question: "What caps your capacity to deliver or scale right now (people, hours, compliance, anything)?"
         mode: text
   - id: 01-value-equation
+    label: Build and score 10 offers
+    eta_hint: "Building offer variants and scoring the Value Equation — usually 3–6 minutes"
     prompt: |
       You are building a Grand Slam Offer using Hormozi's Value Equation.
 
@@ -89,6 +93,8 @@ steps:
         bind: value_equation_scores
         props: {title: "Value Equation scores", sort: value_score}
   - id: 02-enhancement-stack
+    label: Stack bonuses, guarantee, scarcity
+    eta_hint: "Assembling the one-page offer — usually 2–4 minutes"
     prompt: |
       Take Offer #1 from the previous step and apply Hormozi's five offer enhancers:
 
@@ -118,6 +124,8 @@ steps:
         bind: bonus_stack
         props: {title: "Bonus stack"}
   - id: 03-hooks
+    label: Generate 60+ hooks in your avatar's language
+    eta_hint: "Writing and ranking hooks — usually 3–6 minutes"
     prompt: |
       You are generating scroll-stopping hooks for the offer above, in the avatar's language.
 
@@ -146,6 +154,8 @@ steps:
         bind: hooks
         props: {title: "Top hooks"}
   - id: 04-proof-authority
+    label: Turn proof into persuasion assets
+    eta_hint: "Rewriting proof in three lengths — usually 2–4 minutes"
     prompt: |
       You are converting our raw proof into persuasion assets.
 
@@ -175,6 +185,8 @@ steps:
         bind: proof_assets
         props: {title: "Proof library"}
   - id: 05-content-batching
+    label: Batch a 30-day content engine
+    eta_hint: "Building pillars and the day-by-day calendar — usually 3–6 minutes"
     prompt: |
       You are turning this offer into a 30-day content engine.
 
@@ -198,6 +210,8 @@ steps:
         bind: content_pillars
         props: {title: "Content pillars"}
   - id: 06-funnel-audit
+    label: Audit the funnel, output the punch list
+    eta_hint: "Stress-testing the path from stranger to customer — usually 2–4 minutes"
     prompt: |
       You are auditing the path from stranger → lead → customer.
 

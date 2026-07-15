@@ -28,6 +28,7 @@ function variable(path: string, value: unknown, source = "scraped"): Record<stri
   return {
     id: `var-${path}`,
     account_id: "account-1",
+    company_key: "acme.example",
     path,
     value,
     confidence: "medium",
@@ -52,6 +53,15 @@ class SweepFakeClient {
   readonly tables: Record<string, Record<string, unknown>[]> = {
     brain_variables: [],
     workspace_messages: [],
+    // Lets the no-company_key payload fallback resolve the active company
+    // (jobs queued before company scoping shipped carry no key).
+    business_context_versions: [{
+      id: "context-1",
+      account_id: "account-1",
+      company_name: "Acme Strategy",
+      website: "https://acme.example",
+      created_at: "2026-07-12T00:00:00Z",
+    }],
     agent_runs: [{ id: "run-sweep-1", account_id: "account-1" }],
     model_routes: [{
       account_id: null,
@@ -73,7 +83,7 @@ class SweepFakeClient {
   async rpc(name: string, params: Record<string, unknown>) {
     if (name !== "write_brain_variables") throw new Error(`Unexpected RPC ${name}`);
     for (const write of params.p_writes as Array<Record<string, unknown>>) {
-      this.rpcWrites.push({ ...write, source: params.p_source });
+      this.rpcWrites.push({ ...write, source: params.p_source, company_key: params.p_company_key });
     }
     return { data: { variables: [], contradictions: [], history: [] }, error: null };
   }
@@ -163,6 +173,9 @@ describe("SynthesisSweepHandler", () => {
     expect(paths).toContain("contradiction.sweep.canvas.revenue_streams+positioning.statement");
     expect(paths).toContain("synergy.canvas.key_resources+intel.competitor_gaps");
     expect(client.rpcWrites.every((write) => write.source === "workflow:synthesis-sweep@v1.0#s1")).toBe(true);
+    // No company_key in the payload → the sweep resolved the active company
+    // and wrote its findings into that company's brain.
+    expect(client.rpcWrites.every((write) => write.company_key === "acme.example")).toBe(true);
 
     const messages = client.tables.workspace_messages;
     expect(messages).toHaveLength(1);

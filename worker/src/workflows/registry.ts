@@ -52,6 +52,15 @@ const awaitInputSchema = z.strictObject({
 
 const workflowStepSchema = z.strictObject({
   id: z.string().min(1),
+  /** Human step name shown on the run card (falls back to a prettified id). */
+  label: z.string().min(1).optional(),
+  /**
+   * Expectation-setter shown while the step is active — e.g. "Researching
+   * competitors on the live web — usually 5–10 minutes". Owner finding
+   * 2026-07-15: an unexplained spinner on a long research step reads as a
+   * hung run.
+   */
+  eta_hint: z.string().min(1).optional(),
   prompt: z.string().min(1),
   reads: z.array(z.string()),
   variables_schema: jsonSchemaObject,

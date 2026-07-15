@@ -397,10 +397,13 @@ render (records themselves exist from AT-1).
    overlaps with workflow cards. Supersede, merge, or keep for skill-orchestration?
 3. **Workflow launch UX home**: War Room hero buttons (shipped in AT-3) vs. a
    Workflows drawer vs. Atlas chat commands ("run positioning sprint").
-4. **Competitor-scoped brains**: `brain_variables` is account-scoped (your business).
-   Competitor intel stays in the existing canvas/evidence system; `intel.*` variables
-   describe YOUR competitive picture. If per-competitor brains are ever wanted,
-   that's a `company_id` column + scoping decision.
+4. **Competitor-scoped brains** — ~~RESOLVED 2026-07-15 (the company half)~~: the
+   brain is now COMPANY-scoped inside the account (`company_key` era identity from
+   company-scope.ts on `brain_variables`/history/`workflow_runs`/`workflow_artifacts`;
+   migration `20260715220000_brain_company_scope.sql`). Forced by a live incident:
+   an "AcquiPortal" positioning sprint read the account-wide brain and positioned
+   Wesco. Per-COMPETITOR brains (intel about rivals) remain out of scope — the
+   canvas/evidence system still owns competitor intel.
 5. **Draft stubs for the other 21 workflows** in a catalog UI now, or when a workflow
    browser ships. (Library doc allows "at most" stubs.)
 6. **skill_run ↔ workflow_run convergence**: eventually skills could become

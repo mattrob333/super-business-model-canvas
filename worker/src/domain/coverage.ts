@@ -127,10 +127,16 @@ export function scoreCoverage(
 }
 
 /**
- * Load the account's coverage report. Account-specific manifest rows override
- * the global template at the same path (the `account_id is null` seed).
+ * Load the coverage report for one company (pass CompanyScope.companyKey).
+ * Account-specific manifest rows override the global template at the same
+ * path (the `account_id is null` seed); the manifest stays account-level —
+ * only the VARIABLES that fill it are company-scoped.
  */
-export async function loadCoverageReport(client: SupabaseClient, accountId: string): Promise<CoverageReport> {
+export async function loadCoverageReport(
+  client: SupabaseClient,
+  accountId: string,
+  companyKey: string | null,
+): Promise<CoverageReport> {
   const { data, error } = await client
     .from("coverage_manifest")
     .select("account_id, path, section_key, title, value_weight, fill_actions, freshness, sort_order")
@@ -149,7 +155,7 @@ export async function loadCoverageReport(client: SupabaseClient, accountId: stri
   const namespaces = new Set([...byPath.keys()].map((path) => `${path.split(".")[0]}.`));
   const variables: CoverageVariable[] = [];
   for (const prefix of namespaces) {
-    const rows = await readVariables(client, accountId, { prefix });
+    const rows = await readVariables(client, accountId, companyKey, { prefix });
     variables.push(...rows.map((row) => ({ path: row.path, value: row.value, updated_at: row.updated_at })));
   }
 

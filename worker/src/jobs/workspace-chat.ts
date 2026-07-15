@@ -317,7 +317,7 @@ export class WorkspaceChatHandler {
       loadSectionCoverage(this.deps.client, accountId, scope),
       loadGapSummary(this.deps.client, accountId, scope),
       loadImplementedSkills(this.deps.client),
-      loadCoverageReport(this.deps.client, accountId).catch((error: unknown) => {
+      loadCoverageReport(this.deps.client, accountId, scope.companyKey).catch((error: unknown) => {
         console.error(`[coverage] atlas chat coverage failed: ${error instanceof Error ? error.message : String(error)}`);
         return null;
       }),
