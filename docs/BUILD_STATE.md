@@ -285,6 +285,41 @@ Production-readiness audit after the first live deploy, plus public-surface UX p
 
 ## REVIEW FINDINGS
 
+### Interactive workflow steps: pause, ask, resume (2026-07-15)
+
+The last piece of "Atlas guides the user through workflows" (owner
+direction; library doc §4 Guided Interview Mode). A card step can now
+declare `await_input` — what to ASK the user before the step runs.
+
+- **Card schema**: `await_input: [{slot, question, mode: text|chips,
+  options?}]`. Authored: hormozi step 00 asks the three intake questions
+  its own `missing_input_behavior` always prescribed (current price, proof
+  assets, capacity constraints → `intake.*` slots); positioning s3 asks for
+  won-deal notes (the card's LOW-confidence trigger).
+- **Runner pause**: before executing a step with unanswered asks, the run
+  persists its state and goes `awaiting_input` (new status, migration
+  `20260714230000` applied live); the questions render in chat as
+  GapPrompt/ChoiceChips; the queue job finishes cleanly ("paused — waiting
+  for your answer"). Answered slots feed the step's context block.
+- **Resume**: the chat enqueues a resume job (`workflow_run_id` payload)
+  when an answer lands (`onBrainWrite` → `user_stated` write → resume) or
+  when the user taps "Continue without answering" (`skip_awaits` — the run
+  proceeds with the slots honestly absent). Completed steps are NEVER
+  re-executed: variables re-read from the brain (a user_override made while
+  paused flows into later steps), artifact sections restored from
+  `step_state` (now stored per step). Double-resume against a finished run
+  refuses loudly; the chat also debounces one resume per pause.
+- **Surfaces**: WorkflowRunCard shows an amber "waiting for you" state; the
+  thread notice flips to "needs your answer — reply on the question card
+  above" with the continue-anyway button; watcher/discovery treat
+  `awaiting_input` as active, so a paused run survives remounts and pulls
+  you back into its thread like a running one.
+- **Gates:** worker 432 passed / 2 skipped (new: pause at s3 with 2 model
+  calls then resume finishing with exactly 4 more + full 6-section
+  artifact; skip_awaits path; completed-run resume refusal),
+  typecheck/build/eslint clean; root tsc exit 0, build green, lint 64
+  (frozen ceiling).
+
 ### Per-workflow presentation lives in the cards + handoff carries run state (2026-07-14)
 
 Owner direction after watching the live Hormozi run: "design the streaming

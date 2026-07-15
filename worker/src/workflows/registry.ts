@@ -36,12 +36,27 @@ const presentationSchema = z.strictObject({
   props: z.record(z.string(), z.unknown()).optional(),
 });
 
+/**
+ * Interactive steps: the card declares what to ASK the user before this step
+ * runs. The runner pauses the run (`awaiting_input`), emits the question as
+ * a GapPrompt/ChoiceChips, and resumes when the answer lands in the brain as
+ * `user_stated` — or when the user chooses to continue without answering.
+ */
+const awaitInputSchema = z.strictObject({
+  /** Brain path the answer is written to (and read from on resume). */
+  slot: z.string().min(1),
+  question: z.string().min(1),
+  mode: z.enum(["text", "chips"]).optional(),
+  options: z.array(z.string().min(1)).optional(),
+});
+
 const workflowStepSchema = z.strictObject({
   id: z.string().min(1),
   prompt: z.string().min(1),
   reads: z.array(z.string()),
   variables_schema: jsonSchemaObject,
   presentation: z.array(presentationSchema).optional(),
+  await_input: z.array(awaitInputSchema).optional(),
 });
 
 export const workflowCardSchema = z.strictObject({

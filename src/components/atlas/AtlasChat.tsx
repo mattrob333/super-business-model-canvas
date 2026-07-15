@@ -62,6 +62,10 @@ interface ActiveWorkflow {
   threadId: string | null;
   workflowId: string | null;
   title: string;
+  /** The durable workflow_runs row id — needed to resume a paused run. */
+  runRowId: string | null;
+  /** queued | running | awaiting_input (terminal states clear this state). */
+  status: string;
   /** True until the durable workflow_runs row has been seen. */
   optimistic: boolean;
 }
@@ -150,7 +154,7 @@ export function AtlasChat({
       .from<{ id: string; workflow_id: string; thread_id: string | null; status: string }>("workflow_runs")
       .select("id, workflow_id, thread_id, status")
       .eq("account_id", accountId)
-      .in("status", ["queued", "running"])
+      .in("status", ["queued", "running", "awaiting_input"])
       .order("created_at", { ascending: false })
       .limit(1);
     return data?.[0] ?? null;
@@ -372,6 +376,8 @@ export function AtlasChat({
               threadId: parsed.threadId ?? null,
               workflowId: parsed.workflowId,
               title: parsed.title ?? workflowTitle(parsed.workflowId),
+              runRowId: null,
+              status: "queued",
               optimistic: true,
             });
           }
@@ -389,6 +395,8 @@ export function AtlasChat({
         threadId: row.thread_id,
         workflowId: row.workflow_id,
         title: workflowTitle(row.workflow_id),
+        runRowId: row.id,
+        status: row.status,
         optimistic: false,
       });
       if (row.thread_id && !threadIdRef.current) setThreadId(row.thread_id);
@@ -441,11 +449,13 @@ export function AtlasChat({
       const row = await findActiveRun().catch(() => undefined);
       if (cancelled || disposedRef.current) return;
       if (row) {
-        if (current?.optimistic || current?.workflowId !== row.workflow_id) {
+        if (current?.optimistic || current?.workflowId !== row.workflow_id || current?.status !== row.status) {
           setActiveWorkflow({
             threadId: row.thread_id,
             workflowId: row.workflow_id,
             title: workflowTitle(row.workflow_id),
+            runRowId: row.id,
+            status: row.status,
             optimistic: false,
           });
         }
@@ -494,7 +504,7 @@ export function AtlasChat({
         triggeredBy: user?.id ?? null,
         input: { workflow_id: workflow.id, thread_id: thread },
       });
-      setActiveWorkflow({ threadId: thread, workflowId: workflow.id, title: workflow.title, optimistic: true });
+      setActiveWorkflow({ threadId: thread, workflowId: workflow.id, title: workflow.title, runRowId: null, status: "queued", optimistic: true });
       if (fullPageOnWorkflow) {
         // The dock is too small for a live run — hand the thread AND the
         // optimistic run state to the full War Room.
@@ -518,6 +528,50 @@ export function AtlasChat({
       setSending(false);
     }
   }, [accountId, agentProfileId, ensureThread, fullPageOnWorkflow, loadMessages, navigate, sending, user]);
+
+  // Resume a run paused for input. Called when a GapPrompt/ChoiceChips answer
+  // lands in the brain (resume with the answers) or when the user chooses to
+  // continue without answering (skip=true — the run proceeds with the slots
+  // honestly absent). One resume per pause: the guard clears when the watcher
+  // sees the status leave awaiting_input.
+  const resumingRef = useRef(false);
+  useEffect(() => {
+    if (activeWorkflow?.status !== "awaiting_input") resumingRef.current = false;
+  }, [activeWorkflow?.status]);
+
+  const resumeWorkflow = useCallback(async (skip: boolean) => {
+    const current = activeWorkflowRef.current;
+    if (!current || current.status !== "awaiting_input" || !current.runRowId || !current.workflowId) return;
+    if (resumingRef.current) return;
+    resumingRef.current = true;
+    try {
+      await getAgentRuntime(accountId).startRun({
+        agentProfileId,
+        accountId,
+        runType: "workflow_run",
+        triggerType: "manual",
+        triggeredBy: user?.id ?? null,
+        input: {
+          workflow_id: current.workflowId,
+          workflow_run_id: current.runRowId,
+          thread_id: current.threadId,
+          ...(skip ? { skip_awaits: true } : {}),
+        },
+      });
+    } catch (error) {
+      resumingRef.current = false;
+      setChatError(
+        error instanceof Error
+          ? `Couldn't resume the workflow: ${error.message}. Try again in a moment.`
+          : "Couldn't reach the agent runtime. Try again in a moment.",
+      );
+    }
+  }, [accountId, agentProfileId, user]);
+
+  // A brain write while a run waits for input IS the answer — resume.
+  const handleBrainWrite = useCallback(() => {
+    if (activeWorkflowRef.current?.status === "awaiting_input") void resumeWorkflow(false);
+  }, [resumeWorkflow]);
 
   const lastMessage = messages[messages.length - 1];
   // A pending workflow is not an unanswered message — the run card (or the
@@ -716,7 +770,7 @@ export function AtlasChat({
               if (message.kind === "a2ui") {
                 const surface = [...surfaces.values()].find((candidate) => candidate.anchorRowId === message.id);
                 if (!surface) return null;
-                return <A2uiSurface key={message.id} surface={surface} accountId={accountId} />;
+                return <A2uiSurface key={message.id} surface={surface} accountId={accountId} onBrainWrite={handleBrainWrite} />;
               }
               return <AtlasMessage key={message.id} message={message} />;
             })}
@@ -728,12 +782,28 @@ export function AtlasChat({
             )}
             {activeWorkflow && (
               activeWorkflow.threadId === threadId ? (
-                <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs" role="status">
-                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
-                  <span className="min-w-0">
-                    The {activeWorkflow.title} workflow is running — step cards land here as they finish.
-                  </span>
-                </div>
+                activeWorkflow.status === "awaiting_input" ? (
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs" role="status">
+                    <span className="min-w-0">
+                      The {activeWorkflow.title} workflow needs your answer — reply on the question card above.
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 shrink-0 text-xs"
+                      onClick={() => void resumeWorkflow(true)}
+                    >
+                      Continue without answering
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs" role="status">
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+                    <span className="min-w-0">
+                      The {activeWorkflow.title} workflow is running — step cards land here as they finish.
+                    </span>
+                  </div>
+                )
               ) : (
                 <div className="flex items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
                   <span className="flex min-w-0 items-center gap-2">
