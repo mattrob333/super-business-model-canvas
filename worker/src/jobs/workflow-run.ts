@@ -83,6 +83,9 @@ export class WorkflowRunHandler {
     const workflowId = readString(payload.workflow_id ?? payload.workflowId);
     if (!workflowId) throw new Error("workflow_run requires workflow_id");
     const threadId = readString(payload.thread_id ?? payload.threadId) ?? null;
+    // Resume flag: the user chose to continue without answering the step's
+    // questions — proceed, leaving the unanswered slots honestly absent.
+    const skipAwaits = payload.skip_awaits === true;
 
     const registry = this.deps.registry ?? await registryAtBoot;
     const card = registry.get(workflowId);
@@ -91,7 +94,7 @@ export class WorkflowRunHandler {
 
     const runId = await this.ensureWorkflowRun(job, card, threadId, readString(payload.workflow_run_id ?? payload.workflowRunId));
     try {
-      await this.execute(job, runId, card, threadId);
+      await this.execute(job, runId, card, threadId, skipAwaits);
     } catch (error) {
       const message = humanError(error);
       await this.failWorkflowRun(job.account_id, runId, message);
@@ -103,13 +106,23 @@ export class WorkflowRunHandler {
     }
   }
 
-  private async execute(job: AgentJob, runId: string, card: LoadedWorkflowCard, threadId: string | null): Promise<void> {
+  private async execute(job: AgentJob, runId: string, card: LoadedWorkflowCard, threadId: string | null, skipAwaits = false): Promise<void> {
     const scope = await loadCompanyScope(this.deps.client, job.account_id);
     if (!scope.activeContextId) {
       throw new Error("This workflow needs an analyzed company first. Add a website or founder document, then retry.");
     }
 
     const route = await this.loadModelRoute(job.account_id);
+    // Resume support: a run paused for input carries its finished steps in
+    // step_state (variables written + the artifact section). Completed steps
+    // are skipped, their outputs rebuilt from the durable record.
+    const { data: existingRun } = await this.deps.client
+      .from("workflow_runs")
+      .select("step_state")
+      .eq("id", runId)
+      .eq("account_id", job.account_id)
+      .maybeSingle();
+    const priorState = asRecord(existingRun?.step_state);
     await this.markRunning(job, runId, card, route);
 
     const canvasRows = await readVariables(this.deps.client, job.account_id, { prefix: "canvas." });
@@ -135,6 +148,10 @@ export class WorkflowRunHandler {
     const consumed = new Set(initialInputs.map((variable) => variable.path));
     const artifactSections: string[] = [];
     const stepState: Record<string, unknown> = {};
+    for (const [stepId, entry] of Object.entries(priorState)) {
+      const record = asRecord(entry);
+      if (record.status === "completed") stepState[stepId] = record;
+    }
     let totals = { tokensIn: 0, tokensOut: 0, costUsd: 0 };
 
     // AT-3: one A2UI surface per run. The WorkflowRunCard binds to /run and
@@ -167,6 +184,51 @@ export class WorkflowRunHandler {
 
     for (let index = 0; index < card.steps.length; index += 1) {
       const step = card.steps[index];
+
+      // Resume: a step this run already finished is rebuilt from the durable
+      // record — variables re-read from the brain (freshest values win, so a
+      // user_override made while paused flows into later steps), artifact
+      // section restored — and never re-executed.
+      const completedEntry = asRecord(stepState[step.id]);
+      if (completedEntry.status === "completed") {
+        const paths = Array.isArray(completedEntry.variables)
+          ? completedEntry.variables.filter((path): path is string => typeof path === "string")
+          : [];
+        if (paths.length > 0) {
+          const restored = await readVariables(this.deps.client, job.account_id, { paths });
+          for (const variable of restored) priorVariables[variable.path] = variable.value;
+        }
+        if (typeof completedEntry.artifact_section === "string") {
+          artifactSections.push(completedEntry.artifact_section);
+        }
+        await this.emit(job, threadId, runId, [
+          updateDataModel(surfaceId, `/run/steps/${index}/status`, "completed"),
+        ]);
+        continue;
+      }
+
+      // Interactive step: the card asks the user BEFORE this step runs. If
+      // any asked slot is still empty (and the user hasn't chosen to skip),
+      // pause the run — the questions render in chat, the answers land as
+      // user_stated, and the resume job picks up exactly here.
+      const asks = step.await_input ?? [];
+      const askPaths = asks.map((ask) => ask.slot);
+      if (askPaths.length > 0) {
+        const answered = await readVariables(this.deps.client, job.account_id, { paths: askPaths });
+        for (const variable of answered) {
+          byPath.set(variable.path, variable);
+          consumed.add(variable.path);
+        }
+        if (!skipAwaits) {
+          const answeredPaths = new Set(answered.filter((v) => hasValue(v.value)).map((v) => v.path));
+          const missingAsks = asks.filter((ask) => !answeredPaths.has(ask.slot));
+          if (missingAsks.length > 0) {
+            await this.pauseForInput(job, runId, card, threadId, step.id, index, missingAsks, stepState);
+            return;
+          }
+        }
+      }
+
       const declaredReads = brainReads(step.reads);
       if (declaredReads.length > 0) {
         const refreshed = await readVariables(this.deps.client, job.account_id, { paths: declaredReads });
@@ -177,11 +239,12 @@ export class WorkflowRunHandler {
       }
 
       await this.updateWorkflowRun(job.account_id, runId, {
+        status: "running",
         current_step: step.id,
         step_state: { ...stepState, [step.id]: { status: "running", attempts: 0 } },
       });
 
-      const prompt = buildStepPrompt(card, step, index, snapshot.snapshot, byPath, priorVariables, missing);
+      const prompt = buildStepPrompt(card, step, index, snapshot.snapshot, byPath, priorVariables, missing, askPaths);
       const execution = await this.runValidatedStep(job, card, step, route, prompt);
       totals = addUsage(totals, execution.result);
 
@@ -213,6 +276,9 @@ export class WorkflowRunHandler {
         attempts: execution.attempts,
         variables: writes.map((write) => write.path),
         contradictions: writeResult.contradictions.map((conflict) => conflict.contradictionPath),
+        // Stored so a paused-then-resumed run reassembles the full report
+        // without re-executing finished steps.
+        artifact_section: execution.parsed.artifactSection,
       };
       await this.updateWorkflowRun(job.account_id, runId, {
         current_step: step.id,
@@ -337,6 +403,58 @@ export class WorkflowRunHandler {
     }
   }
 
+  /**
+   * Pause the run for user input: persist state, mark the durable run
+   * `awaiting_input`, render the questions, and finish this job cleanly.
+   * The resume job (enqueued by the chat when answers land) picks up here.
+   */
+  private async pauseForInput(
+    job: AgentJob,
+    runId: string,
+    card: LoadedWorkflowCard,
+    threadId: string | null,
+    stepId: string,
+    stepIndex: number,
+    missingAsks: Array<{ slot: string; question: string; mode?: "text" | "chips"; options?: string[] }>,
+    stepState: Record<string, unknown>,
+  ): Promise<void> {
+    await this.updateWorkflowRun(job.account_id, runId, {
+      status: "awaiting_input",
+      current_step: stepId,
+      step_state: stepState,
+    });
+    const surfaceId = surfaceIdForRun(runId);
+    await this.emit(job, threadId, runId, [
+      updateComponents(surfaceId, missingAsks.map((ask): A2uiComponent => ({
+        id: `ask-${ask.slot}`,
+        component: {
+          [ask.mode === "chips" && (ask.options?.length ?? 0) > 0 ? "ChoiceChips" : "GapPrompt"]: {
+            slot: ask.slot,
+            question: ask.question,
+            mode: ask.mode ?? "text",
+            ...(ask.options ? { options: ask.options } : {}),
+          },
+        },
+      }))),
+      updateDataModel(surfaceId, "/run/status", "awaiting_input"),
+      updateDataModel(surfaceId, `/run/steps/${stepIndex}/status`, "awaiting"),
+    ]);
+    if (job.agent_run_id) {
+      const { error } = await this.deps.client
+        .from("agent_runs")
+        .update({
+          status: "completed",
+          summary: `${card.name} paused — waiting for your answer`,
+          output: { workflow_id: card.id, workflow_run_id: runId, awaiting_input: missingAsks.map((ask) => ask.slot) },
+          completed_at: new Date().toISOString(),
+          error: null,
+        })
+        .eq("id", job.agent_run_id)
+        .eq("account_id", job.account_id);
+      if (error) throw new Error(`Failed to mark paused workflow job: ${error.message}`);
+    }
+  }
+
   /** Non-fatal by contract — chat emission never fails the run (a2ui.ts logs). */
   private async emit(job: AgentJob, threadId: string | null, runId: string, messages: A2uiMessage[]): Promise<void> {
     if (!threadId) return;
@@ -427,12 +545,15 @@ export class WorkflowRunHandler {
     if (requestedId) {
       const { data, error } = await this.deps.client
         .from("workflow_runs")
-        .select("id, workflow_id")
+        .select("id, workflow_id, status")
         .eq("id", requestedId)
         .eq("account_id", job.account_id)
         .maybeSingle();
       if (error) throw new Error(`Failed to load workflow run: ${error.message}`);
       if (!data || data.workflow_id !== card.id) throw new Error("workflow_run_id does not match this account and workflow");
+      // Double-resume guard: a duplicate resume against a finished run would
+      // re-execute remaining steps and write a duplicate artifact.
+      if (data.status === "completed") throw new Error("This workflow run already completed — nothing to resume.");
       return requestedId;
     }
 
@@ -590,10 +711,12 @@ function buildStepPrompt(
   inputs: Map<string, BrainVariable>,
   priorVariables: Record<string, unknown>,
   missing: string[],
+  askPaths: string[] = [],
 ): string {
   const declared = unique([
     ...[...card.inputs_required, ...card.inputs_optional].map(inputBrainPath).filter(isString),
     ...brainReads(step.reads),
+    ...askPaths,
   ]);
   const values = Object.fromEntries(declared.flatMap((path) => {
     const variable = inputs.get(path);

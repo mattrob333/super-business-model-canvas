@@ -80,6 +80,12 @@ class WorkflowFakeClient {
       variable("canvas.value_propositions", [{ text: "Turns strategy into an operating plan", confidence: "high" }]),
       variable("canvas.revenue_streams", [{ text: "Annual subscription", confidence: "medium" }]),
       variable("canvas.channels", [{ text: "Founder-led sales", confidence: "medium" }]),
+      // Interactive-step answers pre-seeded: the plain E2E tests exercise the
+      // no-pause path; the pause/resume tests remove these deliberately.
+      variable("intake.won_deal_notes", "They chose us for speed and accountability"),
+      variable("intake.current_price", "$1,500/mo retainer"),
+      variable("intake.proof_assets", "Two pilot case studies"),
+      variable("intake.capacity_constraints", "One delivery lead"),
     ];
     this.tables = {
       business_context_versions: [{
@@ -323,6 +329,69 @@ describe("workflow_run headless interpreter", () => {
     (job.payload as Record<string, unknown>).thread_id = "thread-1";
     await new WorkflowRunHandler({ client: refusing.asSupabase(), runner: new SchemaScriptedRunner() }).handle(job);
     expect(refusing.tables.workflow_runs.at(-1)).toMatchObject({ status: "completed" });
+  });
+
+  it("pauses at an await_input step, asks in chat, and resumes without re-running finished steps", async () => {
+    const client = new WorkflowFakeClient();
+    client.tables.brain_variables = client.tables.brain_variables.filter(
+      (row) => row.path !== "intake.won_deal_notes",
+    );
+    const runner = new SchemaScriptedRunner();
+    const handler = new WorkflowRunHandler({ client: client.asSupabase(), runner });
+    const job = workflowJob("positioning-sprint");
+    (job.payload as Record<string, unknown>).thread_id = "thread-1";
+
+    // Steps s1–s2 execute, then s3's ask (won_deal_notes) pauses the run.
+    await handler.handle(job);
+    expect(runner.requests).toHaveLength(2);
+    expect(client.tables.workflow_runs[0]).toMatchObject({ status: "awaiting_input", current_step: "s3-value" });
+    const rendered = JSON.stringify(client.tables.workspace_messages.map((row) => row.content));
+    expect(rendered).toContain("ask-intake.won_deal_notes");
+    expect(rendered).toContain("awaiting_input");
+    expect(client.tables.agent_runs.find((run) => run.id === job.agent_run_id)).toMatchObject({
+      status: "completed",
+      summary: expect.stringContaining("paused"),
+    });
+
+    // The user answers → the chat enqueues a resume job with the run id.
+    client.tables.brain_variables.push(variable("intake.won_deal_notes", "Speed and one throat to choke"));
+    const resume = workflowJob("positioning-sprint");
+    resume.agent_run_id = "agent-resume";
+    client.tables.agent_runs.push({ id: "agent-resume", account_id: "account-1" });
+    (resume.payload as Record<string, unknown>).thread_id = "thread-1";
+    (resume.payload as Record<string, unknown>).workflow_run_id = client.tables.workflow_runs[0].id;
+    await handler.handle(resume);
+
+    // s1–s2 were NOT re-executed: 2 original + 4 remaining = 6 model calls.
+    expect(runner.requests).toHaveLength(6);
+    expect(client.tables.workflow_runs).toHaveLength(1);
+    expect(client.tables.workflow_runs[0]).toMatchObject({ status: "completed" });
+    // The final artifact carries every section, including the pre-pause ones.
+    const body = String(client.tables.workflow_artifacts[0].body_md);
+    expect((body.match(/# ARTIFACT-CALL-/g) ?? []).length).toBe(6);
+  });
+
+  it("skip_awaits resumes past unanswered questions and blocks resuming a completed run", async () => {
+    const client = new WorkflowFakeClient();
+    client.tables.brain_variables = client.tables.brain_variables.filter(
+      (row) => row.path !== "intake.won_deal_notes",
+    );
+    const runner = new SchemaScriptedRunner();
+    const handler = new WorkflowRunHandler({ client: client.asSupabase(), runner });
+    const job = workflowJob("positioning-sprint");
+    await handler.handle(job);
+    expect(client.tables.workflow_runs[0]).toMatchObject({ status: "awaiting_input" });
+
+    const resume = workflowJob("positioning-sprint");
+    resume.agent_run_id = "agent-resume-skip";
+    client.tables.agent_runs.push({ id: "agent-resume-skip", account_id: "account-1" });
+    (resume.payload as Record<string, unknown>).workflow_run_id = client.tables.workflow_runs[0].id;
+    (resume.payload as Record<string, unknown>).skip_awaits = true;
+    await handler.handle(resume);
+    expect(client.tables.workflow_runs[0]).toMatchObject({ status: "completed" });
+
+    // A duplicate resume against the finished run must refuse loudly.
+    await expect(handler.handle(resume)).rejects.toThrow("already completed");
   });
 
   it("persists a step's declared contradictions[] block as a contradiction.* record", async () => {

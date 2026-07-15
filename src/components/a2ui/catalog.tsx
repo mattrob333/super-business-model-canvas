@@ -378,7 +378,12 @@ const WorkflowRunCard: CatalogRenderer = (props, ctx) => {
     <div className="rounded-md border border-border bg-card px-3 py-2.5">
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-sm font-semibold">{name}</p>
-        {status === "running" ? (
+        {status === "awaiting_input" ? (
+          <span className="flex shrink-0 items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
+            <CircleDashed className="h-3 w-3" />
+            waiting for you
+          </span>
+        ) : status === "running" ? (
           <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
             step {Math.min(done + 1, Math.max(steps.length, 1))} of {steps.length || "…"}

@@ -3509,7 +3509,7 @@ create table if not exists public.workflow_runs (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null references public.accounts(id) on delete cascade,
   workflow_id text not null,
-  status text not null check (status in ('queued', 'running', 'completed', 'failed')),
+  status text not null check (status in ('queued', 'running', 'awaiting_input', 'completed', 'failed')),
   current_step text,
   step_state jsonb not null default '{}'::jsonb,
   artifact_id uuid,
@@ -3526,7 +3526,7 @@ create index if not exists workflow_runs_agent_run_idx
   on public.workflow_runs(agent_run_id) where agent_run_id is not null;
 create index if not exists workflow_runs_active_idx
   on public.workflow_runs(account_id, created_at desc)
-  where status in ('queued', 'running');
+  where status in ('queued', 'running', 'awaiting_input');
 
 create table if not exists public.workflow_artifacts (
   id uuid primary key default gen_random_uuid(),

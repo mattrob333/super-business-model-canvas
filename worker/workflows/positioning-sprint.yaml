@@ -127,6 +127,10 @@ steps:
         "confidence": "high|medium|low", "confidence_gaps": [""] }
     reads: ["canvas_snapshot", "s2-attributes", "canvas.proof_assets", "canvas.won_deal_notes"]
     variables_schema: {"type":"object","required":["value_themes","confidence","confidence_gaps"],"properties":{"value_themes":{"type":"array"},"confidence":{"enum":["high","medium","low"]},"confidence_gaps":{"type":"array"}}}
+    await_input:
+      - slot: intake.won_deal_notes
+        question: "Why did your best customers actually choose you? Paste any won-deal notes or the real reasons you heard - or continue without and I'll flag the themes as unproven."
+        mode: text
     presentation:
       - component: ValueThemeCard
         bind: value_themes

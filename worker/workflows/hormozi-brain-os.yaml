@@ -39,6 +39,16 @@ steps:
       2. VARIABLES — a fenced JSON object matching this step schema exactly; no prose inside.
     reads: ["canvas_snapshot", "canvas.customer_segments", "canvas.value_proposition", "canvas.revenue_streams", "canvas.channels"]
     variables_schema: {"type":"object","required":["market_fit"],"properties":{"market_fit":{"type":"object","required":["massive_pain","purchasing_power","easy_to_target","growing","verdict"],"properties":{"massive_pain":{"type":"object"},"purchasing_power":{"type":"object"},"easy_to_target":{"type":"object"},"growing":{"type":"object"},"verdict":{"enum":["GREEN","YELLOW","RED"]}}}}}
+    await_input:
+      - slot: intake.current_price
+        question: "Before we build offers: what do you charge today, and how (monthly, per project, retainer)?"
+        mode: text
+      - slot: intake.proof_assets
+        question: "What proof do you have on hand - case studies, testimonials, pilot results, stats? List everything, even thin stuff."
+        mode: text
+      - slot: intake.capacity_constraints
+        question: "What caps your capacity to deliver or scale right now (people, hours, compliance, anything)?"
+        mode: text
   - id: 01-value-equation
     prompt: |
       You are building a Grand Slam Offer using Hormozi's Value Equation.
